@@ -371,7 +371,30 @@ app.post('/api/ai/transcribe', async (req, res) => {
       },
     });
 
-    res.json({ text: response.text });
+    // Native audio/transcription models return the transcript in
+    // part.audioTranscription (a non-text part), which response.text ignores.
+    const parts = response.candidates?.[0]?.content?.parts ?? [];
+
+    const transcriptionText = parts
+      .map((part) => part.audioTranscription?.text)
+      .filter((t): t is string => Boolean(t && t.trim()))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const plainText = parts
+      .filter((part) => typeof part.text === 'string' && !part.thought)
+      .map((part) => part.text)
+      .join('')
+      .trim();
+
+    const text = transcriptionText || plainText;
+
+    if (!text) {
+      return res.status(500).json({ error: 'No transcription text was returned by the model' });
+    }
+
+    res.json({ text });
   } catch (err: any) {
     console.error('Transcription error:', err);
     res.status(500).json({ error: err.message || 'Failed to transcribe audio' });
