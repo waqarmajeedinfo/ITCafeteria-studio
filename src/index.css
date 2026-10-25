@@ -1,1 +1,18 @@
 @import "tailwindcss";
+
+/* Deep navy shell with soft accent glows instead of a flat black background. */
+.app-shell-bg {
+  background-color: #070b16;
+  background-image:
+    radial-gradient(900px 520px at 8% -10%, rgba(34, 211, 238, 0.13), transparent 62%),
+    radial-gradient(820px 520px at 102% 2%, rgba(99, 102, 241, 0.14), transparent 58%),
+    radial-gradient(760px 540px at 48% 112%, rgba(217, 70, 239, 0.08), transparent 62%);
+  background-attachment: fixed;
+}
+
+/* Readability floor: compact 9-10px utility labels render at 11px. */
+.text-\[9px\],
+.text-\[10px\] {
+  font-size: 11px;
+  line-height: 1.45;
+}
