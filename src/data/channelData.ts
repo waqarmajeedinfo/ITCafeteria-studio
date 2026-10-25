@@ -629,7 +629,8 @@ const BEAUTY_CATEGORIES: ChannelCategory[] = [
   { id: 6, name: "Self-Grooming & Personal Care", playlist: "Self-Grooming & Personal Care" },
   { id: 7, name: "Beauty Hacks & Quick Tips", playlist: "Beauty Hacks & Quick Tips" },
   { id: 8, name: "Beauty Products & Reviews", playlist: "Beauty Products & Reviews" },
-  { id: 9, name: "Beauty Looks & Trends", playlist: "Beauty Looks & Trends" }
+  { id: 9, name: "Beauty Looks & Trends", playlist: "Beauty Looks & Trends" },
+  { id: 10, name: "Custom Search", playlist: "Digital Growth" }
 ];
 
 export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfile> = {
