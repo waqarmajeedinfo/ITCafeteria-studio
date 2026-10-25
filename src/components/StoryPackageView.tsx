@@ -3,10 +3,14 @@ import {
   Check,
   Copy,
   Database,
+  FileText,
   Film,
   Image as ImageIcon,
   Layers,
-  Sparkles
+  MessageSquare,
+  Sparkles,
+  Tag,
+  Youtube
 } from 'lucide-react';
 import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
 import { StoryThumbnailPanel } from './StoryThumbnailPanel';
@@ -191,7 +195,7 @@ export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story })
         {story.scenes.map((scene) => (
           <div
             key={scene.num}
-            className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 sm:p-5 hover:border-slate-700 transition-colors"
+            className="bg-gradient-to-br from-slate-950/95 via-slate-950/85 to-slate-900/60 border border-slate-800/80 rounded-xl p-4 sm:p-5 shadow-[0_10px_30px_rgba(2,6,23,0.25)] hover:border-cyan-500/40 transition-colors"
           >
             <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -256,42 +260,50 @@ export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story })
         </h4>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl space-y-1">
-            <span className="text-[10px] font-semibold text-slate-400 uppercase">Item 1: YouTube Title + Hashtags</span>
-            <p className="text-white font-medium">{story.title}</p>
-            <p className="text-cyan-400 font-mono text-[10px]">{story.hashtags.join(' ')}</p>
-          </div>
-
-          <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl space-y-1">
-            <span className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1">
-              <ImageIcon className="w-3 h-3" /> Item 5: Thumbnail
+          <div className="bg-cyan-950/20 border border-cyan-500/30 p-4 rounded-xl space-y-1.5">
+            <span className="text-[11px] font-semibold text-cyan-300 uppercase flex items-center gap-1.5">
+              <Youtube className="w-3.5 h-3.5" /> Item 1: YouTube Title + Hashtags
             </span>
-            <p className="text-amber-300 font-semibold">{story.thumbnailHeadline}</p>
-            <p className="text-slate-400 text-[10px]">Sub-banner: {story.thumbnailSubBadge || '—'} • 9:16 • Master v3.45</p>
+            <p className="text-white font-medium text-sm leading-snug">{story.title}</p>
+            <p className="text-cyan-300 font-mono text-xs">{story.hashtags.join(' ')}</p>
           </div>
 
-          <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl space-y-1">
-            <span className="text-[10px] font-semibold text-slate-400 uppercase">Item 3: YouTube Tags</span>
-            <p className="text-slate-300 font-mono text-[10px] leading-relaxed">{story.tags.join(', ')}</p>
+          <div className="bg-amber-950/20 border border-amber-500/30 p-4 rounded-xl space-y-1.5">
+            <span className="text-[11px] font-semibold text-amber-300 uppercase flex items-center gap-1.5">
+              <ImageIcon className="w-3.5 h-3.5" /> Item 5: Thumbnail
+            </span>
+            <p className="text-amber-200 font-semibold text-sm leading-snug">{story.thumbnailHeadline}</p>
+            <p className="text-amber-100/70 text-xs">Sub-banner: {story.thumbnailSubBadge || '—'} • 9:16 • Master v3.45</p>
           </div>
 
-          <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl space-y-1">
-            <span className="text-[10px] font-semibold text-slate-400 uppercase">Item 4: TikTok Block</span>
-            <p className="text-slate-200 text-[11px]">{story.tiktokCaption}</p>
+          <div className="bg-indigo-950/20 border border-indigo-500/30 p-4 rounded-xl space-y-1.5">
+            <span className="text-[11px] font-semibold text-indigo-300 uppercase flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5" /> Item 3: YouTube Tags
+            </span>
+            <p className="text-indigo-100/85 font-mono text-xs leading-relaxed">{story.tags.join(', ')}</p>
+          </div>
+
+          <div className="bg-fuchsia-950/20 border border-fuchsia-500/30 p-4 rounded-xl space-y-1.5">
+            <span className="text-[11px] font-semibold text-fuchsia-300 uppercase flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5" /> Item 4: TikTok Block
+            </span>
+            <p className="text-fuchsia-100/90 text-[13px] leading-relaxed">{story.tiktokCaption}</p>
           </div>
         </div>
 
-        <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl space-y-1.5">
-          <span className="text-[10px] font-semibold text-slate-400 uppercase">Item 2: Description + Practical Steps</span>
-          <p className="text-slate-300 text-[11px] whitespace-pre-wrap leading-relaxed">{story.description}</p>
+        <div className="bg-blue-950/20 border border-blue-500/30 p-4 rounded-xl space-y-2">
+          <span className="text-[11px] font-semibold text-blue-300 uppercase flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5" /> Item 2: Description + Practical Steps
+          </span>
+          <p className="text-slate-200 text-[13px] whitespace-pre-wrap leading-relaxed">{story.description}</p>
         </div>
 
-        <div className="bg-gradient-to-r from-blue-950/40 to-slate-950 border border-blue-500/30 p-3.5 rounded-xl space-y-1.5">
-          <span className="font-bold text-cyan-300 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-            <Database className="w-3.5 h-3.5 text-cyan-400" />
+        <div className="bg-gradient-to-r from-violet-950/40 via-slate-950/80 to-slate-950 border border-violet-500/30 p-4 rounded-xl space-y-2">
+          <span className="font-bold text-violet-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+            <Database className="w-3.5 h-3.5 text-violet-400" />
             Memory Block (v3.41)
           </span>
-          <p className="text-slate-300 font-mono text-[10px] whitespace-pre-wrap leading-relaxed">
+          <p className="text-slate-300 font-mono text-xs whitespace-pre-wrap leading-relaxed">
             {story.memoryBlock}
           </p>
         </div>
