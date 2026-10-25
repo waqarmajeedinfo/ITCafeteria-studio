@@ -316,10 +316,12 @@ app.post('/api/ai/generate-image', async (req, res) => {
 
     const parts: any[] = [];
     if (base64InputImage) {
+      const rawImage = String(base64InputImage);
+      const dataUrlMatch = rawImage.match(/^data:(image\/[\w.+-]+);base64,(.+)$/);
       parts.push({
         inlineData: {
-          mimeType: 'image/png',
-          data: base64InputImage.replace(/^data:image\/\w+;base64,/, ''),
+          mimeType: dataUrlMatch?.[1] || 'image/png',
+          data: dataUrlMatch?.[2] || rawImage,
         },
       });
     }
@@ -918,6 +920,7 @@ Return STRICT valid JSON only, no markdown fences:
       line2: thumbnailLine2,
       subBanner: thumbnailSubBadge,
       hologram: thumbnailHologram,
+      characterTag: tag,
     });
     const thumbnailHeadline = [thumbnailLine1, thumbnailLine2].filter(Boolean).join(' ').slice(0, 40);
 
