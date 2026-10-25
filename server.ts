@@ -50,6 +50,67 @@ const getAiClient = () => {
   });
 };
 
+const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string) =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timeout — ${Math.round(ms / 1000)}s mein jawab nahi aaya`)),
+      ms
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+
+function extractJsonObject(raw: string): any | null {
+  const text = String(raw || '')
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '');
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Neeche balanced-brace extraction try hoti hai.
+  }
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === '{') depth += 1;
+    else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          return JSON.parse(text.slice(start, index + 1));
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'IT Cafeteria Studio', uptime: process.uptime() });
 });
@@ -64,6 +125,14 @@ app.post('/api/ai/chat', async (req, res) => {
       ? 'gemini-4-argon' 
       : model === 'gemini-3.1-flash-lite' 
       ? 'gemini-3.1-flash-lite' 
+      : model === 'gemini-3.6-flash'
+      ? 'gemini-3.6-flash'
+      : model === 'gemini-3.5-flash'
+      ? 'gemini-3.5-flash'
+      : model === 'gemini-3-flash-preview'
+      ? 'gemini-3-flash-preview'
+      : model === 'gemini-3.5-flash-lite'
+      ? 'gemini-3.5-flash-lite'
       : 'gemini-3.8-flash';
 
     // Format contents for multi-turn history
@@ -508,6 +577,330 @@ Return STRICT valid JSON only with NO markdown fences, matching this structure:
       tiktokCaption: `Check out this crazy trick! 🔥 #tech #techtok #pakistan #shorts`,
       episodicBridge: `Agli episode mein hum is tool ka next level automation cover karenge!`
     });
+  }
+});
+
+// 8. Agent Trigger — fresh story ideas (duplicate-aware)
+app.post('/api/ai/story-ideas', async (req, res) => {
+  try {
+    const {
+      channelName = 'IT Cafeteria',
+      presenter = 'Waqar Majeed',
+      niche = 'IT & Technology',
+      category = 'General',
+      seedTopic = '',
+      excludeTitles = [],
+      count = 3,
+    } = req.body || {};
+
+    const ai = getAiClient();
+    const safeCount = Math.min(Math.max(Number(count) || 3, 2), 5);
+    const excluded = (Array.isArray(excludeTitles) ? excludeTitles : [])
+      .map((title: any) => String(title || '').trim())
+      .filter(Boolean)
+      .slice(0, 80)
+      .join(' | ');
+
+    const prompt = `You are the story discovery agent for "${channelName}" (${niche}), presenter "${presenter}".
+Category: "${category}".
+Creator ka idea / topic: "${seedTopic || 'koi specific topic nahi — is category ke andar fresh angle chunein'}"
+
+Task: ${safeCount} FRESH YouTube Shorts (vertical 9:16) story ideas generate karein jo is channel par pehle cover nahi hue.
+Rules:
+- Title clickable aur short ho, maximum 65 characters. Roman Urdu + English tech keywords mix.
+- Har idea excluded titles se clearly DIFFERENT ho, sirf words badal kar wahi topic na dohraye.
+- Hook Roman Urdu mein, first 1.5 seconds ke liye pattern interrupt (no greeting).
+- "angle" ek line mein unique story angle bataye.
+- "points" mein 3-4 concrete points likhein jo video cover karegi.
+- "whyFresh" bataye ke yeh duplicate kyun nahi hai.
+- Channel IT/tech ho to practical tech tutorial, Beauty ho to beauty-specific idea ho.
+- Generic "is video mein" ya "aaj hum seekhenge" titles bilkul nahi.
+
+Excluded already-published / remembered titles (do NOT reuse or paraphrase):
+${excluded || '(none)'}
+
+Return STRICT raw JSON only, no markdown fences:
+{
+  "ideas": [
+    { "title": "...", "hook": "...", "angle": "...", "points": "...", "whyFresh": "..." }
+  ]
+}`;
+
+    const ideaAttempts = [
+      { model: 'gemini-3.5-flash-lite', timeoutMs: 45000, thinking: false },
+      { model: 'gemini-3-flash-preview', timeoutMs: 45000, thinking: true },
+      { model: 'gemini-3.6-flash', timeoutMs: 45000, thinking: true },
+    ];
+    let data: any = null;
+    let lastError: any = null;
+
+    for (let attemptIndex = 0; attemptIndex < ideaAttempts.length; attemptIndex += 1) {
+      const attempt = ideaAttempts[attemptIndex];
+      try {
+        const response = await withTimeout(
+          ai.models.generateContent({
+            model: attempt.model,
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              temperature: 0.9,
+              maxOutputTokens: 2048,
+              ...(attempt.thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+            },
+          }),
+          attempt.timeoutMs,
+          'Story ideas'
+        );
+
+        const parsed = extractJsonObject(response.text || '');
+        if (!parsed || !Array.isArray(parsed.ideas) || !parsed.ideas.length) {
+          throw new Error('AI ne valid ideas JSON return nahi kiya');
+        }
+        data = parsed;
+        break;
+      } catch (attemptError: any) {
+        lastError = attemptError;
+        console.error(`Story ideas attempt ${attemptIndex + 1} (${attempt.model}) failed:`, attemptError?.message || attemptError);
+      }
+    }
+
+    if (!data) {
+      throw lastError || new Error('Fresh ideas generate nahi ho sake');
+    }
+
+    const ideas = (Array.isArray(data.ideas) ? data.ideas : [])
+      .filter((idea: any) => idea && String(idea.title || '').trim())
+      .map((idea: any) => ({
+        title: String(idea.title).trim().slice(0, 90),
+        hook: String(idea.hook || '').trim(),
+        angle: String(idea.angle || '').trim(),
+        points: String(idea.points || '').trim(),
+        whyFresh: String(idea.whyFresh || '').trim(),
+      }))
+      .slice(0, safeCount);
+
+    if (!ideas.length) {
+      throw new Error('AI ne koi fresh idea return nahi kiya');
+    }
+
+    res.json({ ideas });
+  } catch (err: any) {
+    console.error('Story ideas error:', err);
+    res.status(500).json({ error: err.message || 'Fresh ideas generate nahi ho sake' });
+  }
+});
+
+// 9. Agent Trigger — full scene-by-scene story package
+app.post('/api/ai/generate-story', async (req, res) => {
+  try {
+    const {
+      channelName = 'IT Cafeteria',
+      presenter = 'Waqar Majeed',
+      niche = 'IT & Technology',
+      category = 'General',
+      playlist = category,
+      tag = '@WM25-1',
+      sceneCount = 10,
+      idea = {},
+      discussionNotes = '',
+      discussionTranscript = [],
+      excludeTitles = [],
+    } = req.body || {};
+
+    const ideaTitle = String(idea.title || '').trim();
+    if (!ideaTitle) {
+      return res.status(400).json({ error: 'Story idea ka title required hai' });
+    }
+
+    const totalScenes = Math.min(Math.max(Number(sceneCount) || 10, 4), 15);
+    const beatGuide = totalScenes <= 4
+      ? 'Hook; Problem + Reveal; Demonstration + Proof; Benefit + Save CTA'
+      : totalScenes <= 7
+      ? 'Hook; Problem; Agitate; Reveal; Demonstration; Proof / Result; Conclusion + Save CTA'
+      : totalScenes <= 10
+      ? 'Hook; Problem; Agitate; Reveal; Demonstrate 1; Demonstrate 2; Proof / Result; Benefit; Curiosity Loop; Conclusion + Save CTA'
+      : 'Hook; Problem; Agitate; Reveal; multiple Demonstration scenes; Proof / Result; Benefit; common mistakes; recap; Curiosity Loop; Conclusion + Save CTA';
+
+    const transcript = (Array.isArray(discussionTranscript) ? discussionTranscript : [])
+      .filter((message: any) => message && String(message.text || '').trim())
+      .slice(-10)
+      .map((message: any) => `${message.role === 'user' ? 'Creator' : 'AI'}: ${String(message.text).trim().slice(0, 600)}`)
+      .join('\n');
+
+    const excluded = (Array.isArray(excludeTitles) ? excludeTitles : [])
+      .map((title: any) => String(title || '').trim())
+      .filter(Boolean)
+      .slice(0, 60)
+      .join(' | ');
+
+    const primaryHashtag = channelName.toLowerCase().includes('beauty') ? '#BeautyHub' : '#ITCafeteria';
+
+    const prompt = `You are the lead story architect for "${channelName}" (${niche}), presenter "${presenter}".
+Create a complete ${totalScenes}-scene vertical YouTube Shorts story package in Roman Urdu (Pakistani Urdu in Latin script), with English tech/beauty keywords where natural.
+
+CREATOR BRIEF
+- Category: "${category}" | Playlist: "${playlist}"
+- Character tag for Flow prompts: "${tag}"
+- Working idea title: "${ideaTitle}"
+- Idea hook direction: "${String(idea.hook || '').trim()}"
+- Unique angle: "${String(idea.angle || '').trim()}"
+- Points to cover: "${String(idea.points || '').trim()}"
+- Discussion notes from creator: "${String(discussionNotes || '').trim() || '(none)'}"
+- Discussion transcript:
+${transcript || '(none)'}
+- Already published titles to avoid: ${excluded || '(none)'}
+- Primary hashtag: ${primaryHashtag}
+
+STORY RULES (strict)
+1. Exactly ${totalScenes} scenes. Beat guide: ${beatGuide}
+2. Every scene is exactly 10 seconds and the spoken "dialogue" must be 22 to 25 Roman Urdu words (2.7 words per second). Count carefully. "words" field must match the actual dialogue word count.
+3. Scene 1 Hook: no greeting, immediate pattern interrupt in the first line. Final scene must be a Save/Follow CTA.
+4. Dialogue must be Roman Urdu in Latin script. No Devanagari. English only for tool names/tech terms. No repeated word or syllable, no filler.
+5. Each "script" is a paste-ready Google Flow prompt for that scene:
+   - Character scenes start with "${tag}" and include: sitting/standing anchor pose (0.5s), studio setting, gesture/visual overlay, voice instruction line ("He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated."), then the exact dialogue in double quotes, then the closing anchor pose.
+   - Screen-demo scenes start with "The camera cuts to a full-screen..." and include ${tag}'s voiceover plus the exact dialogue in quotes.
+   - The dialogue inside script must be word-for-word identical to the "dialogue" field.
+6. The story must follow the creator's idea and discussion notes. Do not drift to an unrelated topic.
+7. Title must NOT be the raw topic sentence. Max 65 characters, curiosity + search keyword. Do not reuse excluded titles.
+8. Description: 2-3 Roman Urdu lines + a "PRACTICAL STEPS / COMMANDS:" block with 3-6 concrete steps when the topic is a tech tutorial. For beauty, give a short step routine instead.
+9. Thumbnail prompt must be a detailed 9:16 vertical image prompt with dark navy/neon-cyan studio style, presenter ${presenter}, 3D headline, sub-badge, hologram, branded mug/laptop, sparkle finish, strong contrast.
+10. seriesPlan: one line teaser for the next episode.
+
+Return STRICT valid JSON only, no markdown fences:
+{
+  "title": "...",
+  "hook": "...",
+  "thumbnailHeadline": "3-4 UPPERCASE WORDS",
+  "thumbnailSubBadge": "2-3 WORDS",
+  "hashtags": ["${primaryHashtag}", "#Shorts", "#..."],
+  "description": "...",
+  "tags": ["keyword1", "keyword2", "... 10-14 tags"],
+  "tiktokCaption": "...",
+  "thumbnailPrompt": "...",
+  "seriesPlan": "...",
+  "scenes": [
+    {
+      "num": 1,
+      "duration": "10s",
+      "purpose": "Hook",
+      "isCTA": false,
+      "words": 24,
+      "visual": "short visual direction",
+      "dialogue": "exact Roman Urdu dialogue",
+      "script": "full paste-ready Flow prompt"
+    }
+  ]
+}`;
+
+    const ai = getAiClient();
+    const storyAttempts = [
+      { model: 'gemini-3-flash-preview', timeoutMs: 80000, thinking: true },
+      { model: 'gemini-3.6-flash', timeoutMs: 50000, thinking: true },
+      { model: 'gemini-3.5-flash', timeoutMs: 80000, thinking: true },
+      { model: 'gemini-3.5-flash-lite', timeoutMs: 80000, thinking: false },
+      { model: 'gemini-3.7-flash', timeoutMs: 60000, thinking: true },
+    ];
+    let data: any = null;
+    let modelUsed = storyAttempts[0].model;
+    let lastError: any = null;
+    const minimumScenes = Math.max(4, totalScenes - 2);
+
+    for (let attemptIndex = 0; attemptIndex < storyAttempts.length; attemptIndex += 1) {
+      const attempt = storyAttempts[attemptIndex];
+      try {
+        const response = await withTimeout(
+          ai.models.generateContent({
+            model: attempt.model,
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              temperature: 0.8,
+              maxOutputTokens: 32768,
+              ...(attempt.thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+            },
+          }),
+          attempt.timeoutMs,
+          'Story generation'
+        );
+
+        const parsed = extractJsonObject(response.text || '');
+        if (!parsed) {
+          throw new Error('AI ne valid JSON return nahi kiya');
+        }
+        const parsedScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+        if (parsedScenes.length < minimumScenes) {
+          throw new Error(`AI ne sirf ${parsedScenes.length} scenes return kiye (${totalScenes} chahiye the)`);
+        }
+
+        data = parsed;
+        modelUsed = attempt.model;
+        break;
+      } catch (attemptError: any) {
+        lastError = attemptError;
+        console.error(`Story generation attempt ${attemptIndex + 1} (${attempt.model}) failed:`, attemptError?.message || attemptError);
+        if (attemptIndex < storyAttempts.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
+      }
+    }
+
+    if (!data) {
+      throw lastError || new Error('Story generate nahi ho saki');
+    }
+
+    const safeString = (value: any) => String(value || '').trim();
+    const rawScenes = Array.isArray(data.scenes) ? data.scenes : [];
+    const scenes = rawScenes
+      .filter((scene: any) => scene && (scene.script || scene.dialogue))
+      .map((scene: any, index: number) => {
+        const dialogue = safeString(scene.dialogue);
+        const visual = safeString(scene.visual);
+        const script = safeString(scene.script) || `${tag} — ${visual}\nHe says: "${dialogue}"`;
+        const computedWords = dialogue ? dialogue.split(/\s+/).filter(Boolean).length : 0;
+        return {
+          num: index + 1,
+          duration: '10s',
+          purpose: safeString(scene.purpose) || `Scene ${index + 1}`,
+          isCTA: Boolean(scene.isCTA) || index === rawScenes.length - 1,
+          words: computedWords || Number(scene.words) || 0,
+          visual,
+          dialogue,
+          script,
+        };
+      });
+
+    if (!scenes.length) {
+      throw new Error('AI ne adhoori story return ki — koi scene nahi mila');
+    }
+
+    const tags = Array.isArray(data.tags)
+      ? data.tags.map((item: any) => safeString(item)).filter(Boolean).slice(0, 16)
+      : [];
+    const hashtags = Array.isArray(data.hashtags)
+      ? data.hashtags.map((item: any) => safeString(item)).filter(Boolean).slice(0, 5)
+      : [primaryHashtag, '#Shorts'];
+    if (!hashtags.length) hashtags.push(primaryHashtag, '#Shorts');
+
+    const title = safeString(data.title) || ideaTitle;
+    const tiktokCaption = safeString(data.tiktokCaption) || `${title} ${hashtags.join(' ')}`;
+
+    res.json({
+      title,
+      hook: safeString(data.hook) || safeString(idea.hook) || 'Reveal',
+      thumbnailHeadline: safeString(data.thumbnailHeadline) || title.split(/\s+/).slice(0, 3).join(' ').toUpperCase(),
+      thumbnailSubBadge: safeString(data.thumbnailSubBadge) || 'MUST TRY',
+      hashtags,
+      description: safeString(data.description),
+      tags,
+      tiktokCaption,
+      thumbnailPrompt: safeString(data.thumbnailPrompt),
+      seriesPlan: safeString(data.seriesPlan),
+      scenes,
+      modelUsed,
+    });
+  } catch (err: any) {
+    console.error('Story generation error:', err);
+    res.status(500).json({ error: err.message || 'Story generate nahi ho saki' });
   }
 });
 
