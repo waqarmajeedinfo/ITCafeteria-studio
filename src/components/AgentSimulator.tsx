@@ -6,7 +6,8 @@ import {
   AlertTriangle,
   Loader2,
   Sparkles,
-  Film
+  Film,
+  RefreshCw
 } from 'lucide-react';
 import { CHANNEL_PROFILES, type ChannelProfile } from '../data/channelData';
 import {
@@ -19,6 +20,55 @@ import { StoryPackageView, type GeneratedStory } from './StoryPackageView';
 
 const LATEST_STORY_KEY = 'itcafeteria_latest_story';
 const MEMORY_RECORDS_KEY = 'itcafeteria_memory_records';
+const ROTATION_STATE_KEY = 'itcafeteria_agent_rotation_v1';
+
+type SavedRotation = Partial<Record<ChannelProfile['id'], { tag: string; categoryId: number }>>;
+
+function loadRotationState(): SavedRotation {
+  try {
+    const raw = localStorage.getItem(ROTATION_STATE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed as SavedRotation : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveRotationForChannel(channelId: ChannelProfile['id'], tag: string, categoryId: number) {
+  try {
+    const state = loadRotationState();
+    state[channelId] = { tag, categoryId };
+    localStorage.setItem(ROTATION_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // Storage unavailable — rotation session ke andar phir bhi chalegi.
+  }
+}
+
+function resolveSavedTag(profile: ChannelProfile, tag?: string) {
+  return tag && profile.tags.some((item) => item.value === tag) ? tag : profile.defaultTag;
+}
+
+function resolveSavedCategory(profile: ChannelProfile, categoryId?: number) {
+  return categoryId && profile.categories.some((item) => item.id === categoryId)
+    ? categoryId
+    : profile.defaultCategoryId;
+}
+
+function getNextTag(profile: ChannelProfile, currentTag: string) {
+  const index = profile.tags.findIndex((item) => item.value === currentTag);
+  if (index === -1) return profile.tags[0]?.value ?? profile.defaultTag;
+  return profile.tags[(index + 1) % profile.tags.length].value;
+}
+
+function getNextCategoryId(profile: ChannelProfile, currentCategoryId: number) {
+  const rotation = profile.rotationCategoryIds.length
+    ? profile.rotationCategoryIds
+    : profile.categories.map((item) => item.id);
+  const index = rotation.indexOf(currentCategoryId);
+  if (index === -1) return rotation[0] ?? profile.defaultCategoryId;
+  return rotation[(index + 1) % rotation.length];
+}
 
 function loadLatestStory(): GeneratedStory | null {
   try {
@@ -47,9 +97,14 @@ function loadMemoryRecords(): AgentMemoryRecord[] {
 }
 
 export const AgentSimulator: React.FC = () => {
+  const [initialRotation] = useState<SavedRotation>(loadRotationState);
   const [draftChannel, setDraftChannel] = useState<ChannelProfile['id']>('itcafeteria');
-  const [draftTag, setDraftTag] = useState<string>(CHANNEL_PROFILES.itcafeteria.defaultTag);
-  const [draftCategory, setDraftCategory] = useState<number>(CHANNEL_PROFILES.itcafeteria.defaultCategoryId);
+  const [draftTag, setDraftTag] = useState<string>(() =>
+    resolveSavedTag(CHANNEL_PROFILES.itcafeteria, initialRotation.itcafeteria?.tag)
+  );
+  const [draftCategory, setDraftCategory] = useState<number>(() =>
+    resolveSavedCategory(CHANNEL_PROFILES.itcafeteria, initialRotation.itcafeteria?.categoryId)
+  );
   const [draftSceneCount, setDraftSceneCount] = useState<number>(CHANNEL_PROFILES.itcafeteria.defaultSceneCount);
   const [appliedSelection, setAppliedSelection] = useState<AgentTriggerSelection | null>(null);
   const [triggerOutcome, setTriggerOutcome] = useState<AgentTriggerOutcome | null>(null);
@@ -59,6 +114,10 @@ export const AgentSimulator: React.FC = () => {
 
   const draftProfile = CHANNEL_PROFILES[draftChannel];
   const draftCategoryMeta = draftProfile.categories.find((cat) => cat.id === draftCategory) ?? draftProfile.categories[0];
+  const nextDraftTagValue = getNextTag(draftProfile, draftTag);
+  const nextDraftTagLabel = draftProfile.tags.find((tag) => tag.value === nextDraftTagValue)?.label ?? nextDraftTagValue;
+  const nextDraftCategoryId = getNextCategoryId(draftProfile, draftCategory);
+  const nextDraftCategoryMeta = draftProfile.categories.find((cat) => cat.id === nextDraftCategoryId) ?? draftProfile.categories[0];
   const appliedProfile = appliedSelection ? CHANNEL_PROFILES[appliedSelection.channelId] : null;
   const appliedCategory = appliedSelection && appliedProfile
     ? appliedProfile.categories.find((cat) => cat.id === appliedSelection.categoryId) ?? appliedProfile.categories[0]
@@ -95,11 +154,16 @@ export const AgentSimulator: React.FC = () => {
     }
   }, [memoryRecords]);
 
+  useEffect(() => {
+    saveRotationForChannel(draftChannel, draftTag, draftCategory);
+  }, [draftChannel, draftTag, draftCategory]);
+
   const handleDraftChannelChange = (channelId: ChannelProfile['id']) => {
     const nextProfile = CHANNEL_PROFILES[channelId];
+    const saved = loadRotationState()[channelId];
     setDraftChannel(channelId);
-    setDraftTag(nextProfile.defaultTag);
-    setDraftCategory(nextProfile.defaultCategoryId);
+    setDraftTag(resolveSavedTag(nextProfile, saved?.tag));
+    setDraftCategory(resolveSavedCategory(nextProfile, saved?.categoryId));
     setDraftSceneCount(nextProfile.defaultSceneCount);
   };
 
@@ -119,6 +183,7 @@ export const AgentSimulator: React.FC = () => {
     if (outcome.status !== 'generated' || !outcome.story) return;
 
     const generatedStory = outcome.story;
+    const outcomeProfile = CHANNEL_PROFILES[outcome.selection.channelId];
     setLatestStory(generatedStory);
 
     setMemoryRecords((records) => {
@@ -128,7 +193,6 @@ export const AgentSimulator: React.FC = () => {
       );
       if (exists) return records;
 
-      const outcomeProfile = CHANNEL_PROFILES[outcome.selection.channelId];
       const outcomeCategory = outcomeProfile.categories.find((cat) => cat.id === outcome.selection.categoryId);
       const idea = generatedStory.idea ?? outcome.idea;
       return [...records, {
@@ -140,6 +204,15 @@ export const AgentSimulator: React.FC = () => {
         source: 'Trigger Flow Memory'
       }].slice(-80);
     });
+
+    const nextTag = getNextTag(outcomeProfile, outcome.selection.tag);
+    const nextCategoryId = getNextCategoryId(outcomeProfile, outcome.selection.categoryId);
+    if (draftChannel === outcome.selection.channelId) {
+      setDraftTag(nextTag);
+      setDraftCategory(nextCategoryId);
+    } else {
+      saveRotationForChannel(outcome.selection.channelId, nextTag, nextCategoryId);
+    }
   };
 
   const decisionTone =
@@ -211,7 +284,12 @@ export const AgentSimulator: React.FC = () => {
 
           {/* Character Tag */}
           <div>
-            <label className="text-slate-400 block mb-1">Character Tag Variant (Q3)</label>
+            <label className="flex items-center gap-1.5 text-slate-400 mb-1">
+              Character Tag Variant (Q3)
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[9px] font-semibold tracking-wide">
+                AUTO
+              </span>
+            </label>
             <select
               value={draftTag}
               onChange={(e) => setDraftTag(e.target.value)}
@@ -225,7 +303,12 @@ export const AgentSimulator: React.FC = () => {
 
           {/* Category */}
           <div>
-            <label className="text-slate-400 block mb-1">Category & Playlist (Section 9)</label>
+            <label className="flex items-center gap-1.5 text-slate-400 mb-1">
+              Category & Playlist (Section 9)
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[9px] font-semibold tracking-wide">
+                AUTO
+              </span>
+            </label>
             <select
               value={draftCategory}
               onChange={(e) => setDraftCategory(Number(e.target.value))}
@@ -252,6 +335,19 @@ export const AgentSimulator: React.FC = () => {
               ))}
             </select>
           </div>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-emerald-500/25 bg-emerald-950/20 px-3 py-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+          <span className="flex items-center gap-1.5 text-emerald-300 font-semibold shrink-0">
+            <RefreshCw className="w-3.5 h-3.5" />
+            Auto-rotate ON
+          </span>
+          <span className="text-slate-500">—</span>
+          <span className="text-slate-400">Successful story ke baad next:</span>
+          <span className="font-mono text-cyan-300">{nextDraftTagLabel}</span>
+          <span className="text-slate-600">•</span>
+          <span className="text-cyan-300">{nextDraftCategoryMeta.id}. {nextDraftCategoryMeta.name}</span>
+          <span className="text-slate-500">(manual change bhi kar sakte hain)</span>
         </div>
 
         {draftCategoryMeta.id === 10 && (
