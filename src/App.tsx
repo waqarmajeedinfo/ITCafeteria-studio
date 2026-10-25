@@ -27,10 +27,12 @@ import {
   Vote,
   ChevronDown,
   Menu,
-  Check
+  Check,
+  Activity
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
+import { LiveInsights, type OAuthNotice } from './components/LiveInsights';
 import { AgentSimulator } from './components/AgentSimulator';
 import { DuplicateChecker } from './components/DuplicateChecker';
 import { UpscalingRoadmap } from './components/UpscalingRoadmap';
@@ -50,7 +52,8 @@ import { StudioAssistant } from './components/StudioAssistant';
 import { PHONETIC_DICTIONARY } from './data/channelData';
 
 type TabType = 
-  | 'analytics' 
+  | 'analytics'
+  | 'live'
   | 'signals'
   | 'calendar'
   | 'community'
@@ -69,12 +72,43 @@ type TabType =
 
 export type { TabType };
 
+interface LaunchState {
+  tab: TabType;
+  notice: OAuthNotice | null;
+}
+
+function readLaunchState(): LaunchState {
+  if (typeof window === 'undefined') return { tab: 'analytics', notice: null };
+  const params = new URLSearchParams(window.location.search);
+  const provider = params.get('integration');
+  const notice: OAuthNotice | null =
+    provider === 'youtube' || provider === 'tiktok'
+      ? {
+          provider,
+          status: params.get('status') === 'connected' ? 'connected' : 'error',
+          message: params.get('message') || undefined,
+        }
+      : null;
+  return {
+    tab: params.get('tab') === 'live' ? 'live' : 'analytics',
+    notice,
+  };
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabType>('analytics');
+  const [launch] = useState<LaunchState>(readLaunchState);
+  const [activeTab, setActiveTab] = useState<TabType>(launch.tab);
+  const [oauthNotice, setOauthNotice] = useState<OAuthNotice | null>(launch.notice);
   const [showDictionary, setShowDictionary] = useState(false);
   const [openMenu, setOpenMenu] = useState<'core' | 'ai' | 'management' | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -99,6 +133,7 @@ export default function App() {
   const tabs: { id: TabType; label: string; icon: React.ReactNode; group: 'core' | 'ai' | 'management' }[] = [
     // Core Channel Tabs
     { id: 'analytics', label: 'Channel Diagnostics', icon: <BarChart3 className="w-4 h-4" />, group: 'core' },
+    { id: 'live', label: 'Live Insights (YouTube + TikTok)', icon: <Activity className="w-4 h-4 text-emerald-400" />, group: 'core' },
     { id: 'signals', label: 'Growth Signals & Anomalies', icon: <Rocket className="w-4 h-4 text-amber-400" />, group: 'core' },
     { id: 'calendar', label: 'Content Calendar', icon: <CalendarIcon className="w-4 h-4 text-emerald-400" />, group: 'core' },
     { id: 'community', label: 'Community Polls', icon: <Vote className="w-4 h-4 text-rose-400" />, group: 'core' },
@@ -290,6 +325,12 @@ export default function App() {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
         {activeTab === 'analytics' && <ChannelAnalytics />}
+        {activeTab === 'live' && (
+          <LiveInsights
+            oauthNotice={oauthNotice}
+            onDismissOauthNotice={() => setOauthNotice(null)}
+          />
+        )}
         {activeTab === 'signals' && <GrowthSignals />}
         {activeTab === 'calendar' && <ContentCalendar />}
         {activeTab === 'community' && <CommunityPollWidget />}
