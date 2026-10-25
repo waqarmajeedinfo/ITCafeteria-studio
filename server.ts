@@ -494,7 +494,7 @@ app.post('/api/ai/generate-video', async (req, res) => {
     res.status(500).json({ error: 'Video generation completed but output data was empty' });
   } catch (err: any) {
     console.error('Video generation error:', err);
-    res.status(500).json({ error: err.message || 'Failed to generate video' });
+    res.status(500).json({ error: friendlyGeminiError(err, 'Video generate nahi ho saki. Dobara try karein.') });
   }
 });
 
@@ -552,7 +552,7 @@ app.post('/api/ai/transcribe', async (req, res) => {
     res.json({ text });
   } catch (err: any) {
     console.error('Transcription error:', err);
-    res.status(500).json({ error: err.message || 'Failed to transcribe audio' });
+    res.status(500).json({ error: friendlyGeminiError(err, 'Voice transcribe nahi ho saki. Dobara try karein.') });
   }
 });
 
@@ -591,7 +591,7 @@ app.post('/api/ai/generate-music', async (req, res) => {
     res.json({ audioUrl });
   } catch (err: any) {
     console.error('Music generation error:', err);
-    res.status(500).json({ error: err.message || 'Failed to generate music' });
+    res.status(500).json({ error: friendlyGeminiError(err, 'Music generate nahi ho saka. Dobara try karein.') });
   }
 });
 
@@ -772,7 +772,7 @@ Return STRICT raw JSON only, no markdown fences:
     res.json({ ideas });
   } catch (err: any) {
     console.error('Story ideas error:', err);
-    res.status(500).json({ error: err.message || 'Fresh ideas generate nahi ho sake' });
+    res.status(500).json({ error: friendlyGeminiError(err, 'Fresh ideas generate nahi ho sake. Dobara try karein.') });
   }
 });
 
@@ -1018,7 +1018,7 @@ Return STRICT valid JSON only, no markdown fences:
     });
   } catch (err: any) {
     console.error('Story generation error:', err);
-    res.status(500).json({ error: err.message || 'Story generate nahi ho saki' });
+    res.status(500).json({ error: friendlyGeminiError(err, 'Story generate nahi ho saki. Dobara try karein.') });
   }
 });
 
