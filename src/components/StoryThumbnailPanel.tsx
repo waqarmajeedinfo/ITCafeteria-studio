@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   Check,
@@ -22,6 +22,42 @@ const IMAGE_MODELS = [
 
 type ImageModel = (typeof IMAGE_MODELS)[number]['id'];
 
+interface StoredReference {
+  image: string;
+  name: string;
+}
+
+const REFERENCE_STORAGE_PREFIX = 'itcafeteria_character_ref_';
+const REFERENCE_EVENT = 'itcafeteria-character-reference';
+
+const readStoredReference = (tag: string): StoredReference | null => {
+  try {
+    const raw = localStorage.getItem(`${REFERENCE_STORAGE_PREFIX}${tag || 'default'}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.image === 'string' && parsed.image.startsWith('data:image/')) {
+      return {
+        image: parsed.image,
+        name: typeof parsed?.name === 'string' && parsed.name ? parsed.name : 'reference.jpg'
+      };
+    }
+  } catch {
+    // Storage disabled ya corrupt value ho to reference ke bina continue karein.
+  }
+  return null;
+};
+
+const persistReference = (tag: string, reference: StoredReference | null) => {
+  const key = tag || 'default';
+  try {
+    if (reference) localStorage.setItem(`${REFERENCE_STORAGE_PREFIX}${key}`, JSON.stringify(reference));
+    else localStorage.removeItem(`${REFERENCE_STORAGE_PREFIX}${key}`);
+  } catch {
+    // Quota full ho to image sirf isi session mein kaam karegi.
+  }
+  window.dispatchEvent(new CustomEvent(REFERENCE_EVENT, { detail: { tag: key, reference } }));
+};
+
 export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story }) => {
   const [copied, setCopied] = useState(false);
   const [model, setModel] = useState<ImageModel>('gemini-nano-banana-2.1');
@@ -29,10 +65,27 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [usedModel, setUsedModel] = useState('');
   const [error, setError] = useState('');
-  const [referenceImage, setReferenceImage] = useState('');
-  const [referenceName, setReferenceName] = useState('');
+  const [reference, setReference] = useState<StoredReference | null>(() =>
+    readStoredReference(story.characterTag)
+  );
   const [referenceBusy, setReferenceBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const referenceImage = reference?.image || '';
+  const referenceName = reference?.name || '';
+
+  useEffect(() => {
+    const tag = story.characterTag || 'default';
+    const handleReferenceChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ tag: string; reference: StoredReference | null }>).detail;
+      if (detail?.tag === tag) {
+        setReference(detail.reference ?? null);
+        setImageUrl(null);
+        setUsedModel('');
+      }
+    };
+    window.addEventListener(REFERENCE_EVENT, handleReferenceChange);
+    return () => window.removeEventListener(REFERENCE_EVENT, handleReferenceChange);
+  }, [story.characterTag]);
 
   const spec = resolveThumbnailSpec({
     channelName: story.channelName,
@@ -76,7 +129,7 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
         img.src = dataUrl;
       });
 
-      const maxSide = 1200;
+      const maxSide = 1024;
       const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
       const canvas = document.createElement('canvas');
       canvas.width = Math.max(1, Math.round(image.width * scale));
@@ -84,8 +137,12 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Reference image process nahi ho saki.');
       ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-      setReferenceImage(canvas.toDataURL('image/jpeg', 0.9));
-      setReferenceName(file.name);
+      const nextReference = {
+        image: canvas.toDataURL('image/jpeg', 0.85),
+        name: file.name
+      };
+      setReference(nextReference);
+      persistReference(story.characterTag, nextReference);
       setImageUrl(null);
       setUsedModel('');
     } catch (err: any) {
@@ -96,8 +153,8 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
   };
 
   const removeReference = () => {
-    setReferenceImage('');
-    setReferenceName('');
+    setReference(null);
+    persistReference(story.characterTag, null);
     setImageUrl(null);
     setUsedModel('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -227,8 +284,23 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
             {copied ? 'Prompt Copied!' : 'Copy Prompt'}
           </button>
           <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading || referenceBusy}
+            title={referenceImage ? 'Change character reference image' : 'Upload character reference image'}
+            className="flex items-center gap-1.5 px-3 py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-200 border border-cyan-500/30 rounded-xl text-xs font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {referenceBusy ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : referenceImage ? (
+              <img src={referenceImage} alt="" className="w-4 h-4 rounded object-cover border border-cyan-500/40" />
+            ) : (
+              <Upload className="w-4 h-4" />
+            )}
+            {referenceBusy ? 'Processing...' : referenceImage ? 'Change Reference' : 'Add Reference'}
+          </button>
+          <button
             onClick={handleGenerate}
-            disabled={loading}
+            disabled={loading || referenceBusy}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-fuchsia-600 to-cyan-600 text-white rounded-xl text-xs font-semibold shadow-lg shadow-fuchsia-500/20 hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
@@ -378,7 +450,7 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
             )}
 
             <p className="text-[9px] text-slate-500 leading-snug">
-              Is tag ke against character ki ek clear front-facing photo upload karein. Prompt copy kar rahe hain to yehi image external tool mein bhi attach karein.
+              Is tag ke against character ki ek clear front-facing photo upload karein. Image is tag ke liye save rehti hai aur agli story mein khud load hoti hai. Prompt copy kar rahe hain to yehi image external tool mein bhi attach karein.
             </p>
           </div>
 

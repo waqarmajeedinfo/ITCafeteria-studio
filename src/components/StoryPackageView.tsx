@@ -247,7 +247,7 @@ export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story })
         ))}
       </div>
 
-      <StoryThumbnailPanel story={story} />
+      <StoryThumbnailPanel key={`${story.characterTag}-${story.title}`} story={story} />
 
       <div className="pt-4 border-t border-slate-800 space-y-3">
         <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
