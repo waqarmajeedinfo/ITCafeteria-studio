@@ -5,6 +5,7 @@ import { timingSafeEqual } from 'crypto';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { buildMasterThumbnailPrompt, splitHeadline } from './src/lib/thumbnailMaster';
+import { INTEGRATION_PUBLIC_PATHS, registerIntegrationRoutes } from './integrations';
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -21,6 +23,7 @@ const accessKey = process.env.APP_ACCESS_KEY;
 if (accessKey) {
   app.use((req, res, next) => {
     if (req.path === '/api/health') return next();
+    if (INTEGRATION_PUBLIC_PATHS.includes(req.path)) return next();
     const [scheme, encoded] = (req.headers.authorization || '').split(' ');
     if (scheme === 'Basic' && encoded) {
       const decoded = Buffer.from(encoded, 'base64').toString('utf8');
@@ -1021,6 +1024,8 @@ Return STRICT valid JSON only, no markdown fences:
     res.status(500).json({ error: friendlyGeminiError(err, 'Story generate nahi ho saki. Dobara try karein.') });
   }
 });
+
+registerIntegrationRoutes(app);
 
 // Setup Vite middleware in dev or static files in prod
 async function startServer() {
