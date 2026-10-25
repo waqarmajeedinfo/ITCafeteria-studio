@@ -5,41 +5,93 @@ import {
   Check, 
   Layers, 
   Database,
-  CheckCircle2
+  CheckCircle2,
+  Play,
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { CHANNEL_PROFILES, type ChannelProfile } from '../data/channelData';
-import { AgentFlowScreen, type AgentFlowSelection } from './AgentFlowScreen';
+import {
+  AgentFlowScreen,
+  type AgentMemoryRecord,
+  type AgentTriggerOutcome,
+  type AgentTriggerSelection
+} from './AgentFlowScreen';
 
 export const AgentSimulator: React.FC = () => {
-  const [selectedChannel, setSelectedChannel] = useState<ChannelProfile['id']>('itcafeteria');
-  const [selectedTag, setSelectedTag] = useState<string>(CHANNEL_PROFILES.itcafeteria.defaultTag);
-  const [selectedMode, setSelectedMode] = useState<'routine' | 'custom'>('routine');
-  const [selectedCategory, setSelectedCategory] = useState<number>(CHANNEL_PROFILES.itcafeteria.defaultCategoryId);
-  const [sceneCount, setSceneCount] = useState<number>(CHANNEL_PROFILES.itcafeteria.defaultSceneCount);
-  const [flowMode, setFlowMode] = useState<'routine' | 'custom' | null>(null);
+  const [draftChannel, setDraftChannel] = useState<ChannelProfile['id']>('itcafeteria');
+  const [draftTag, setDraftTag] = useState<string>(CHANNEL_PROFILES.itcafeteria.defaultTag);
+  const [draftCategory, setDraftCategory] = useState<number>(CHANNEL_PROFILES.itcafeteria.defaultCategoryId);
+  const [draftSceneCount, setDraftSceneCount] = useState<number>(CHANNEL_PROFILES.itcafeteria.defaultSceneCount);
+  const [appliedSelection, setAppliedSelection] = useState<AgentTriggerSelection | null>(null);
+  const [triggerOutcome, setTriggerOutcome] = useState<AgentTriggerOutcome | null>(null);
+  const [memoryRecords, setMemoryRecords] = useState<AgentMemoryRecord[]>([]);
+  const [flowOpen, setFlowOpen] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedPackage, setCopiedPackage] = useState<boolean>(false);
 
-  const profile = CHANNEL_PROFILES[selectedChannel];
-  const activeCategory = profile.categories.find((cat) => cat.id === selectedCategory) ?? profile.categories[0];
-  const activeNote = profile.sampleNotes[selectedCategory] ?? { title: activeCategory.name, hook: 'Reveal' };
-  // The full story package below is a fixed IT Cafeteria reference sample, so its character tag stays in that family
-  const sampleTag = selectedChannel === 'itcafeteria' ? selectedTag : CHANNEL_PROFILES.itcafeteria.defaultTag;
+  const draftProfile = CHANNEL_PROFILES[draftChannel];
+  const draftCategoryMeta = draftProfile.categories.find((cat) => cat.id === draftCategory) ?? draftProfile.categories[0];
+  const appliedProfile = appliedSelection ? CHANNEL_PROFILES[appliedSelection.channelId] : null;
+  const appliedCategory = appliedSelection && appliedProfile
+    ? appliedProfile.categories.find((cat) => cat.id === appliedSelection.categoryId) ?? appliedProfile.categories[0]
+    : null;
 
-  const handleChannelChange = (channelId: ChannelProfile['id']) => {
+  const pendingChanges = !appliedSelection ||
+    draftChannel !== appliedSelection.channelId ||
+    draftTag !== appliedSelection.tag ||
+    draftCategory !== appliedSelection.categoryId ||
+    draftSceneCount !== appliedSelection.sceneCount;
+
+  const appliedNote = appliedProfile && appliedCategory
+    ? appliedProfile.sampleNotes[appliedSelection!.categoryId] ?? { title: appliedCategory.name, hook: 'Reveal' }
+    : null;
+  const decisionTitle = triggerOutcome?.title || appliedNote?.title || 'Trigger dabayein';
+  const decisionHook = triggerOutcome?.hook || appliedNote?.hook || 'Pending';
+
+  const handleDraftChannelChange = (channelId: ChannelProfile['id']) => {
     const nextProfile = CHANNEL_PROFILES[channelId];
-    setSelectedChannel(channelId);
-    setSelectedTag(nextProfile.defaultTag);
-    setSelectedCategory(nextProfile.defaultCategoryId);
-    setSceneCount(nextProfile.defaultSceneCount);
-    setFlowMode(null);
+    setDraftChannel(channelId);
+    setDraftTag(nextProfile.defaultTag);
+    setDraftCategory(nextProfile.defaultCategoryId);
+    setDraftSceneCount(nextProfile.defaultSceneCount);
   };
 
-  const handleFlowApply = (selection: AgentFlowSelection) => {
-    setSelectedTag(selection.tag);
-    setSelectedCategory(selection.categoryId);
-    setSceneCount(selection.sceneCount);
+  const handleTrigger = () => {
+    setAppliedSelection({
+      channelId: draftChannel,
+      tag: draftTag,
+      categoryId: draftCategory,
+      sceneCount: draftSceneCount
+    });
+    setTriggerOutcome(null);
+    setFlowOpen(true);
   };
+
+  const handleFlowOutcome = (outcome: AgentTriggerOutcome) => {
+    setTriggerOutcome(outcome);
+    if (outcome.status === 'generated') {
+      setMemoryRecords((records) => {
+        const exists = records.some((record) =>
+          record.channelId === outcome.selection.channelId &&
+          record.title.toLowerCase() === outcome.title.toLowerCase()
+        );
+        if (exists) return records;
+        const outcomeProfile = CHANNEL_PROFILES[outcome.selection.channelId];
+        const outcomeCategory = outcomeProfile.categories.find((cat) => cat.id === outcome.selection.categoryId);
+        return [...records, {
+          id: `MEM-${Date.now()}`,
+          channelId: outcome.selection.channelId,
+          title: outcome.title,
+          tool: outcome.topic?.trim() || outcome.title,
+          points: outcome.discussionNotes?.trim() || `Category: ${outcomeCategory?.name ?? outcomeProfile.niche}`,
+          source: 'Trigger Flow Memory'
+        }];
+      });
+    }
+  };
+
+  const sampleTag = CHANNEL_PROFILES.itcafeteria.defaultTag;
 
   // Sample Generated Scenes adhering to Section 19 of v3.41
   const sampleScenes = [
@@ -195,34 +247,21 @@ Status: bani`;
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium ${
+              pendingChanges
+                ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+            }`}>
+              {!appliedSelection ? 'Not triggered yet' : pendingChanges ? 'Pending changes — Trigger dabayein' : 'Selections processed'}
+            </span>
             <button 
-              onClick={() => {
-                setSelectedMode('routine');
-                setFlowMode('routine');
-              }}
-              title="Routine flow screen kholein — category aur tag auto-rotate honge"
-              className={`px-3 py-1.5 rounded-lg border font-medium transition-all ${
-                selectedMode === 'routine' 
-                  ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20' 
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-              }`}
+              onClick={handleTrigger}
+              title="Duplicate check chalayein aur selected category ke mutabiq story package generate karein"
+              className="px-4 py-2 rounded-xl border border-cyan-400/40 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-opacity flex items-center gap-1.5"
             >
-              1. Routine / Auto Mode
-            </button>
-            <button 
-              onClick={() => {
-                setSelectedMode('custom');
-                setFlowMode('custom');
-              }}
-              title="Custom flow screen kholein — apna topic, category, tag aur duration chunein"
-              className={`px-3 py-1.5 rounded-lg border font-medium transition-all ${
-                selectedMode === 'custom' 
-                  ? 'bg-violet-600 border-violet-400 text-white shadow-lg shadow-violet-500/20' 
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              2. Custom Mode
+              <Play className="w-3.5 h-3.5" />
+              Trigger
             </button>
           </div>
         </div>
@@ -233,8 +272,8 @@ Status: bani`;
           <div>
             <label className="text-slate-400 block mb-1">Active Channel (Q1)</label>
             <select 
-              value={selectedChannel}
-              onChange={(e) => handleChannelChange(e.target.value as ChannelProfile['id'])}
+              value={draftChannel}
+              onChange={(e) => handleDraftChannelChange(e.target.value as ChannelProfile['id'])}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="itcafeteria">1. IT Cafeteria (Waqar Majeed)</option>
@@ -246,11 +285,11 @@ Status: bani`;
           <div>
             <label className="text-slate-400 block mb-1">Character Tag Variant (Q3)</label>
             <select 
-              value={selectedTag}
-              onChange={(e) => setSelectedTag(e.target.value)}
+              value={draftTag}
+              onChange={(e) => setDraftTag(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono"
             >
-              {profile.tags.map((tag) => (
+              {draftProfile.tags.map((tag) => (
                 <option key={tag.value} value={tag.value}>{tag.label}</option>
               ))}
             </select>
@@ -260,11 +299,11 @@ Status: bani`;
           <div>
             <label className="text-slate-400 block mb-1">Category & Playlist (Section 9)</label>
             <select 
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(Number(e.target.value))}
+              value={draftCategory}
+              onChange={(e) => setDraftCategory(Number(e.target.value))}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
             >
-              {profile.categories.map(cat => (
+              {draftProfile.categories.map(cat => (
                 <option key={cat.id} value={cat.id}>
                   {cat.id}. {cat.name}
                 </option>
@@ -276,44 +315,89 @@ Status: bani`;
           <div>
             <label className="text-slate-400 block mb-1">Duration & Scenes (Sec 12)</label>
             <select 
-              value={sceneCount}
-              onChange={(e) => setSceneCount(Number(e.target.value))}
+              value={draftSceneCount}
+              onChange={(e) => setDraftSceneCount(Number(e.target.value))}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
             >
-              {profile.durations.map((duration) => (
+              {draftProfile.durations.map((duration) => (
                 <option key={duration.value} value={duration.value}>{duration.label}</option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* Silent Decision Engine Status Bar (Section 11 Step 4b) */}
-        <div className="mt-4 p-3 bg-blue-950/40 border border-blue-500/20 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-xs">
+        {draftCategoryMeta.id === 10 && (
+          <div className="mt-3 rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-[11px] text-amber-200">
+            Category 10 — Search: Trigger ke baad flow screen topic aur discussion notes poochega, phir <strong>Generate Story</strong> button se package banega.
+          </div>
+        )}
+
+        {/* Trigger Decision Note (Step 4b) */}
+        <div className={`mt-4 p-3 rounded-xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-xs ${
+          triggerOutcome?.status === 'duplicate'
+            ? 'bg-rose-950/30 border-rose-500/30'
+            : triggerOutcome?.status === 'generated'
+            ? 'bg-emerald-950/20 border-emerald-500/25'
+            : 'bg-blue-950/40 border-blue-500/20'
+        }`}>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-cyan-300 font-mono">Decision Note (Step 4b):</span>
-            <span className="text-slate-200">
-              Title: "{activeNote.title}" | Hook: {activeNote.hook} | Confidence: High
-            </span>
+            {!appliedSelection ? (
+              <span className="text-slate-300">Title: "Trigger dabayein" | Hook: Pending | Confidence: Pending</span>
+            ) : triggerOutcome?.status === 'duplicate' ? (
+              <span className="text-rose-100">Title: "{decisionTitle}" | Hook: {decisionHook} | Confidence: Blocked</span>
+            ) : triggerOutcome?.status === 'generated' ? (
+              <span className="text-emerald-100">Title: "{decisionTitle}" | Hook: {decisionHook} | Confidence: High</span>
+            ) : triggerOutcome?.status === 'topic-pending' ? (
+              <span className="text-amber-100">Topic pending — flow screen mein Search topic likhein | Confidence: Pending</span>
+            ) : (
+              <span className="text-slate-200">
+                {flowOpen ? 'Duplicate check + story package generation chal raha hai...' : 'Flow band hua — dobara Trigger dabayein.'}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            <span className="px-2 py-0.5 bg-slate-800/80 text-slate-300 border border-slate-700 rounded text-[11px] font-mono">
-              {profile.name} • {activeCategory.id}. {activeCategory.name}
-            </span>
-            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[11px] font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Duplicate Check: Naya (Safe to produce)
-            </span>
-            <span className="text-slate-400 text-[11px]">Omni Flash Credits: ~120-150</span>
+            {appliedProfile && appliedCategory && (
+              <span className="px-2 py-0.5 bg-slate-800/80 text-slate-300 border border-slate-700 rounded text-[11px] font-mono">
+                {appliedProfile.name} • {appliedCategory.id}. {appliedCategory.name}
+              </span>
+            )}
+            {!appliedSelection ? (
+              <span className="px-2 py-0.5 bg-slate-800 text-slate-400 border border-slate-700 rounded text-[11px] font-medium">
+                Duplicate Check: Pending
+              </span>
+            ) : triggerOutcome?.status === 'duplicate' ? (
+              <span className="px-2 py-0.5 bg-rose-500/15 text-rose-300 border border-rose-500/30 rounded text-[11px] font-medium flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> Duplicate: {triggerOutcome.duplicates.length} match
+              </span>
+            ) : triggerOutcome?.status === 'generated' ? (
+              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[11px] font-medium flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Duplicate Check: Naya (Passed)
+              </span>
+            ) : triggerOutcome?.status === 'topic-pending' ? (
+              <span className="px-2 py-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded text-[11px] font-medium">
+                Topic pending
+              </span>
+            ) : flowOpen ? (
+              <span className="px-2 py-0.5 bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 rounded text-[11px] font-medium flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Checking...
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 bg-slate-800 text-slate-400 border border-slate-700 rounded text-[11px] font-medium">
+                Not completed
+              </span>
+            )}
+            <span className="text-slate-400 text-[11px]">Memory: {memoryRecords.length}</span>
+            <span className="text-slate-400 text-[11px]">Credits: ~120-150</span>
           </div>
         </div>
       </div>
 
       {/* Generated Story Proposition Header & Reference Line */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-        {selectedChannel !== 'itcafeteria' && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-4 py-2.5 text-[11px] text-amber-200">
-            Neeche wala full story sample IT Cafeteria ke Windows topic ka reference hai. {profile.name} ke liye Routine ya Custom Mode chalayein — flow screen channel profile ke mutabiq title, category, tag aur package tayar karega.
-          </div>
-        )}
+        <div className="rounded-xl border border-slate-700/70 bg-slate-950/50 px-4 py-2.5 text-[11px] text-slate-300">
+          Neeche wala full story package ek fixed <strong className="text-white">IT Cafeteria (Category 4)</strong> reference sample hai. Aapke dropdown selections aur generated package upar <strong className="text-cyan-300">Trigger</strong> flow screen mein process hote hain.
+        </div>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800">
           <div>
             <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-cyan-400">
@@ -330,7 +414,7 @@ Status: bani`;
               <span>•</span>
               <span>Presenter: {sampleTag}</span>
               <span>•</span>
-              <span>Duration: {sceneCount * 10} seconds ({sceneCount} scenes)</span>
+              <span>Duration: 100 seconds (10 scenes)</span>
               <span>•</span>
               <span>Format: Extended 7-Beat with Screen-Zoom</span>
             </div>
@@ -346,7 +430,7 @@ Status: bani`;
               </>
             ) : (
               <>
-                <Copy className="w-4 h-4" /> {selectedChannel === 'itcafeteria' ? 'Copy Complete YouTube & Memory Package' : 'Copy Reference Sample Package'}
+                <Copy className="w-4 h-4" /> Copy Reference Sample Package
               </>
             )}
           </button>
@@ -360,7 +444,7 @@ Status: bani`;
           </div>
 
           <div className="space-y-3">
-            {sampleScenes.slice(0, sceneCount).map((scene) => (
+            {sampleScenes.slice(0, 10).map((scene) => (
               <div 
                 key={scene.num}
                 className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 hover:border-slate-700 transition-colors relative group"
@@ -512,15 +596,13 @@ Status: bani`}
         </div>
       </div>
 
-      {flowMode && (
+      {flowOpen && appliedSelection && (
         <AgentFlowScreen
-          profile={profile}
-          mode={flowMode}
-          currentTag={selectedTag}
-          currentCategoryId={selectedCategory}
-          currentSceneCount={sceneCount}
-          onClose={() => setFlowMode(null)}
-          onApply={handleFlowApply}
+          profile={CHANNEL_PROFILES[appliedSelection.channelId]}
+          selection={appliedSelection}
+          memoryRecords={memoryRecords}
+          onClose={() => setFlowOpen(false)}
+          onOutcome={handleFlowOutcome}
         />
       )}
     </div>
