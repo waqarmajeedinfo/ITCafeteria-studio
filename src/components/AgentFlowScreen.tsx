@@ -402,8 +402,15 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
       const dateLabel = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       const title = String(data.title || idea.title).trim();
       const hook = String(data.hook || idea.hook || 'Reveal').trim();
-      const thumbnailHeadline = String(data.thumbnailHeadline || title.split(/\s+/).slice(0, 3).join(' ').toUpperCase()).trim();
-      const thumbnailSubBadge = String(data.thumbnailSubBadge || 'MUST TRY').trim();
+      const thumbnailLine1 = String(data.thumbnailLine1 || '').trim();
+      const thumbnailLine2 = String(data.thumbnailLine2 || '').trim();
+      const thumbnailHeadline = String(
+        data.thumbnailHeadline ||
+          `${thumbnailLine1} ${thumbnailLine2}`.trim() ||
+          title.split(/\s+/).slice(0, 3).join(' ').toUpperCase()
+      ).trim();
+      const thumbnailSubBadge = String(data.thumbnailSubBanner || data.thumbnailSubBadge || 'MUST TRY').trim();
+      const thumbnailHologram = String(data.thumbnailHologram || '').trim();
       const hashtags: string[] = (Array.isArray(data.hashtags) ? data.hashtags : [])
         .map((tag: any) => String(tag || '').trim())
         .filter(Boolean)
@@ -448,6 +455,9 @@ Status: bani`;
         thumbnailHeadline,
         thumbnailSubBadge,
         thumbnailPrompt,
+        thumbnailLine1,
+        thumbnailLine2,
+        thumbnailHologram,
         seriesPlan,
         memoryBlock,
         idea,

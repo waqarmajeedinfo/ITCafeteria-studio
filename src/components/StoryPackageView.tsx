@@ -8,6 +8,8 @@ import {
   Layers,
   Sparkles
 } from 'lucide-react';
+import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
+import { StoryThumbnailPanel } from './StoryThumbnailPanel';
 
 export interface StoryIdea {
   title: string;
@@ -46,6 +48,9 @@ export interface GeneratedStory {
   thumbnailHeadline: string;
   thumbnailSubBadge: string;
   thumbnailPrompt: string;
+  thumbnailLine1?: string;
+  thumbnailLine2?: string;
+  thumbnailHologram?: string;
   seriesPlan: string;
   memoryBlock: string;
   idea: StoryIdea;
@@ -54,6 +59,19 @@ export interface GeneratedStory {
 }
 
 export function buildStoryPackageText(story: GeneratedStory): string {
+  const thumbnail = resolveThumbnailSpec({
+    channelName: story.channelName,
+    presenter: story.presenter,
+    title: story.title,
+    ideaTitle: story.idea?.title,
+    headline: story.thumbnailHeadline,
+    line1: story.thumbnailLine1,
+    line2: story.thumbnailLine2,
+    subBanner: story.thumbnailSubBadge,
+    hologram: story.thumbnailHologram,
+    characterTag: story.characterTag,
+  });
+
   const scenesText = story.scenes.map((scene) => {
     return `Scene ${scene.num} — ${scene.duration} [${scene.purpose}]${scene.isCTA ? ' — CTA' : ''} (${scene.words} words)
 Visual: ${scene.visual || '—'}
@@ -70,7 +88,7 @@ Hook: ${story.hook}
 Character Tag: ${story.characterTag}
 Length: ${story.sceneCount} scenes (${story.sceneCount * 10}s)
 Duplicate Check: PASSED
-Thumbnail: ${story.thumbnailHeadline} (Sub-badge: ${story.thumbnailSubBadge})
+Thumbnail: ${thumbnail.line1}${thumbnail.line2 ? ` / ${thumbnail.line2}` : ''} (Sub-banner: ${thumbnail.subBanner})
 Hashtags: ${story.hashtags.join(' ')}
 
 SCENE-BY-SCENE STORY (Flow paste-ready):
@@ -82,8 +100,8 @@ ${scenesText}
 ${story.description}
 3. Tags: ${story.tags.join(', ')}
 4. TikTok Block: ${story.tiktokCaption}
-5. Thumbnail Prompt:
-${story.thumbnailPrompt}
+5. Thumbnail Prompt (Master Thumbnail Agent v3.45):
+${thumbnail.prompt}
 
 Memory Block (v3.41):
 ${story.memoryBlock}
@@ -229,6 +247,8 @@ export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story })
         ))}
       </div>
 
+      <StoryThumbnailPanel story={story} />
+
       <div className="pt-4 border-t border-slate-800 space-y-3">
         <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
           <Layers className="w-4 h-4 text-cyan-400" />
@@ -247,7 +267,7 @@ export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story })
               <ImageIcon className="w-3 h-3" /> Item 5: Thumbnail
             </span>
             <p className="text-amber-300 font-semibold">{story.thumbnailHeadline}</p>
-            <p className="text-slate-400 text-[10px]">Sub-badge: {story.thumbnailSubBadge || '—'} • 9:16</p>
+            <p className="text-slate-400 text-[10px]">Sub-banner: {story.thumbnailSubBadge || '—'} • 9:16 • Master v3.45</p>
           </div>
 
           <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl space-y-1">
@@ -264,11 +284,6 @@ export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story })
         <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl space-y-1.5">
           <span className="text-[10px] font-semibold text-slate-400 uppercase">Item 2: Description + Practical Steps</span>
           <p className="text-slate-300 text-[11px] whitespace-pre-wrap leading-relaxed">{story.description}</p>
-        </div>
-
-        <div className="bg-slate-950/60 border border-slate-800 p-3 rounded-xl space-y-1.5">
-          <span className="text-[10px] font-semibold text-slate-400 uppercase">Item 5: Thumbnail Prompt</span>
-          <p className="text-slate-400 text-[10px] whitespace-pre-wrap leading-relaxed">{story.thumbnailPrompt}</p>
         </div>
 
         <div className="bg-gradient-to-r from-blue-950/40 to-slate-950 border border-blue-500/30 p-3.5 rounded-xl space-y-1.5">
