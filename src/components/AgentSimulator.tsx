@@ -1,30 +1,45 @@
 import React, { useState } from 'react';
 import { 
   Bot, 
-  Play, 
   Copy, 
   Check, 
-  Sparkles, 
-  AlertCircle, 
   Layers, 
-  Tv, 
-  RefreshCw, 
-  FileText, 
   Database,
-  Sliders,
   CheckCircle2
 } from 'lucide-react';
-import { CATEGORIES_IT_CAFETERIA, PHONETIC_DICTIONARY } from '../data/channelData';
+import { CHANNEL_PROFILES, type ChannelProfile } from '../data/channelData';
+import { AgentFlowScreen, type AgentFlowSelection } from './AgentFlowScreen';
 
 export const AgentSimulator: React.FC = () => {
-  const [selectedChannel, setSelectedChannel] = useState<'itcafeteria' | 'beautyhub'>('itcafeteria');
-  const [selectedTag, setSelectedTag] = useState<string>('@WM25-1');
+  const [selectedChannel, setSelectedChannel] = useState<ChannelProfile['id']>('itcafeteria');
+  const [selectedTag, setSelectedTag] = useState<string>(CHANNEL_PROFILES.itcafeteria.defaultTag);
   const [selectedMode, setSelectedMode] = useState<'routine' | 'custom'>('routine');
-  const [selectedCategory, setSelectedCategory] = useState<number>(4); // Default PC & Windows Hacks
-  const [sceneCount, setSceneCount] = useState<number>(10);
+  const [selectedCategory, setSelectedCategory] = useState<number>(CHANNEL_PROFILES.itcafeteria.defaultCategoryId);
+  const [sceneCount, setSceneCount] = useState<number>(CHANNEL_PROFILES.itcafeteria.defaultSceneCount);
+  const [flowMode, setFlowMode] = useState<'routine' | 'custom' | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedPackage, setCopiedPackage] = useState<boolean>(false);
-  const [customTopic, setCustomTopic] = useState<string>('Windows 11 Storage Sense & Temp Clean Auto Fix');
+
+  const profile = CHANNEL_PROFILES[selectedChannel];
+  const activeCategory = profile.categories.find((cat) => cat.id === selectedCategory) ?? profile.categories[0];
+  const activeNote = profile.sampleNotes[selectedCategory] ?? { title: activeCategory.name, hook: 'Reveal' };
+  // The full story package below is a fixed IT Cafeteria reference sample, so its character tag stays in that family
+  const sampleTag = selectedChannel === 'itcafeteria' ? selectedTag : CHANNEL_PROFILES.itcafeteria.defaultTag;
+
+  const handleChannelChange = (channelId: ChannelProfile['id']) => {
+    const nextProfile = CHANNEL_PROFILES[channelId];
+    setSelectedChannel(channelId);
+    setSelectedTag(nextProfile.defaultTag);
+    setSelectedCategory(nextProfile.defaultCategoryId);
+    setSceneCount(nextProfile.defaultSceneCount);
+    setFlowMode(null);
+  };
+
+  const handleFlowApply = (selection: AgentFlowSelection) => {
+    setSelectedTag(selection.tag);
+    setSelectedCategory(selection.categoryId);
+    setSceneCount(selection.sceneCount);
+  };
 
   // Sample Generated Scenes adhering to Section 19 of v3.41
   const sampleScenes = [
@@ -34,7 +49,7 @@ export const AgentSimulator: React.FC = () => {
       purpose: 'Hook',
       isCTA: false,
       words: 24,
-      script: `${selectedTag} sits at the desk, looking directly at the camera with calm-confident focus, both hands resting on the desk for the opening 0.5-second anchor pose. In the center window, he gestures outward with an open palm toward the viewer as a glowing red warning overlay appears above the desk. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in an intriguing, confident tone: "Kya aapka laptop ak-sr bina wajah slow ho jata hai? Yeh aik single Windows setting aapka ghanton ka waq-t bachaye gi!" He returns to the exact resting anchor pose at the final 0.5 second.`
+      script: `${sampleTag} sits at the desk, looking directly at the camera with calm-confident focus, both hands resting on the desk for the opening 0.5-second anchor pose. In the center window, he gestures outward with an open palm toward the viewer as a glowing red warning overlay appears above the desk. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in an intriguing, confident tone: "Kya aapka laptop ak-sr bina wajah slow ho jata hai? Yeh aik single Windows setting aapka ghanton ka waq-t bachaye gi!" He returns to the exact resting anchor pose at the final 0.5 second.`
     },
     {
       num: 2,
@@ -42,7 +57,7 @@ export const AgentSimulator: React.FC = () => {
       purpose: 'Problem',
       isCTA: false,
       words: 23,
-      script: `${selectedTag} sits at the desk, leaning slightly forward with an empathetic expression. A floating graphic showing a full red C-Drive appears on the back wall. He gestures toward the back wall visual as he explains the frustration of hidden junk files accumulating over months. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in an empathetic, relatable tone: "Har baar C-drive laal ho jati hai aur samajh nahi aati ke konsi bekaar files delete karni hain, theek hai na?" He settles smoothly into the closing anchor pose.`
+      script: `${sampleTag} sits at the desk, leaning slightly forward with an empathetic expression. A floating graphic showing a full red C-Drive appears on the back wall. He gestures toward the back wall visual as he explains the frustration of hidden junk files accumulating over months. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in an empathetic, relatable tone: "Har baar C-drive laal ho jati hai aur samajh nahi aati ke konsi bekaar files delete karni hain, theek hai na?" He settles smoothly into the closing anchor pose.`
     },
     {
       num: 3,
@@ -50,7 +65,7 @@ export const AgentSimulator: React.FC = () => {
       purpose: 'Agitate',
       isCTA: false,
       words: 24,
-      script: `${selectedTag} remains seated, camera smoothly pushes in slightly. On the screen to his right, multiple background app cache windows flicker rapidly. He shakes his head gently, explaining how manual cleaning wastes precious hours. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in a thoughtful, concerned tone: "Manual cleaning mein ghanton lagte hain aur ghalti se zaroori file delete hone ka Fikr rehta hai, jo bilkul theek tareeqa nahi." He returns to the resting anchor pose.`
+      script: `${sampleTag} remains seated, camera smoothly pushes in slightly. On the screen to his right, multiple background app cache windows flicker rapidly. He shakes his head gently, explaining how manual cleaning wastes precious hours. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in a thoughtful, concerned tone: "Manual cleaning mein ghanton lagte hain aur ghalti se zaroori file delete hone ka Fikr rehta hai, jo bilkul theek tareeqa nahi." He returns to the resting anchor pose.`
     },
     {
       num: 4,
@@ -58,7 +73,7 @@ export const AgentSimulator: React.FC = () => {
       purpose: 'Reveal',
       isCTA: false,
       words: 23,
-      script: `${selectedTag} sits at the desk, smiling with renewed confidence. The glowing icon of Windows Storage Sense animates cleanly in front of his chest below chin level. He points toward the icon with his right hand. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in a warm, reassuring tone: "Iska aik automatic solution maujood hai Windows ke andar, jiska naam hai Storage Sense, aur yeh for-rn kaam shuru karta hai." He holds the anchor pose at the end.`
+      script: `${sampleTag} sits at the desk, smiling with renewed confidence. The glowing icon of Windows Storage Sense animates cleanly in front of his chest below chin level. He points toward the icon with his right hand. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in a warm, reassuring tone: "Iska aik automatic solution maujood hai Windows ke andar, jiska naam hai Storage Sense, aur yeh for-rn kaam shuru karta hai." He holds the anchor pose at the end.`
     },
     {
       num: 5,
@@ -66,7 +81,7 @@ export const AgentSimulator: React.FC = () => {
       purpose: 'Demonstrate: Settings Walkthrough',
       isCTA: false,
       words: 24,
-      script: `The camera cuts to a full-screen zoomed recording of the Windows 11 Settings window. The cursor visibly moves to System, then smoothly clicks on Storage, highlighting the toggle button with a cyan pulse glow. ${selectedTag}'s voice continues smoothly in voiceover. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in a calm, clear tone: "Sab se pehle Settings open karein, System mein ja kar Storage par click karein aur yahan Storage Sense ko on kar dein." The screen recording holds on the toggle.`
+      script: `The camera cuts to a full-screen zoomed recording of the Windows 11 Settings window. The cursor visibly moves to System, then smoothly clicks on Storage, highlighting the toggle button with a cyan pulse glow. ${sampleTag}'s voice continues smoothly in voiceover. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in a calm, clear tone: "Sab se pehle Settings open karein, System mein ja kar Storage par click karein aur yahan Storage Sense ko on kar dein." The screen recording holds on the toggle.`
     },
     {
       num: 6,
@@ -74,7 +89,7 @@ export const AgentSimulator: React.FC = () => {
       purpose: 'Demonstrate: Configuration',
       isCTA: false,
       words: 24,
-      script: `Full-screen view of the Storage Sense configuration menu. The cursor clicks on the dropdown for Automatic User Content Cleanup and selects 'Every Week', followed by setting Recycle Bin cleanup to 14 days. ${selectedTag}'s voice guides the action. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in an instructive, clear tone: "Yahan schedule ko weekly par set karein taake temp files aur recycle bin ka kachra auto delete hota rahe bina kisi rukawat ke." The cursor highlights the selected days.`
+      script: `Full-screen view of the Storage Sense configuration menu. The cursor clicks on the dropdown for Automatic User Content Cleanup and selects 'Every Week', followed by setting Recycle Bin cleanup to 14 days. ${sampleTag}'s voice guides the action. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in an instructive, clear tone: "Yahan schedule ko weekly par set karein taake temp files aur recycle bin ka kachra auto delete hota rahe bina kisi rukawat ke." The cursor highlights the selected days.`
     },
     {
       num: 7,
@@ -82,7 +97,7 @@ export const AgentSimulator: React.FC = () => {
       purpose: 'Proof / Result',
       isCTA: false,
       words: 23,
-      script: `Full-screen screen recording showing the Storage Cleanup bar clearing 15.4 GB of temporary files in real-time, the drive space bar turning from deep red to healthy blue. ${selectedTag}'s voice narration continues. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in a delighted, confident tone: "Yeh dekhein, aik click par 15 G-B space for-rn aazad ho gayi aur laptop ki speed mein wazeh farq parra hai." The space bar settles into clear blue.`
+      script: `Full-screen screen recording showing the Storage Cleanup bar clearing 15.4 GB of temporary files in real-time, the drive space bar turning from deep red to healthy blue. ${sampleTag}'s voice narration continues. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in a delighted, confident tone: "Yeh dekhein, aik click par 15 G-B space for-rn aazad ho gayi aur laptop ki speed mein wazeh farq parra hai." The space bar settles into clear blue.`
     },
     {
       num: 8,
@@ -90,7 +105,7 @@ export const AgentSimulator: React.FC = () => {
       purpose: 'Benefit & Command mention',
       isCTA: false,
       words: 25,
-      script: `${selectedTag} reappears at the desk in medium shot, anchor pose matching Scene 4. He rests one hand on the desk and gestures with the other toward the side display. He mentions the exact steps are saved below. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in an encouraging, helpful tone: "Aapko ab kabhi manual temp files dhoondne ki zaroorat nahi parre gi, mukammal steps aur shortcut details niche description mein maujood hain." He settles smoothly into the anchor pose.`
+      script: `${sampleTag} reappears at the desk in medium shot, anchor pose matching Scene 4. He rests one hand on the desk and gestures with the other toward the side display. He mentions the exact steps are saved below. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in an encouraging, helpful tone: "Aapko ab kabhi manual temp files dhoondne ki zaroorat nahi parre gi, mukammal steps aur shortcut details niche description mein maujood hain." He settles smoothly into the anchor pose.`
     },
     {
       num: 9,
@@ -98,7 +113,7 @@ export const AgentSimulator: React.FC = () => {
       purpose: 'Curiosity Loop & Series Continuation',
       isCTA: false,
       words: 24,
-      script: `${selectedTag} sits at the desk, leaning in slightly with an engaging smile. A floating preview icon for the next episode's CMD cleanmgr command appears on the side screen. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in an inviting, curious tone: "Agli video mein main Windows ka aik aesa secret command bataunga jo corrupted system files ko secondon mein repair karta hai." He returns to the resting anchor pose.`
+      script: `${sampleTag} sits at the desk, leaning in slightly with an engaging smile. A floating preview icon for the next episode's CMD cleanmgr command appears on the side screen. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in an inviting, curious tone: "Agli video mein main Windows ka aik aesa secret command bataunga jo corrupted system files ko secondon mein repair karta hai." He returns to the resting anchor pose.`
     },
     {
       num: 10,
@@ -106,7 +121,7 @@ export const AgentSimulator: React.FC = () => {
       purpose: 'Conclusion & Save CTA',
       isCTA: true,
       words: 24,
-      script: `${selectedTag} sits at the desk in the opening anchor pose, smiling warmly at the camera. He gives a purposeful thumbs-up and pointing gesture toward the screen's save bookmark icon. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in a warm, inviting tone: "Is video ko abhi save kar lein taake baad mein dhoondna na parre, aur aese practical tricks ke liye IT Cafeteria ko follow karein!" He returns to the exact resting anchor pose at the 0.5-second finish.`
+      script: `${sampleTag} sits at the desk in the opening anchor pose, smiling warmly at the camera. He gives a purposeful thumbs-up and pointing gesture toward the screen's save bookmark icon. He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated. He says, in a warm, inviting tone: "Is video ko abhi save kar lein taake baad mein dhoondna na parre, aur aese practical tricks ke liye IT Cafeteria ko follow karein!" He returns to the exact resting anchor pose at the 0.5-second finish.`
     }
   ];
 
@@ -182,7 +197,11 @@ Status: bani`;
 
           <div className="flex items-center gap-2 text-xs">
             <button 
-              onClick={() => setSelectedMode('routine')}
+              onClick={() => {
+                setSelectedMode('routine');
+                setFlowMode('routine');
+              }}
+              title="Routine flow screen kholein — category aur tag auto-rotate honge"
               className={`px-3 py-1.5 rounded-lg border font-medium transition-all ${
                 selectedMode === 'routine' 
                   ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20' 
@@ -192,10 +211,14 @@ Status: bani`;
               1. Routine / Auto Mode
             </button>
             <button 
-              onClick={() => setSelectedMode('custom')}
+              onClick={() => {
+                setSelectedMode('custom');
+                setFlowMode('custom');
+              }}
+              title="Custom flow screen kholein — apna topic, category, tag aur duration chunein"
               className={`px-3 py-1.5 rounded-lg border font-medium transition-all ${
                 selectedMode === 'custom' 
-                  ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20' 
+                  ? 'bg-violet-600 border-violet-400 text-white shadow-lg shadow-violet-500/20' 
                   : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
               }`}
             >
@@ -211,7 +234,7 @@ Status: bani`;
             <label className="text-slate-400 block mb-1">Active Channel (Q1)</label>
             <select 
               value={selectedChannel}
-              onChange={(e) => setSelectedChannel(e.target.value as any)}
+              onChange={(e) => handleChannelChange(e.target.value as ChannelProfile['id'])}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
             >
               <option value="itcafeteria">1. IT Cafeteria (Waqar Majeed)</option>
@@ -227,11 +250,9 @@ Status: bani`;
               onChange={(e) => setSelectedTag(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono"
             >
-              <option value="@WM25-1">@WM25-1 (Casual Studio)</option>
-              <option value="@WM25-2">@WM25-2 (Blue Accent)</option>
-              <option value="@WM25-3">@WM25-3 (Tech Setup)</option>
-              <option value="@WM25-4">@WM25-4 (Lecture Series)</option>
-              <option value="@WM25-5">@WM25-5 (Smart Casual)</option>
+              {profile.tags.map((tag) => (
+                <option key={tag.value} value={tag.value}>{tag.label}</option>
+              ))}
             </select>
           </div>
 
@@ -243,7 +264,7 @@ Status: bani`;
               onChange={(e) => setSelectedCategory(Number(e.target.value))}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
             >
-              {CATEGORIES_IT_CAFETERIA.map(cat => (
+              {profile.categories.map(cat => (
                 <option key={cat.id} value={cat.id}>
                   {cat.id}. {cat.name}
                 </option>
@@ -259,23 +280,25 @@ Status: bani`;
               onChange={(e) => setSceneCount(Number(e.target.value))}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
             >
-              <option value={10}>10 Scenes (100s — Standard Short)</option>
-              <option value={12}>12 Scenes (120s — Extended)</option>
-              <option value={15}>15 Scenes (150s — Max Short)</option>
-              <option value={7}>7 Scenes (70s — Minimal Threshold)</option>
+              {profile.durations.map((duration) => (
+                <option key={duration.value} value={duration.value}>{duration.label}</option>
+              ))}
             </select>
           </div>
         </div>
 
         {/* Silent Decision Engine Status Bar (Section 11 Step 4b) */}
         <div className="mt-4 p-3 bg-blue-950/40 border border-blue-500/20 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-cyan-300 font-mono">Decision Note (Step 4b):</span>
             <span className="text-slate-200">
-              Title: "Windows 11 Hidden Trick: Auto Clean Temp Files" | Hook: Contrarian Warning | Confidence: High
+              Title: "{activeNote.title}" | Hook: {activeNote.hook} | Confidence: High
             </span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <span className="px-2 py-0.5 bg-slate-800/80 text-slate-300 border border-slate-700 rounded text-[11px] font-mono">
+              {profile.name} • {activeCategory.id}. {activeCategory.name}
+            </span>
             <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[11px] font-medium flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> Duplicate Check: Naya (Safe to produce)
             </span>
@@ -286,10 +309,18 @@ Status: bani`;
 
       {/* Generated Story Proposition Header & Reference Line */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        {selectedChannel !== 'itcafeteria' && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-4 py-2.5 text-[11px] text-amber-200">
+            Neeche wala full story sample IT Cafeteria ke Windows topic ka reference hai. {profile.name} ke liye Routine ya Custom Mode chalayein — flow screen channel profile ke mutabiq title, category, tag aur package tayar karega.
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800">
           <div>
-            <div className="text-xs font-mono text-cyan-400">
-              Category: 4 — PC & Windows Hacks | Playlist: PC & Windows Hacks
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-cyan-400">
+              <span>Category: 4 — PC & Windows Hacks | Playlist: PC & Windows Hacks</span>
+              <span className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-[10px] text-slate-400 font-sans">
+                Reference Sample • IT Cafeteria
+              </span>
             </div>
             <h2 className="text-xl font-bold text-white tracking-tight">
               Windows 11 Hidden Trick: Auto Clean Temp Files in Seconds!
@@ -297,7 +328,7 @@ Status: bani`;
             <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
               <span>Aspect Ratio: 9:16 Short</span>
               <span>•</span>
-              <span>Presenter: {selectedTag}</span>
+              <span>Presenter: {sampleTag}</span>
               <span>•</span>
               <span>Duration: {sceneCount * 10} seconds ({sceneCount} scenes)</span>
               <span>•</span>
@@ -315,7 +346,7 @@ Status: bani`;
               </>
             ) : (
               <>
-                <Copy className="w-4 h-4" /> Copy Complete YouTube & Memory Package
+                <Copy className="w-4 h-4" /> {selectedChannel === 'itcafeteria' ? 'Copy Complete YouTube & Memory Package' : 'Copy Reference Sample Package'}
               </>
             )}
           </button>
@@ -480,6 +511,18 @@ Status: bani`}
           </div>
         </div>
       </div>
+
+      {flowMode && (
+        <AgentFlowScreen
+          profile={profile}
+          mode={flowMode}
+          currentTag={selectedTag}
+          currentCategoryId={selectedCategory}
+          currentSceneCount={sceneCount}
+          onClose={() => setFlowMode(null)}
+          onApply={handleFlowApply}
+        />
+      )}
     </div>
   );
 };
