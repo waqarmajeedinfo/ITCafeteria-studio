@@ -20,7 +20,10 @@ import {
   ChevronRight,
   Filter,
   Layers,
-  Search
+  Search,
+  Mic,
+  MicOff,
+  AudioLines
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -56,6 +59,13 @@ export const AiChatbot: React.FC = () => {
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
   const [copiedKeyword, setCopiedKeyword] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Voice Input States
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [isTranscribingVoice, setIsTranscribingVoice] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceStreamRef = useRef<MediaStream | null>(null);
 
   // Trending Keywords Sidebar States
   const [showTrendingSidebar, setShowTrendingSidebar] = useState<boolean>(true);
@@ -127,6 +137,12 @@ export const AiChatbot: React.FC = () => {
   };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return () => {
+      voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -218,6 +234,81 @@ Always adhere to IT Cafeteria rules:
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const toggleVoiceRecording = async () => {
+    if (isRecordingVoice) {
+      mediaRecorderRef.current?.stop();
+      setIsRecordingVoice(false);
+      return;
+    }
+
+    try {
+      setErrorMsg(null);
+      voiceChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      voiceStreamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          voiceChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(voiceChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach((track) => track.stop());
+        voiceStreamRef.current = null;
+        transcribeVoiceInput(blob);
+      };
+
+      mediaRecorder.start();
+      setIsRecordingVoice(true);
+    } catch (err: any) {
+      console.error('Microphone error:', err);
+      setErrorMsg('Microphone access nahi mil saka. Browser ki site settings mein microphone allow karein (HTTPS ya localhost zaroori hai).');
+    }
+  };
+
+  const transcribeVoiceInput = (blob: Blob) => {
+    setIsTranscribingVoice(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64Audio = reader.result as string;
+        const res = await fetch('/api/ai/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base64Audio,
+            mimeType: blob.type || 'audio/webm',
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Transcription failed with status ${res.status}`);
+        }
+
+        const data = await res.json();
+        const transcript = (data.text || '').trim();
+        if (!transcript) {
+          throw new Error('Koi awaaz detect nahi hui. Dobara try karein.');
+        }
+
+        const combined = inputText.trim() ? `${inputText.trim()} ${transcript}` : transcript;
+        setInputText(combined);
+        handleSend(combined);
+      } catch (err: any) {
+        console.error('Voice transcription error:', err);
+        setErrorMsg(err.message || 'Voice transcribe nahi ho saka.');
+      } finally {
+        setIsTranscribingVoice(false);
+      }
+    };
+    reader.readAsDataURL(blob);
   };
 
   const copyText = (id: string, text: string) => {
@@ -435,11 +526,24 @@ Always adhere to IT Cafeteria rules:
               }}
               className="flex items-center gap-2"
             >
+              <button
+                type="button"
+                onClick={toggleVoiceRecording}
+                disabled={isLoading || isTranscribingVoice}
+                title={isRecordingVoice ? 'Recording band karein' : 'Awaaz se likhein (Roman Urdu bol kar)'}
+                className={`p-2.5 rounded-xl transition-all cursor-pointer disabled:opacity-40 shrink-0 ${
+                  isRecordingVoice
+                    ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30 animate-pulse'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                }`}
+              >
+                {isRecordingVoice ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
               <input
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Roman Urdu ya English mein sawal poochein ya prompt dein..."
+                placeholder="Roman Urdu ya English mein sawal poochein ya prompt dein... (ya mic se bol kar) "
                 className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-sans"
                 disabled={isLoading}
               />
@@ -451,6 +555,23 @@ Always adhere to IT Cafeteria rules:
                 <Send className="w-4 h-4" />
               </button>
             </form>
+
+            {/* Voice Status Line */}
+            {(isRecordingVoice || isTranscribingVoice) && (
+              <div className="mt-2 text-[11px]">
+                {isRecordingVoice ? (
+                  <span className="flex items-center gap-1.5 text-rose-300">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    Recording chal rahi hai... apna sawal bol kar poochein, phir mic dobara daba kar band karein.
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-cyan-300">
+                    <AudioLines className="w-3.5 h-3.5 animate-pulse" />
+                    Aap ki awaaz Roman Urdu text mein badli ja rahi hai...
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
