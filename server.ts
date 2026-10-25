@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { timingSafeEqual } from 'crypto';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import { buildMasterThumbnailPrompt, splitHeadline } from './src/lib/thumbnailMaster';
 
 dotenv.config();
 
@@ -360,7 +361,15 @@ app.post('/api/ai/generate-image', async (req, res) => {
     res.json({ imageUrl, description: descriptionText });
   } catch (err: any) {
     console.error('Image generation error:', err);
-    res.status(500).json({ error: err.message || 'Failed to generate image' });
+    const raw = String(err?.message || err || '');
+    const message = /429|quota|rate limit|exceeded your current quota/i.test(raw)
+      ? 'Image model ki free quota abhi khatam hai. 1-2 minute baad dobara try karein ya doosra image model chunein.'
+      : /503|high demand|overloaded|unavailable/i.test(raw)
+      ? 'Image model abhi busy hai. Thori der baad dobara try karein.'
+      : raw && raw.length <= 240
+      ? raw
+      : 'Thumbnail generate nahi hui. Dobara try karein.';
+    res.status(500).json({ error: message });
   }
 });
 
@@ -763,20 +772,25 @@ STORY RULES (strict)
 6. The story must follow the creator's idea and discussion notes. Do not drift to an unrelated topic.
 7. Title must NOT be the raw topic sentence. Max 65 characters, curiosity + search keyword. Do not reuse excluded titles.
 8. Description: 2-3 Roman Urdu lines + a "PRACTICAL STEPS / COMMANDS:" block with 3-6 concrete steps when the topic is a tech tutorial. For beauty, give a short step routine instead.
-9. Thumbnail prompt must be a detailed 9:16 vertical image prompt with dark navy/neon-cyan studio style, presenter ${presenter}, 3D headline, sub-badge, hologram, branded mug/laptop, sparkle finish, strong contrast.
+9. THUMBNAIL AGENT v3.45 structured output (server master prompt khud banayega, is liye poora image prompt mat likho):
+   - thumbnailLine1 + thumbnailLine2: total 3-5 UPPERCASE words, har line maximum 14 characters. Line 1 white aur line 2 neon-cyan render hogi. Raw topic sentence kabhi nahi.
+   - thumbnailSubBanner: 2-4 word punchy yellow-banner hook, Roman Urdu + English mix allowed.
+   - thumbnailHologram: 20-35 words mein EXACT story/tool-specific floating 3D hologram (icons, UI panels, data flows) + uske around adapted energy trails. Generic "tech hologram" bilkul nahi.
+   - Thumbnail text story ke core result/tool par ho, clickbait jhooth par nahi.
 10. seriesPlan: one line teaser for the next episode.
 
 Return STRICT valid JSON only, no markdown fences:
 {
   "title": "...",
   "hook": "...",
-  "thumbnailHeadline": "3-4 UPPERCASE WORDS",
-  "thumbnailSubBadge": "2-3 WORDS",
+  "thumbnailLine1": "MAX 14 CHARS",
+  "thumbnailLine2": "MAX 14 CHARS",
+  "thumbnailSubBanner": "2-4 WORDS",
+  "thumbnailHologram": "story-specific floating 3D hologram description with energy trails",
   "hashtags": ["${primaryHashtag}", "#Shorts", "#..."],
   "description": "...",
   "tags": ["keyword1", "keyword2", "... 10-14 tags"],
   "tiktokCaption": "...",
-  "thumbnailPrompt": "...",
   "seriesPlan": "...",
   "scenes": [
     {
@@ -884,16 +898,42 @@ Return STRICT valid JSON only, no markdown fences:
     const title = safeString(data.title) || ideaTitle;
     const tiktokCaption = safeString(data.tiktokCaption) || `${title} ${hashtags.join(' ')}`;
 
+    const [fallbackLine1, fallbackLine2] = splitHeadline(
+      safeString(data.thumbnailHeadline) || title || ideaTitle
+    );
+    const thumbnailLine1 = safeString(data.thumbnailLine1).slice(0, 22) || fallbackLine1;
+    const thumbnailLine2 = safeString(data.thumbnailLine2).slice(0, 22) || fallbackLine2;
+    const thumbnailSubBadge =
+      safeString(data.thumbnailSubBanner) || safeString(data.thumbnailSubBadge) || 'MUST TRY';
+    const ideaPoints = safeString(idea.points);
+    const thumbnailHologram =
+      safeString(data.thumbnailHologram) ||
+      `a glowing floating 3D hologram visualising "${ideaTitle}"${
+        ideaPoints ? ` with ${ideaPoints.slice(0, 140)}` : ' with layered UI panels and data streams'
+      }, surrounded by custom cyan energy trails that adapt to its shape`;
+    const thumbnailPrompt = buildMasterThumbnailPrompt({
+      channelName,
+      presenter,
+      line1: thumbnailLine1,
+      line2: thumbnailLine2,
+      subBanner: thumbnailSubBadge,
+      hologram: thumbnailHologram,
+    });
+    const thumbnailHeadline = [thumbnailLine1, thumbnailLine2].filter(Boolean).join(' ').slice(0, 40);
+
     res.json({
       title,
       hook: safeString(data.hook) || safeString(idea.hook) || 'Reveal',
-      thumbnailHeadline: safeString(data.thumbnailHeadline) || title.split(/\s+/).slice(0, 3).join(' ').toUpperCase(),
-      thumbnailSubBadge: safeString(data.thumbnailSubBadge) || 'MUST TRY',
+      thumbnailLine1,
+      thumbnailLine2,
+      thumbnailHeadline,
+      thumbnailSubBadge,
+      thumbnailHologram,
       hashtags,
       description: safeString(data.description),
       tags,
       tiktokCaption,
-      thumbnailPrompt: safeString(data.thumbnailPrompt),
+      thumbnailPrompt,
       seriesPlan: safeString(data.seriesPlan),
       scenes,
       modelUsed,
