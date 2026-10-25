@@ -69,6 +69,21 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string) =>
     );
   });
 
+const friendlyGeminiError = (err: any, fallback: string): string => {
+  const raw = String(err?.message || '');
+  if (/429|RESOURCE_EXHAUSTED|exceeded your current quota|quota|rate limit/i.test(raw)) {
+    return 'Gemini ki free limit abhi khatam hai, is liye request poori nahi ho saki. Thori der baad ya quota reset hone par dobara try karein. Jaldi chahiye to Google AI Studio mein billing enable karni padegi.';
+  }
+  if (/503|UNAVAILABLE|high demand|overloaded/i.test(raw)) {
+    return 'Gemini model abhi busy hai. 1-2 minute baad dobara try karein.';
+  }
+  if (/401|403|PERMISSION_DENIED|API key not valid|invalid api key/i.test(raw)) {
+    return 'Gemini API key ka issue hai. Render Environment mein GEMINI_API_KEY check karein.';
+  }
+  const trimmed = raw.trim();
+  return trimmed && trimmed.length <= 240 ? trimmed : fallback;
+};
+
 function extractJsonObject(raw: string): any | null {
   const text = String(raw || '')
     .trim()
@@ -117,24 +132,31 @@ app.get('/api/health', (_req, res) => {
 });
 
 // 1. AI Chatbot API (gemini-3.8-flash, gemini-4-argon, gemini-3.1-flash-lite)
+const CHAT_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-4-argon',
+  'gemini-3.1-flash-lite',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3-flash-preview',
+  'gemini-3.5-flash-lite',
+];
+const CHAT_FALLBACK_ORDER = [
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-3-flash-preview',
+  'gemini-3.5-flash-lite',
+];
+
 app.post('/api/ai/chat', async (req, res) => {
   try {
-    const { messages, model = 'gemini-3.8-flash', systemInstruction } = req.body;
+    const { messages, model = 'gemini-3.8-flash', systemInstruction, fallback = false } = req.body;
     const ai = getAiClient();
 
-    const selectedModel = model === 'gemini-4-argon' 
-      ? 'gemini-4-argon' 
-      : model === 'gemini-3.1-flash-lite' 
-      ? 'gemini-3.1-flash-lite' 
-      : model === 'gemini-3.6-flash'
-      ? 'gemini-3.6-flash'
-      : model === 'gemini-3.5-flash'
-      ? 'gemini-3.5-flash'
-      : model === 'gemini-3-flash-preview'
-      ? 'gemini-3-flash-preview'
-      : model === 'gemini-3.5-flash-lite'
-      ? 'gemini-3.5-flash-lite'
-      : 'gemini-3.8-flash';
+    const selectedModel = CHAT_MODELS.includes(model) ? model : 'gemini-3.8-flash';
+    const modelsToTry = fallback
+      ? [selectedModel, ...CHAT_FALLBACK_ORDER.filter((item) => item !== selectedModel)]
+      : [selectedModel];
 
     // Format contents for multi-turn history
     const contents = messages.map((m: any) => ({
@@ -142,19 +164,42 @@ app.post('/api/ai/chat', async (req, res) => {
       parts: [{ text: m.text }],
     }));
 
-    const response = await ai.models.generateContent({
-      model: selectedModel,
-      contents,
-      config: {
-        systemInstruction: systemInstruction || "You are an expert AI Production Assistant and Script Doctor for IT Cafeteria, run by Waqar Majeed. You communicate warmly in Roman Urdu or English as requested, assisting with Google Flow prompts, YouTube Shorts hooks, and viral retention.",
-        temperature: 0.7,
-      },
-    });
+    let response: any = null;
+    let lastError: any = null;
+    let modelUsed = selectedModel;
 
-    res.json({ text: response.text });
+    for (const candidate of modelsToTry) {
+      try {
+        response = await withTimeout(
+          ai.models.generateContent({
+            model: candidate,
+            contents,
+            config: {
+              systemInstruction: systemInstruction || "You are an expert AI Production Assistant and Script Doctor for IT Cafeteria, run by Waqar Majeed. You communicate warmly in Roman Urdu or English as requested, assisting with Google Flow prompts, YouTube Shorts hooks, and viral retention.",
+              temperature: 0.7,
+            },
+          }),
+          30000,
+          'Chat'
+        );
+        modelUsed = candidate;
+        break;
+      } catch (attemptError: any) {
+        lastError = attemptError;
+        console.error(`Chat attempt (${candidate}) failed:`, attemptError?.message || attemptError);
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error('Failed to generate response');
+    }
+
+    res.json({ text: response.text, modelUsed });
   } catch (err: any) {
     console.error('Chat error:', err);
-    res.status(500).json({ error: err.message || 'Failed to generate response' });
+    res.status(500).json({
+      error: friendlyGeminiError(err, 'Chat jawab generate nahi ho saka. Dobara try karein.'),
+    });
   }
 });
 
@@ -167,14 +212,42 @@ app.post('/api/ai/search-grounding', async (req, res) => {
     }
     const ai = getAiClient();
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: query,
-      config: {
-        tools: [{ googleSearch: {} }],
-        systemInstruction: "You are a tech research engine for IT Cafeteria. Find the latest verified facts, model releases, prices, and features for tech content creators. Summarize in concise Roman Urdu and list sources.",
-      },
-    });
+    const searchAttempts = [
+      { model: 'gemini-3.8-flash', timeoutMs: 30000 },
+      { model: 'gemini-3.6-flash', timeoutMs: 30000 },
+      { model: 'gemini-3-flash-preview', timeoutMs: 30000 },
+    ];
+
+    let response: any = null;
+    let lastError: any = null;
+
+    for (const attempt of searchAttempts) {
+      try {
+        response = await withTimeout(
+          ai.models.generateContent({
+            model: attempt.model,
+            contents: query,
+            config: {
+              tools: [{ googleSearch: {} }],
+              systemInstruction: "You are a tech research engine for IT Cafeteria. Find the latest verified facts, model releases, prices, and features for tech content creators. Summarize in concise Roman Urdu and list sources.",
+            },
+          }),
+          attempt.timeoutMs,
+          'Search grounding'
+        );
+        break;
+      } catch (attemptError: any) {
+        lastError = attemptError;
+        console.error(
+          `Search grounding attempt (${attempt.model}) failed:`,
+          attemptError?.message || attemptError
+        );
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error('Failed to search');
+    }
 
     const text = response.text;
     const searchChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
@@ -185,7 +258,9 @@ app.post('/api/ai/search-grounding', async (req, res) => {
     res.json({ text, sources: webSources });
   } catch (err: any) {
     console.error('Search grounding error:', err);
-    res.status(500).json({ error: err.message || 'Failed to search' });
+    res.status(500).json({
+      error: friendlyGeminiError(err, 'Research search fail ho gayi. Dobara try karein.'),
+    });
   }
 });
 
