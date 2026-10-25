@@ -588,3 +588,114 @@ export const CATEGORIES_IT_CAFETERIA = [
   { id: 9, name: "YT Automation (Course Series)", playlist: "YT Automation", special: "16:9 format, manual selection" },
   { id: 10, name: "Custom Search", playlist: "Digital Growth or closest category" }
 ];
+
+export interface ChannelCategory {
+  id: number;
+  name: string;
+  playlist: string;
+}
+
+export interface ChannelTagVariant {
+  value: string;
+  label: string;
+}
+
+export interface ChannelDurationOption {
+  value: number;
+  label: string;
+}
+
+export interface ChannelProfile {
+  id: "itcafeteria" | "beautyhub";
+  name: string;
+  presenter: string;
+  niche: string;
+  tags: ChannelTagVariant[];
+  categories: ChannelCategory[];
+  rotationCategoryIds: number[];
+  defaultTag: string;
+  defaultCategoryId: number;
+  durations: ChannelDurationOption[];
+  defaultSceneCount: number;
+  sampleNotes: Record<number, { title: string; hook: string }>;
+}
+
+const BEAUTY_CATEGORIES: ChannelCategory[] = [
+  { id: 1, name: "Makeup", playlist: "Makeup" },
+  { id: 2, name: "Skincare", playlist: "Skincare" },
+  { id: 3, name: "Hair & Hairstyling", playlist: "Hair & Hairstyling" },
+  { id: 4, name: "Nails & Hand Care", playlist: "Nails & Hand Care" },
+  { id: 5, name: "Bridal & Wedding Beauty", playlist: "Bridal & Wedding Beauty" },
+  { id: 6, name: "Self-Grooming & Personal Care", playlist: "Self-Grooming & Personal Care" },
+  { id: 7, name: "Beauty Hacks & Quick Tips", playlist: "Beauty Hacks & Quick Tips" },
+  { id: 8, name: "Beauty Products & Reviews", playlist: "Beauty Products & Reviews" },
+  { id: 9, name: "Beauty Looks & Trends", playlist: "Beauty Looks & Trends" }
+];
+
+export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfile> = {
+  itcafeteria: {
+    id: "itcafeteria",
+    name: "IT Cafeteria",
+    presenter: "Waqar Majeed",
+    niche: "IT & Technology",
+    tags: [
+      { value: "@WM25-1", label: "@WM25-1 (Casual Studio)" },
+      { value: "@WM25-2", label: "@WM25-2 (Blue Accent)" },
+      { value: "@WM25-3", label: "@WM25-3 (Tech Setup)" },
+      { value: "@WM25-4", label: "@WM25-4 (Lecture Series)" },
+      { value: "@WM25-5", label: "@WM25-5 (Smart Casual)" }
+    ],
+    categories: CATEGORIES_IT_CAFETERIA.map(({ id, name, playlist }) => ({ id, name, playlist })),
+    rotationCategoryIds: CATEGORIES_IT_CAFETERIA.filter((c) => c.id <= 8).map((c) => c.id),
+    defaultTag: "@WM25-1",
+    defaultCategoryId: 4,
+    durations: [
+      { value: 10, label: "10 Scenes (100s — Standard Short)" },
+      { value: 12, label: "12 Scenes (120s — Extended)" },
+      { value: 15, label: "15 Scenes (150s — Max Short)" },
+      { value: 7, label: "7 Scenes (70s — Minimal Threshold)" }
+    ],
+    defaultSceneCount: 10,
+    sampleNotes: {
+      1: { title: "Google Astra Live Vision: Phone Camera Ka Naya Kamaal", hook: "Reveal" },
+      2: { title: "ChatGPT vs Gemini: Konsa AI Assistant Aapke Kaam Ka Hai?", hook: "Comparison" },
+      3: { title: "AI Image Prompt Formula: Studio-Level Results", hook: "Mistake" },
+      4: { title: "Windows 11 Hidden Trick: Auto Clean Temp Files", hook: "Contrarian Warning" },
+      5: { title: "Gemini 4 Argon Launch: Sab Kuch Jo Aapko Pata Hona Chahiye", hook: "Reveal" },
+      6: { title: "AI Smart Home 2026: Ghar Ke Devices Ab Auto Manage", hook: "Before/After" },
+      7: { title: "WhatsApp Hidden Trick: Blue Tick Ke Baghair Message Padhein", hook: "Reveal" },
+      8: { title: "Shopify Store Management Se Remote Income Ka Tareeqa", hook: "Warning" },
+      9: { title: "YouTube Automation Chapter 11: B-Roll & Generative Visuals", hook: "Reveal" },
+      10: { title: "Custom Topic: Aapki Research Ke Mutabiq", hook: "Reveal" }
+    }
+  },
+  beautyhub: {
+    id: "beautyhub",
+    name: "Beauty Hub",
+    presenter: "Mehr Zadi",
+    niche: "Beauty & Grooming",
+    tags: [{ value: "@MZ22-1", label: "@MZ22-1 (Rose Gold Studio)" }],
+    categories: BEAUTY_CATEGORIES,
+    rotationCategoryIds: BEAUTY_CATEGORIES.map((c) => c.id),
+    defaultTag: "@MZ22-1",
+    defaultCategoryId: 1,
+    durations: [
+      { value: 10, label: "10 Scenes (100s — Standard Short)" },
+      { value: 12, label: "12 Scenes (120s — Extended Look)" },
+      { value: 15, label: "15 Scenes (150s — Max Short)" },
+      { value: 8, label: "8 Scenes (80s — Quick Look)" }
+    ],
+    defaultSceneCount: 10,
+    sampleNotes: {
+      1: { title: "5-Minute Everyday Makeup Look — Beginners Ke Liye", hook: "Relatable Mistake" },
+      2: { title: "Dull Skin Fix: Morning Skincare Routine In 3 Steps", hook: "Before/After" },
+      3: { title: "Heatless Hairstyle: Bina Heat Ke Salon Look", hook: "Reveal" },
+      4: { title: "Minimal Nail Art: 2-Minute Daily Look", hook: "Reveal" },
+      5: { title: "Bridal Makeup Prep: Skincare Timeline Jo Miss Nahi Karna", hook: "Warning" },
+      6: { title: "Night Routine: 10 Minute Self-Grooming Habit", hook: "Relatable Mistake" },
+      7: { title: "Emergency Beauty Fix: 3 Quick Hacks", hook: "Reveal" },
+      8: { title: "Affordable Makeup Kit: Worth It Ya Not?", hook: "Comparison" },
+      9: { title: "Soft Glam Look: Pakistani Wedding Season Trending", hook: "Reveal" }
+    }
+  }
+};
