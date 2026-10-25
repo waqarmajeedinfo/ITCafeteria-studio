@@ -202,6 +202,7 @@ export const AiChatbot: React.FC = () => {
         body: JSON.stringify({
           messages: newMessages.map(m => ({ role: m.role, text: m.text })),
           model: selectedModel,
+          fallback: true,
           systemInstruction: `You are the specialized AI Production Agent for IT Cafeteria (Waqar Majeed). 
 You help research, refine, and write Google Flow (Gemini Omni Flash) video scripts, hooks, and YouTube packages.
 Always adhere to IT Cafeteria rules:
@@ -224,7 +225,7 @@ Always adhere to IT Cafeteria rules:
         role: 'assistant',
         text: data.text || 'Koi jawab generate nahi ho saka.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        model: selectedModel
+        model: data.modelUsed || selectedModel
       };
 
       setMessages(prev => [...prev, botMsg]);
@@ -485,9 +486,9 @@ Always adhere to IT Cafeteria rules:
             )}
 
             {errorMsg && (
-              <div className="p-3 bg-rose-950/50 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                <span>{errorMsg}</span>
+              <div className="p-3 bg-rose-950/50 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                <span className="break-words whitespace-pre-wrap leading-relaxed">{errorMsg}</span>
               </div>
             )}
 

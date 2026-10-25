@@ -208,9 +208,9 @@ export const AudioTranscriber: React.FC = () => {
           </div>
 
           {error && (
-            <div className="p-3 bg-rose-950/40 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>{error}</span>
+            <div className="p-3 bg-rose-950/40 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span className="break-words whitespace-pre-wrap leading-relaxed">{error}</span>
             </div>
           )}
         </div>

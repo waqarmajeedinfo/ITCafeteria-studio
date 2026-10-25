@@ -25,6 +25,7 @@ export const ImageThumbnailStudio: React.FC = () => {
   const [inputImageName, setInputImageName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [usedModel, setUsedModel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,30 +44,47 @@ export const ImageThumbnailStudio: React.FC = () => {
     setIsLoading(true);
     setError(null);
 
+    const modelsToTry = model === 'gemini-nano-banana-2.1'
+      ? ['gemini-nano-banana-2.1', 'gemini-3.1-flash-lite-image'] as const
+      : ['gemini-3.1-flash-lite-image', 'gemini-nano-banana-2.1'] as const;
+
+    let lastError: Error | null = null;
+
     try {
-      const res = await fetch('/api/ai/generate-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: prompt.trim(),
-          aspectRatio,
-          imageSize,
-          model,
-          base64InputImage: base64InputImage || undefined,
-        }),
-      });
+      for (const modelId of modelsToTry) {
+        try {
+          const res = await fetch('/api/ai/generate-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: prompt.trim(),
+              aspectRatio,
+              imageSize,
+              model: modelId,
+              base64InputImage: base64InputImage || undefined,
+            }),
+          });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Image generation failed with status ${res.status}`);
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Image generation failed with status ${res.status}`);
+          }
+
+          const data = await res.json();
+          if (!data.imageUrl) {
+            throw new Error('No image URL returned from model.');
+          }
+
+          setGeneratedImageUrl(data.imageUrl);
+          setUsedModel(modelId);
+          lastError = null;
+          break;
+        } catch (err: any) {
+          lastError = err;
+        }
       }
 
-      const data = await res.json();
-      if (data.imageUrl) {
-        setGeneratedImageUrl(data.imageUrl);
-      } else {
-        throw new Error('No image URL returned from model.');
-      }
+      if (lastError) throw lastError;
     } catch (err: any) {
       console.error('Image gen error:', err);
       setError(err.message || 'Image generation failed.');
@@ -264,9 +282,9 @@ export const ImageThumbnailStudio: React.FC = () => {
           </button>
 
           {error && (
-            <div className="p-3 bg-rose-950/40 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>{error}</span>
+            <div className="p-3 bg-rose-950/40 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span className="break-words whitespace-pre-wrap leading-relaxed">{error}</span>
             </div>
           )}
         </div>
@@ -305,10 +323,15 @@ export const ImageThumbnailStudio: React.FC = () => {
           </div>
 
           {generatedImageUrl && (
-            <div className="pt-4 border-t border-slate-800 mt-4 flex items-center justify-between">
-              <span className="text-xs text-emerald-400 flex items-center gap-1">
-                <CheckCircle2 className="w-4 h-4" /> Ready for YouTube Studio
-              </span>
+            <div className="pt-4 border-t border-slate-800 mt-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-4 h-4" /> Ready for YouTube Studio
+                </span>
+                {usedModel && (
+                  <span className="text-[10px] font-mono text-slate-500">Model: {usedModel}</span>
+                )}
+              </div>
               <a
                 href={generatedImageUrl}
                 download="it_cafeteria_thumbnail.png"

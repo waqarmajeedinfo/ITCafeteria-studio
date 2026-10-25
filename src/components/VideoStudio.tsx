@@ -218,7 +218,7 @@ export const VideoStudio: React.FC = () => {
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <div>
                 <strong className="block font-semibold">Generation Note:</strong>
-                <p className="text-[11px] mt-0.5">{error}</p>
+                <p className="text-[11px] mt-0.5 break-words whitespace-pre-wrap leading-relaxed">{error}</p>
               </div>
             </div>
           )}

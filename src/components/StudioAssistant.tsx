@@ -89,6 +89,7 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
         body: JSON.stringify({
           messages: newMessages.map((m) => ({ role: m.role, text: m.text })),
           model: 'gemini-3.8-flash',
+          fallback: true,
           systemInstruction: `You are the embedded IT Cafeteria Studio Assistant — like the Gemini assistant inside Chrome, but living inside Waqar Majeed's IT Cafeteria AI content studio app. Waqar is currently viewing the "${currentTabLabel}" tab (tab id: ${currentTab}).
 Your job:
 1. Guide him in friendly natural Roman Urdu (English tech terms allowed) about how to use the app's studios.
@@ -222,9 +223,9 @@ Keep replies concise (under 150 words) and always end with one practical next st
             )}
 
             {errorMsg && (
-              <div className="p-2 bg-rose-950/50 border border-rose-500/30 text-rose-300 rounded-lg text-[11px] flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
-                <span>{errorMsg}</span>
+              <div className="p-2 bg-rose-950/50 border border-rose-500/30 text-rose-300 rounded-lg text-[11px] flex items-start gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400 mt-0.5" />
+                <span className="break-words whitespace-pre-wrap leading-relaxed">{errorMsg}</span>
               </div>
             )}
 

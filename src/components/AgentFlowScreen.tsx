@@ -1161,7 +1161,7 @@ Rules:
                   <AlertTriangle className="w-4 h-4 text-rose-400" />
                   Story generate nahi ho saki
                 </p>
-                <p className="text-[11px] text-rose-100/80">{errorMsg}</p>
+                <p className="text-[11px] text-rose-100/80 break-words whitespace-pre-wrap leading-relaxed">{errorMsg}</p>
                 <p className="text-[10px] text-slate-400">
                   Idea aur discussion mehfooz hain. Neeche se dobara try karein.
                 </p>
