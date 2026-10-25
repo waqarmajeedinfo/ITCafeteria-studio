@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   BarChart3, 
   Bot, 
@@ -24,7 +24,10 @@ import {
   X,
   Calendar as CalendarIcon,
   Users,
-  Vote
+  Vote,
+  ChevronDown,
+  Menu,
+  Check
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -43,6 +46,7 @@ import { GrowthSignals } from './components/GrowthSignals';
 import { ContentCalendar } from './components/ContentCalendar';
 import { CompetitorBenchmarking } from './components/CompetitorBenchmarking';
 import { CommunityPollWidget } from './components/CommunityPollWidget';
+import { StudioAssistant } from './components/StudioAssistant';
 import { PHONETIC_DICTIONARY } from './data/channelData';
 
 type TabType = 
@@ -63,9 +67,34 @@ type TabType =
   | 'roadmap' 
   | 'masterlist';
 
+export type { TabType };
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('analytics');
   const [showDictionary, setShowDictionary] = useState(false);
+  const [openMenu, setOpenMenu] = useState<'core' | 'ai' | 'management' | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setOpenMenu(null);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenMenu(null);
+        setMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode; group: 'core' | 'ai' | 'management' }[] = [
     // Core Channel Tabs
@@ -90,6 +119,21 @@ export default function App() {
     { id: 'roadmap', label: 'Upscaling (v3.42+)', icon: <Rocket className="w-4 h-4" />, group: 'management' },
     { id: 'masterlist', label: 'Master List', icon: <ListTodo className="w-4 h-4" />, group: 'management' },
   ];
+
+  const groups: { id: 'core' | 'ai' | 'management'; label: string; icon: React.ReactNode }[] = [
+    { id: 'core', label: 'Core Channel', icon: <BarChart3 className="w-3.5 h-3.5 text-cyan-400" /> },
+    { id: 'ai', label: 'AI Studios', icon: <Sparkles className="w-3.5 h-3.5 text-amber-400" /> },
+    { id: 'management', label: 'Management', icon: <Layers className="w-3.5 h-3.5 text-indigo-400" /> },
+  ];
+
+  const activeGroup = tabs.find((t) => t.id === activeTab)?.group;
+  const activeTabMeta = tabs.find((t) => t.id === activeTab);
+
+  const selectTab = (id: TabType) => {
+    setActiveTab(id);
+    setOpenMenu(null);
+    setMobileMenuOpen(false);
+  };
 
   return (
     <div className="min-h-screen bg-[#070a13] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
@@ -137,26 +181,110 @@ export default function App() {
           </div>
         </div>
 
-        {/* Multi-Section Tab Navigation */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto no-scrollbar gap-1 pt-1 border-t border-slate-800/40 text-xs">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
+        {/* Multi-Section Menu Navigation (Website Style) */}
+        <nav className="relative border-t border-slate-800/40 bg-slate-950/60" ref={navRef}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Desktop Menu Bar */}
+            <div className="hidden md:flex items-center gap-1 py-1 text-xs">
+              {groups.map((group) => {
+                const isGroupActive = activeGroup === group.id;
+                const isOpen = openMenu === group.id;
+                const groupTabs = tabs.filter((t) => t.group === group.id);
+                return (
+                  <div key={group.id} className="relative">
+                    <button
+                      onClick={() => setOpenMenu(isOpen ? null : group.id)}
+                      className={`px-3 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors cursor-pointer ${
+                        isOpen || isGroupActive
+                          ? 'text-cyan-300 bg-cyan-500/10'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      }`}
+                    >
+                      {group.icon}
+                      <span>{group.label}</span>
+                      <span className="text-[9px] font-mono text-slate-500">({groupTabs.length})</span>
+                      <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isOpen && (
+                      <div className="absolute left-0 top-full mt-1 w-64 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl shadow-black/60 py-1.5 z-50">
+                        {groupTabs.map((tab) => {
+                          const isActive = activeTab === tab.id;
+                          return (
+                            <button
+                              key={tab.id}
+                              onClick={() => selectTab(tab.id)}
+                              className={`w-full px-3 py-2 flex items-center gap-2.5 text-left transition-colors cursor-pointer ${
+                                isActive
+                                  ? 'bg-cyan-500/10 text-cyan-300'
+                                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                              }`}
+                            >
+                              <span className="shrink-0">{tab.icon}</span>
+                              <span className="flex-1">{tab.label}</span>
+                              {isActive && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              <div className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-500">
+                <span className="hidden lg:inline">Abhi khula:</span>
+                <span className="text-slate-300 font-medium">{activeTabMeta?.label}</span>
+              </div>
+            </div>
+
+            {/* Mobile Menu Bar */}
+            <div className="md:hidden flex items-center justify-between py-2 text-xs">
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-2.5 font-medium border-b-2 flex items-center gap-2 transition-all whitespace-nowrap ${
-                  isActive
-                    ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10'
-                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                }`}
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200 cursor-pointer"
               >
-                {tab.icon}
-                <span>{tab.label}</span>
+                <Menu className="w-4 h-4 text-cyan-400" />
+                <span>Menu</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${mobileMenuOpen ? 'rotate-180' : ''}`} />
               </button>
-            );
-          })}
-        </div>
+              <span className="text-slate-400 truncate max-w-[55%]">{activeTabMeta?.label}</span>
+            </div>
+
+            {/* Mobile Expanded Panel */}
+            {mobileMenuOpen && (
+              <div className="md:hidden border-t border-slate-800/60 py-2 space-y-3">
+                {groups.map((group) => (
+                  <div key={group.id}>
+                    <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                      {group.icon}
+                      {group.label}
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {tabs.filter((t) => t.group === group.id).map((tab) => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => selectTab(tab.id)}
+                            className={`px-2.5 py-2 rounded-lg flex items-center gap-2 text-left text-[11px] transition-colors cursor-pointer ${
+                              isActive
+                                ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                                : 'text-slate-300 bg-slate-800/50 hover:bg-slate-800'
+                            }`}
+                          >
+                            <span className="shrink-0">{tab.icon}</span>
+                            <span className="truncate">{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </nav>
       </header>
 
       {/* Main Container */}
@@ -224,6 +352,13 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Floating AI Assistant (Chrome Gemini Style) */}
+      <StudioAssistant
+        currentTab={activeTab}
+        currentTabLabel={activeTabMeta?.label || ''}
+        onNavigate={(tab) => setActiveTab(tab)}
+      />
 
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-slate-950/60 py-4 text-center text-xs text-slate-400">
