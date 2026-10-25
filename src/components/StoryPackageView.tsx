@@ -191,25 +191,25 @@ export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story })
         {story.scenes.map((scene) => (
           <div
             key={scene.num}
-            className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3.5 sm:p-4 hover:border-slate-700 transition-colors"
+            className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 sm:p-5 hover:border-slate-700 transition-colors"
           >
-            <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-bold text-white text-sm">
+                <span className="font-bold text-white text-base">
                   Scene {scene.num} — {scene.duration} [{scene.purpose}]{scene.isCTA ? ' — CTA' : ''}
                 </span>
                 {scene.isCTA && (
-                  <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[9px] font-mono">
+                  <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-mono">
                     SAVE CTA
                   </span>
                 )}
-                <span className="text-[10px] text-slate-400 font-mono">
+                <span className="text-[11px] text-slate-400 font-mono">
                   ({scene.words} words • ~2.7 w/s)
                 </span>
               </div>
               <button
                 onClick={() => copyScene(scene)}
-                className="flex items-center gap-1 text-[11px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700"
+                className="flex items-center gap-1 text-xs px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700"
               >
                 {copiedScene === scene.num ? (
                   <>
@@ -224,23 +224,23 @@ export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story })
             </div>
 
             {scene.visual && (
-              <p className="text-[11px] text-slate-400 mb-2">
-                <span className="text-slate-500 uppercase font-mono text-[9px] mr-1">Visual:</span>
+              <p className="text-xs text-slate-400 mb-2.5">
+                <span className="text-slate-500 uppercase font-mono text-[10px] mr-1">Visual:</span>
                 {scene.visual}
               </p>
             )}
 
             {scene.dialogue && (
-              <p className="text-[11px] text-fuchsia-200/90 bg-fuchsia-950/20 border border-fuchsia-500/20 rounded-lg px-3 py-2 mb-2">
-                <span className="text-fuchsia-400/80 uppercase font-mono text-[9px] mr-1">Dialogue:</span>
+              <p className="text-sm text-fuchsia-200/90 bg-fuchsia-950/20 border border-fuchsia-500/20 rounded-lg px-3.5 py-2.5 mb-2.5">
+                <span className="text-fuchsia-400/80 uppercase font-mono text-[10px] mr-1">Dialogue:</span>
                 “{scene.dialogue}”
               </p>
             )}
 
-            <div className="text-[10px] text-blue-400/80 font-mono mb-1">
+            <div className="text-xs text-blue-400/80 font-mono mb-1.5">
               Flow — Copy-Paste Script
             </div>
-            <p className="text-xs text-slate-300 font-mono leading-relaxed bg-slate-900/90 p-3 rounded-lg border border-slate-800/60 selection:bg-blue-600 selection:text-white whitespace-pre-wrap">
+            <p className="text-sm text-slate-300 font-mono leading-relaxed bg-slate-900/90 p-4 sm:p-5 rounded-xl border border-slate-800/60 selection:bg-blue-600 selection:text-white whitespace-pre-wrap min-h-[9rem] sm:min-h-[11rem]">
               {scene.script}
             </p>
           </div>
