@@ -1164,13 +1164,13 @@ function registerIntegrationRoutes(app2) {
 dotenv.config();
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
+var port = process.env.DEFAULT_APP_PORT ? Number(process.env.DEFAULT_APP_PORT) : process.env.PORT && process.env.PORT !== "8080" ? Number(process.env.PORT) : 3e3;
 var app = express();
-var port = Number(process.env.PORT) || 3e3;
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 var accessKey = process.env.APP_ACCESS_KEY;
-if (accessKey) {
+if (accessKey && process.env.NODE_ENV === "production" && !process.env.DEFAULT_APP_PORT) {
   app.use((req, res, next) => {
     if (req.path === "/api/health") return next();
     if (INTEGRATION_PUBLIC_PATHS.includes(req.path)) return next();

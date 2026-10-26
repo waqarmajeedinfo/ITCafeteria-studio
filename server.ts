@@ -12,15 +12,25 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// AI Studio container runs nginx on 8080 and proxies to 3000 (DEFAULT_APP_PORT).
+// On Render, Render sets a custom PORT (e.g. 10000).
+const port = process.env.DEFAULT_APP_PORT
+  ? Number(process.env.DEFAULT_APP_PORT)
+  : (process.env.PORT && process.env.PORT !== '8080')
+    ? Number(process.env.PORT)
+    : 3000;
+
 const app = express();
-const port = Number(process.env.PORT) || 3000;
 
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 const accessKey = process.env.APP_ACCESS_KEY;
-if (accessKey) {
+// Enforce Basic Auth in production deployments (e.g. on Render) to protect the live studio.
+// In AI Studio development preview (where DEFAULT_APP_PORT is set or NODE_ENV !== 'production'),
+// bypass so the preview iframe is not blocked by browser cross-origin basic auth restrictions.
+if (accessKey && process.env.NODE_ENV === 'production' && !process.env.DEFAULT_APP_PORT) {
   app.use((req, res, next) => {
     if (req.path === '/api/health') return next();
     if (INTEGRATION_PUBLIC_PATHS.includes(req.path)) return next();

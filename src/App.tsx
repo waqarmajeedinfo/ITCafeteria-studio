@@ -133,9 +133,9 @@ export default function App() {
   });
   const [bannerHeight, setBannerHeight] = useState<'auto' | 'spacious' | 'standard' | 'compact'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('itc_banner_height') as any) || 'auto';
+      return (localStorage.getItem('itc_banner_height') as any) || 'spacious';
     }
-    return 'auto';
+    return 'spacious';
   });
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [customUrlInput, setCustomUrlInput] = useState('');
@@ -259,21 +259,21 @@ export default function App() {
     };
   }, []);
 
-  type TabGroup = 'core' | 'automation' | 'management' | 'ai';
+  type TabGroup = 'core' | 'autopilot' | 'management' | 'ai';
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode; group: TabGroup }[] = [
-    // 1. Core Channel Tabs (Red marked)
+    // 1. Core Channel Tabs
     { id: 'analytics', label: 'Channel Diagnostics', icon: <BarChart3 className="w-4 h-4 text-cyan-400" />, group: 'core' },
     { id: 'live', label: 'Live Insights (YouTube + TikTok)', icon: <Activity className="w-4 h-4 text-emerald-400" />, group: 'core' },
     { id: 'signals', label: 'Growth Signals & Anomalies', icon: <Rocket className="w-4 h-4 text-amber-400" />, group: 'core' },
     { id: 'benchmarking', label: 'Competitor Benchmarks', icon: <Users className="w-4 h-4 text-indigo-400" />, group: 'core' },
 
-    // 2. Autopilot & Agents (Green marked)
-    { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-emerald-400" />, group: 'automation' },
-    { id: 'simulator', label: 'Agent Flow Simulator', icon: <Bot className="w-4 h-4 text-cyan-400" />, group: 'automation' },
-    { id: 'community', label: 'Community Polls', icon: <Vote className="w-4 h-4 text-rose-400" />, group: 'automation' },
+    // 2. Standalone Autopilot Tab (User requested: standalone separate tab)
+    { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-emerald-400" />, group: 'autopilot' },
+    { id: 'simulator', label: 'Agent Flow Simulator', icon: <Bot className="w-4 h-4 text-cyan-400" />, group: 'autopilot' },
+    { id: 'community', label: 'Community Polls', icon: <Vote className="w-4 h-4 text-rose-400" />, group: 'autopilot' },
 
-    // 3. Management & Production Queue (Yellow marked)
+    // 3. Management & Production Queue
     { id: 'pending', label: 'Pending Stories & Target Queue', icon: <Clock className="w-4 h-4 text-amber-400" />, group: 'management' },
     { id: 'calendar', label: 'Content Calendar', icon: <CalendarIcon className="w-4 h-4 text-cyan-400" />, group: 'management' },
     { id: 'duplicates', label: 'Duplicate Checker (58)', icon: <ShieldAlert className="w-4 h-4 text-rose-400" />, group: 'management' },
@@ -290,14 +290,14 @@ export default function App() {
     { id: '3d', label: '3D Virtual Studio', icon: <Box className="w-4 h-4 text-violet-400" />, group: 'ai' },
   ];
 
-  const groups: { id: TabGroup; label: string; icon: React.ReactNode }[] = [
-    { id: 'core', label: 'Core Channel', icon: <BarChart3 className="w-3.5 h-3.5 text-cyan-400" /> },
-    { id: 'automation', label: 'Autopilot & Agents', icon: <Cpu className="w-3.5 h-3.5 text-emerald-400" /> },
-    { id: 'management', label: 'Management & Queue', icon: <Layers className="w-3.5 h-3.5 text-indigo-400" /> },
-    { id: 'ai', label: 'AI Studios', icon: <Sparkles className="w-3.5 h-3.5 text-amber-400" /> },
+  const groups: { id: TabGroup; label: string; icon: React.ReactNode; defaultTab: TabType }[] = [
+    { id: 'core', label: 'Core Channel', icon: <BarChart3 className="w-4 h-4 text-cyan-400" />, defaultTab: 'analytics' },
+    { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-emerald-400" />, defaultTab: 'autopilot' },
+    { id: 'management', label: 'Management & Queue', icon: <Layers className="w-4 h-4 text-indigo-400" />, defaultTab: 'pending' },
+    { id: 'ai', label: 'AI Studios', icon: <Sparkles className="w-4 h-4 text-amber-400" />, defaultTab: 'chat' },
   ];
 
-  const activeGroup = tabs.find((t) => t.id === activeTab)?.group;
+  const activeGroup = tabs.find((t) => t.id === activeTab)?.group || 'core';
   const activeTabMeta = tabs.find((t) => t.id === activeTab);
 
   const selectTab = (id: TabType) => {
@@ -306,28 +306,35 @@ export default function App() {
     setMobileMenuOpen(false);
   };
 
+  const handleGroupSelect = (group: typeof groups[0]) => {
+    // If clicking the currently active group, do not disturb current sub-tab unless switching
+    if (activeGroup !== group.id) {
+      selectTab(group.defaultTab);
+    }
+  };
+
   return (
     <div className="min-h-screen app-shell-bg text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white relative">
       {/* Fixed Full-Page Animated Holographic Background (Stays fixed during scroll, visible between blocks) */}
       <HolographicBackground theme={holoTheme} opacity={holoOpacity} speed={holoSpeed} />
 
-      {/* Top Header — YouTube Channel Showcase with Integrated Glass Overlay */}
+      {/* Top Header — YouTube Channel Showcase with Full-Height Banner */}
       <header className="relative w-full bg-slate-950/80 backdrop-blur-sm z-30">
-        {/* Full-Height Channel Banner with Auto-Resize and Overlay */}
-        <div className={`relative w-full overflow-hidden bg-slate-950 border-b border-slate-800/80 transition-all duration-500 ease-out ${
+        {/* Full-Height Channel Banner with Height Control and object-top to prevent clipping */}
+        <div className={`relative w-full overflow-hidden bg-slate-950 transition-all duration-500 ease-out ${
           bannerHeight === 'compact' 
-            ? 'h-64 sm:h-72 md:h-80' 
+            ? 'h-80 sm:h-96 md:h-[420px]' 
             : bannerHeight === 'spacious' 
-            ? 'h-96 sm:h-[460px] md:h-[520px]' 
+            ? 'h-[480px] sm:h-[560px] md:h-[640px]' 
             : bannerHeight === 'standard'
-            ? 'h-80 sm:h-96 md:h-[420px]'
-            : 'aspect-[21/9] sm:aspect-[16/6] md:aspect-[16/5.2] min-h-[280px] max-h-[480px] w-full'
+            ? 'h-96 sm:h-[450px] md:h-[520px]'
+            : 'h-[440px] sm:h-[520px] md:h-[600px] w-full'
         }`}>
-          {/* Banner Graphic Image */}
+          {/* Banner Graphic Image — object-top ensures Waqar's head/neck and logo artwork are fully preserved without clipping */}
           <img
             src={bannerUrl}
             alt="IT Cafeteria channel banner"
-            className="w-full h-full object-cover object-center transition-transform duration-700"
+            className="w-full h-full object-cover object-top transition-transform duration-700"
           />
 
           {/* User-selected Overlay Design FX */}
@@ -338,9 +345,9 @@ export default function App() {
             <div className="absolute inset-0 bg-black/45 pointer-events-none" />
           )}
           {bannerOverlayStyle === 'minimal' ? (
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-950/20 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent pointer-events-none" />
           )}
 
           {/* Top-Right: Holographic Mode Switcher + Edit Banner Floating Buttons */}
@@ -348,7 +355,7 @@ export default function App() {
             <button
               onClick={cycleNextHoloTheme}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-cyan-500/40 text-xs font-semibold text-cyan-300 backdrop-blur-md shadow-xl transition-all cursor-pointer hover:border-cyan-300 hover:shadow-cyan-500/20"
-              title="Click to Cycle Holographic Moving Background (6 Themes)"
+              title="Click to Cycle Holographic Moving Background"
             >
               <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
               <span className="hidden sm:inline">Holo BG:</span>
@@ -358,166 +365,123 @@ export default function App() {
             <button
               onClick={() => setShowBannerModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-xl transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
-              title="Customize Banner, Auto-Resize & Hologram Overlay"
+              title="Customize Banner, Height & Hologram"
             >
               <Camera className="w-3.5 h-3.5 text-cyan-400" />
               <span>Edit Banner</span>
             </button>
           </div>
+        </div>
 
-          {/* Bottom Side of Banner: Integrated Branding & 3 Action Buttons */}
-          <div className="absolute bottom-0 inset-x-0 z-20 pb-4 pt-14 px-4 sm:px-6 lg:px-8 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent">
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-4">
-              {/* Left: Avatar with green pulsing dot + IT Cafeteria Title & Subs (NO paragraph!) */}
-              <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
-                <div className="relative shrink-0">
-                  <img
-                    src="/brand/logo.jpeg"
-                    alt="IT Cafeteria logo"
-                    className="w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 rounded-full object-cover bg-slate-900 ring-2 sm:ring-3 ring-cyan-400/60 shadow-xl shadow-cyan-500/25"
-                  />
-                  <span
-                    className="absolute bottom-0 right-0 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-emerald-500 rounded-full ring-2 ring-slate-950 flex items-center justify-center"
-                    title="Active Creator Studio"
-                  >
-                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
-                  </span>
-                </div>
+        {/* Sub-Header Action Bar — blended seamlessly with tabs background, duplicate logo & branding removed */}
+        <div className="w-full bg-slate-950/95 border-b border-slate-800/80 backdrop-blur-md py-3 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            {/* The 3 Action Buttons with identical subtle dark glass styling as Phonetic Dictionary */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              {/* 1. Channel Button */}
+              <a
+                href="https://www.youtube.com/@itcafeteria"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
+              >
+                <Youtube className="w-4 h-4 text-red-500" />
+                <span>Channel</span>
+              </a>
 
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="font-extrabold text-white text-lg sm:text-2xl md:text-3xl tracking-tight drop-shadow-md">
-                      IT Cafeteria
-                    </h1>
-                    <BadgeCheck className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400 shrink-0" aria-label="Verified channel" />
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 backdrop-blur-sm">
-                      Official Studio
-                    </span>
-                  </div>
+              {/* 2. Phonetic Rules Dictionary */}
+              <button
+                onClick={() => setShowDictionary(true)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
+              >
+                <BookOpen className="w-4 h-4 text-cyan-400" />
+                <span>Phonetic Rules Dictionary</span>
+              </button>
 
-                  <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 mt-0.5 flex-wrap drop-shadow">
-                    <a
-                      href="https://www.youtube.com/@itcafeteria"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-cyan-300 font-semibold hover:text-cyan-200 hover:underline flex items-center gap-1"
-                    >
-                      @itcafeteria
-                    </a>
-                    <span className="text-slate-500">•</span>
-                    <span className="text-white font-medium">1,348 Subscribers</span>
-                    <span className="text-slate-500">•</span>
-                    <span className="text-slate-300">58+ Shorts</span>
-                    <span className="text-slate-500">•</span>
-                    <span className="text-slate-400 italic hidden sm:inline">Better Content • Bigger Dreams</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: The 3 Action Buttons with UNIFIED identical dark glass styling */}
-              <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 flex-wrap">
-                {/* 1. Go Live Voice Co-Pilot Button (Identical dark glass style) */}
-                <button
-                  onClick={() => setIsLiveActive((prev) => !prev)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-medium transition-all cursor-pointer backdrop-blur-md shadow-md ${
-                    isLiveActive
-                      ? 'bg-rose-950/90 border-rose-500/80 text-rose-300 ring-2 ring-rose-500/30'
-                      : 'bg-slate-900/85 hover:bg-slate-800/90 border-slate-700/80 text-slate-200 hover:text-white'
-                  }`}
-                  title="Go Live: Real-time Hands-Free Voice Co-Pilot"
-                >
-                  <Radio className={`w-4 h-4 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
-                  <span>{isLiveActive ? 'Live Voice ON' : '🔴 Go Live'}</span>
-                </button>
-
-                {/* 2. Phonetic Rules Dictionary */}
-                <button
-                  onClick={() => setShowDictionary(true)}
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
-                >
-                  <BookOpen className="w-4 h-4 text-cyan-400" />
-                  <span>Phonetic Dictionary</span>
-                </button>
-
-                {/* 3. YouTube Channel Link (Identical dark glass style) */}
-                <a
-                  href="https://www.youtube.com/@itcafeteria"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
-                >
-                  <Youtube className="w-4 h-4 text-red-500" />
-                  <span>YouTube Channel</span>
-                </a>
-
-                {/* Quick Edit Overlay / Banner & Background Setting */}
-                <button
-                  onClick={() => setShowBannerModal(true)}
-                  className="p-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-slate-300 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
-                  title="Banner, Auto-Resize & Hologram Settings"
-                >
-                  <Sliders className="w-4 h-4 text-cyan-400" />
-                </button>
-              </div>
+              {/* 3. Go Live Voice Co-Pilot Button (identical slate-border styling) */}
+              <button
+                onClick={() => setIsLiveActive((prev) => !prev)}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-medium transition-all cursor-pointer backdrop-blur-md shadow-md ${
+                  isLiveActive
+                    ? 'bg-slate-900/95 border-rose-500/80 text-rose-300 ring-2 ring-rose-500/40 shadow-rose-950/50'
+                    : 'bg-slate-900/85 hover:bg-slate-800/90 border-slate-700/80 text-slate-200 hover:text-white'
+                }`}
+                title="Go Live: Real-time Hands-Free Voice Co-Pilot"
+              >
+                <Radio className={`w-4 h-4 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
+                <span>{isLiveActive ? 'Live Voice Active' : 'Go Live'}</span>
+              </button>
             </div>
+
+            {/* Quick Banner & Hologram Settings Button */}
+            <button
+              onClick={() => setShowBannerModal(true)}
+              className="p-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-slate-300 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md shrink-0"
+              title="Banner Height & Hologram Settings"
+            >
+              <Sliders className="w-4 h-4 text-cyan-400" />
+            </button>
           </div>
         </div>
 
-        {/* Multi-Section Menu Navigation (Website Style) — Sticky during scroll */}
+        {/* Multi-Section Menu Navigation (Expanded Website Style) — Sticky during scroll */}
         <nav className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur-md shadow-lg shadow-black/40" ref={navRef}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Desktop Menu Bar */}
-            <div className="hidden md:flex items-center gap-1 py-1 text-xs">
+            {/* Desktop Top Category Tabs Bar */}
+            <div className="hidden md:flex items-center gap-2 py-2 border-b border-slate-800/60 text-xs">
               {groups.map((group) => {
                 const isGroupActive = activeGroup === group.id;
-                const isOpen = openMenu === group.id;
-                const groupTabs = tabs.filter((t) => t.group === group.id);
+                const groupCount = tabs.filter((t) => t.group === group.id).length;
                 return (
-                  <div key={group.id} className="relative">
-                    <button
-                      onClick={() => setOpenMenu(isOpen ? null : group.id)}
-                      className={`px-3 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors cursor-pointer ${
-                        isOpen || isGroupActive
-                          ? 'text-cyan-300 bg-cyan-500/10'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                      }`}
-                    >
-                      {group.icon}
-                      <span>{group.label}</span>
-                      <span className="text-[9px] font-mono text-slate-500">({groupTabs.length})</span>
-                      <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {isOpen && (
-                      <div className="absolute left-0 top-full mt-1 w-64 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl shadow-black/60 py-1.5 z-50">
-                        {groupTabs.map((tab) => {
-                          const isActive = activeTab === tab.id;
-                          return (
-                            <button
-                              key={tab.id}
-                              onClick={() => selectTab(tab.id)}
-                              className={`w-full px-3 py-2 flex items-center gap-2.5 text-left transition-colors cursor-pointer ${
-                                isActive
-                                  ? 'bg-cyan-500/10 text-cyan-300'
-                                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                              }`}
-                            >
-                              <span className="shrink-0">{tab.icon}</span>
-                              <span className="flex-1">{tab.label}</span>
-                              {isActive && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    key={group.id}
+                    onClick={() => handleGroupSelect(group)}
+                    className={`px-3.5 py-2 rounded-xl font-medium flex items-center gap-2 transition-all cursor-pointer border ${
+                      isGroupActive
+                        ? 'text-cyan-200 bg-cyan-950/50 border-cyan-500/50 shadow-md shadow-cyan-950/40'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border-transparent hover:border-slate-800'
+                    }`}
+                  >
+                    {group.icon}
+                    <span className="font-semibold">{group.label}</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      isGroupActive ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-500'
+                    }`}>
+                      {groupCount}
+                    </span>
+                  </button>
                 );
               })}
 
               <div className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-500">
-                <span className="hidden lg:inline">Abhi khula:</span>
-                <span className="text-slate-300 font-medium">{activeTabMeta?.label}</span>
+                <span className="hidden lg:inline">Active View:</span>
+                <span className="text-cyan-300 font-medium px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                  {activeTabMeta?.label}
+                </span>
               </div>
+            </div>
+
+            {/* Expanded Sub-Tabs Bar: Directly displays all child tabs of the selected group! */}
+            <div className="hidden md:flex items-center gap-1.5 py-2 overflow-x-auto no-scrollbar text-xs">
+              {tabs
+                .filter((t) => t.group === activeGroup)
+                .map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => selectTab(tab.id)}
+                      className={`px-3 py-1.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer text-xs ${
+                        isActive
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold shadow-sm'
+                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white border border-transparent'
+                      }`}
+                    >
+                      <span className="shrink-0">{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
             </div>
 
             {/* Mobile Menu Bar */}
@@ -527,10 +491,10 @@ export default function App() {
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200 cursor-pointer"
               >
                 <Menu className="w-4 h-4 text-cyan-400" />
-                <span>Menu</span>
+                <span>Menu & Tabs</span>
                 <ChevronDown className={`w-3 h-3 transition-transform ${mobileMenuOpen ? 'rotate-180' : ''}`} />
               </button>
-              <span className="text-slate-400 truncate max-w-[55%]">{activeTabMeta?.label}</span>
+              <span className="text-cyan-300 font-medium truncate max-w-[55%]">{activeTabMeta?.label}</span>
             </div>
 
             {/* Mobile Expanded Panel */}
@@ -538,11 +502,11 @@ export default function App() {
               <div className="md:hidden border-t border-slate-800/60 py-2 space-y-3">
                 {groups.map((group) => (
                   <div key={group.id}>
-                    <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                       {group.icon}
                       {group.label}
                     </div>
-                    <div className="grid grid-cols-2 gap-1">
+                    <div className="grid grid-cols-2 gap-1 mt-1">
                       {tabs.filter((t) => t.group === group.id).map((tab) => {
                         const isActive = activeTab === tab.id;
                         return (

@@ -23,7 +23,15 @@ import {
   Search,
   Mic,
   MicOff,
-  AudioLines
+  AudioLines,
+  Volume2,
+  VolumeX,
+  Square,
+  RotateCcw,
+  Play,
+  Pause,
+  Settings2,
+  X
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -59,6 +67,53 @@ export const AiChatbot: React.FC = () => {
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
   const [copiedKeyword, setCopiedKeyword] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Voice Persona & Settings States
+  const [showVoiceSettings, setShowVoiceSettings] = useState<boolean>(false);
+  const [voiceGender, setVoiceGender] = useState<'Puck' | 'Charon' | 'Fenrir' | 'Aoede' | 'Kore'>(() => {
+    try {
+      return (localStorage.getItem('itcafeteria_voice_gender') as any) || 'Puck';
+    } catch {
+      return 'Puck';
+    }
+  });
+  const [voicePersona, setVoicePersona] = useState<string>(() => {
+    try {
+      return localStorage.getItem('itcafeteria_voice_persona') || 'Natural warm conversational Pakistani Urdu tech presenter, friendly Punjabi Pakistani accent tone, calm cadence, articulate';
+    } catch {
+      return 'Natural warm conversational Pakistani Urdu tech presenter, friendly Punjabi Pakistani accent tone, calm cadence, articulate';
+    }
+  });
+  const [autoSpeakReplies, setAutoSpeakReplies] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('itcafeteria_copilot_auto_speak');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+  const [bargeInEnabled, setBargeInEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('itcafeteria_copilot_barge_in');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+  const [speechSpeed, setSpeechSpeed] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('itcafeteria_speech_speed');
+      return saved ? parseFloat(saved) : 1.0;
+    } catch {
+      return 1.0;
+    }
+  });
+
+  // Audio Playback & Interruption States
+  const [isSpeakingAudio, setIsSpeakingAudio] = useState(false);
+  const [activeSpeakingMsgId, setActiveSpeakingMsgId] = useState<string | null>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
 
   // Voice Input States (with Gemini Natural Flow Auto-Detection)
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
@@ -143,8 +198,125 @@ export const AiChatbot: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Stop current audio playback immediately (Interruption Logic)
+  const stopAudioPlayback = () => {
+    if (currentAudioRef.current) {
+      try {
+        currentAudioRef.current.pause();
+        currentAudioRef.current.currentTime = 0;
+      } catch {}
+      currentAudioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeakingAudio(false);
+    setActiveSpeakingMsgId(null);
+  };
+
+  // High-Fidelity Natural Speech Generation & Playback (Gemini TTS API)
+  const speakMessage = async (textToSpeak: string, msgId?: string) => {
+    stopAudioPlayback();
+
+    const cleanText = textToSpeak
+      .replace(/--- SCENE[\s\S]*?---/g, '')
+      .replace(/[*_#`>-]/g, ' ')
+      .replace(/https?:\/\/\S+/g, 'link')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!cleanText) return;
+
+    setIsGeneratingVoice(true);
+    if (msgId) setActiveSpeakingMsgId(msgId);
+
+    try {
+      const response = await fetch('/api/ai/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: cleanText.slice(0, 500),
+          voiceName: voiceGender,
+          voiceStyle: `${voicePersona}, Pakistani Urdu accent, calm cadence`
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('TTS voice response failed');
+      }
+
+      const data = await response.json();
+      if (data.audioUrl) {
+        const audio = new Audio(data.audioUrl);
+        audio.playbackRate = speechSpeed;
+        currentAudioRef.current = audio;
+        setIsSpeakingAudio(true);
+        if (msgId) setActiveSpeakingMsgId(msgId);
+
+        audio.onended = () => {
+          setIsSpeakingAudio(false);
+          setActiveSpeakingMsgId(null);
+          currentAudioRef.current = null;
+        };
+
+        audio.onerror = () => {
+          setIsSpeakingAudio(false);
+          setActiveSpeakingMsgId(null);
+          currentAudioRef.current = null;
+        };
+
+        await audio.play();
+      }
+    } catch (err: any) {
+      console.warn('Speech synthesis error:', err?.message || err);
+      setIsSpeakingAudio(false);
+      setActiveSpeakingMsgId(null);
+    } finally {
+      setIsGeneratingVoice(false);
+    }
+  };
+
+  // Test current selected voice
+  const testCurrentVoice = () => {
+    speakMessage(
+      `Asalam-u-Alikum Waqar Bhai! Main IT Cafeteria ka dedicated AI Copilot hoon. Yeh meri live awaaz hai.`
+    );
+  };
+
+  // Voice Settings Persistence
+  useEffect(() => {
+    try {
+      localStorage.setItem('itcafeteria_voice_persona', voicePersona);
+    } catch {}
+  }, [voicePersona]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('itcafeteria_voice_gender', voiceGender);
+    } catch {}
+  }, [voiceGender]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('itcafeteria_copilot_auto_speak', autoSpeakReplies.toString());
+    } catch {}
+  }, [autoSpeakReplies]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('itcafeteria_copilot_barge_in', bargeInEnabled.toString());
+    } catch {}
+  }, [bargeInEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('itcafeteria_speech_speed', speechSpeed.toString());
+    } catch {}
+  }, [speechSpeed]);
+
   useEffect(() => {
     return () => {
+      stopAudioPlayback();
       voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
@@ -186,6 +358,9 @@ export const AiChatbot: React.FC = () => {
   const handleSend = async (textToSend?: string) => {
     const text = textToSend || inputText;
     if (!text.trim() || isLoading) return;
+
+    // Interruption logic: stop any playing speech when sending a new message
+    stopAudioPlayback();
 
     setErrorMsg(null);
     const userMsg: ChatMessage = {
@@ -234,6 +409,11 @@ Always adhere to IT Cafeteria rules:
       };
 
       setMessages(prev => [...prev, botMsg]);
+
+      // Automatically speak reply if auto-speak is enabled
+      if (autoSpeakReplies && data.text) {
+        speakMessage(data.text, botMsg.id);
+      }
     } catch (err: any) {
       console.warn('Chat error:', err);
       setErrorMsg(err.message || 'Error communicating with Gemini');
@@ -274,6 +454,9 @@ Always adhere to IT Cafeteria rules:
       return;
     }
 
+    // Interruption logic: stop any playing speech immediately when mic is pressed!
+    stopAudioPlayback();
+
     setErrorMsg(null);
     setSilenceProgress(0);
     isAutoSubmittingRef.current = false;
@@ -297,6 +480,11 @@ Always adhere to IT Cafeteria rules:
         };
 
         recognition.onresult = (event: any) => {
+          // Barge-in interruption: if user starts speaking while AI is talking, stop audio immediately!
+          if (bargeInEnabled && isSpeakingAudio) {
+            stopAudioPlayback();
+          }
+
           if (isAutoSubmittingRef.current) return;
 
           let interim = '';
@@ -564,6 +752,35 @@ Always adhere to IT Cafeteria rules:
             </button>
           </div>
 
+          {/* Toggle Voice Settings Button */}
+          <button
+            onClick={() => setShowVoiceSettings(!showVoiceSettings)}
+            className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-1.5 border transition-all cursor-pointer ${
+              showVoiceSettings 
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm' 
+                : 'bg-slate-900 text-slate-300 border-slate-700/80 hover:text-white'
+            }`}
+            title="Voice Persona, Speeds & Interruption Settings"
+          >
+            <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Voice Settings</span>
+            {isSpeakingAudio && (
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+            )}
+          </button>
+
+          {/* Active Audio Stop / Interruption Button if Speaking */}
+          {isSpeakingAudio && (
+            <button
+              onClick={stopAudioPlayback}
+              className="px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 transition-all cursor-pointer animate-pulse"
+              title="Awaaz Rokein (Barge-in Interruption)"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              <span>Stop Speaking</span>
+            </button>
+          )}
+
           {/* Toggle Trending Sidebar Button */}
           <button
             onClick={() => setShowTrendingSidebar(!showTrendingSidebar)}
@@ -579,6 +796,136 @@ Always adhere to IT Cafeteria rules:
           </button>
         </div>
       </div>
+
+      {/* Collapsible Voice Settings & Interruption Configuration Panel */}
+      {showVoiceSettings && (
+        <div className="p-4 bg-slate-950/95 border-b border-slate-800 text-xs space-y-3 shadow-inner">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-white text-xs flex items-center gap-1.5">
+              <Volume2 className="w-4 h-4 text-cyan-400" /> Copilot Voice & Interruption Settings
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setVoicePersona('Natural warm conversational Pakistani Urdu tech presenter, friendly Punjabi Pakistani accent tone, calm cadence, articulate');
+                  setVoiceGender('Puck');
+                  setAutoSpeakReplies(true);
+                  setBargeInEnabled(true);
+                  setSpeechSpeed(1.0);
+                }}
+                className="text-[11px] text-slate-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" /> Reset Defaults
+              </button>
+              <button
+                onClick={() => setShowVoiceSettings(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Voice Actor / Persona */}
+            <div>
+              <label className="text-[11px] text-slate-400 font-semibold block mb-1">Voice Actor / Gender:</label>
+              <select
+                value={voiceGender}
+                onChange={(e) => setVoiceGender(e.target.value as any)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+              >
+                <optgroup label="Male Voices">
+                  <option value="Puck">Waqar Majeed (Warm Punjabi Male)</option>
+                  <option value="Charon">Studio Anchor (Deep Resonance)</option>
+                  <option value="Fenrir">High Energy Tech Presenter</option>
+                </optgroup>
+                <optgroup label="Female Voices">
+                  <option value="Aoede">Pakistani Urdu Female (Natural & Friendly)</option>
+                  <option value="Kore">Studio Female Anchor (Clear & Crisp)</option>
+                </optgroup>
+              </select>
+            </div>
+
+            {/* Speech Speed / Playback Rate */}
+            <div>
+              <label className="text-[11px] text-slate-400 font-semibold block mb-1">
+                Speech Speed: <span className="text-cyan-300 font-mono">{speechSpeed}x</span>
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[0.85, 1.0, 1.2].map((speed) => (
+                  <button
+                    key={speed}
+                    type="button"
+                    onClick={() => setSpeechSpeed(speed)}
+                    className={`py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      speechSpeed === speed
+                        ? 'bg-cyan-600 text-white shadow-sm'
+                        : 'bg-slate-900 border border-slate-700 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {speed}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Test Voice Button */}
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={testCurrentVoice}
+                disabled={isSpeakingAudio || isGeneratingVoice}
+                className="w-full py-2 px-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:opacity-90 disabled:opacity-40 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-cyan-600/20 cursor-pointer"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>{isGeneratingVoice ? 'Generating...' : 'Awaaz Check Karein'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Voice Prompt Texture Description */}
+          <div>
+            <label className="text-[11px] text-slate-400 font-semibold block mb-1">
+              Voice Style Prompt (Pakistani Urdu Persona):
+            </label>
+            <input
+              type="text"
+              value={voicePersona}
+              onChange={(e) => setVoicePersona(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+              placeholder="Voice style description..."
+            />
+          </div>
+
+          {/* Interruption & Auto-Speak Toggles */}
+          <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+              <input
+                type="checkbox"
+                checked={bargeInEnabled}
+                onChange={(e) => setBargeInEnabled(e.target.checked)}
+                className="rounded accent-cyan-500 w-4 h-4 cursor-pointer"
+              />
+              <span>
+                <strong className="text-white">Barge-in Interruption:</strong> Bolne ya mic dabane par AI ki awaaz foran ruk jaye
+              </span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+              <input
+                type="checkbox"
+                checked={autoSpeakReplies}
+                onChange={(e) => setAutoSpeakReplies(e.target.checked)}
+                className="rounded accent-cyan-500 w-4 h-4 cursor-pointer"
+              />
+              <span>
+                <strong className="text-white">Auto-Speak:</strong> AI har jawab khud bol kar sunaye
+              </span>
+            </label>
+          </div>
+        </div>
+      )}
 
       {/* Main Split Body: Chat Area (Left) + Trending Keywords Sidebar (Right) */}
       <div className="flex-1 flex overflow-hidden">
@@ -618,6 +965,40 @@ Always adhere to IT Cafeteria rules:
                   {/* Action row */}
                   {msg.role === 'assistant' && (
                     <div className="mt-2.5 pt-2 border-t border-slate-700/50 flex flex-wrap items-center justify-end gap-3">
+                      {/* Listen / Stop Audio (TTS with Interruption) */}
+                      <button
+                        onClick={() => {
+                          if (activeSpeakingMsgId === msg.id && isSpeakingAudio) {
+                            stopAudioPlayback();
+                          } else {
+                            speakMessage(msg.text, msg.id);
+                          }
+                        }}
+                        className={`flex items-center gap-1 text-[11px] transition-colors cursor-pointer ${
+                          activeSpeakingMsgId === msg.id && isSpeakingAudio
+                            ? 'text-rose-400 font-bold'
+                            : 'text-slate-400 hover:text-cyan-300'
+                        }`}
+                        title={activeSpeakingMsgId === msg.id && isSpeakingAudio ? "Awaaz Rokein (Interrupt)" : "Awaaz Sunein (TTS)"}
+                      >
+                        {activeSpeakingMsgId === msg.id && isSpeakingAudio ? (
+                          <>
+                            <Square className="w-3 h-3 fill-current text-rose-400 animate-pulse" />
+                            <span>Stop Audio</span>
+                          </>
+                        ) : isGeneratingVoice && activeSpeakingMsgId === msg.id ? (
+                          <>
+                            <Sparkles className="w-3 h-3 text-cyan-400 animate-spin" />
+                            <span>Generating Voice...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 className="w-3 h-3 text-cyan-400" />
+                            <span>Listen (Awaaz)</span>
+                          </>
+                        )}
+                      </button>
+
                       <button
                         onClick={() => sendToContentCalendar(msg.text, msg.id)}
                         className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer"
@@ -693,6 +1074,26 @@ Always adhere to IT Cafeteria rules:
 
           {/* Input Bar */}
           <div className="p-3 bg-slate-950 border-t border-slate-800">
+            {/* Real-time Voice Speaking & Barge-In Interruption Bar */}
+            {isSpeakingAudio && (
+              <div className="mb-2.5 px-3 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 flex items-center justify-between text-xs text-cyan-200 shadow-lg shadow-cyan-950/40 animate-pulse">
+                <div className="flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-cyan-400 animate-bounce shrink-0" />
+                  <span className="font-semibold text-[11px] text-cyan-300">
+                    Co-Pilot bol raha hai... (Bol kar ya Stop daba kar rokein)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={stopAudioPlayback}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                  title="Awaaz foran rokein"
+                >
+                  <Square className="w-3 h-3 fill-current" />
+                  <span>Interrupt / Stop</span>
+                </button>
+              </div>
+            )}
             <form
               onSubmit={(e) => {
                 e.preventDefault();

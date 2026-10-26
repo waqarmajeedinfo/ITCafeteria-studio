@@ -1328,6 +1328,17 @@ Core rules:
                   </button>
                 </div>
               </div>
+
+              {/* Interruption Feature Notice */}
+              <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-300">
+                <span className="flex items-center gap-1.5 text-cyan-300 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Barge-in Interruption: Active
+                </span>
+                <span className="text-slate-400 text-[10px]">
+                  AI bolte waqt aap bolen ya Stop dabayein to awaaz foran ruk jati hai
+                </span>
+              </div>
             </div>
           )}
 
