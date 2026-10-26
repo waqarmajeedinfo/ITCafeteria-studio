@@ -28,6 +28,7 @@ import {
   ChevronDown,
   Menu,
   Check,
+  BadgeCheck,
   Activity
 } from 'lucide-react';
 
@@ -172,47 +173,65 @@ export default function App() {
 
   return (
     <div className="min-h-screen app-shell-bg text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
-      {/* Top Header */}
+      {/* Top Header — YouTube channel style */}
       <header className="border-b border-slate-800/80 bg-slate-950/75 backdrop-blur-md sticky top-0 z-50 shadow-[0_8px_30px_rgba(2,6,23,0.35)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-cyan-500 to-indigo-500 p-0.5 shadow-lg shadow-blue-500/25 flex items-center justify-center">
-              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center text-cyan-400 font-black tracking-tighter text-sm">
-                ITC
+        {/* Channel banner */}
+        <div className="relative h-16 sm:h-24 overflow-hidden">
+          <img
+            src="/brand/banner.jpg"
+            alt="IT Cafeteria channel banner"
+            className="w-full h-full object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/20 via-transparent to-slate-950/60" />
+        </div>
+
+        {/* Channel row */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end gap-3 sm:gap-4 -mt-7 sm:-mt-9">
+            <img
+              src="/brand/logo.jpeg"
+              alt="IT Cafeteria logo"
+              className="w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-full object-cover bg-slate-900 ring-4 ring-slate-950 shadow-xl shadow-blue-500/20 shrink-0"
+            />
+            <div className="min-w-0 flex-1 pb-1">
+              <div className="flex items-center gap-1.5">
+                <h1 className="font-bold text-white text-base sm:text-lg tracking-tight">IT Cafeteria</h1>
+                <BadgeCheck className="w-4 h-4 text-slate-300 shrink-0" aria-label="Verified channel" />
               </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-bold text-white text-base tracking-tight">IT Cafeteria</h1>
-                <span className="text-[10px] bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-cyan-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-mono font-medium">
-                  Full-Stack AI Studio
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Waqar Majeed • Google Flow Omni Flash & Interactions API Suite
+              <p className="text-[11px] text-slate-400 truncate">
+                <a
+                  href="https://www.youtube.com/@itcafeteria"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-slate-300 font-medium hover:text-cyan-300 transition-colors"
+                >
+                  @itcafeteria
+                </a>
+                {' • '}Better Content • Bigger Dreams
               </p>
             </div>
-          </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => setShowDictionary(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 transition-colors"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Phonetic Rules Dictionary</span>
-            </button>
+            {/* Action buttons */}
+            <div className="flex items-center gap-2.5 pb-1.5 shrink-0">
+              <button
+                onClick={() => setShowDictionary(true)}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 transition-colors"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Phonetic Rules Dictionary</span>
+              </button>
 
-            <a
-              href="https://www.youtube.com/@itcafeteria"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-xs text-red-300 transition-colors"
-            >
-              <Youtube className="w-3.5 h-3.5 text-red-400" />
-              <span className="hidden sm:inline">Channel</span>
-            </a>
+              <a
+                href="https://www.youtube.com/@itcafeteria"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-red-600 hover:bg-red-500 text-xs font-semibold text-white shadow-lg shadow-red-600/25 transition-colors"
+              >
+                <Youtube className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Channel</span>
+                <span className="sm:hidden">YouTube</span>
+              </a>
+            </div>
           </div>
         </div>
 
@@ -404,6 +423,11 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-slate-950/60 py-4 text-center text-xs text-slate-400">
         <p>IT Cafeteria Full-Stack Studio • Built for Waqar Majeed • Lahore, Pakistan • Roman Urdu Protocol</p>
+        <p className="mt-1.5 flex items-center justify-center gap-3 text-[11px]">
+          <a href="/terms.html" target="_blank" rel="noreferrer" className="hover:text-cyan-300 transition-colors">Terms of Service</a>
+          <span className="text-slate-700">•</span>
+          <a href="/privacy.html" target="_blank" rel="noreferrer" className="hover:text-cyan-300 transition-colors">Privacy Policy</a>
+        </p>
       </footer>
     </div>
   );
