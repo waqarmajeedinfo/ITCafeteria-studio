@@ -24,6 +24,8 @@ if (accessKey) {
   app.use((req, res, next) => {
     if (req.path === '/api/health') return next();
     if (INTEGRATION_PUBLIC_PATHS.includes(req.path)) return next();
+    // TikTok domain-verification file (root .txt) must be readable by TikTok's server-side fetcher.
+    if (req.path.startsWith('/tiktok') && req.path.endsWith('.txt')) return next();
     const [scheme, encoded] = (req.headers.authorization || '').split(' ');
     if (scheme === 'Basic' && encoded) {
       const decoded = Buffer.from(encoded, 'base64').toString('utf8');
