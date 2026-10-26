@@ -113,20 +113,81 @@ ${story.memoryBlock}
 Series Plan: ${story.seriesPlan || '—'}`;
 }
 
-export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story }) => {
+export function buildScenesOnlyText(story: GeneratedStory): string {
+  const scenesText = story.scenes.map((scene) => {
+    return `Scene ${scene.num} — ${scene.duration} [${scene.purpose}]${scene.isCTA ? ' — CTA' : ''} (${scene.words} words)
+Visual: ${scene.visual || '—'}
+Dialogue: "${scene.dialogue}"
+Flow Script:
+${scene.script}`;
+  }).join('\n\n');
+
+  return `STORY SCRIPT (${story.scenes.length} SCENES) — ${story.title}
+Hook: ${story.hook}
+Presenter: ${story.presenter} (${story.characterTag})
+Category: ${story.categoryName}
+
+${scenesText}`;
+}
+
+export function buildYouTubePackageOnlyText(story: GeneratedStory): string {
+  const thumbnail = resolveThumbnailSpec({
+    channelName: story.channelName,
+    presenter: story.presenter,
+    title: story.title,
+    ideaTitle: story.idea?.title,
+    headline: story.thumbnailHeadline,
+    line1: story.thumbnailLine1,
+    line2: story.thumbnailLine2,
+    subBanner: story.thumbnailSubBadge,
+    hologram: story.thumbnailHologram,
+    characterTag: story.characterTag,
+  });
+
+  return `YOUTUBE UPLOAD PACKAGE — ${story.title}
+1. Video Title: ${story.title} ${story.hashtags.join(' ')}
+
+2. Description:
+${story.description}
+
+3. Search Tags:
+${story.tags.join(', ')}
+
+4. TikTok Block:
+${story.tiktokCaption}
+
+5. Master Thumbnail Prompt:
+${thumbnail.prompt}
+Headline: ${thumbnail.line1} ${thumbnail.line2 || ''} (Sub-banner: ${thumbnail.subBanner})
+
+Memory Block:
+${story.memoryBlock}`;
+}
+
+export interface StoryPackageViewProps {
+  story: GeneratedStory;
+  publishStatus?: 'pending' | 'published' | 'draft' | 'overdue';
+  onTogglePublish?: () => void;
+}
+
+export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
+  story,
+  publishStatus,
+  onTogglePublish
+}) => {
   const [copiedScene, setCopiedScene] = useState<number | null>(null);
-  const [copiedAll, setCopiedAll] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyText = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2200);
+  };
 
   const copyScene = (scene: StoryScene) => {
     navigator.clipboard.writeText(scene.script);
     setCopiedScene(scene.num);
     setTimeout(() => setCopiedScene(null), 2000);
-  };
-
-  const copyAll = () => {
-    navigator.clipboard.writeText(buildStoryPackageText(story));
-    setCopiedAll(true);
-    setTimeout(() => setCopiedAll(false), 2000);
   };
 
   return (
@@ -162,13 +223,37 @@ export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story })
             </p>
           </div>
 
-          <button
-            onClick={copyAll}
-            className="shrink-0 flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-500/20 hover:opacity-90 transition-opacity"
-          >
-            {copiedAll ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
-            {copiedAll ? 'Copied Full Package!' : 'Copy Full Story Package'}
-          </button>
+          {/* Dedicated Copy Actions */}
+          <div className="flex flex-wrap sm:flex-col items-stretch gap-1.5 shrink-0">
+            <button
+              onClick={() => copyText(buildStoryPackageText(story), 'all')}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 hover:opacity-95 transition-all cursor-pointer"
+              title="Copy all scenes, dialogue, visuals, and YouTube package"
+            >
+              {copiedKey === 'all' ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedKey === 'all' ? 'Pura Package Copied!' : 'Copy Full Story Package'}</span>
+            </button>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                onClick={() => copyText(buildScenesOnlyText(story), 'scenes')}
+                className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                title="Copy only scene flow scripts and dialogue"
+              >
+                {copiedKey === 'scenes' ? <Check className="w-3 h-3 text-emerald-400" /> : <Film className="w-3 h-3" />}
+                <span>{copiedKey === 'scenes' ? 'Copied!' : 'Scenes Only'}</span>
+              </button>
+
+              <button
+                onClick={() => copyText(buildYouTubePackageOnlyText(story), 'yt')}
+                className="flex items-center justify-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
+                title="Copy only YouTube title, tags, description and thumbnail prompt"
+              >
+                {copiedKey === 'yt' ? <Check className="w-3 h-3 text-emerald-400" /> : <Youtube className="w-3 h-3" />}
+                <span>{copiedKey === 'yt' ? 'Copied!' : 'YouTube Only'}</span>
+              </button>
+            </div>
+          </div>
         </div>
         {story.idea?.title && (
           <p className="text-[11px] text-slate-400 bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2">
@@ -312,6 +397,44 @@ export const StoryPackageView: React.FC<{ story: GeneratedStory }> = ({ story })
           <p className="text-[11px] text-slate-400">
             <span className="text-cyan-300 font-semibold">Series bridge:</span> {story.seriesPlan}
           </p>
+        )}
+
+        {/* Publication Status Card & Action Button */}
+        {onTogglePublish && (
+          <div className={`mt-5 p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg ${
+            publishStatus === 'published'
+              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+              : 'bg-slate-900 border-amber-500/40 text-amber-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <span className={`w-3.5 h-3.5 rounded-full ${publishStatus === 'published' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-ping'}`} />
+              <div>
+                <div className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <span>Current Status:</span>
+                  <span className={publishStatus === 'published' ? 'text-emerald-300' : 'text-amber-300'}>
+                    {publishStatus === 'published' ? '✅ PUBLISHED (پبلش ہو چکی ہے)' : '⏳ PENDING (ابھی تک پبلش نہیں کی گئی)'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {publishStatus === 'published'
+                    ? 'Yeh story channel par publish ho chuki hai aur record me update hai.'
+                    : 'Jab tak aap publish button nahi dabayein ge, yeh story Pending rahe gi.'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={onTogglePublish}
+              className={`px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg transition-all cursor-pointer ${
+                publishStatus === 'published'
+                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/40'
+              }`}
+            >
+              <Check className="w-4 h-4" />
+              <span>{publishStatus === 'published' ? 'Wapas Pending Karein' : 'Mark as Published (پبلش ہو چکی ہے)'}</span>
+            </button>
+          </div>
         )}
       </div>
     </div>

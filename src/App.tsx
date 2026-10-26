@@ -113,7 +113,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>(launch.tab);
   const [oauthNotice, setOauthNotice] = useState<OAuthNotice | null>(launch.notice);
   const [showDictionary, setShowDictionary] = useState(false);
-  const [openMenu, setOpenMenu] = useState<'core' | 'ai' | 'management' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'core' | 'automation' | 'management' | 'ai' | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLiveActive, setIsLiveActive] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
@@ -259,37 +259,42 @@ export default function App() {
     };
   }, []);
 
-  const tabs: { id: TabType; label: string; icon: React.ReactNode; group: 'core' | 'ai' | 'management' }[] = [
-    // Core Channel Tabs
-    { id: 'analytics', label: 'Channel Diagnostics', icon: <BarChart3 className="w-4 h-4" />, group: 'core' },
-    { id: 'pending', label: 'Pending Stories & Target Queue', icon: <Clock className="w-4 h-4 text-amber-400" />, group: 'core' },
-    { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-cyan-400" />, group: 'core' },
-    { id: 'simulator', label: 'Agent Flow Simulator', icon: <Bot className="w-4 h-4" />, group: 'core' },
-    { id: 'calendar', label: 'Content Calendar', icon: <CalendarIcon className="w-4 h-4 text-emerald-400" />, group: 'core' },
+  type TabGroup = 'core' | 'automation' | 'management' | 'ai';
+
+  const tabs: { id: TabType; label: string; icon: React.ReactNode; group: TabGroup }[] = [
+    // 1. Core Channel Tabs (Red marked)
+    { id: 'analytics', label: 'Channel Diagnostics', icon: <BarChart3 className="w-4 h-4 text-cyan-400" />, group: 'core' },
     { id: 'live', label: 'Live Insights (YouTube + TikTok)', icon: <Activity className="w-4 h-4 text-emerald-400" />, group: 'core' },
     { id: 'signals', label: 'Growth Signals & Anomalies', icon: <Rocket className="w-4 h-4 text-amber-400" />, group: 'core' },
-    { id: 'community', label: 'Community Polls', icon: <Vote className="w-4 h-4 text-rose-400" />, group: 'core' },
     { id: 'benchmarking', label: 'Competitor Benchmarks', icon: <Users className="w-4 h-4 text-indigo-400" />, group: 'core' },
-    
-    // AI Studios
-    { id: 'chat', label: 'AI Script Chatbot', icon: <MessageSquare className="w-4 h-4" />, group: 'ai' },
-    { id: 'search', label: 'Search Grounding', icon: <Globe2 className="w-4 h-4" />, group: 'ai' },
-    { id: 'video', label: 'Omni Flash Video', icon: <Video className="w-4 h-4" />, group: 'ai' },
-    { id: 'image', label: 'Thumbnails (Nano Banana)', icon: <ImageIcon className="w-4 h-4" />, group: 'ai' },
-    { id: 'transcribe', label: 'Voice Dictation', icon: <Mic className="w-4 h-4" />, group: 'ai' },
-    { id: 'music', label: 'Music Generator', icon: <Music className="w-4 h-4" />, group: 'ai' },
-    { id: '3d', label: '3D Virtual Studio', icon: <Box className="w-4 h-4" />, group: 'ai' },
 
-    // Management & Roadmap
-    { id: 'duplicates', label: 'Duplicate Checker (58)', icon: <ShieldAlert className="w-4 h-4" />, group: 'management' },
-    { id: 'roadmap', label: 'Upscaling (v3.42+)', icon: <Rocket className="w-4 h-4" />, group: 'management' },
-    { id: 'masterlist', label: 'Master List', icon: <ListTodo className="w-4 h-4" />, group: 'management' },
+    // 2. Autopilot & Agents (Green marked)
+    { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-emerald-400" />, group: 'automation' },
+    { id: 'simulator', label: 'Agent Flow Simulator', icon: <Bot className="w-4 h-4 text-cyan-400" />, group: 'automation' },
+    { id: 'community', label: 'Community Polls', icon: <Vote className="w-4 h-4 text-rose-400" />, group: 'automation' },
+
+    // 3. Management & Production Queue (Yellow marked)
+    { id: 'pending', label: 'Pending Stories & Target Queue', icon: <Clock className="w-4 h-4 text-amber-400" />, group: 'management' },
+    { id: 'calendar', label: 'Content Calendar', icon: <CalendarIcon className="w-4 h-4 text-cyan-400" />, group: 'management' },
+    { id: 'duplicates', label: 'Duplicate Checker (58)', icon: <ShieldAlert className="w-4 h-4 text-rose-400" />, group: 'management' },
+    { id: 'masterlist', label: 'Master List', icon: <ListTodo className="w-4 h-4 text-slate-300" />, group: 'management' },
+    { id: 'roadmap', label: 'Upscaling (v3.42+)', icon: <Rocket className="w-4 h-4 text-purple-400" />, group: 'management' },
+
+    // 4. AI Studios
+    { id: 'chat', label: 'AI Script Chatbot', icon: <MessageSquare className="w-4 h-4 text-cyan-300" />, group: 'ai' },
+    { id: 'search', label: 'Search Grounding', icon: <Globe2 className="w-4 h-4 text-emerald-300" />, group: 'ai' },
+    { id: 'video', label: 'Omni Flash Video', icon: <Video className="w-4 h-4 text-blue-400" />, group: 'ai' },
+    { id: 'image', label: 'Thumbnails (Nano Banana)', icon: <ImageIcon className="w-4 h-4 text-amber-400" />, group: 'ai' },
+    { id: 'transcribe', label: 'Voice Dictation', icon: <Mic className="w-4 h-4 text-fuchsia-400" />, group: 'ai' },
+    { id: 'music', label: 'Music Generator', icon: <Music className="w-4 h-4 text-pink-400" />, group: 'ai' },
+    { id: '3d', label: '3D Virtual Studio', icon: <Box className="w-4 h-4 text-violet-400" />, group: 'ai' },
   ];
 
-  const groups: { id: 'core' | 'ai' | 'management'; label: string; icon: React.ReactNode }[] = [
+  const groups: { id: TabGroup; label: string; icon: React.ReactNode }[] = [
     { id: 'core', label: 'Core Channel', icon: <BarChart3 className="w-3.5 h-3.5 text-cyan-400" /> },
+    { id: 'automation', label: 'Autopilot & Agents', icon: <Cpu className="w-3.5 h-3.5 text-emerald-400" /> },
+    { id: 'management', label: 'Management & Queue', icon: <Layers className="w-3.5 h-3.5 text-indigo-400" /> },
     { id: 'ai', label: 'AI Studios', icon: <Sparkles className="w-3.5 h-3.5 text-amber-400" /> },
-    { id: 'management', label: 'Management', icon: <Layers className="w-3.5 h-3.5 text-indigo-400" /> },
   ];
 
   const activeGroup = tabs.find((t) => t.id === activeTab)?.group;

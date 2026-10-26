@@ -557,3 +557,34 @@ export function getNextTargetStory(queue?: PendingStoryRecord[]): PendingStoryRe
   if (draft) return draft;
   return list[0] || null;
 }
+
+export function updatePendingStoryStatus(id: string, newStatus: StoryPublishStatus): PendingStoryRecord[] {
+  const current = loadPendingQueue();
+  const updated = current.map((item) => {
+    if (item.id === id) {
+      return {
+        ...item,
+        status: newStatus,
+        publishedAt: newStatus === 'published' ? new Date().toISOString() : undefined,
+      };
+    }
+    return item;
+  });
+  savePendingQueue(updated);
+  return updated;
+}
+
+export function upsertPendingStoryRecord(record: PendingStoryRecord): PendingStoryRecord[] {
+  const current = loadPendingQueue();
+  const existingIndex = current.findIndex((item) => item.id === record.id || item.title === record.title);
+  let updated: PendingStoryRecord[];
+  if (existingIndex >= 0) {
+    updated = [...current];
+    updated[existingIndex] = { ...updated[existingIndex], ...record };
+  } else {
+    updated = [record, ...current];
+  }
+  savePendingQueue(updated);
+  return updated;
+}
+

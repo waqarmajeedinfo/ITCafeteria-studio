@@ -577,7 +577,11 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
 
               {/* Renders the Complete 6-Scene Story Package */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-1 overflow-hidden">
-                <StoryPackageView story={selectedRecord.storyPackage} />
+                <StoryPackageView
+                  story={selectedRecord.storyPackage}
+                  publishStatus={selectedRecord.status}
+                  onTogglePublish={() => togglePublishStatus(selectedRecord.id)}
+                />
               </div>
             </div>
           ) : (

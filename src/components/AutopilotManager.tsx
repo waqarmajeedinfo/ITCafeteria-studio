@@ -30,7 +30,8 @@ import {
   Database,
   Tag,
   Wand2,
-  Settings2
+  Settings2,
+  X
 } from 'lucide-react';
 
 import {
@@ -41,7 +42,8 @@ import {
   type ChannelProfile
 } from '../data/channelData';
 import { buildMasterThumbnailPrompt, splitHeadline } from '../lib/thumbnailMaster';
-import type { GeneratedStory, StoryScene } from './StoryPackageView';
+import { StoryPackageView, buildStoryPackageText, type GeneratedStory, type StoryScene } from './StoryPackageView';
+import { updatePendingStoryStatus, upsertPendingStoryRecord } from '../lib/pendingQueueStore';
 import type { TabType } from '../App';
 
 // --- Task & Queue Types ---
@@ -118,58 +120,217 @@ const STORAGE_KEYS = {
   AI_DRAFT: 'itcafeteria_latest_ai_draft',
 };
 
+export function createFullAutopilotStoryPackage(task: {
+  id: string;
+  title: string;
+  category: string;
+  characterTag: string;
+  scheduledSlot: string;
+  scheduledDate: string;
+  priority: string;
+}): GeneratedStory {
+  const [line1, line2] = splitHeadline(task.title.toUpperCase());
+  const tag = task.characterTag.replace('@', '');
+
+  return {
+    title: `${task.title} #shorts #itcafeteria`,
+    hook: `Kya aap jante hain ke ${task.title} aapka kitna qeemti waqt bacha sakta hai?`,
+    channelName: 'IT Cafeteria',
+    presenter: 'Waqar Majeed',
+    categoryName: task.category,
+    playlist: 'Autopilot Co-Pilot Series',
+    characterTag: tag,
+    dateLabel: `${task.scheduledDate} • ${task.scheduledSlot}`,
+    sceneCount: 10,
+    hashtags: ['#shorts', '#itcafeteria', '#techurdu', '#pakistantech', '#automation'],
+    description: `${task.title} — IT Cafeteria production guide by Waqar Majeed.\n\nKey Steps:\n1. Open target tool settings\n2. Run automated shortcut\n3. Save clean output instantly\n\nSubscribe for daily Urdu tech shortcuts!\n#itcafeteria #pakistantech #shorts`,
+    tags: ['it cafeteria', 'waqar majeed', 'tech tips', 'urdu tech', 'automation', 'productivity', 'shorts'],
+    tiktokCaption: `${task.title} 🔥⚡ #itcafeteria #pakistantech #shorts`,
+    thumbnailHeadline: `${line1 || 'SECRET'} ${line2 || 'TRICK'}`,
+    thumbnailSubBadge: '5 SEC FIX',
+    thumbnailLine1: line1 || 'SECRET',
+    thumbnailLine2: line2 || 'TRICK',
+    thumbnailHologram: 'CONFIRMED 100% WORKING',
+    thumbnailPrompt: buildMasterThumbnailPrompt({
+      channelName: 'IT Cafeteria',
+      presenter: 'Waqar Majeed',
+      line1: line1 || 'SECRET',
+      line2: line2 || 'TRICK',
+      subBanner: '5 SEC FIX',
+      hologram: `a glowing cyan 3D hologram visualizing "${task.title}" with floating UI panels and animated data stream nodes`,
+      characterTag: tag
+    }),
+    seriesPlan: 'Episode in Autopilot Co-Pilot Series',
+    memoryBlock: `Autopilot Task #${task.id} — Priority ${task.priority}. 10-Scene Structure. Zero-duplicate verified.`,
+    idea: {
+      title: task.title,
+      hook: 'Pattern interrupt opening hook',
+      angle: 'High-utility viral tech productivity',
+      points: '10 scenes structured for 104% retention loop'
+    },
+    discussionNotes: 'Generated via Autonomous Multi-Agent Pipeline with 10-scene pacing.',
+    scenes: [
+      {
+        num: 1,
+        duration: '6s',
+        purpose: 'Disruptive Hook',
+        isCTA: false,
+        words: 22,
+        visual: `${tag} stands in dark cyber studio, points directly at screen with intense alert expression.`,
+        dialogue: `Kya aapka kaam ghanton tak phansa rehta hai? Sirf yeh secret trick lagayein aur seconds mein complete karein!`,
+        script: `${tag} — standing anchor pose. Conversational Roman Urdu: "Kya aapka kaam ghanton tak phansa rehta hai? Sirf yeh secret trick lagayein aur seconds mein complete karein!"`
+      },
+      {
+        num: 2,
+        duration: '6s',
+        purpose: 'The Problem Exposed',
+        isCTA: false,
+        words: 23,
+        visual: 'Screen demonstration showing red error popup and slow manual dragging.',
+        dialogue: 'Aksar log is task ke liye purana manual rasta use karte hain aur apna bohot zyada waqt zaya karte hain.',
+        script: `Screen demonstration. Voiceover: "Aksar log is task ke liye purana manual rasta use karte hain aur apna bohot zyada waqt zaya karte hain."`
+      },
+      {
+        num: 3,
+        duration: '6s',
+        purpose: 'Pattern Interrupt',
+        isCTA: false,
+        words: 24,
+        visual: 'Glowing cyan circuit animation cuts across the screen with camera zoom.',
+        dialogue: 'Lekin IT Cafeteria par aaj mein aapko ek aesa hidden tool batane ja raha hoon jo totally free aur fast hai.',
+        script: `${tag} appears in half split-screen: "Lekin IT Cafeteria par aaj mein aapko ek aesa hidden tool batane ja raha hoon jo totally free aur fast hai."`
+      },
+      {
+        num: 4,
+        duration: '6s',
+        purpose: 'Step 1: Setup',
+        isCTA: false,
+        words: 24,
+        visual: 'Direct mouse click highlighting the secret option with glowing emerald ring.',
+        dialogue: 'Pehla step: Apne browser ya software mein is setting ko open karein aur automatic mode enable karein.',
+        script: `Screen recording showing cursor clicking the hidden toggle: "Pehla step: Apne browser ya software mein is setting ko open karein aur automatic mode enable karein."`
+      },
+      {
+        num: 5,
+        duration: '6s',
+        purpose: 'Step 2: Execution',
+        isCTA: false,
+        words: 23,
+        visual: 'Command line or keyboard shortcut pressed with neon overlay effect.',
+        dialogue: 'Doosra step: Yeh command enter karein ya single click se execution trigger kar dein.',
+        script: `Close up on keyboard and UI execution: "Doosra step: Yeh command enter karein ya single click se execution trigger kar dein."`
+      },
+      {
+        num: 6,
+        duration: '6s',
+        purpose: 'Visual Transformation',
+        isCTA: false,
+        words: 22,
+        visual: 'Before vs After split screen showing 10x faster clean results in real time.',
+        dialogue: 'Aur dekhein! Sara data khud-ba-khud clean ho kar seconds mein ready ho chuka hai.',
+        script: `Split screen Before/After comparison: "Aur dekhein! Sara data khud-ba-khud clean ho kar seconds mein ready ho chuka hai."`
+      },
+      {
+        num: 7,
+        duration: '6s',
+        purpose: 'Pro Level Tip',
+        isCTA: false,
+        words: 24,
+        visual: `${tag} leans in with confident smile, holding up index finger.`,
+        dialogue: 'Pro tip: Is process ko daily schedule par bhi laga sakte hain taake aapko baar baar na karna parhe.',
+        script: `${tag} close shot: "Pro tip: Is process ko daily schedule par bhi laga sakte hain taake aapko baar baar na karna parhe."`
+      },
+      {
+        num: 8,
+        duration: '6s',
+        purpose: 'Cross-Device Verification',
+        isCTA: false,
+        words: 21,
+        visual: 'Mobile phone and laptop screens running side by side seamlessly.',
+        dialogue: 'Yeh trick Windows, Mac aur mobile sab par barabar tezi se kaam karti hai.',
+        script: `Dual device mockup animation: "Yeh trick Windows, Mac aur mobile sab par barabar tezi se kaam karti hai."`
+      },
+      {
+        num: 9,
+        duration: '6s',
+        purpose: 'Episodic Hook',
+        isCTA: false,
+        words: 22,
+        visual: 'Next episode teaser thumbnail flashing with glowing mystery question mark.',
+        dialogue: 'Iske Part 2 mein hum iska advanced AI automation dekhein ge jo aur bhi zordar hai.',
+        script: `Teaser badge: "Iske Part 2 mein hum iska advanced AI automation dekhein ge jo aur bhi zordar hai."`
+      },
+      {
+        num: 10,
+        duration: '6s',
+        purpose: 'Seamless Loop CTA',
+        isCTA: true,
+        words: 22,
+        visual: 'IT Cafeteria subscribe bell animation seamlessly blending back into opening scene.',
+        dialogue: 'Aisi daily tech tricks ke liye IT Cafeteria ko follow karein aur video doston ke sath share karein!',
+        script: `${tag} outro gesture: "Aisi daily tech tricks ke liye IT Cafeteria ko follow karein aur video doston ke sath share karein!"`
+      }
+    ]
+  };
+}
+
 // Seed initial task queue based on channel growth signals & optimal cadence
 function getInitialTasks(): AutopilotTask[] {
-  return [
-    {
-      id: 'task-ap-1',
-      type: 'AUTO_POST',
-      title: 'Power Automate Desktop: Web Scraping to Clean Excel in 60s',
-      category: 'AI Chatbots, Workflows & AI Tools',
-      categoryId: 2,
-      characterTag: '@WM25-3',
-      priority: 'URGENT',
-      status: 'queued',
-      progress: 0,
-      scheduledSlot: '5:00 PM PKT',
-      scheduledDate: 'Tomorrow (Office Peak)',
-      sourceSignal: 'Dual-Platform Search Surge',
-      evidence: '#1 YT Views (137) + 27.8% TikTok Top Search Share on scraper workflows.',
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-    {
-      id: 'task-ap-2',
-      type: 'METADATA_REFINE',
-      title: 'Excel Center Across Selection: Stop Merging Cells Forever',
-      category: 'PC & Windows Hacks',
-      categoryId: 4,
-      characterTag: '@WM25-1',
-      priority: 'HIGH',
-      status: 'queued',
-      progress: 0,
-      scheduledSlot: '6:00 PM PKT',
-      scheduledDate: 'In 2 Days',
-      sourceSignal: '104.7% Retention Loop Multiplier',
-      evidence: 'Video #28 achieved 104.7% avg view % via seamless loop resolution.',
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-    {
-      id: 'task-ap-3',
-      type: 'CROSS_STUDIO_SYNC',
-      title: 'Google Sheets AI Smart Fill: Ghanton Ka Data Seconds Mein',
-      category: 'AI & Smart Technology',
-      categoryId: 1,
-      characterTag: '@WM25-2',
-      priority: 'NORMAL',
-      status: 'queued',
-      progress: 0,
-      scheduledSlot: '6:00 PM PKT',
-      scheduledDate: 'In 3 Days',
-      sourceSignal: 'Episodic Bridge Fix (0.2% Returning Viewers)',
-      evidence: 'Needs high-urgency Scene 10 2-part episodic bridge to plug subscriber leak.',
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    }
-  ];
+  const t1: AutopilotTask = {
+    id: 'task-ap-1',
+    type: 'AUTO_POST',
+    title: 'Power Automate Desktop: Web Scraping to Clean Excel in 60s',
+    category: 'AI Chatbots, Workflows & AI Tools',
+    categoryId: 2,
+    characterTag: '@WM25-3',
+    priority: 'URGENT',
+    status: 'queued',
+    progress: 0,
+    scheduledSlot: '5:00 PM PKT',
+    scheduledDate: 'Tomorrow (Office Peak)',
+    sourceSignal: 'Dual-Platform Search Surge',
+    evidence: '#1 YT Views (137) + 27.8% TikTok Top Search Share on scraper workflows.',
+    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+  t1.storyPackage = createFullAutopilotStoryPackage(t1);
+
+  const t2: AutopilotTask = {
+    id: 'task-ap-2',
+    type: 'METADATA_REFINE',
+    title: 'Excel Center Across Selection: Stop Merging Cells Forever',
+    category: 'PC & Windows Hacks',
+    categoryId: 4,
+    characterTag: '@WM25-1',
+    priority: 'HIGH',
+    status: 'queued',
+    progress: 0,
+    scheduledSlot: '6:00 PM PKT',
+    scheduledDate: 'In 2 Days',
+    sourceSignal: '104.7% Retention Loop Multiplier',
+    evidence: 'Video #28 achieved 104.7% avg view % via seamless loop resolution.',
+    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+  t2.storyPackage = createFullAutopilotStoryPackage(t2);
+
+  const t3: AutopilotTask = {
+    id: 'task-ap-3',
+    type: 'CROSS_STUDIO_SYNC',
+    title: 'Google Sheets AI Smart Fill: Ghanton Ka Data Seconds Mein',
+    category: 'AI & Smart Technology',
+    categoryId: 1,
+    characterTag: '@WM25-2',
+    priority: 'NORMAL',
+    status: 'queued',
+    progress: 0,
+    scheduledSlot: '6:00 PM PKT',
+    scheduledDate: 'In 3 Days',
+    sourceSignal: 'Episodic Bridge Fix (0.2% Returning Viewers)',
+    evidence: 'Needs high-urgency Scene 10 2-part episodic bridge to plug subscriber leak.',
+    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+  t3.storyPackage = createFullAutopilotStoryPackage(t3);
+
+  return [t1, t2, t3];
 }
 
 export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTab, onOpenStory }) => {
@@ -241,6 +402,45 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
       return updated;
     });
   }, []);
+
+  const toggleTaskPublish = (taskId: string) => {
+    setTasks((prev) => {
+      const updated = prev.map((t) => {
+        if (t.id === taskId) {
+          const nextStatus: TaskStatus = t.status === 'completed' ? 'queued' : 'completed';
+          const nextProgress = nextStatus === 'completed' ? 100 : 0;
+
+          // Also sync with pendingQueueStore
+          updatePendingStoryStatus(taskId, nextStatus === 'completed' ? 'published' : 'pending');
+
+          addLog(
+            'DECISION',
+            nextStatus === 'completed'
+              ? `Task #${t.id} ("${t.title.slice(0, 30)}...") marked as PUBLISHED by creator.`
+              : `Task #${t.id} reverted to PENDING by creator.`
+          );
+
+          const updatedTask: AutopilotTask = {
+            ...t,
+            status: nextStatus,
+            progress: nextProgress,
+            completedAt: nextStatus === 'completed' ? new Date().toLocaleTimeString() : undefined,
+          };
+
+          if (selectedTask && selectedTask.id === taskId) {
+            setSelectedTask(updatedTask);
+          }
+
+          return updatedTask;
+        }
+        return t;
+      });
+      try {
+        localStorage.setItem(STORAGE_KEYS.QUEUE, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
 
   // Save tasks and settings to storage
   useEffect(() => {
@@ -995,17 +1195,18 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
 
                       {/* Task Actions */}
                       <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0">
-                        {isCompleted && task.storyPackage && (
-                          <button
-                            onClick={() => {
-                              setSelectedTask(task);
-                              setShowTaskModal(true);
-                            }}
-                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <FileText className="w-3.5 h-3.5" /> View Package
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            const pkg = task.storyPackage || createFullAutopilotStoryPackage(task);
+                            setSelectedTask({ ...task, storyPackage: pkg });
+                            setShowTaskModal(true);
+                          }}
+                          className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm hover:border-cyan-500/40"
+                          title="Pura 10-scene package aur YouTube details open karein"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Open Full Story (10 سینز)</span>
+                        </button>
 
                         {!isCompleted && !isProcessing && (
                           <button
@@ -1144,66 +1345,56 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
       </div>
 
       {/* Package Inspection Modal */}
-      {showTaskModal && selectedTask && selectedTask.storyPackage && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+      {showTaskModal && selectedTask && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
             <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-mono text-cyan-400 uppercase font-semibold">
-                  Autopilot Package • {selectedTask.characterTag} • {selectedTask.scheduledSlot}
-                </span>
-                <h3 className="font-bold text-white text-base truncate max-w-xl">{selectedTask.title}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/40">
+                    Autopilot Story Package • {selectedTask.characterTag}
+                  </span>
+                  <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                    selectedTask.status === 'completed'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  }`}>
+                    {selectedTask.status === 'completed' ? '✅ Published (پبلش ہو چکی ہے)' : '⏳ Pending (ابھی پینڈنگ ہے)'}
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    Slot: {selectedTask.scheduledSlot} ({selectedTask.scheduledDate})
+                  </span>
+                </div>
+                <h3 className="font-bold text-white text-base truncate max-w-2xl mt-1">{selectedTask.title}</h3>
               </div>
               <button
                 onClick={() => setShowTaskModal(false)}
-                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs"
+                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs cursor-pointer transition-colors"
+                title="Close Modal"
               >
-                Close
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-5 overflow-y-auto space-y-4 text-xs">
-              <div className="flex items-center justify-between bg-cyan-950/40 p-3 rounded-xl border border-cyan-800/40">
-                <span className="font-semibold text-cyan-300">Google Flow Prompt Package Ready</span>
-                <button
-                  onClick={() => {
-                    const prompts = selectedTask.storyPackage!.scenes
-                      .map((s) => `--- SCENE ${s.num} (${s.purpose}) ---\n${s.script}`)
-                      .join('\n\n');
-                    copyToClipboard(prompts, 'modal-prompts');
-                  }}
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
-                >
-                  {copiedKey === 'modal-prompts' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  Copy Flow Prompts
-                </button>
-              </div>
-
-              {/* 10 Scenes Accordion */}
-              <div className="space-y-2">
-                {selectedTask.storyPackage.scenes.map((s) => (
-                  <div key={s.num} className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-1">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold text-cyan-300">Scene {s.num}: {s.purpose}</span>
-                      <span className="text-slate-400 font-mono">{s.words} Roman Urdu words</span>
-                    </div>
-                    <p className="text-slate-300 italic text-xs">"{s.dialogue}"</p>
-                  </div>
-                ))}
-              </div>
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+              <StoryPackageView
+                story={selectedTask.storyPackage || createFullAutopilotStoryPackage(selectedTask)}
+                publishStatus={selectedTask.status === 'completed' ? 'published' : 'pending'}
+                onTogglePublish={() => toggleTaskPublish(selectedTask.id)}
+              />
             </div>
 
-            <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
-              <span className="text-slate-400 text-[11px]">Auto-Synced across Calendar & Simulator</span>
+            <div className="p-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs">
+              <span className="text-slate-400 text-[11px]">Auto-Synced across Calendar, Queue & Simulator</span>
               {onNavigateTab && (
                 <button
                   onClick={() => {
                     setShowTaskModal(false);
-                    onNavigateTab('calendar');
+                    onNavigateTab('pending');
                   }}
-                  className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1"
+                  className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  Open in Calendar <ArrowRight className="w-3.5 h-3.5" />
+                  Open in Target Queue <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
