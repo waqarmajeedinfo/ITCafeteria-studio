@@ -36,7 +36,8 @@ import {
   Sliders,
   RotateCcw,
   Upload,
-  Clock
+  Clock,
+  ArrowUp
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -259,6 +260,24 @@ export default function App() {
     };
   }, []);
 
+  // Track window scroll to smoothly elevate sticky navigation when scrolling down
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Elevate and dock sticky navbar when scrolling passes banner/action bar threshold
+      setIsScrolled(window.scrollY > 90);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   type TabGroup = 'core' | 'automation' | 'management' | 'ai';
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode; group: TabGroup }[] = [
@@ -416,131 +435,180 @@ export default function App() {
             </button>
           </div>
         </div>
+      </header>
 
-        {/* Multi-Section Dropdown Navigation (Exact match to original screenshot dropdowns) */}
-        <nav className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur-md shadow-lg shadow-black/40" ref={navRef}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Desktop Navbar with 4 Interactive Dropdown Menus */}
-            <div className="hidden md:flex items-center gap-3 py-2.5">
-              {groups.map((group) => {
-                const isGroupActive = activeGroup === group.id;
-                const isMenuOpen = openMenu === group.id;
-                const groupTabs = tabs.filter((t) => t.group === group.id);
-
-                return (
-                  <div key={group.id} className="relative">
-                    <button
-                      onClick={() => setOpenMenu(isMenuOpen ? null : group.id)}
-                      className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-all cursor-pointer border ${
-                        isMenuOpen || isGroupActive
-                          ? 'text-cyan-300 bg-cyan-950/40 border-cyan-500/50 shadow-md shadow-cyan-950/50'
-                          : 'text-slate-300 hover:text-white bg-slate-900/60 hover:bg-slate-900 border-slate-800 hover:border-slate-700'
-                      }`}
-                      aria-expanded={isMenuOpen}
-                    >
-                      <span className="shrink-0">{group.icon}</span>
-                      <span>{group.label}</span>
-                      <span className="text-xs text-slate-400 font-mono font-normal">({group.count})</span>
-                      <ChevronDown
-                        className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
-                          isMenuOpen ? 'rotate-180 text-cyan-400' : ''
-                        }`}
-                      />
-                    </button>
-
-                    {/* Floating Dropdown Popup Menu */}
-                    {isMenuOpen && (
-                      <div className="absolute left-0 top-full mt-2 w-72 bg-[#0c1427]/98 backdrop-blur-2xl border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 flex flex-col gap-1 ring-1 ring-white/10 animate-in fade-in zoom-in-95 duration-150">
-                        {groupTabs.map((tab) => {
-                          const isActive = activeTab === tab.id;
-                          return (
-                            <button
-                              key={tab.id}
-                              onClick={() => selectTab(tab.id)}
-                              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left text-sm transition-colors cursor-pointer ${
-                                isActive
-                                  ? 'bg-cyan-950/60 text-cyan-300 font-medium border border-cyan-500/30 shadow-sm'
-                                  : 'text-slate-200 hover:bg-slate-800/80 hover:text-white'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3 min-w-0">
-                                <span className="shrink-0">{tab.icon}</span>
-                                <span className="truncate text-sm">{tab.label}</span>
-                              </div>
-                              {isActive && <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Active Tab Indicator on the right */}
-              <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
-                <span className="hidden lg:inline text-slate-400 text-xs">Currently Open:</span>
-                <div className="text-cyan-300 font-medium px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2 shadow-inner">
-                  {activeTabMeta?.icon}
-                  <span className="font-semibold text-xs sm:text-sm">{activeTabMeta?.label}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile Menu Bar */}
-            <div className="md:hidden flex items-center justify-between py-2 text-xs">
+      {/* Sticky Main Menu Navigation (Takes over top position on scroll, remains locked while scrolling) */}
+      <nav
+        ref={navRef}
+        className={`sticky top-0 z-50 transition-all duration-300 border-b ${
+          isScrolled
+            ? 'bg-slate-950/98 backdrop-blur-2xl border-cyan-500/40 shadow-2xl shadow-cyan-950/60 py-1'
+            : 'bg-slate-950/95 backdrop-blur-md border-slate-800/80 shadow-lg shadow-black/40 py-0'
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Desktop Navbar with 4 Interactive Dropdown Menus */}
+          <div className="hidden md:flex items-center gap-3 py-2.5">
+            {/* Scrolled Mini Brand Anchor to quickly jump back to Header */}
+            {isScrolled && (
               <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200 cursor-pointer"
+                onClick={scrollToTop}
+                className="hidden xl:flex items-center gap-2 pr-3 mr-1 border-r border-slate-800 text-slate-300 hover:text-cyan-300 transition-colors cursor-pointer group"
+                title="Header par wapis jayein (Scroll to Top)"
               >
-                <Menu className="w-4 h-4 text-cyan-400" />
-                <span>Navigation Menu</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${mobileMenuOpen ? 'rotate-180' : ''}`} />
+                <img
+                  src="/brand/logo.jpeg"
+                  alt="Logo"
+                  className="w-7 h-7 rounded-lg object-cover ring-1 ring-cyan-500/40 group-hover:ring-cyan-400 transition-all"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+                <span className="font-bold text-xs tracking-tight text-white group-hover:text-cyan-300">IT Cafeteria</span>
               </button>
-              <span className="text-cyan-300 font-medium truncate max-w-[55%] flex items-center gap-1.5">
-                {activeTabMeta?.icon} {activeTabMeta?.label}
-              </span>
-            </div>
+            )}
 
-            {/* Mobile Expanded Panel */}
-            {mobileMenuOpen && (
-              <div className="md:hidden border-t border-slate-800/60 py-2.5 space-y-3">
-                {groups.map((group) => (
-                  <div key={group.id}>
-                    <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                      {group.icon}
-                      <span>{group.label}</span>
-                      <span className="text-slate-500 font-mono">({group.count})</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-1">
-                      {tabs.filter((t) => t.group === group.id).map((tab) => {
+            {groups.map((group) => {
+              const isGroupActive = activeGroup === group.id;
+              const isMenuOpen = openMenu === group.id;
+              const groupTabs = tabs.filter((t) => t.group === group.id);
+
+              return (
+                <div key={group.id} className="relative">
+                  <button
+                    onClick={() => setOpenMenu(isMenuOpen ? null : group.id)}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-all cursor-pointer border ${
+                      isMenuOpen || isGroupActive
+                        ? 'text-cyan-300 bg-cyan-950/40 border-cyan-500/50 shadow-md shadow-cyan-950/50'
+                        : 'text-slate-300 hover:text-white bg-slate-900/60 hover:bg-slate-900 border-slate-800 hover:border-slate-700'
+                    }`}
+                    aria-expanded={isMenuOpen}
+                  >
+                    <span className="shrink-0">{group.icon}</span>
+                    <span>{group.label}</span>
+                    <span className="text-xs text-slate-400 font-mono font-normal">({group.count})</span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                        isMenuOpen ? 'rotate-180 text-cyan-400' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {/* Floating Dropdown Popup Menu */}
+                  {isMenuOpen && (
+                    <div className="absolute left-0 top-full mt-2 w-72 bg-[#0c1427]/98 backdrop-blur-2xl border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 flex flex-col gap-1 ring-1 ring-white/10 animate-in fade-in zoom-in-95 duration-150">
+                      {groupTabs.map((tab) => {
                         const isActive = activeTab === tab.id;
                         return (
                           <button
                             key={tab.id}
                             onClick={() => selectTab(tab.id)}
-                            className={`px-3 py-2 rounded-xl flex items-center justify-between text-left text-xs transition-colors cursor-pointer ${
+                            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left text-sm transition-colors cursor-pointer ${
                               isActive
-                                ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-                                : 'text-slate-300 bg-slate-900/60 hover:bg-slate-800'
+                                ? 'bg-cyan-950/60 text-cyan-300 font-medium border border-cyan-500/30 shadow-sm'
+                                : 'text-slate-200 hover:bg-slate-800/80 hover:text-white'
                             }`}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-3 min-w-0">
                               <span className="shrink-0">{tab.icon}</span>
-                              <span className="truncate">{tab.label}</span>
+                              <span className="truncate text-sm">{tab.label}</span>
                             </div>
-                            {isActive && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0 ml-2" />}
+                            {isActive && <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />}
                           </button>
                         );
                       })}
                     </div>
-                  </div>
-                ))}
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Active Tab Indicator & Top Scroll Jump on the right */}
+            <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
+              <span className="hidden lg:inline text-slate-400 text-xs">Currently Open:</span>
+              <div className="text-cyan-300 font-medium px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2 shadow-inner">
+                {activeTabMeta?.icon}
+                <span className="font-semibold text-xs sm:text-sm">{activeTabMeta?.label}</span>
               </div>
-            )}
+
+              {/* Scroll To Top Jump Button when Scrolled */}
+              {isScrolled && (
+                <button
+                  onClick={scrollToTop}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 hover:text-cyan-300 text-xs font-semibold cursor-pointer transition-all shadow-md group ml-1"
+                  title="Upar Jayein / Header Dekhein"
+                >
+                  <ArrowUp className="w-3.5 h-3.5 group-hover:-translate-y-0.5 transition-transform" />
+                  <span className="hidden sm:inline text-[11px]">Top</span>
+                </button>
+              )}
+            </div>
           </div>
-        </nav>
-      </header>
+
+          {/* Mobile Menu Bar */}
+          <div className="md:hidden flex items-center justify-between py-2 text-xs">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200 cursor-pointer"
+            >
+              <Menu className="w-4 h-4 text-cyan-400" />
+              <span>Navigation Menu</span>
+              <ChevronDown className={`w-3 h-3 transition-transform ${mobileMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-cyan-300 font-medium truncate max-w-[45vw] flex items-center gap-1.5">
+                {activeTabMeta?.icon} {activeTabMeta?.label}
+              </span>
+              {isScrolled && (
+                <button
+                  onClick={scrollToTop}
+                  className="p-1 rounded-md bg-slate-900 border border-slate-700 text-cyan-400 cursor-pointer"
+                  title="Scroll to Top"
+                >
+                  <ArrowUp className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Expanded Panel */}
+          {mobileMenuOpen && (
+            <div className="md:hidden border-t border-slate-800/60 py-2.5 space-y-3">
+              {groups.map((group) => (
+                <div key={group.id}>
+                  <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    {group.icon}
+                    <span>{group.label}</span>
+                    <span className="text-slate-500 font-mono">({group.count})</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-1">
+                    {tabs.filter((t) => t.group === group.id).map((tab) => {
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => selectTab(tab.id)}
+                          className={`px-3 py-2 rounded-xl flex items-center justify-between text-left text-xs transition-colors cursor-pointer ${
+                            isActive
+                              ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                              : 'text-slate-300 bg-slate-900/60 hover:bg-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="shrink-0">{tab.icon}</span>
+                            <span className="truncate">{tab.label}</span>
+                          </div>
+                          {isActive && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0 ml-2" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </nav>
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
