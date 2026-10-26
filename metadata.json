@@ -1,6 +1,6 @@
 {
   "name": "IT Cafeteria — AI Content Engine & Growth Studio",
   "description": "IT Cafeteria YouTube Shorts channel analytics, multi-channel AI content agent management, prompt optimization, duplicate checking, and growth enhancements for Waqar Majeed.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
