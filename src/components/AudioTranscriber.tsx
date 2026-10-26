@@ -48,8 +48,9 @@ export const AudioTranscriber: React.FC = () => {
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err: any) {
-      console.error('Microphone error:', err);
-      setError('Microphone access denied or not supported by browser.');
+      console.warn('AudioTranscriber microphone permission notice:', err?.name || err?.message || err);
+      setIsRecording(false);
+      setError('Microphone permission allow nahi hui ya browser mein blocked hai. Browser URL bar mein mic allow karein ya audio file upload karein.');
     }
   };
 

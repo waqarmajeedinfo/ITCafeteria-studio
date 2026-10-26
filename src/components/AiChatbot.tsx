@@ -60,12 +60,17 @@ export const AiChatbot: React.FC = () => {
   const [copiedKeyword, setCopiedKeyword] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Voice Input States
+  // Voice Input States (with Gemini Natural Flow Auto-Detection)
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [isTranscribingVoice, setIsTranscribingVoice] = useState(false);
+  const [vadState, setVadState] = useState<'idle' | 'listening' | 'speaking' | 'silence_detected'>('idle');
+  const [silenceProgress, setSilenceProgress] = useState<number>(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const voiceChunksRef = useRef<Blob[]>([]);
   const voiceStreamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<any>(null);
+  const isAutoSubmittingRef = useRef<boolean>(false);
 
   // Trending Keywords Sidebar States
   const [showTrendingSidebar, setShowTrendingSidebar] = useState<boolean>(true);
@@ -230,27 +235,157 @@ Always adhere to IT Cafeteria rules:
 
       setMessages(prev => [...prev, botMsg]);
     } catch (err: any) {
-      console.error('Chat error:', err);
+      console.warn('Chat error:', err);
       setErrorMsg(err.message || 'Error communicating with Gemini');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const stopVoiceInput = () => {
+    setIsRecordingVoice(false);
+    setVadState('idle');
+    setSilenceProgress(0);
+    if (silenceTimerRef.current) {
+      clearInterval(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      recognitionRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
+      mediaRecorderRef.current = null;
+    }
+    if (voiceStreamRef.current) {
+      voiceStreamRef.current.getTracks().forEach((track) => track.stop());
+      voiceStreamRef.current = null;
+    }
+  };
+
   const toggleVoiceRecording = async () => {
     if (isRecordingVoice) {
-      mediaRecorderRef.current?.stop();
-      setIsRecordingVoice(false);
+      stopVoiceInput();
       return;
     }
 
+    setErrorMsg(null);
+    setSilenceProgress(0);
+    isAutoSubmittingRef.current = false;
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognitionRef.current = recognition;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'ur-PK';
+
+        let accumulated = '';
+
+        recognition.onstart = () => {
+          setIsRecordingVoice(true);
+          setVadState('listening');
+        };
+
+        recognition.onresult = (event: any) => {
+          if (isAutoSubmittingRef.current) return;
+
+          let interim = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              accumulated += ' ' + event.results[i][0].transcript;
+            } else {
+              interim += event.results[i][0].transcript;
+            }
+          }
+
+          const currentWords = (accumulated + ' ' + interim).trim();
+          if (!currentWords) return;
+
+          setInputText(currentWords);
+          setVadState('speaking');
+
+          if (silenceTimerRef.current) {
+            clearInterval(silenceTimerRef.current);
+            silenceTimerRef.current = null;
+          }
+          setSilenceProgress(0);
+
+          // Once user has spoken, start 1.2s silence auto-submit countdown
+          if (currentWords.length >= 2) {
+            const start = Date.now();
+            const durationMs = 1200;
+
+            silenceTimerRef.current = setInterval(() => {
+              const elapsed = Date.now() - start;
+              const pct = Math.min(100, Math.round((elapsed / durationMs) * 100));
+              setSilenceProgress(pct);
+              setVadState('silence_detected');
+
+              if (elapsed >= durationMs) {
+                if (silenceTimerRef.current) {
+                  clearInterval(silenceTimerRef.current);
+                  silenceTimerRef.current = null;
+                }
+                isAutoSubmittingRef.current = true;
+                setSilenceProgress(100);
+                stopVoiceInput();
+                handleSend(currentWords);
+              }
+            }, 80);
+          }
+        };
+
+        recognition.onerror = (e: any) => {
+          console.warn('SpeechRecognition notice:', e?.error);
+          if (e?.error === 'not-allowed') {
+            setErrorMsg('Microphone allow karein browser address bar se.');
+          }
+          stopVoiceInput();
+        };
+
+        recognition.onend = () => {
+          if (!isAutoSubmittingRef.current) {
+            setIsRecordingVoice(false);
+            setVadState('idle');
+          }
+        };
+
+        recognition.start();
+        setIsRecordingVoice(true);
+        setVadState('listening');
+        return;
+      } catch (err) {
+        console.warn('SpeechRecognition fallback to MediaRecorder:', err);
+      }
+    }
+
+    // Fallback: MediaRecorder + Web Audio API VAD
     try {
-      setErrorMsg(null);
       voiceChunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       voiceStreamRef.current = stream;
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
+
+      const audioCtx = new AudioContext();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      const buffer = new Uint8Array(analyser.frequencyBinCount);
+
+      let hasSpoken = false;
+      let silenceStart: number | null = null;
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -259,17 +394,55 @@ Always adhere to IT Cafeteria rules:
       };
 
       mediaRecorder.onstop = () => {
+        try {
+          audioCtx.close();
+        } catch {}
         const blob = new Blob(voiceChunksRef.current, { type: 'audio/webm' });
         stream.getTracks().forEach((track) => track.stop());
         voiceStreamRef.current = null;
         transcribeVoiceInput(blob);
       };
 
+      const checkVolume = () => {
+        if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
+        analyser.getByteFrequencyData(buffer);
+        let sum = 0;
+        for (let i = 0; i < buffer.length; i++) sum += buffer[i];
+        const average = sum / buffer.length;
+        const levelPct = Math.min(100, Math.round((average / 128) * 100));
+
+        if (levelPct > 14) {
+          hasSpoken = true;
+          silenceStart = null;
+          setVadState('speaking');
+          setSilenceProgress(0);
+        } else if (hasSpoken) {
+          if (!silenceStart) silenceStart = Date.now();
+          const elapsed = Date.now() - silenceStart;
+          const pct = Math.min(100, Math.round((elapsed / 1200) * 100));
+          setSilenceProgress(pct);
+          setVadState('silence_detected');
+
+          if (elapsed >= 1200) {
+            hasSpoken = false;
+            setSilenceProgress(100);
+            isAutoSubmittingRef.current = true;
+            stopVoiceInput();
+            return;
+          }
+        }
+
+        requestAnimationFrame(checkVolume);
+      };
+
       mediaRecorder.start();
       setIsRecordingVoice(true);
+      setVadState('listening');
+      checkVolume();
     } catch (err: any) {
-      console.error('Microphone error:', err);
-      setErrorMsg('Microphone access nahi mil saka. Browser ki site settings mein microphone allow karein (HTTPS ya localhost zaroori hai).');
+      console.warn('Microphone error:', err);
+      setErrorMsg('Microphone access check karein (browser site settings mein microphone allow karein).');
+      stopVoiceInput();
     }
   };
 
@@ -303,7 +476,7 @@ Always adhere to IT Cafeteria rules:
         setInputText(combined);
         handleSend(combined);
       } catch (err: any) {
-        console.error('Voice transcription error:', err);
+        console.warn('Voice transcription error:', err);
         setErrorMsg(err.message || 'Voice transcribe nahi ho saka.');
       } finally {
         setIsTranscribingVoice(false);
@@ -557,18 +730,36 @@ Always adhere to IT Cafeteria rules:
               </button>
             </form>
 
-            {/* Voice Status Line */}
+            {/* Voice Status Line (Gemini Auto-Detection Flow) */}
             {(isRecordingVoice || isTranscribingVoice) && (
-              <div className="mt-2 text-[11px]">
+              <div className="mt-2 text-[11px] bg-slate-900/90 border border-slate-800 rounded-lg p-2 overflow-hidden relative">
+                {vadState === 'silence_detected' && silenceProgress > 0 && (
+                  <div
+                    className="absolute top-0 left-0 h-0.5 bg-gradient-to-r from-amber-400 to-cyan-400 transition-all duration-75"
+                    style={{ width: `${silenceProgress}%` }}
+                  />
+                )}
                 {isRecordingVoice ? (
-                  <span className="flex items-center gap-1.5 text-rose-300">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                    Recording chal rahi hai... apna sawal bol kar poochein, phir mic dobara daba kar band karein.
-                  </span>
+                  vadState === 'silence_detected' ? (
+                    <span className="flex items-center gap-1.5 text-amber-300 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      Khamoshi detect hui... Auto-submitting prompt!
+                    </span>
+                  ) : vadState === 'speaking' ? (
+                    <span className="flex items-center gap-1.5 text-purple-300 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                      Aap bol rahe hain... (Rukne par auto-submit ho jayega)
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-cyan-300">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                      🎙️ Sun raha hoon... Bolte jayein, rukne par khud submit ho jayega (Gemini Flow).
+                    </span>
+                  )
                 ) : (
                   <span className="flex items-center gap-1.5 text-cyan-300">
                     <AudioLines className="w-3.5 h-3.5 animate-pulse" />
-                    Aap ki awaaz Roman Urdu text mein badli ja rahi hai...
+                    Aap ki awaaz process ho rahi hai...
                   </span>
                 )}
               </div>

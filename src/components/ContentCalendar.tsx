@@ -77,7 +77,7 @@ interface AiChatDraft {
 
 export const ContentCalendar: React.FC = () => {
   const [selectedSlotTime, setSelectedSlotTime] = useState<string>('6:00 PM PKT');
-  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([
+  const DEFAULT_POSTS: ScheduledPost[] = [
     {
       id: 'sp-1',
       title: 'Google Flow AI Video Trick: Start & End Frames',
@@ -133,7 +133,24 @@ export const ContentCalendar: React.FC = () => {
       platform: 'YouTube Only',
       reason: 'Long-form lecture series prime weekend window'
     }
-  ]);
+  ];
+
+  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>(() => {
+    try {
+      const stored = localStorage.getItem('itcafeteria_scheduled_posts');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_POSTS;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('itcafeteria_scheduled_posts', JSON.stringify(scheduledPosts));
+    } catch {}
+  }, [scheduledPosts]);
 
   // Optimal Slots Definition based on IT Cafeteria's real analytics
   const optimalSlots = [

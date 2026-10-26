@@ -28,7 +28,7 @@ interface GrowthSignal {
   recommendedAction: string;
 }
 
-export const GrowthSignals: React.FC = () => {
+export const GrowthSignals: React.FC<{ onNavigateTab?: (tab: string) => void }> = ({ onNavigateTab }) => {
   const [selectedHookType, setSelectedHookType] = useState<string>('Contrarian Warning');
   const [selectedDuration, setSelectedDuration] = useState<number>(75);
   const [selectedCategory, setSelectedCategory] = useState<string>('PC & Windows Hacks');
@@ -130,6 +130,32 @@ export const GrowthSignals: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Autopilot Coordination Action Banner */}
+      {onNavigateTab && (
+        <div className="bg-gradient-to-r from-cyan-950/40 via-indigo-950/40 to-slate-900 border border-cyan-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center shrink-0">
+              <Zap className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-white text-xs font-bold">Autopilot Mode Ready</span>
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded font-mono">5 Signals Mapped</span>
+              </div>
+              <p className="text-slate-300 text-xs mt-0.5">
+                In anomalies aur viral triggers ko khud-kar sequence mein execute karein: script, flow prompt aur calendar slot khud banayein.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigateTab('autopilot')}
+            className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-cyan-500/20 transition-all shrink-0 cursor-pointer"
+          >
+            Launch Autopilot Manager <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Flagged Signals & Anomalies Feed */}
       <div className="space-y-4">
