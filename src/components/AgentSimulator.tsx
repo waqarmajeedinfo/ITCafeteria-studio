@@ -17,6 +17,7 @@ import {
   type AgentTriggerSelection
 } from './AgentFlowScreen';
 import { StoryPackageView, type GeneratedStory } from './StoryPackageView';
+import { loadPendingQueue, savePendingQueue, getNextTargetStory, type PendingStoryRecord } from '../lib/pendingQueueStore';
 
 const LATEST_STORY_KEY = 'itcafeteria_latest_story';
 const MEMORY_RECORDS_KEY = 'itcafeteria_memory_records';
@@ -73,13 +74,18 @@ function getNextCategoryId(profile: ChannelProfile, currentCategoryId: number) {
 function loadLatestStory(): GeneratedStory | null {
   try {
     const raw = localStorage.getItem(LATEST_STORY_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.scenes) || !parsed.title) return null;
-    return parsed as GeneratedStory;
-  } catch {
-    return null;
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.scenes) && parsed.title) return parsed as GeneratedStory;
+    }
+  } catch {}
+
+  // Fallback to active Pending Queue target story so new logins NEVER see an empty screen!
+  const nextTarget = getNextTargetStory();
+  if (nextTarget && nextTarget.storyPackage && Array.isArray(nextTarget.storyPackage.scenes) && nextTarget.storyPackage.scenes.length > 0) {
+    return nextTarget.storyPackage;
   }
+  return null;
 }
 
 function loadMemoryRecords(): AgentMemoryRecord[] {
@@ -185,6 +191,33 @@ export const AgentSimulator: React.FC = () => {
     const generatedStory = outcome.story;
     const outcomeProfile = CHANNEL_PROFILES[outcome.selection.channelId];
     setLatestStory(generatedStory);
+
+    // Auto-save generated story into the unified Pending Stories Queue so it's tracked in the new tab!
+    try {
+      const currentQueue = loadPendingQueue();
+      const exists = currentQueue.some((item) => item.title.toLowerCase() === generatedStory.title.toLowerCase());
+      if (!exists) {
+        const newQueueItem: PendingStoryRecord = {
+          id: `pq-sim-${Date.now()}`,
+          title: generatedStory.title,
+          hook: generatedStory.hook,
+          category: generatedStory.categoryName || outcomeProfile.categories[0]?.name || 'AI & Smart Technology',
+          categoryId: outcome.selection.categoryId,
+          characterTag: outcome.selection.tag,
+          scheduledTime: '6:00 PM PKT',
+          scheduledDate: 'Next Slot',
+          targetSlotReason: 'Generated via Agent Flow Simulator — waiting for review and upload.',
+          status: 'pending',
+          source: 'simulator',
+          priority: 'HIGH',
+          createdAt: new Date().toISOString(),
+          storyPackage: generatedStory
+        };
+        savePendingQueue([newQueueItem, ...currentQueue]);
+      }
+    } catch (e) {
+      console.error('Error syncing Simulator story to pending queue', e);
+    }
 
     setMemoryRecords((records) => {
       const exists = records.some((record) =>

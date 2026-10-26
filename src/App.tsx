@@ -35,7 +35,8 @@ import {
   Camera,
   Sliders,
   RotateCcw,
-  Upload
+  Upload,
+  Clock
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -58,12 +59,14 @@ import { CompetitorBenchmarking } from './components/CompetitorBenchmarking';
 import { CommunityPollWidget } from './components/CommunityPollWidget';
 import { StudioAssistant } from './components/StudioAssistant';
 import { HolographicBackground, type HolographicTheme, HOLOGRAPHIC_THEMES } from './components/HolographicBackground';
+import { PendingQueueTracker } from './components/PendingQueueTracker';
 import { PHONETIC_DICTIONARY } from './data/channelData';
 
 type TabType = 
   | 'analytics'
-  | 'live'
+  | 'pending'
   | 'autopilot'
+  | 'live'
   | 'signals'
   | 'calendar'
   | 'community'
@@ -259,13 +262,14 @@ export default function App() {
   const tabs: { id: TabType; label: string; icon: React.ReactNode; group: 'core' | 'ai' | 'management' }[] = [
     // Core Channel Tabs
     { id: 'analytics', label: 'Channel Diagnostics', icon: <BarChart3 className="w-4 h-4" />, group: 'core' },
+    { id: 'pending', label: 'Pending Stories & Target Queue', icon: <Clock className="w-4 h-4 text-amber-400" />, group: 'core' },
     { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-cyan-400" />, group: 'core' },
+    { id: 'simulator', label: 'Agent Flow Simulator', icon: <Bot className="w-4 h-4" />, group: 'core' },
+    { id: 'calendar', label: 'Content Calendar', icon: <CalendarIcon className="w-4 h-4 text-emerald-400" />, group: 'core' },
     { id: 'live', label: 'Live Insights (YouTube + TikTok)', icon: <Activity className="w-4 h-4 text-emerald-400" />, group: 'core' },
     { id: 'signals', label: 'Growth Signals & Anomalies', icon: <Rocket className="w-4 h-4 text-amber-400" />, group: 'core' },
-    { id: 'calendar', label: 'Content Calendar', icon: <CalendarIcon className="w-4 h-4 text-emerald-400" />, group: 'core' },
     { id: 'community', label: 'Community Polls', icon: <Vote className="w-4 h-4 text-rose-400" />, group: 'core' },
     { id: 'benchmarking', label: 'Competitor Benchmarks', icon: <Users className="w-4 h-4 text-indigo-400" />, group: 'core' },
-    { id: 'simulator', label: 'Agent Flow Simulator', icon: <Bot className="w-4 h-4" />, group: 'core' },
     
     // AI Studios
     { id: 'chat', label: 'AI Script Chatbot', icon: <MessageSquare className="w-4 h-4" />, group: 'ai' },
@@ -563,6 +567,7 @@ export default function App() {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
         {activeTab === 'analytics' && <ChannelAnalytics />}
+        {activeTab === 'pending' && <PendingQueueTracker onNavigateTab={(tab) => selectTab(tab as TabType)} />}
         {activeTab === 'autopilot' && <AutopilotManager onNavigateTab={(tab) => selectTab(tab as TabType)} />}
         {activeTab === 'live' && (
           <LiveInsights
