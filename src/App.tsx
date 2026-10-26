@@ -259,28 +259,28 @@ export default function App() {
     };
   }, []);
 
-  type TabGroup = 'core' | 'autopilot' | 'management' | 'ai';
+  type TabGroup = 'core' | 'automation' | 'management' | 'ai';
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode; group: TabGroup }[] = [
-    // 1. Core Channel Tabs
+    // 1. Core Channel Tabs (4)
     { id: 'analytics', label: 'Channel Diagnostics', icon: <BarChart3 className="w-4 h-4 text-cyan-400" />, group: 'core' },
     { id: 'live', label: 'Live Insights (YouTube + TikTok)', icon: <Activity className="w-4 h-4 text-emerald-400" />, group: 'core' },
     { id: 'signals', label: 'Growth Signals & Anomalies', icon: <Rocket className="w-4 h-4 text-amber-400" />, group: 'core' },
     { id: 'benchmarking', label: 'Competitor Benchmarks', icon: <Users className="w-4 h-4 text-indigo-400" />, group: 'core' },
 
-    // 2. Standalone Autopilot Tab (User requested: standalone separate tab)
-    { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-emerald-400" />, group: 'autopilot' },
-    { id: 'simulator', label: 'Agent Flow Simulator', icon: <Bot className="w-4 h-4 text-cyan-400" />, group: 'autopilot' },
-    { id: 'community', label: 'Community Polls', icon: <Vote className="w-4 h-4 text-rose-400" />, group: 'autopilot' },
+    // 2. Autopilot & Agents (3)
+    { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-emerald-400" />, group: 'automation' },
+    { id: 'simulator', label: 'Agent Flow Simulator', icon: <Bot className="w-4 h-4 text-cyan-400" />, group: 'automation' },
+    { id: 'community', label: 'Community Polls', icon: <Vote className="w-4 h-4 text-rose-400" />, group: 'automation' },
 
-    // 3. Management & Production Queue
+    // 3. Management & Queue (5)
     { id: 'pending', label: 'Pending Stories & Target Queue', icon: <Clock className="w-4 h-4 text-amber-400" />, group: 'management' },
     { id: 'calendar', label: 'Content Calendar', icon: <CalendarIcon className="w-4 h-4 text-cyan-400" />, group: 'management' },
     { id: 'duplicates', label: 'Duplicate Checker (58)', icon: <ShieldAlert className="w-4 h-4 text-rose-400" />, group: 'management' },
     { id: 'masterlist', label: 'Master List', icon: <ListTodo className="w-4 h-4 text-slate-300" />, group: 'management' },
     { id: 'roadmap', label: 'Upscaling (v3.42+)', icon: <Rocket className="w-4 h-4 text-purple-400" />, group: 'management' },
 
-    // 4. AI Studios
+    // 4. AI Studios (7)
     { id: 'chat', label: 'AI Script Chatbot', icon: <MessageSquare className="w-4 h-4 text-cyan-300" />, group: 'ai' },
     { id: 'search', label: 'Search Grounding', icon: <Globe2 className="w-4 h-4 text-emerald-300" />, group: 'ai' },
     { id: 'video', label: 'Omni Flash Video', icon: <Video className="w-4 h-4 text-blue-400" />, group: 'ai' },
@@ -290,11 +290,11 @@ export default function App() {
     { id: '3d', label: '3D Virtual Studio', icon: <Box className="w-4 h-4 text-violet-400" />, group: 'ai' },
   ];
 
-  const groups: { id: TabGroup; label: string; icon: React.ReactNode; defaultTab: TabType }[] = [
-    { id: 'core', label: 'Core Channel', icon: <BarChart3 className="w-4 h-4 text-cyan-400" />, defaultTab: 'analytics' },
-    { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-emerald-400" />, defaultTab: 'autopilot' },
-    { id: 'management', label: 'Management & Queue', icon: <Layers className="w-4 h-4 text-indigo-400" />, defaultTab: 'pending' },
-    { id: 'ai', label: 'AI Studios', icon: <Sparkles className="w-4 h-4 text-amber-400" />, defaultTab: 'chat' },
+  const groups: { id: TabGroup; label: string; icon: React.ReactNode; count: number }[] = [
+    { id: 'core', label: 'Core Channel', icon: <BarChart3 className="w-4 h-4 text-cyan-400" />, count: 4 },
+    { id: 'automation', label: 'Autopilot & Agents', icon: <Cpu className="w-4 h-4 text-emerald-400" />, count: 3 },
+    { id: 'management', label: 'Management & Queue', icon: <Layers className="w-4 h-4 text-indigo-400" />, count: 5 },
+    { id: 'ai', label: 'AI Studios', icon: <Sparkles className="w-4 h-4 text-amber-400" />, count: 7 },
   ];
 
   const activeGroup = tabs.find((t) => t.id === activeTab)?.group || 'core';
@@ -304,13 +304,6 @@ export default function App() {
     setActiveTab(id);
     setOpenMenu(null);
     setMobileMenuOpen(false);
-  };
-
-  const handleGroupSelect = (group: typeof groups[0]) => {
-    // If clicking the currently active group, do not disturb current sub-tab unless switching
-    if (activeGroup !== group.id) {
-      selectTab(group.defaultTab);
-    }
   };
 
   return (
@@ -424,64 +417,74 @@ export default function App() {
           </div>
         </div>
 
-        {/* Multi-Section Menu Navigation (Expanded Website Style) — Sticky during scroll */}
+        {/* Multi-Section Dropdown Navigation (Exact match to original screenshot dropdowns) */}
         <nav className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur-md shadow-lg shadow-black/40" ref={navRef}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Desktop Top Category Tabs Bar */}
-            <div className="hidden md:flex items-center gap-2 py-2 border-b border-slate-800/60 text-xs">
+            {/* Desktop Navbar with 4 Interactive Dropdown Menus */}
+            <div className="hidden md:flex items-center gap-3 py-2.5">
               {groups.map((group) => {
                 const isGroupActive = activeGroup === group.id;
-                const groupCount = tabs.filter((t) => t.group === group.id).length;
+                const isMenuOpen = openMenu === group.id;
+                const groupTabs = tabs.filter((t) => t.group === group.id);
+
                 return (
-                  <button
-                    key={group.id}
-                    onClick={() => handleGroupSelect(group)}
-                    className={`px-3.5 py-2 rounded-xl font-medium flex items-center gap-2 transition-all cursor-pointer border ${
-                      isGroupActive
-                        ? 'text-cyan-200 bg-cyan-950/50 border-cyan-500/50 shadow-md shadow-cyan-950/40'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border-transparent hover:border-slate-800'
-                    }`}
-                  >
-                    {group.icon}
-                    <span className="font-semibold">{group.label}</span>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
-                      isGroupActive ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-500'
-                    }`}>
-                      {groupCount}
-                    </span>
-                  </button>
+                  <div key={group.id} className="relative">
+                    <button
+                      onClick={() => setOpenMenu(isMenuOpen ? null : group.id)}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-all cursor-pointer border ${
+                        isMenuOpen || isGroupActive
+                          ? 'text-cyan-300 bg-cyan-950/40 border-cyan-500/50 shadow-md shadow-cyan-950/50'
+                          : 'text-slate-300 hover:text-white bg-slate-900/60 hover:bg-slate-900 border-slate-800 hover:border-slate-700'
+                      }`}
+                      aria-expanded={isMenuOpen}
+                    >
+                      <span className="shrink-0">{group.icon}</span>
+                      <span>{group.label}</span>
+                      <span className="text-xs text-slate-400 font-mono font-normal">({group.count})</span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                          isMenuOpen ? 'rotate-180 text-cyan-400' : ''
+                        }`}
+                      />
+                    </button>
+
+                    {/* Floating Dropdown Popup Menu */}
+                    {isMenuOpen && (
+                      <div className="absolute left-0 top-full mt-2 w-72 bg-[#0c1427]/98 backdrop-blur-2xl border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 flex flex-col gap-1 ring-1 ring-white/10 animate-in fade-in zoom-in-95 duration-150">
+                        {groupTabs.map((tab) => {
+                          const isActive = activeTab === tab.id;
+                          return (
+                            <button
+                              key={tab.id}
+                              onClick={() => selectTab(tab.id)}
+                              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left text-sm transition-colors cursor-pointer ${
+                                isActive
+                                  ? 'bg-cyan-950/60 text-cyan-300 font-medium border border-cyan-500/30 shadow-sm'
+                                  : 'text-slate-200 hover:bg-slate-800/80 hover:text-white'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="shrink-0">{tab.icon}</span>
+                                <span className="truncate text-sm">{tab.label}</span>
+                              </div>
+                              {isActive && <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
 
-              <div className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-500">
-                <span className="hidden lg:inline">Active View:</span>
-                <span className="text-cyan-300 font-medium px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
-                  {activeTabMeta?.label}
-                </span>
+              {/* Active Tab Indicator on the right */}
+              <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
+                <span className="hidden lg:inline text-slate-400 text-xs">Currently Open:</span>
+                <div className="text-cyan-300 font-medium px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2 shadow-inner">
+                  {activeTabMeta?.icon}
+                  <span className="font-semibold text-xs sm:text-sm">{activeTabMeta?.label}</span>
+                </div>
               </div>
-            </div>
-
-            {/* Expanded Sub-Tabs Bar: Directly displays all child tabs of the selected group! */}
-            <div className="hidden md:flex items-center gap-1.5 py-2 overflow-x-auto no-scrollbar text-xs">
-              {tabs
-                .filter((t) => t.group === activeGroup)
-                .map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => selectTab(tab.id)}
-                      className={`px-3 py-1.5 rounded-lg flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer text-xs ${
-                        isActive
-                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold shadow-sm'
-                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white border border-transparent'
-                      }`}
-                    >
-                      <span className="shrink-0">{tab.icon}</span>
-                      <span>{tab.label}</span>
-                    </button>
-                  );
-                })}
             </div>
 
             {/* Mobile Menu Bar */}
@@ -491,36 +494,42 @@ export default function App() {
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200 cursor-pointer"
               >
                 <Menu className="w-4 h-4 text-cyan-400" />
-                <span>Menu & Tabs</span>
+                <span>Navigation Menu</span>
                 <ChevronDown className={`w-3 h-3 transition-transform ${mobileMenuOpen ? 'rotate-180' : ''}`} />
               </button>
-              <span className="text-cyan-300 font-medium truncate max-w-[55%]">{activeTabMeta?.label}</span>
+              <span className="text-cyan-300 font-medium truncate max-w-[55%] flex items-center gap-1.5">
+                {activeTabMeta?.icon} {activeTabMeta?.label}
+              </span>
             </div>
 
             {/* Mobile Expanded Panel */}
             {mobileMenuOpen && (
-              <div className="md:hidden border-t border-slate-800/60 py-2 space-y-3">
+              <div className="md:hidden border-t border-slate-800/60 py-2.5 space-y-3">
                 {groups.map((group) => (
                   <div key={group.id}>
-                    <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                       {group.icon}
-                      {group.label}
+                      <span>{group.label}</span>
+                      <span className="text-slate-500 font-mono">({group.count})</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-1 mt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-1">
                       {tabs.filter((t) => t.group === group.id).map((tab) => {
                         const isActive = activeTab === tab.id;
                         return (
                           <button
                             key={tab.id}
                             onClick={() => selectTab(tab.id)}
-                            className={`px-2.5 py-2 rounded-lg flex items-center gap-2 text-left text-[11px] transition-colors cursor-pointer ${
+                            className={`px-3 py-2 rounded-xl flex items-center justify-between text-left text-xs transition-colors cursor-pointer ${
                               isActive
                                 ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-                                : 'text-slate-300 bg-slate-800/50 hover:bg-slate-800'
+                                : 'text-slate-300 bg-slate-900/60 hover:bg-slate-800'
                             }`}
                           >
-                            <span className="shrink-0">{tab.icon}</span>
-                            <span className="truncate">{tab.label}</span>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="shrink-0">{tab.icon}</span>
+                              <span className="truncate">{tab.label}</span>
+                            </div>
+                            {isActive && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0 ml-2" />}
                           </button>
                         );
                       })}
