@@ -25,10 +25,17 @@ type ImageModel = (typeof IMAGE_MODELS)[number]['id'];
 interface StoredReference {
   image: string;
   name: string;
+  bundled?: boolean;
 }
 
 const REFERENCE_STORAGE_PREFIX = 'itcafeteria_character_ref_';
 const REFERENCE_EVENT = 'itcafeteria-character-reference';
+const BUNDLED_REFERENCE_BASE = '/character-refs/';
+
+const getBundledReferencePath = (tag: string): string | null => {
+  const match = /^@?(WM25-\d)$/.exec((tag || '').trim());
+  return match ? `${BUNDLED_REFERENCE_BASE}${match[1]}.jpg` : null;
+};
 
 const readStoredReference = (tag: string): StoredReference | null => {
   try {
@@ -56,6 +63,32 @@ const persistReference = (tag: string, reference: StoredReference | null) => {
     // Quota full ho to image sirf isi session mein kaam karegi.
   }
   window.dispatchEvent(new CustomEvent(REFERENCE_EVENT, { detail: { tag: key, reference } }));
+};
+
+const downscaleImageFile = async (file: File): Promise<string> => {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Reference image read nahi ho saki.'));
+    reader.readAsDataURL(file);
+  });
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Reference image load nahi ho saki.'));
+    img.src = dataUrl;
+  });
+
+  const maxSide = 1024;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Reference image process nahi ho saki.');
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.85);
 };
 
 export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story }) => {
@@ -87,6 +120,35 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
     return () => window.removeEventListener(REFERENCE_EVENT, handleReferenceChange);
   }, [story.characterTag]);
 
+  const bundledPath = getBundledReferencePath(story.characterTag);
+
+  useEffect(() => {
+    if (!bundledPath) return;
+    if (readStoredReference(story.characterTag)) return;
+    let cancelled = false;
+    setReferenceBusy(true);
+    const fileName = bundledPath.split('/').pop() || 'default.jpg';
+    fetch(bundledPath)
+      .then((res) => {
+        if (!res.ok) throw new Error('Bundled reference available nahi.');
+        return res.blob();
+      })
+      .then((blob) => downscaleImageFile(new File([blob], fileName, { type: 'image/jpeg' })))
+      .then((image) => {
+        if (cancelled) return;
+        setReference({ image, name: fileName, bundled: true });
+      })
+      .catch(() => {
+        // Built-in reference optional hai — upload prompt waise bhi kaam karta hai.
+      })
+      .finally(() => {
+        if (!cancelled) setReferenceBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bundledPath, story.characterTag]);
+
   const spec = resolveThumbnailSpec({
     channelName: story.channelName,
     presenter: story.presenter,
@@ -115,30 +177,9 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
     setReferenceBusy(true);
     setError('');
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Reference image read nahi ho saki.'));
-        reader.readAsDataURL(file);
-      });
-
-      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('Reference image load nahi ho saki.'));
-        img.src = dataUrl;
-      });
-
-      const maxSide = 1024;
-      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(image.width * scale));
-      canvas.height = Math.max(1, Math.round(image.height * scale));
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Reference image process nahi ho saki.');
-      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const image = await downscaleImageFile(file);
       const nextReference = {
-        image: canvas.toDataURL('image/jpeg', 0.85),
+        image,
         name: file.name
       };
       setReference(nextReference);
@@ -345,7 +386,11 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
               `Logo: ${spec.identity.channelName}`,
               `Tagline: ${spec.identity.tagline}`,
               `Character tag: ${story.characterTag || 'default'}`,
-              referenceImage ? 'Reference: uploaded' : 'Reference: not uploaded',
+              referenceImage
+                ? reference?.bundled
+                  ? 'Reference: built-in (tag default)'
+                  : 'Reference: uploaded'
+                : 'Reference: not uploaded',
               'Character: lower-left',
               'Signature patch',
               'No haze / heavy filters'
@@ -418,6 +463,11 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
                   <p className="text-[9px] text-emerald-400 leading-snug mt-0.5">
                     Face, hair aur outfit isi image se lock honge.
                   </p>
+                  {reference?.bundled && (
+                    <p className="text-[9px] text-slate-500 leading-snug mt-0.5">
+                      Tag ka built-in default — remove kar sakte hain, apni photo upload karna override kar deti hai.
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
                   <button
@@ -450,7 +500,7 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
             )}
 
             <p className="text-[9px] text-slate-500 leading-snug">
-              Is tag ke against character ki ek clear front-facing photo upload karein. Image is tag ke liye save rehti hai aur agli story mein khud load hoti hai. Prompt copy kar rahe hain to yehi image external tool mein bhi attach karein.
+              WM25 tag ka built-in studio reference apne aap load ho jata hai. Apni pasand ki image upload karein to woh save ho kar agli story mein khud load hogi aur built-in ko override kar degi. Prompt copy kar rahe hain to yehi image external tool mein bhi attach karein.
             </p>
           </div>
 

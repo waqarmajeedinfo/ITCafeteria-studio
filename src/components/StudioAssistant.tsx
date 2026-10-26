@@ -11,7 +11,9 @@ import {
   Video,
   Image as ImageIcon,
   Mic,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import type { TabType } from '../App';
 
@@ -44,6 +46,23 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Voice mode (Level 1: push-to-talk + spoken replies)
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [isTranscribingVoice, setIsTranscribingVoice] = useState(false);
+  const [voiceRepliesOn, setVoiceRepliesOn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('itcafeteria_assistant_voice_replies') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const voiceRepliesRef = useRef(voiceRepliesOn);
+  voiceRepliesRef.current = voiceRepliesOn;
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceStreamRef = useRef<MediaStream | null>(null);
+  const sendMessageRef = useRef<(text: string) => Promise<void>>(async () => {});
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,6 +76,128 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const setVoiceReplies = (on: boolean) => {
+    setVoiceRepliesOn(on);
+    try {
+      localStorage.setItem('itcafeteria_assistant_voice_replies', on ? '1' : '0');
+    } catch {
+      // Storage band ho to sirf isi session ke liye setting rahegi.
+    }
+    if (!on && typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  const speakReply = (text: string) => {
+    if (!voiceRepliesRef.current || typeof window === 'undefined' || !window.speechSynthesis) return;
+    const clean = text
+      .replace(/https?:\/\/\S+/g, 'link')
+      .replace(/[*_`#>]/g, '')
+      .trim();
+    if (!clean) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(clean);
+    const voices = window.speechSynthesis.getVoices();
+    const preferred =
+      voices.find((v) => v.lang.toLowerCase().startsWith('ur')) ||
+      voices.find((v) => v.lang.toLowerCase().startsWith('hi')) ||
+      voices.find((v) => v.lang.toLowerCase().startsWith('en-in')) ||
+      voices.find((v) => v.lang.toLowerCase().startsWith('en')) ||
+      null;
+    if (preferred) utterance.voice = preferred;
+    utterance.rate = 1;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const transcribeVoiceInput = (blob: Blob) => {
+    setIsTranscribingVoice(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64Audio = reader.result as string;
+        const res = await fetch('/api/ai/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base64Audio,
+            mimeType: blob.type || 'audio/webm',
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Transcription failed with status ${res.status}`);
+        }
+
+        const data = await res.json();
+        const transcript = (data.text || '').trim();
+        if (!transcript) {
+          setErrorMsg('Awaaz samajh nahi aayi — dobara bol kar try karein.');
+          return;
+        }
+        // Voice se bheja gaya sawal: jawab bhi awaaz mein sunwayen.
+        setVoiceReplies(true);
+        setInputText(transcript);
+        sendMessageRef.current(transcript);
+      } catch (err: any) {
+        console.error('Assistant voice transcription error:', err);
+        setErrorMsg(err.message || 'Voice transcribe nahi ho saka.');
+      } finally {
+        setIsTranscribingVoice(false);
+      }
+    };
+    reader.readAsDataURL(blob);
+  };
+
+  const toggleVoiceRecording = async () => {
+    if (isRecordingVoice) {
+      mediaRecorderRef.current?.stop();
+      setIsRecordingVoice(false);
+      return;
+    }
+    if (isLoading || isTranscribingVoice) return;
+    if (typeof window === 'undefined' || typeof MediaRecorder === 'undefined') {
+      setErrorMsg('Is browser mein voice recording support nahi hai. Chrome ya Edge use karein.');
+      return;
+    }
+    try {
+      setErrorMsg(null);
+      voiceChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      voiceStreamRef.current = stream;
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          voiceChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(voiceChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach((track) => track.stop());
+        voiceStreamRef.current = null;
+        transcribeVoiceInput(blob);
+      };
+
+      mediaRecorder.start();
+      setIsRecordingVoice(true);
+    } catch (err: any) {
+      console.error('Assistant microphone error:', err);
+      setErrorMsg('Microphone access nahi mil saka. Site settings mein microphone allow karein (HTTPS zaroori hai).');
+    }
+  };
 
   const quickActions: { label: string; icon: React.ReactNode; prompt?: string; tab?: TabType }[] = [
     { label: 'Aaj ke 3 viral topics do', icon: <Sparkles className="w-3 h-3" />, prompt: 'Mere IT Cafeteria channel ke liye aaj ke 3 sab se viral tech topics do, har ek ke saath Roman Urdu hook likh kar.' },
@@ -106,14 +247,16 @@ Keep replies concise (under 150 words) and always end with one practical next st
       }
 
       const data = await res.json();
+      const replyText = data.text || 'Koi jawab generate nahi ho saka.';
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          text: data.text || 'Koi jawab generate nahi ho saka.',
+          text: replyText,
         },
       ]);
+      speakReply(replyText);
     } catch (err: any) {
       console.error('Assistant error:', err);
       setErrorMsg(err.message || 'Assistant se rabta nahi ho saka.');
@@ -121,6 +264,7 @@ Keep replies concise (under 150 words) and always end with one practical next st
       setIsLoading(false);
     }
   };
+  sendMessageRef.current = sendMessage;
 
   const handleQuickAction = (action: { label: string; prompt?: string; tab?: TabType }) => {
     if (action.tab) {
@@ -249,6 +393,12 @@ Keep replies concise (under 150 words) and always end with one practical next st
 
           {/* Input */}
           <div className="p-2.5 bg-slate-950 border-t border-slate-800">
+            {(isRecordingVoice || isTranscribingVoice) && (
+              <p className={`text-[10px] mb-1.5 flex items-center gap-1.5 ${isRecordingVoice ? 'text-rose-300' : 'text-cyan-300'}`}>
+                <Mic className={`w-3 h-3 ${isRecordingVoice ? 'animate-pulse' : 'animate-spin'}`} />
+                {isRecordingVoice ? 'Recording... rukne ke liye mic dobara dabayein' : 'Awaaz likhi ja rahi hai...'}
+              </p>
+            )}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -256,6 +406,19 @@ Keep replies concise (under 150 words) and always end with one practical next st
               }}
               className="flex items-center gap-2"
             >
+              <button
+                type="button"
+                onClick={() => void toggleVoiceRecording()}
+                disabled={isLoading || isTranscribingVoice}
+                title={isRecordingVoice ? 'Recording ruken' : 'Bol kar sawal poochein (mic)'}
+                className={`p-2 rounded-xl transition-colors cursor-pointer disabled:opacity-40 ${
+                  isRecordingVoice
+                    ? 'bg-rose-600 text-white animate-pulse'
+                    : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700'
+                }`}
+              >
+                <Mic className="w-3.5 h-3.5" />
+              </button>
               <input
                 type="text"
                 value={inputText}
@@ -264,6 +427,18 @@ Keep replies concise (under 150 words) and always end with one practical next st
                 className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                 disabled={isLoading}
               />
+              <button
+                type="button"
+                onClick={() => setVoiceReplies(!voiceRepliesOn)}
+                title={voiceRepliesOn ? 'Awaaz wale jawab band karein' : 'Jawab awaaz mein sunwayen'}
+                className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                  voiceRepliesOn
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700'
+                }`}
+              >
+                {voiceRepliesOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+              </button>
               <button
                 type="submit"
                 disabled={!inputText.trim() || isLoading}
