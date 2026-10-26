@@ -29,12 +29,15 @@ import {
   Menu,
   Check,
   BadgeCheck,
-  Activity
+  Activity,
+  Cpu,
+  Radio
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
 import { LiveInsights, type OAuthNotice } from './components/LiveInsights';
 import { AgentSimulator } from './components/AgentSimulator';
+import { AutopilotManager } from './components/AutopilotManager';
 import { DuplicateChecker } from './components/DuplicateChecker';
 import { UpscalingRoadmap } from './components/UpscalingRoadmap';
 import { MasterListTracker } from './components/MasterListTracker';
@@ -55,6 +58,7 @@ import { PHONETIC_DICTIONARY } from './data/channelData';
 type TabType = 
   | 'analytics'
   | 'live'
+  | 'autopilot'
   | 'signals'
   | 'calendar'
   | 'community'
@@ -103,6 +107,7 @@ export default function App() {
   const [showDictionary, setShowDictionary] = useState(false);
   const [openMenu, setOpenMenu] = useState<'core' | 'ai' | 'management' | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLiveActive, setIsLiveActive] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -134,6 +139,7 @@ export default function App() {
   const tabs: { id: TabType; label: string; icon: React.ReactNode; group: 'core' | 'ai' | 'management' }[] = [
     // Core Channel Tabs
     { id: 'analytics', label: 'Channel Diagnostics', icon: <BarChart3 className="w-4 h-4" />, group: 'core' },
+    { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-cyan-400" />, group: 'core' },
     { id: 'live', label: 'Live Insights (YouTube + TikTok)', icon: <Activity className="w-4 h-4 text-emerald-400" />, group: 'core' },
     { id: 'signals', label: 'Growth Signals & Anomalies', icon: <Rocket className="w-4 h-4 text-amber-400" />, group: 'core' },
     { id: 'calendar', label: 'Content Calendar', icon: <CalendarIcon className="w-4 h-4 text-emerald-400" />, group: 'core' },
@@ -212,7 +218,21 @@ export default function App() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex items-center gap-2.5 pb-1.5 shrink-0">
+            <div className="flex items-center gap-2 pb-1.5 shrink-0">
+              {/* Prominent Go Live Voice Co-Pilot Button in Header */}
+              <button
+                onClick={() => setIsLiveActive((prev) => !prev)}
+                className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
+                  isLiveActive
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30 ring-2 ring-rose-400 animate-pulse'
+                    : 'bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 hover:opacity-95 text-white shadow-red-600/25'
+                }`}
+                title="Go Live: Real-time Hands-Free Voice Co-Pilot"
+              >
+                <Radio className="w-3.5 h-3.5 text-white animate-pulse" />
+                <span>{isLiveActive ? 'Live Voice ON' : '🔴 Go Live'}</span>
+              </button>
+
               <button
                 onClick={() => setShowDictionary(true)}
                 className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 transition-colors"
@@ -344,13 +364,14 @@ export default function App() {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
         {activeTab === 'analytics' && <ChannelAnalytics />}
+        {activeTab === 'autopilot' && <AutopilotManager onNavigateTab={(tab) => selectTab(tab as TabType)} />}
         {activeTab === 'live' && (
           <LiveInsights
             oauthNotice={oauthNotice}
             onDismissOauthNotice={() => setOauthNotice(null)}
           />
         )}
-        {activeTab === 'signals' && <GrowthSignals />}
+        {activeTab === 'signals' && <GrowthSignals onNavigateTab={(tab) => selectTab(tab as TabType)} />}
         {activeTab === 'calendar' && <ContentCalendar />}
         {activeTab === 'community' && <CommunityPollWidget />}
         {activeTab === 'benchmarking' && <CompetitorBenchmarking />}
@@ -418,6 +439,8 @@ export default function App() {
         currentTab={activeTab}
         currentTabLabel={activeTabMeta?.label || ''}
         onNavigate={(tab) => setActiveTab(tab)}
+        isLiveActive={isLiveActive}
+        onToggleLive={(active) => setIsLiveActive(active)}
       />
 
       {/* Footer */}
