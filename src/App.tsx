@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { 
   BarChart3, 
   Bot, 
@@ -62,6 +63,12 @@ import { StudioAssistant } from './components/StudioAssistant';
 import { HolographicBackground, type HolographicTheme, HOLOGRAPHIC_THEMES } from './components/HolographicBackground';
 import { PendingQueueTracker } from './components/PendingQueueTracker';
 import { PHONETIC_DICTIONARY } from './data/channelData';
+import { 
+  ThemeCustomizerModal, 
+  type StudioThemeConfig, 
+  DEFAULT_THEME_CONFIG,
+  ACCENT_COLORS
+} from './components/ThemeCustomizerModal';
 
 type TabType = 
   | 'analytics'
@@ -141,26 +148,42 @@ export default function App() {
   const [showBannerModal, setShowBannerModal] = useState(false);
   const [customUrlInput, setCustomUrlInput] = useState('');
 
+  // Theme Customizer & Studio WP-Style Configuration
+  const [themeConfig, setThemeConfig] = useState<StudioThemeConfig>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('itc_studio_theme_config');
+      if (saved) {
+        try {
+          return { ...DEFAULT_THEME_CONFIG, ...JSON.parse(saved) };
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return DEFAULT_THEME_CONFIG;
+  });
+  const [showThemeCustomizer, setShowThemeCustomizer] = useState(false);
+
   // Holographic background theme & animation states
   const [holoTheme, setHoloTheme] = useState<HolographicTheme>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('itc_holo_theme') as HolographicTheme) || 'cyber-matrix';
+      return (localStorage.getItem('itc_holo_theme') as HolographicTheme) || themeConfig.holoTheme || 'cyber-matrix';
     }
-    return 'cyber-matrix';
+    return themeConfig.holoTheme || 'cyber-matrix';
   });
   const [holoOpacity, setHoloOpacity] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('itc_holo_opacity');
-      return saved ? parseFloat(saved) : 0.6;
+      return saved ? parseFloat(saved) : themeConfig.holoOpacity || 0.65;
     }
-    return 0.6;
+    return themeConfig.holoOpacity || 0.65;
   });
   const [holoSpeed, setHoloSpeed] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('itc_holo_speed');
-      return saved ? parseFloat(saved) : 1.0;
+      return saved ? parseFloat(saved) : themeConfig.holoSpeed || 1.0;
     }
-    return 1.0;
+    return themeConfig.holoSpeed || 1.0;
   });
 
   const updateBannerUrl = (url: string) => {
@@ -205,10 +228,91 @@ export default function App() {
     }
   };
 
+  const updateThemeConfig = (updated: StudioThemeConfig) => {
+    setThemeConfig(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('itc_studio_theme_config', JSON.stringify(updated));
+    }
+    updateHoloTheme(updated.holoTheme);
+    updateHoloOpacity(updated.holoOpacity);
+    updateHoloSpeed(updated.holoSpeed);
+  };
+
+  const resetThemeConfig = () => {
+    updateThemeConfig(DEFAULT_THEME_CONFIG);
+  };
+
+  // Time-of-day Auto Theme Engine
+  const [effectiveHoloTheme, setEffectiveHoloTheme] = useState<HolographicTheme>(themeConfig.holoTheme);
+
+  useEffect(() => {
+    if (!themeConfig.autoThemeByTime) {
+      setEffectiveHoloTheme(themeConfig.holoTheme);
+      return;
+    }
+    const updateTimeTheme = () => {
+      const hour = new Date().getHours();
+      let target: HolographicTheme = 'cyber-matrix';
+      if (hour >= 6 && hour < 12) {
+        target = 'holographic-aurora';
+      } else if (hour >= 12 && hour < 17) {
+        target = 'hex-nexus';
+      } else if (hour >= 17 && hour < 20) {
+        target = 'quantum-orbs';
+      } else {
+        target = 'cyber-matrix';
+      }
+      setEffectiveHoloTheme(target);
+    };
+    updateTimeTheme();
+    const interval = setInterval(updateTimeTheme, 60000);
+    return () => clearInterval(interval);
+  }, [themeConfig.autoThemeByTime, themeConfig.holoTheme]);
+
+  // User activity-level reactive opacity sensor
+  const [userActive, setUserActive] = useState(false);
+  const activityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!themeConfig.activityReactiveHolo) {
+      setUserActive(false);
+      return;
+    }
+    const handleActivity = () => {
+      setUserActive(true);
+      if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
+      activityTimerRef.current = setTimeout(() => {
+        setUserActive(false);
+      }, 6000);
+    };
+
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('scroll', handleActivity);
+    window.addEventListener('click', handleActivity);
+
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('scroll', handleActivity);
+      window.removeEventListener('click', handleActivity);
+      if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
+    };
+  }, [themeConfig.activityReactiveHolo]);
+
+  const activeHoloOpacity = themeConfig.activityReactiveHolo
+    ? (userActive ? Math.min(1.0, themeConfig.holoOpacity + 0.16) : Math.max(0.25, themeConfig.holoOpacity * 0.75))
+    : themeConfig.holoOpacity;
+
   const cycleNextHoloTheme = () => {
-    const idx = HOLOGRAPHIC_THEMES.findIndex((t) => t.id === holoTheme);
+    const idx = HOLOGRAPHIC_THEMES.findIndex((t) => t.id === effectiveHoloTheme);
     const nextIdx = (idx + 1) % HOLOGRAPHIC_THEMES.length;
-    updateHoloTheme(HOLOGRAPHIC_THEMES[nextIdx].id);
+    const nextTheme = HOLOGRAPHIC_THEMES[nextIdx].id;
+    updateThemeConfig({
+      ...themeConfig,
+      autoThemeByTime: false,
+      holoTheme: nextTheme,
+    });
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,7 +333,7 @@ export default function App() {
     updateOverlayStyle('cinematic');
     updateBannerHeight('auto');
     updateHoloTheme('cyber-matrix');
-    updateHoloOpacity(0.6);
+    updateHoloOpacity(0.65);
     updateHoloSpeed(1.0);
     setCustomUrlInput('');
   };
@@ -260,19 +364,89 @@ export default function App() {
     };
   }, []);
 
+  // Framer-motion entrance animation variants for seamless tab transitions
+  const tabContentVariants = {
+    hidden: {
+      opacity: 0,
+      y: 16,
+      filter: 'blur(3px)',
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      filter: 'blur(0px)',
+      transition: {
+        duration: 0.35,
+        ease: 'easeOut' as const,
+        staggerChildren: 0.07,
+        delayChildren: 0.03,
+      },
+    },
+  };
+
   // Track window scroll to smoothly elevate sticky navigation when scrolling down
   const [isScrolled, setIsScrolled] = useState(false);
 
+  // Per-tab individual scroll position memory to preserve user focus points in long-form components
+  const scrollPositionsRef = useRef<Partial<Record<TabType, number>>>({});
+  const isSwitchingTabRef = useRef<boolean>(false);
+
   useEffect(() => {
     const handleScroll = () => {
-      // Elevate and dock sticky navbar when scrolling passes banner/action bar threshold
-      setIsScrolled(window.scrollY > 90);
+      const currentY = window.scrollY;
+      setIsScrolled(currentY > 90);
+
+      // Record scroll position continuously for the active tab while reading
+      if (!isSwitchingTabRef.current) {
+        scrollPositionsRef.current[activeTab] = currentY;
+      }
     };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-  }, []);
+  }, [activeTab]);
+
+  // Restore remembered scroll position when switching tabs
+  useEffect(() => {
+    const targetScroll = scrollPositionsRef.current[activeTab];
+
+    const restorePosition = () => {
+      if (typeof targetScroll === 'number') {
+        window.scrollTo({
+          top: targetScroll,
+          behavior: 'instant' as ScrollBehavior,
+        });
+      } else {
+        // First visit to this tab:
+        // If sticky nav is already locked (isScrolled), smoothly anchor right below the sticky navigation
+        const stickyThreshold = 520;
+        if (window.scrollY > stickyThreshold) {
+          window.scrollTo({
+            top: stickyThreshold,
+            behavior: 'instant' as ScrollBehavior,
+          });
+        }
+      }
+
+      setTimeout(() => {
+        isSwitchingTabRef.current = false;
+      }, 50);
+    };
+
+    const rafId = requestAnimationFrame(() => {
+      restorePosition();
+    });
+    const timerId = setTimeout(() => {
+      restorePosition();
+    }, 40);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
+    };
+  }, [activeTab]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -320,6 +494,16 @@ export default function App() {
   const activeTabMeta = tabs.find((t) => t.id === activeTab);
 
   const selectTab = (id: TabType) => {
+    if (id === activeTab) {
+      setOpenMenu(null);
+      setMobileMenuOpen(false);
+      return;
+    }
+
+    // Cache leaving tab's scroll position before navigation
+    scrollPositionsRef.current[activeTab] = window.scrollY;
+    isSwitchingTabRef.current = true;
+
     setActiveTab(id);
     setOpenMenu(null);
     setMobileMenuOpen(false);
@@ -328,7 +512,7 @@ export default function App() {
   return (
     <div className="min-h-screen app-shell-bg text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white relative">
       {/* Fixed Full-Page Animated Holographic Background (Stays fixed during scroll, visible between blocks) */}
-      <HolographicBackground theme={holoTheme} opacity={holoOpacity} speed={holoSpeed} />
+      <HolographicBackground theme={effectiveHoloTheme} opacity={activeHoloOpacity} speed={themeConfig.holoSpeed} />
 
       {/* Top Header — YouTube Channel Showcase with Full-Height Banner */}
       <header className="relative w-full bg-slate-950/80 backdrop-blur-sm z-30">
@@ -362,26 +546,104 @@ export default function App() {
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent pointer-events-none" />
           )}
 
-          {/* Top-Right: Holographic Mode Switcher + Edit Banner Floating Buttons */}
-          <div className="absolute top-3 sm:top-4 right-3 sm:right-4 z-20 flex items-center gap-2">
-            <button
-              onClick={cycleNextHoloTheme}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-cyan-500/40 text-xs font-semibold text-cyan-300 backdrop-blur-md shadow-xl transition-all cursor-pointer hover:border-cyan-300 hover:shadow-cyan-500/20"
-              title="Click to Cycle Holographic Moving Background"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline">Holo BG:</span>
-              <span>{HOLOGRAPHIC_THEMES.find((t) => t.id === holoTheme)?.name.split(' ')[0]}</span>
-            </button>
+          {/* Top Bar Floating Header: Covers previously empty space with Live Status, Breaking Ticker & Quick Actions */}
+          <div className="absolute top-0 inset-x-0 z-20 bg-gradient-to-b from-slate-950/95 via-slate-950/70 to-transparent px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-800/40 backdrop-blur-[2px]">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+              {/* Left: Brand Identity, Tagline & Live Indicator */}
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-cyan-600 to-blue-600 p-0.5 shadow-md shadow-cyan-950 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-white tracking-wide">IT CAFETERIA</span>
+                    {themeConfig.showStudioBadge && (
+                      <BadgeCheck className="w-3.5 h-3.5 text-cyan-400" />
+                    )}
+                    {themeConfig.showTopLiveBadge && (
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-[9px] font-bold text-rose-300 tracking-wider">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                        LIVE
+                      </span>
+                    )}
+                  </div>
+                  {themeConfig.showTagline && (
+                    <p className="text-[10px] text-slate-400 hidden sm:block">{themeConfig.channelTagline}</p>
+                  )}
+                </div>
+              </div>
 
-            <button
-              onClick={() => setShowBannerModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-xl transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
-              title="Customize Banner, Height & Hologram"
-            >
-              <Camera className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Edit Banner</span>
-            </button>
+              {/* Center: Live Stats Ticker or Announcement Bar */}
+              <div className="flex-1 max-w-2xl hidden lg:flex items-center justify-center gap-3">
+                {themeConfig.showTopBarTicker && (
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/60 text-xs text-slate-300 shadow-inner backdrop-blur-md">
+                    <Radio className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
+                    <span className="font-semibold text-amber-300 text-[11px] uppercase tracking-wider">Broadcast:</span>
+                    <span className="text-[11px] text-slate-200 truncate max-w-md">{themeConfig.topAnnouncementText}</span>
+                  </div>
+                )}
+
+                {themeConfig.showTopBarStats && !themeConfig.showTopBarTicker && (
+                  <div className="flex items-center gap-3 px-3.5 py-1 rounded-full bg-slate-900/80 border border-slate-700/60 text-[11px] text-slate-300 backdrop-blur-md">
+                    <span className="flex items-center gap-1 text-cyan-300 font-semibold"><span className="text-slate-400 font-normal">Subs:</span> 142.4K</span>
+                    <span className="text-slate-700">•</span>
+                    <span className="flex items-center gap-1 text-emerald-300 font-semibold"><span className="text-slate-400 font-normal">Views:</span> 18.2M</span>
+                    <span className="text-slate-700">•</span>
+                    <span className="flex items-center gap-1 text-purple-300 font-semibold"><span className="text-slate-400 font-normal">Videos:</span> 348</span>
+                    <span className="text-slate-700">•</span>
+                    <span className="flex items-center gap-1 text-amber-300 font-semibold"><span className="text-slate-400 font-normal">Score:</span> 98.4%</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Right: Holographic Mode Switcher + Edit Banner Floating Buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={cycleNextHoloTheme}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-cyan-500/40 text-xs font-semibold text-cyan-300 backdrop-blur-md shadow-xl transition-all cursor-pointer hover:border-cyan-300 hover:shadow-cyan-500/20"
+                  title="Click to Cycle Holographic Moving Background"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="hidden sm:inline">Holo BG:</span>
+                  <span>{HOLOGRAPHIC_THEMES.find((t) => t.id === effectiveHoloTheme)?.name.split(' ')[0]}</span>
+                </button>
+
+                {/* Edit Banner Button (Works exactly as before, untouched) */}
+                <button
+                  onClick={() => setShowBannerModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-xl transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
+                  title="Customize Banner, Height & Image"
+                >
+                  <Camera className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Edit Banner</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Optional Quick Action Bar under Top Header if enabled */}
+            {themeConfig.showTopBarShortcuts && (
+              <div className="max-w-7xl mx-auto mt-2 pt-1.5 border-t border-slate-800/40 hidden md:flex items-center justify-between text-[11px] text-slate-300">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 font-medium">Quick Hub:</span>
+                  <button onClick={() => selectTab('chat')} className="px-2 py-0.5 rounded bg-slate-900/80 hover:bg-slate-800 text-cyan-300 cursor-pointer transition-colors border border-slate-800">💬 AI Script</button>
+                  <button onClick={() => selectTab('transcribe')} className="px-2 py-0.5 rounded bg-slate-900/80 hover:bg-slate-800 text-purple-300 cursor-pointer transition-colors border border-slate-800">🎙️ Voice Dictation</button>
+                  <button onClick={() => selectTab('duplicates')} className="px-2 py-0.5 rounded bg-slate-900/80 hover:bg-slate-800 text-rose-300 cursor-pointer transition-colors border border-slate-800">🛡️ Duplicate Guard</button>
+                  <button onClick={() => selectTab('autopilot')} className="px-2 py-0.5 rounded bg-slate-900/80 hover:bg-slate-800 text-emerald-300 cursor-pointer transition-colors border border-slate-800">⚡ Autopilot</button>
+                </div>
+
+                {themeConfig.showTopBarStats && themeConfig.showTopBarTicker && (
+                  <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                    <span><strong className="text-cyan-300">142.4K</strong> Subs</span>
+                    <span>•</span>
+                    <span><strong className="text-emerald-300">18.2M</strong> Views</span>
+                    <span>•</span>
+                    <span><strong className="text-purple-300">348</strong> Videos</span>
+                    <span>•</span>
+                    <span><strong className="text-amber-300">98.4%</strong> Positive</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -425,13 +687,14 @@ export default function App() {
               </button>
             </div>
 
-            {/* Quick Banner & Hologram Settings Button */}
+            {/* WordPress Theme & Studio Customizer Button (Circled in user screenshot) */}
             <button
-              onClick={() => setShowBannerModal(true)}
-              className="p-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-slate-300 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md shrink-0"
-              title="Banner Height & Hologram Settings"
+              onClick={() => setShowThemeCustomizer(true)}
+              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-slate-300 hover:text-white transition-all cursor-pointer backdrop-blur-md shadow-md shrink-0 flex items-center gap-2 hover:border-cyan-500/60 group"
+              title="WordPress-style Theme & Studio Customizer"
             >
-              <Sliders className="w-4 h-4 text-cyan-400" />
+              <Sliders className="w-4 h-4 text-cyan-400 group-hover:rotate-90 transition-transform duration-300" />
+              <span className="text-xs font-semibold text-slate-200 hidden sm:inline">Theme Customizer</span>
             </button>
           </div>
         </div>
@@ -610,32 +873,40 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Main Container */}
+      {/* Main Container with Staggered Entrance Animation */}
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
-        {activeTab === 'analytics' && <ChannelAnalytics />}
-        {activeTab === 'pending' && <PendingQueueTracker onNavigateTab={(tab) => selectTab(tab as TabType)} />}
-        {activeTab === 'autopilot' && <AutopilotManager onNavigateTab={(tab) => selectTab(tab as TabType)} />}
-        {activeTab === 'live' && (
-          <LiveInsights
-            oauthNotice={oauthNotice}
-            onDismissOauthNotice={() => setOauthNotice(null)}
-          />
-        )}
-        {activeTab === 'signals' && <GrowthSignals onNavigateTab={(tab) => selectTab(tab as TabType)} />}
-        {activeTab === 'calendar' && <ContentCalendar />}
-        {activeTab === 'community' && <CommunityPollWidget />}
-        {activeTab === 'benchmarking' && <CompetitorBenchmarking />}
-        {activeTab === 'simulator' && <AgentSimulator />}
-        {activeTab === 'chat' && <AiChatbot />}
-        {activeTab === 'search' && <SearchGroundingStudio />}
-        {activeTab === 'video' && <VideoStudio />}
-        {activeTab === 'image' && <ImageThumbnailStudio />}
-        {activeTab === 'transcribe' && <AudioTranscriber />}
-        {activeTab === 'music' && <MusicStudio />}
-        {activeTab === '3d' && <ThreeStudio />}
-        {activeTab === 'duplicates' && <DuplicateChecker />}
-        {activeTab === 'roadmap' && <UpscalingRoadmap />}
-        {activeTab === 'masterlist' && <MasterListTracker />}
+        <motion.div
+          key={activeTab}
+          variants={tabContentVariants}
+          initial="hidden"
+          animate="visible"
+          className="w-full"
+        >
+          {activeTab === 'analytics' && <ChannelAnalytics />}
+          {activeTab === 'pending' && <PendingQueueTracker onNavigateTab={(tab) => selectTab(tab as TabType)} />}
+          {activeTab === 'autopilot' && <AutopilotManager onNavigateTab={(tab) => selectTab(tab as TabType)} />}
+          {activeTab === 'live' && (
+            <LiveInsights
+              oauthNotice={oauthNotice}
+              onDismissOauthNotice={() => setOauthNotice(null)}
+            />
+          )}
+          {activeTab === 'signals' && <GrowthSignals onNavigateTab={(tab) => selectTab(tab as TabType)} />}
+          {activeTab === 'calendar' && <ContentCalendar />}
+          {activeTab === 'community' && <CommunityPollWidget />}
+          {activeTab === 'benchmarking' && <CompetitorBenchmarking />}
+          {activeTab === 'simulator' && <AgentSimulator />}
+          {activeTab === 'chat' && <AiChatbot />}
+          {activeTab === 'search' && <SearchGroundingStudio />}
+          {activeTab === 'video' && <VideoStudio />}
+          {activeTab === 'image' && <ImageThumbnailStudio />}
+          {activeTab === 'transcribe' && <AudioTranscriber />}
+          {activeTab === 'music' && <MusicStudio />}
+          {activeTab === '3d' && <ThreeStudio />}
+          {activeTab === 'duplicates' && <DuplicateChecker />}
+          {activeTab === 'roadmap' && <UpscalingRoadmap />}
+          {activeTab === 'masterlist' && <MasterListTracker />}
+        </motion.div>
       </main>
 
       {/* Phonetic Dictionary Modal */}
@@ -992,6 +1263,15 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* WordPress-style Theme & Studio Customizer Modal */}
+      <ThemeCustomizerModal
+        isOpen={showThemeCustomizer}
+        onClose={() => setShowThemeCustomizer(false)}
+        config={themeConfig}
+        onChange={updateThemeConfig}
+        onReset={resetThemeConfig}
+      />
 
       <StudioAssistant
         currentTab={activeTab}
