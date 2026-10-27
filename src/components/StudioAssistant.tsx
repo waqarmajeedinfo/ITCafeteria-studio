@@ -35,12 +35,42 @@ import {
   ExternalLink,
   Flame,
   CheckCircle2,
-  UserCheck
+  UserCheck,
+  MoreVertical,
+  Pause,
+  Keyboard,
+  Trash2,
+  MicOff
 } from 'lucide-react';
 import type { TabType } from '../App';
 import { PUBLISHED_VIDEOS, PHONETIC_DICTIONARY } from '../data/channelData';
 import { buildMasterThumbnailPrompt, splitHeadline } from '../lib/thumbnailMaster';
 import type { GeneratedStory, StoryScene } from './StoryPackageView';
+
+export function getApplicationPortion(tabId: string): { group: string; name: string } {
+  const map: Record<string, { group: string; name: string }> = {
+    analytics: { group: 'Core Channel', name: 'Channel Diagnostics & Stats' },
+    live: { group: 'Core Channel', name: 'Live Insights (YouTube + TikTok)' },
+    signals: { group: 'Core Channel', name: 'Growth Signals & Anomalies' },
+    benchmarking: { group: 'Core Channel', name: 'Competitor Benchmarks' },
+    autopilot: { group: 'Autopilot & Agents', name: 'Autopilot Coordinator' },
+    simulator: { group: 'Autopilot & Agents', name: 'Agent Flow Simulator' },
+    community: { group: 'Autopilot & Agents', name: 'Community Polls & Feedback' },
+    pending: { group: 'Management & Queue', name: 'Pending Stories & Target Queue' },
+    calendar: { group: 'Management & Queue', name: 'Content Calendar & Schedule' },
+    duplicates: { group: 'Management & Queue', name: 'Duplicate Checker (58 Catalog)' },
+    masterlist: { group: 'Management & Queue', name: 'Master List Tracker' },
+    roadmap: { group: 'Management & Queue', name: 'Upscaling Roadmap (v3.42+)' },
+    chat: { group: 'AI Studios', name: 'AI Script Chatbot' },
+    search: { group: 'AI Studios', name: 'Search Grounding Engine' },
+    video: { group: 'AI Studios', name: 'Omni Flash Video Studio' },
+    image: { group: 'AI Studios', name: 'Thumbnail Studio (Nano Banana)' },
+    transcribe: { group: 'AI Studios', name: 'Voice Dictation Station' },
+    music: { group: 'AI Studios', name: 'Music & Audio Generator' },
+    '3d': { group: 'AI Studios', name: '3D Virtual Studio' },
+  };
+  return map[tabId] || { group: 'Studio Suite', name: tabId };
+}
 
 export interface OperatorProfile {
   id: string;
@@ -118,6 +148,10 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [showOperatorModal, setShowOperatorModal] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showKeyboardInput, setShowKeyboardInput] = useState(false);
+  const [isListeningPaused, setIsListeningPaused] = useState(false);
+  const optionsMenuRef = useRef<HTMLDivElement>(null);
 
   // Active Operator Profile State
   const [operator, setOperator] = useState<OperatorProfile>(() => {
@@ -225,6 +259,43 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       localStorage.setItem('itcafeteria_active_operator', JSON.stringify(operator));
     } catch {}
   }, [operator]);
+
+  // Options menu outside click dismiss
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (optionsMenuRef.current && !optionsMenuRef.current.contains(e.target as Node)) {
+        setShowOptionsMenu(false);
+      }
+    };
+    if (showOptionsMenu) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showOptionsMenu]);
+
+  const clearChatHistory = () => {
+    setMessages([
+      {
+        id: 'welcome_reset',
+        role: 'assistant',
+        text: `Dialogue history reset kar di gayi hai ${operator.honorific}. Main active listening state mein tayar hoon, hukm karein!`,
+      }
+    ]);
+    setShowOptionsMenu(false);
+  };
+
+  const handleTogglePause = () => {
+    if (isListeningPaused) {
+      setIsListeningPaused(false);
+      startHandsFreeListening();
+    } else {
+      setIsListeningPaused(true);
+      stopHandsFreeListening();
+      stopAudioPlayback();
+    }
+  };
 
   // Stop current audio playback immediately (Instant Barge-In Interruption)
   const stopAudioPlayback = useCallback(() => {
@@ -800,6 +871,8 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12000);
 
+      const currentPortion = getApplicationPortion(navigatedTab || currentTab);
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -808,15 +881,16 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
           messages: newMessages.map((m) => ({ role: m.role, text: m.text })),
           model: 'gemini-3.1-flash-lite',
           fallback: true,
-          systemInstruction: `You are the IT Cafeteria Live Co-Pilot & Studio Assistant for ${operator.name}.
+          systemInstruction: `You are the IT Cafeteria Live Co-Pilot & Studio Assistant for ${operator.name} (@WM25-1).
 Active Operator: ${operator.name} (${operator.role}).
 Address them respectfully as "${operator.honorific}".
-Currently viewing: "${navLabel || currentTabLabel}" tab.
+Current Application Portion in use: "${currentPortion.group} > ${currentPortion.name}".
 ${operator.isTrainee ? 'Note: Operator is a new trainee. Explain everything in clear, friendly 3-step beginner Roman Urdu.' : ''}
 Core rules:
-1. Speak in warm, conversational Pakistani Roman Urdu with natural friendly Punjabi cadence.
-2. If asked to make a video or schedule, note that Autopilot can do it automatically.
-3. Keep answers concise, natural, and under 80 words so it sounds natural when spoken aloud.`,
+1. Speak in natural, warm, conversational Pakistani Roman Urdu with a friendly Lahore tech YouTuber cadence.
+2. Maintain engaging responsiveness and a refined, witty sense of humor (e.g. clever tech metaphors, light smiling YouTube creator banter like "Waqar bhai CPU bilkul chill hai, agla script viral karwane ke liye tayar hoon!").
+3. Always helpful, sharp, and practical — if asked to make a video or schedule, note that Autopilot can do it automatically.
+4. Keep answers concise, punchy, and under 75 words so spoken audio sounds lively and crisp.`,
         }),
       }).finally(() => clearTimeout(timeoutId));
 
@@ -837,7 +911,8 @@ Core rules:
       await speakNaturalUrdu(replyText);
     } catch (err: any) {
       console.warn('Chat error:', err);
-      const fallbackReply = `${operator.honorific}! Main aapke sath live hoon. Screen par ${navLabel || currentTabLabel} open hai. Agar aap chahein to main foran aaj ka viral short generate kar ke Content Calendar mein schedule kar sakta hoon.`;
+      const currentPortion = getApplicationPortion(navigatedTab || currentTab);
+      const fallbackReply = `${operator.honorific}! Main active listening mode mein aapke sath hoon. Is waqt hum "${currentPortion.group} > ${currentPortion.name}" portion mein hain. CPU chill hai aur coffee garam! Agar aap chahein to main foran aaj ka viral short generate kar ke Content Calendar mein schedule kar sakta hoon.`;
       setMessages((prev) => [
         ...prev,
         {
@@ -1217,90 +1292,284 @@ Core rules:
 
       {/* 3. Persistent Co-Pilot Chat Board & Live Voice Station (Full Drawer) */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-[60] w-[22rem] sm:w-[440px] h-[640px] max-h-[85vh] bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl shadow-black/80 flex flex-col overflow-hidden">
-          {/* Header */}
-          <div className="p-3.5 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/25">
-                <Cpu className="w-4 h-4" />
+        <div className="fixed bottom-6 right-6 z-[60] w-[22rem] sm:w-[460px] h-[670px] max-h-[88vh] bg-slate-900 border border-cyan-500/30 rounded-2xl shadow-2xl shadow-black/90 flex flex-col overflow-hidden text-slate-100 ring-1 ring-cyan-500/20">
+          {/* Header: Logo on one side, Status Indicator + Options Menu + Close Icon on the other */}
+          <div className="p-3 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between gap-2 relative z-30">
+            {/* Left: User Logo + Copilot Identity */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="relative shrink-0">
+                <img
+                  src="/brand/logo.jpeg"
+                  alt="IT Cafeteria Logo"
+                  className="w-9 h-9 rounded-xl object-cover border border-cyan-500/40 shadow-md shadow-cyan-950 ring-2 ring-cyan-500/20"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+                <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-950 ${
+                  isListeningPaused 
+                    ? 'bg-amber-400' 
+                    : isHandsFreeListening 
+                    ? 'bg-emerald-400 animate-ping' 
+                    : 'bg-slate-500'
+                }`} />
               </div>
-              <div>
-                <h3 className="font-bold text-white text-xs flex items-center gap-1.5">
-                  IT Cafeteria Assistant
-                  {isLiveActive && (
-                    <span className="px-1.5 py-0.2 text-[9px] bg-rose-500/20 text-rose-300 border border-rose-500/40 rounded font-mono animate-pulse">
-                      🔴 Live Voice Active
-                    </span>
-                  )}
-                </h3>
-                <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Operator: <span className="text-cyan-300 font-medium">{operator.honorific}</span>
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h3 className="font-bold text-white text-xs truncate tracking-wide">
+                    IT Cafeteria Copilot
+                  </h3>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono shrink-0">
+                    AI Studio
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                  <span>Host:</span>
+                  <span className="text-cyan-300 font-medium truncate">{operator.honorific}</span>
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
-              {/* Operator Switcher Button */}
-              <button
-                onClick={() => setShowOperatorModal(true)}
-                className="p-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Active Operator Profile Switcher"
-              >
-                <Users className="w-4 h-4 text-cyan-400" />
-              </button>
+            {/* Right: Status Indicator + Three-dot Options Menu + Close Icon */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Dynamic Status Indicator */}
+              <div className="flex items-center">
+                {isListeningPaused ? (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    <span>Paused</span>
+                  </span>
+                ) : vadState === 'ai_speaking' || isSpeakingAudio ? (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[10px] font-semibold animate-pulse">
+                    <Volume2 className="w-3 h-3 text-cyan-400 animate-bounce" />
+                    <span>Speaking</span>
+                  </span>
+                ) : vadState === 'processing' ? (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[10px] font-semibold animate-pulse">
+                    <Cpu className="w-3 h-3 text-indigo-400 animate-spin" />
+                    <span>Thinking</span>
+                  </span>
+                ) : isHandsFreeListening ? (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    <span>Listening</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[10px]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                    <span>Standby</span>
+                  </span>
+                )}
+              </div>
 
-              {/* Voice Persona Settings Toggle */}
-              <button
-                onClick={() => setShowVoiceSettings(!showVoiceSettings)}
-                className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
-                  showVoiceSettings ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-400 hover:text-white'
-                }`}
-                title="Voice Persona & Google Flow Settings"
-              >
-                <Settings2 className="w-4 h-4" />
-              </button>
+              {/* Three-dot Options Menu Dropdown */}
+              <div className="relative" ref={optionsMenuRef}>
+                <button
+                  onClick={() => setShowOptionsMenu((prev) => !prev)}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    showOptionsMenu ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                  title="Copilot Options Menu"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
 
-              {/* Minimize / Close Drawer (Doesn't force-stop Live if active) */}
+                {showOptionsMenu && (
+                  <div className="absolute right-0 top-full mt-1.5 w-52 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 p-1.5 space-y-1 text-xs backdrop-blur-md">
+                    <button
+                      onClick={() => {
+                        setShowOperatorModal(true);
+                        setShowOptionsMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 text-left transition-colors cursor-pointer"
+                    >
+                      <Users className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Switch Operator ({operator.honorific})</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowVoiceSettings((prev) => !prev);
+                        setShowOptionsMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 text-left transition-colors cursor-pointer"
+                    >
+                      <Settings2 className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Voice Persona & Cadence</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setVoiceRepliesOn(!voiceRepliesOn);
+                        setShowOptionsMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 text-left transition-colors cursor-pointer"
+                    >
+                      {voiceRepliesOn ? (
+                        <>
+                          <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Mute Spoken Audio</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Unmute Spoken Audio</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="border-t border-slate-800 my-1" />
+
+                    <button
+                      onClick={clearChatHistory}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 text-left transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Clear Dialogue History</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Close Icon Button */}
               <button
                 onClick={() => setIsOpen(false)}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Chat Board Chhupayein"
+                title="Close Copilot Window"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Collapsible Voice Settings Panel */}
+          {/* Clearly Show Current Application Portion in Use */}
+          {(() => {
+            const currentPortion = getApplicationPortion(currentTab);
+            return (
+              <div className="px-3.5 py-2 bg-slate-950/90 border-b border-slate-800/80 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
+                  <div className="truncate flex items-center gap-1.5 text-slate-300">
+                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold shrink-0">
+                      Current Portion:
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 font-mono text-[11px] truncate">
+                      {currentPortion.group} › {currentPortion.name}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] text-emerald-400 font-mono shrink-0 pl-2 hidden sm:inline">
+                  Active Context Sync
+                </span>
+              </div>
+            );
+          })()}
+
+          {/* Active Listening State Soundwave Mirror & Real-Time Dialogue Transcriptions */}
+          <div className="p-3 bg-gradient-to-b from-slate-950/95 to-slate-900/90 border-b border-slate-800/80 space-y-2">
+            {/* Visual Audio Soundwave Mirror */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {/* 8-bar Reactive Soundwave Equalizer */}
+                <div className="flex items-end gap-1 h-5 w-20 px-1.5 py-0.5 bg-slate-950 rounded-lg border border-slate-800 shadow-inner">
+                  {[0.35, 0.65, 0.95, 0.55, 0.85, 0.45, 0.8, 0.3].map((factor, idx) => {
+                    const isActive = !isListeningPaused && (isHandsFreeListening || isSpeakingAudio);
+                    const calculatedHeight = isActive
+                      ? Math.max(3, Math.min(18, ((audioLevel || 22) * factor / 100) * 18 + (isSpeakingAudio ? 9 * factor : 4)))
+                      : 3;
+                    return (
+                      <span
+                        key={idx}
+                        className={`w-1 rounded-full transition-all duration-75 ${
+                          isListeningPaused
+                            ? 'bg-slate-700'
+                            : isSpeakingAudio
+                            ? 'bg-gradient-to-t from-cyan-500 to-blue-400'
+                            : vadState === 'speaking'
+                            ? 'bg-gradient-to-t from-emerald-500 to-cyan-400'
+                            : 'bg-cyan-500/40'
+                        }`}
+                        style={{ height: `${calculatedHeight}px` }}
+                      />
+                    );
+                  })}
+                </div>
+
+                <span className="text-[11px] font-semibold text-slate-200">
+                  {isListeningPaused
+                    ? 'Listening Paused'
+                    : isSpeakingAudio
+                    ? 'Copilot Voicing Dialogue...'
+                    : vadState === 'speaking'
+                    ? 'Listening to your speech...'
+                    : vadState === 'processing'
+                    ? 'Gemini Processing...'
+                    : 'Active Listening Mirror'}
+                </span>
+              </div>
+
+              {/* Progress/VAD Timer indicator */}
+              <div className="flex items-center gap-1 text-[9px] font-mono text-cyan-400">
+                {vadState === 'silence_detected' && silenceProgress > 0 ? (
+                  <span className="text-amber-300 font-bold animate-pulse">Triggering in {100 - silenceProgress}%</span>
+                ) : isListeningPaused ? (
+                  <span className="text-amber-400">Mic Paused</span>
+                ) : (
+                  <span className="text-emerald-400">Voice Sync Active</span>
+                )}
+              </div>
+            </div>
+
+            {/* Real-time Ongoing Dialogue Transcription Feed */}
+            <div className="px-3 py-2 rounded-xl bg-slate-950/80 border border-cyan-500/30 text-xs shadow-inner">
+              <div className="flex items-center gap-2 text-[10px] text-cyan-400 font-mono mb-1">
+                <Radio className="w-3 h-3 text-rose-500 animate-pulse" />
+                <span className="font-bold tracking-wider uppercase">Real-Time Transcription:</span>
+              </div>
+              <p className="text-slate-200 font-sans text-xs italic leading-relaxed min-h-[1.5rem] break-words">
+                {liveInterimText ? (
+                  <span className="text-cyan-200 font-medium font-mono">"{liveInterimText}"</span>
+                ) : isSpeakingAudio ? (
+                  <span className="text-cyan-300">Copilot is currently speaking... (Aap bol kar rokein to foran sunega)</span>
+                ) : isListeningPaused ? (
+                  <span className="text-slate-500">Listening is paused. Tap "Resume" in the bottom control bar to start dialogue.</span>
+                ) : (
+                  <span className="text-slate-400">Aap bolna shuru karein, aapka dialogue yahan live transcribe hoga...</span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Collapsible Voice Settings Panel (Toggled via Options Menu) */}
           {showVoiceSettings && (
-            <div className="p-3 bg-slate-950/95 border-b border-slate-800 space-y-2.5 text-xs">
+            <div className="p-3 bg-slate-950/95 border-b border-slate-800 space-y-2 text-xs animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-white text-[11px] flex items-center gap-1">
                   <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> Voice Texture & Flow Engine
                 </span>
                 <button
                   onClick={() => setVoicePersona(DEFAULT_VOICE_PERSONA)}
-                  className="text-[10px] text-cyan-400 hover:underline flex items-center gap-1"
+                  className="text-[10px] text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <RotateCcw className="w-3 h-3" /> Reset Default
                 </button>
               </div>
 
               <div>
-                <label className="text-[10px] text-slate-400">Google Flow Voice Description (Pakistani / Punjabi Cadence):</label>
+                <label className="text-[10px] text-slate-400">Voice Cadence / Style:</label>
                 <textarea
                   value={voicePersona}
                   onChange={(e) => setVoicePersona(e.target.value)}
                   rows={2}
                   className="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg p-2 text-[11px] text-white focus:outline-none focus:border-cyan-400"
-                  placeholder="Paste Google Flow voice description here..."
+                  placeholder="Paste Google Flow voice description..."
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
+              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
                 <div>
-                  <label className="text-[10px] text-slate-400 block mb-0.5">Voice Persona & Gender:</label>
+                  <label className="text-[10px] text-slate-400 block mb-0.5">Voice Model:</label>
                   <select
                     value={voiceGender}
                     onChange={(e) => setVoiceGender(e.target.value as VoiceGenderName)}
@@ -1324,121 +1593,10 @@ Core rules:
                     disabled={isSpeakingAudio}
                     className="w-full py-1.5 px-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:opacity-90 disabled:opacity-40 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    <Volume2 className="w-3 h-3" /> Awaaz Check Karein
+                    <Volume2 className="w-3 h-3" /> Test Voice
                   </button>
                 </div>
               </div>
-
-              {/* Interruption Feature Notice */}
-              <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-300">
-                <span className="flex items-center gap-1.5 text-cyan-300 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Barge-in Interruption: Active
-                </span>
-                <span className="text-slate-400 text-[10px]">
-                  AI bolte waqt aap bolen ya Stop dabayein to awaaz foran ruk jati hai
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Current Tab Indicator */}
-          <div className="px-3.5 py-1.5 bg-slate-950/70 border-b border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
-            <div className="flex items-center gap-1.5">
-              <Compass className="w-3 h-3 text-cyan-400" />
-              <span>Viewing Tab:</span>
-              <span className="text-cyan-300 font-medium">{currentTabLabel}</span>
-            </div>
-            <span className="text-emerald-400 font-mono text-[9px]">Autonomous UI Navigation ON</span>
-          </div>
-
-          {/* Real-time Hands-Free Voice Status Banner inside Drawer */}
-          {(isHandsFreeListening || isSpeakingAudio || vadState === 'silence_detected' || vadState === 'processing') && (
-            <div className="relative border-b border-cyan-500/30 overflow-hidden bg-slate-950/90 text-xs shadow-inner">
-              {/* Silence Auto-Submit Progress Bar */}
-              {vadState === 'silence_detected' && silenceProgress > 0 && (
-                <div
-                  className="absolute top-0 left-0 h-1 bg-gradient-to-r from-amber-400 via-rose-500 to-cyan-400 transition-all duration-75"
-                  style={{ width: `${silenceProgress}%` }}
-                />
-              )}
-
-              <div className="px-3.5 py-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {/* Waveform */}
-                  <div className="flex items-end gap-0.5 h-3.5 w-4 shrink-0">
-                    <span
-                      className={`w-0.5 rounded-full transition-all duration-75 ${
-                        vadState === 'speaking' || audioLevel > 10 ? 'bg-cyan-400' : 'bg-slate-600'
-                      }`}
-                      style={{ height: `${Math.max(3, Math.min(14, (audioLevel / 100) * 14))}px` }}
-                    />
-                    <span
-                      className={`w-0.5 rounded-full transition-all duration-75 ${
-                        vadState === 'speaking' || audioLevel > 20 ? 'bg-indigo-400' : 'bg-slate-600'
-                      }`}
-                      style={{ height: `${Math.max(3, Math.min(14, (audioLevel / 100) * 16))}px` }}
-                    />
-                    <span
-                      className={`w-0.5 rounded-full transition-all duration-75 ${
-                        vadState === 'speaking' || audioLevel > 15 ? 'bg-purple-400' : 'bg-slate-600'
-                      }`}
-                      style={{ height: `${Math.max(3, Math.min(14, (audioLevel / 100) * 14))}px` }}
-                    />
-                  </div>
-
-                  {vadState === 'ai_speaking' || isSpeakingAudio ? (
-                    <div className="flex items-center gap-1.5">
-                      <Volume2 className="w-3.5 h-3.5 text-cyan-400 animate-bounce" />
-                      <span className="font-bold text-cyan-300 text-[11px]">Co-Pilot Bol Raha Hai... (Bol kar rokein)</span>
-                    </div>
-                  ) : vadState === 'silence_detected' ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                      <span className="font-bold text-amber-300 text-[11px]">Khamoshi detect hui... (Auto-trigger)</span>
-                    </div>
-                  ) : vadState === 'speaking' ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
-                      <span className="font-bold text-purple-300 text-[11px]">Aap bol rahe hain...</span>
-                    </div>
-                  ) : vadState === 'processing' ? (
-                    <div className="flex items-center gap-1.5">
-                      <Cpu className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
-                      <span className="font-bold text-indigo-300 text-[11px]">Gemini jawab tayar kar raha hai...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                      <span className="font-bold text-rose-300 text-[11px]">Live Sun Raha Hoon (Auto-Detect Active)</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  {(vadState === 'ai_speaking' || isSpeakingAudio) && (
-                    <button
-                      onClick={stopAudioPlayback}
-                      className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded border border-slate-700 cursor-pointer"
-                    >
-                      Barge-in / Stop
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Real-time Interim Voice Stream Preview */}
-          {liveInterimText && (
-            <div className="px-3.5 py-1.5 bg-cyan-950/70 border-b border-cyan-800/40 text-[11px] text-cyan-200 flex items-center justify-between animate-pulse">
-              <div className="flex items-center gap-1.5 truncate">
-                <Mic className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                <span className="italic truncate font-mono">"{liveInterimText}"</span>
-              </div>
-              <span className="text-[9px] font-mono bg-cyan-900/60 text-cyan-300 px-1.5 py-0.2 rounded shrink-0">
-                Auto-Detecting
-              </span>
             </div>
           )}
 
@@ -1571,68 +1729,108 @@ Core rules:
             </button>
           </div>
 
-          {/* Input Bar */}
-          <div className="p-2.5 bg-slate-950 border-t border-slate-800">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                sendMessage(inputText);
-              }}
-              className="flex items-center gap-2"
-            >
-              {/* Hands-Free Mic Toggle */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (isHandsFreeListening) {
-                    stopHandsFreeListening();
-                    if (onToggleLive) onToggleLive(false);
-                  } else {
-                    startHandsFreeListening();
-                    if (onToggleLive) onToggleLive(true);
-                  }
+          {/* Persistent Bottom Control Bar (Featuring Pause Button & Keyboard Toggle) */}
+          <div className="p-3 bg-slate-950 border-t border-slate-800 space-y-2 z-30">
+            {/* If Keyboard toggle is ON, reveal Text Input Form */}
+            {showKeyboardInput && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  sendMessage(inputText);
                 }}
-                disabled={isLoading}
-                title={isHandsFreeListening ? 'Hands-Free VAD band karein' : 'Hands-Free Voice shuru karein (Auto Silence Detection)'}
-                className={`p-2 rounded-xl transition-colors cursor-pointer disabled:opacity-40 ${
-                  isHandsFreeListening
-                    ? 'bg-rose-600 text-white animate-pulse'
-                    : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700'
-                }`}
+                className="flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-150"
               >
-                <Mic className="w-3.5 h-3.5" />
-              </button>
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Type a message or command for Copilot..."
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 shadow-inner"
+                  disabled={isLoading}
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  disabled={!inputText.trim() || isLoading}
+                  className="p-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-40 text-white rounded-xl transition-opacity cursor-pointer shadow-md"
+                  title="Send message"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+            )}
 
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder={isHandsFreeListening ? 'Bolte jayein, auto-detect ho raha hai...' : 'Hukm karein ya mic se bolein...'}
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                disabled={isLoading}
-              />
+            {/* Always Visible Persistent Control Actions Row */}
+            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-900">
+              <div className="flex items-center gap-2">
+                {/* 1. Pause / Resume Button */}
+                <button
+                  type="button"
+                  onClick={handleTogglePause}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm ${
+                    isListeningPaused
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400 shadow-emerald-950'
+                      : 'bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/40 hover:border-amber-400'
+                  }`}
+                  title={isListeningPaused ? 'Resume Active Listening' : 'Pause Active Listening'}
+                >
+                  {isListeningPaused ? (
+                    <>
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>Resume</span>
+                    </>
+                  ) : (
+                    <>
+                      <Pause className="w-3.5 h-3.5 fill-current" />
+                      <span>Pause</span>
+                    </>
+                  )}
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setVoiceRepliesOn(!voiceRepliesOn)}
-                title={voiceRepliesOn ? 'Awaaz wale jawab band karein' : 'Awaaz wale jawab ON karein'}
-                className={`p-2 rounded-xl transition-colors cursor-pointer ${
-                  voiceRepliesOn
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700'
-                }`}
-              >
-                {voiceRepliesOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-              </button>
+                {/* 2. Keyboard Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowKeyboardInput(!showKeyboardInput)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer border ${
+                    showKeyboardInput
+                      ? 'bg-cyan-500/20 text-cyan-200 border-cyan-400 shadow-cyan-950'
+                      : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-700/80 hover:text-white'
+                  }`}
+                  title={showKeyboardInput ? 'Hide Keyboard Input' : 'Show Keyboard Input'}
+                >
+                  <Keyboard className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Keyboard</span>
+                </button>
 
-              <button
-                type="submit"
-                disabled={!inputText.trim() || isLoading}
-                className="p-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 disabled:opacity-40 text-white rounded-xl transition-opacity cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </form>
+                {/* 3. Audio Voice Output Mute Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setVoiceRepliesOn(!voiceRepliesOn)}
+                  className={`p-1.5 rounded-xl text-xs transition-colors cursor-pointer border ${
+                    voiceRepliesOn
+                      ? 'bg-slate-900 text-cyan-300 border-slate-700/80 hover:border-cyan-500/40'
+                      : 'bg-slate-900 text-slate-500 border-slate-800'
+                  }`}
+                  title={voiceRepliesOn ? 'Mute AI Spoken Audio' : 'Enable AI Spoken Audio'}
+                >
+                  {voiceRepliesOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
+              {/* Right: Barge-in Stop if speaking */}
+              <div className="flex items-center gap-1.5">
+                {isSpeakingAudio && (
+                  <button
+                    type="button"
+                    onClick={stopAudioPlayback}
+                    className="px-2.5 py-1 bg-rose-600/90 hover:bg-rose-500 text-white text-[11px] font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1 shadow-md shadow-rose-950 animate-pulse"
+                    title="Stop Voice Playback"
+                  >
+                    <span>Stop</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
