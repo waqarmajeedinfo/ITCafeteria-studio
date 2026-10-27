@@ -185,6 +185,23 @@ export const AgentSimulator: React.FC = () => {
     saveRotationForChannel(draftChannel, draftTag, draftCategory);
   }, [draftChannel, draftTag, draftCategory]);
 
+  useEffect(() => {
+    const handleConfigUpdated = (e: any) => {
+      if (e.detail) {
+        setSimulatorConfig(e.detail);
+        if (e.detail.defaultSceneCount) {
+          setDraftSceneCount(e.detail.defaultSceneCount);
+        }
+      } else {
+        setSimulatorConfig(loadSimulatorConfig());
+      }
+    };
+    window.addEventListener('itcafeteria_simulator_config_updated', handleConfigUpdated);
+    return () => {
+      window.removeEventListener('itcafeteria_simulator_config_updated', handleConfigUpdated);
+    };
+  }, []);
+
   const handleDraftChannelChange = (channelId: string) => {
     const nextProfile = (channels[channelId] || profilesMap[channelId] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile;
     const saved = loadRotationState()[channelId as ChannelProfile['id']];
@@ -364,8 +381,14 @@ export const AgentSimulator: React.FC = () => {
           <div>
             <label className="flex items-center gap-1.5 text-slate-400 mb-1">
               Character Tag Variant (Q3)
-              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[9px] font-semibold tracking-wide">
-                AUTO
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wide border ${
+                draftProfile.tags?.[0]?.value === 'No-Character' || draftProfile.defaultTag === 'No-Character'
+                  ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                  : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+              }`}>
+                {draftProfile.tags?.[0]?.value === 'No-Character' || draftProfile.defaultTag === 'No-Character'
+                  ? 'FACELESS'
+                  : 'AUTO'}
               </span>
             </label>
             <select

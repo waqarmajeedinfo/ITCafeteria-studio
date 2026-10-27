@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Plus,
@@ -6,17 +7,22 @@ import {
   Tv,
   Edit2,
   Check,
-  ShieldCheck,
+  RotateCcw,
+  Undo2,
   Sparkles,
   User,
   Layers,
   Clock,
-  RotateCcw
+  Film,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 import {
   loadAllChannels,
-  saveCustomChannel,
-  deleteCustomChannel,
+  saveOrUpdateChannel,
+  deleteChannel,
+  undoLastChannelAction,
+  resetChannelsToDefault,
   type ExtendedChannelProfile
 } from '../lib/channelStore';
 
@@ -32,87 +38,171 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
   onChannelsUpdated
 }) => {
   const [channels, setChannels] = useState<Record<string, ExtendedChannelProfile>>({});
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
-  // New Channel Form State
+  // Form Fields
   const [name, setName] = useState('');
-  const [presenter, setPresenter] = useState('Waqar Majeed');
-  const [niche, setNiche] = useState('AI & Tech Workflows');
-  const [tag, setTag] = useState('@WM25-Live');
-  const [platform, setPlatform] = useState('YouTube + TikTok');
+  const [presenter, setPresenter] = useState('');
+  const [niche, setNiche] = useState('');
+  const [hasCharacterTag, setHasCharacterTag] = useState(false);
+  const [tag, setTag] = useState('');
+  const [platform, setPlatform] = useState('Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
   const [sceneCount, setSceneCount] = useState(10);
-  const [categoriesText, setCategoriesText] = useState(
-    'AI Tools & Agents, Windows & Cloud Hacks, Remote Income Skills, Tutorials'
-  );
+  const [categoriesText, setCategoriesText] = useState('');
 
+  // Lock background scroll when open
   useEffect(() => {
     if (isOpen) {
+      document.body.style.overflow = 'hidden';
       const loaded = loadAllChannels();
       setChannels(loaded);
+      return () => {
+        document.body.style.overflow = 'unset';
+      };
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleCreateChannel = (e: React.FormEvent) => {
+  const showStatus = (msg: string) => {
+    setStatusNotice(msg);
+    setTimeout(() => setStatusNotice(null), 3000);
+  };
+
+  const resetFormFields = () => {
+    setName('');
+    setPresenter('');
+    setNiche('');
+    setHasCharacterTag(false);
+    setTag('');
+    setPlatform('Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
+    setSceneCount(10);
+    setCategoriesText('');
+    setEditingChannelId(null);
+    setShowForm(false);
+  };
+
+  const handleOpenAddForm = () => {
+    setName('');
+    setPresenter('Waqar Majeed');
+    setNiche('AI & Tech Workflows');
+    setHasCharacterTag(false);
+    setTag('@WM25-Live');
+    setPlatform('Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
+    setSceneCount(10);
+    setCategoriesText('AI Tools & Agents, Windows & Cloud Hacks, Remote Income Skills, Tutorials');
+    setEditingChannelId(null);
+    setShowForm(true);
+  };
+
+  const handleStartEdit = (channel: ExtendedChannelProfile) => {
+    setEditingChannelId(channel.id);
+    setName(channel.name);
+    setPresenter(channel.presenter);
+    setNiche(channel.niche);
+    setHasCharacterTag(Boolean(channel.hasCharacterTag));
+    setTag(channel.defaultTag || (channel.tags && channel.tags[0]?.value) || '');
+    setPlatform(channel.platform || 'Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
+    setSceneCount(channel.defaultSceneCount || 10);
+    setCategoriesText(channel.categories.map((c) => c.name).join(', '));
+    setShowForm(true);
+  };
+
+  const handleSaveChannel = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-
-    const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const channelId = slug || `channel_${Date.now()}`;
 
     const categories = categoriesText
       .split(',')
       .map((c, i) => ({ id: i + 1, name: c.trim(), playlist: c.trim() }))
       .filter((c) => c.name.length > 0);
 
-    const newChannel: ExtendedChannelProfile = {
+    const safeCategories = categories.length
+      ? categories
+      : [{ id: 1, name: 'Main Category', playlist: 'Main' }];
+
+    const channelId = editingChannelId || name.toLowerCase().replace(/[^a-z0-9]/g, '') || `channel_${Date.now()}`;
+    const cleanTag = hasCharacterTag ? (tag.trim() || '@Custom-Tag') : 'No-Character';
+
+    const existing = channels[channelId];
+
+    const channelProfileToSave: ExtendedChannelProfile = {
       id: channelId as any,
       name: name.trim(),
-      presenter: presenter.trim() || 'Waqar Majeed',
-      niche: niche.trim() || 'Tech',
+      presenter: presenter.trim() || 'Anchor Presenter',
+      niche: niche.trim() || 'Content & Tech',
       platform,
-      tags: [{ value: tag.trim() || '@WM25-1', label: `${tag.trim()} (Custom Tag)` }],
-      categories: categories.length ? categories : [{ id: 1, name: 'Main Category', playlist: 'Main' }],
-      rotationCategoryIds: [1],
-      defaultTag: tag.trim() || '@WM25-1',
-      defaultCategoryId: 1,
-      durations: [
+      hasCharacterTag,
+      tags: hasCharacterTag
+        ? [{ value: cleanTag, label: `${cleanTag} (Character Tag)` }]
+        : [{ value: 'No-Character', label: 'Faceless / AI Storyboard (No Character)' }],
+      categories: safeCategories,
+      rotationCategoryIds: safeCategories.map((c) => c.id),
+      defaultTag: cleanTag,
+      defaultCategoryId: safeCategories[0]?.id || 1,
+      durations: existing?.durations || [
         { value: 10, label: '10 Scenes (100s — Standard Short)' },
         { value: 12, label: '12 Scenes (120s — Extended)' },
         { value: 7, label: '7 Scenes (70s — Minimal Threshold)' }
       ],
       defaultSceneCount: sceneCount,
-      sampleNotes: {
-        1: { title: `${name} Premiere Short`, hook: 'Viral Hook' }
+      sampleNotes: existing?.sampleNotes || {
+        1: { title: `${name} Episode 1`, hook: 'Story Reveal' }
       },
-      isCustom: true
+      isCustom: existing?.isCustom ?? (channelId !== 'itcafeteria' && channelId !== 'beautyhub')
     };
 
-    saveCustomChannel(newChannel);
-    const updated = loadAllChannels();
+    const updated = saveOrUpdateChannel(channelProfileToSave);
     setChannels(updated);
     onChannelsUpdated(updated);
-
-    // Reset Form
-    setName('');
-    setShowAddForm(false);
+    showStatus(editingChannelId ? `Channel "${name}" ke changes save ho gaye!` : `Naya Channel "${name}" add ho gaya!`);
+    resetFormFields();
   };
 
   const handleDelete = (channelId: string) => {
-    if (window.confirm('Kya aap waqai is custom channel ko remove karna chahte hain?')) {
-      deleteCustomChannel(channelId);
-      const updated = loadAllChannels();
+    const target = channels[channelId];
+    if (!target) return;
+    if (window.confirm(`Kya aap waqai channel "${target.name}" ko remove karna chahte hain?`)) {
+      const updated = deleteChannel(channelId);
       setChannels(updated);
       onChannelsUpdated(updated);
+      showStatus(`Channel "${target.name}" remove ho gaya. (Aap Undo button se wapis la sakte hain)`);
+      if (editingChannelId === channelId) {
+        resetFormFields();
+      }
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl shadow-emerald-950/80 overflow-hidden text-slate-100">
+  const handleUndo = () => {
+    const reverted = undoLastChannelAction();
+    if (reverted) {
+      setChannels(reverted);
+      onChannelsUpdated(reverted);
+      showStatus('Pichla step Undo ho gaya — channels pehli halat me wapis aa gaye.');
+    } else {
+      showStatus('Peeche jane ke liye koi previous state nahi mili.');
+    }
+  };
+
+  const handleResetDefaults = () => {
+    if (window.confirm('Kya aap tamam channels ko default setting (IT Cafeteria & Beauty Hub) par reset karna chahte hain?')) {
+      const restored = resetChannelsToDefault();
+      setChannels(restored);
+      onChannelsUpdated(restored);
+      showStatus('Tamam default channels restore ho gaye.');
+      resetFormFields();
+    }
+  };
+
+  const channelList = Object.values(channels);
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-emerald-950/80 overflow-hidden text-slate-100">
         {/* Header */}
-        <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
               <Tv className="w-5 h-5" />
@@ -121,11 +211,11 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-white text-base">Channel Manager & Multi-Channel Studio</h3>
                 <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-mono">
-                  {Object.keys(channels).length} Channels Active
+                  {channelList.length} Active Channels
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Naya YouTube/TikTok channel add karein, tags aur categories apne mutabiq customize karein.
+                Default aur custom channels ko modify karein, naya channel create karein ya delete karein.
               </p>
             </div>
           </div>
@@ -133,222 +223,338 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
           <button
             onClick={onClose}
             className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Band Karein"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
-          {/* Active Channels List */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-300 uppercase tracking-wider text-[11px]">
-                Configured Channels ({Object.keys(channels).length})
-              </span>
-              {!showAddForm && (
+        {/* Status Notice Toast */}
+        {statusNotice && (
+          <div className="mx-5 mt-3 p-2.5 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs text-emerald-200 flex items-center gap-2 shadow-lg animate-in fade-in duration-150 shrink-0">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{statusNotice}</span>
+          </div>
+        )}
+
+        {/* Content Body — Scrollable only within modal */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Channel Cards Section */}
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <h4 className="font-bold text-xs uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                Configured Channels ({channelList.length})
+              </h4>
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setShowAddForm(true)}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950/40 transition-colors"
+                  type="button"
+                  onClick={handleUndo}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Pichli tabdili ko wapis layein"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  Naya Channel Add Karein
+                  <Undo2 className="w-3 h-3 text-cyan-400" />
+                  <span>Undo Step</span>
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={handleResetDefaults}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 border border-slate-700 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Tamam channels ko default par reset karein"
+                >
+                  <RotateCcw className="w-3 h-3 text-amber-400" />
+                  <span>Restore Defaults</span>
+                </button>
+                {!showForm && (
+                  <button
+                    type="button"
+                    onClick={handleOpenAddForm}
+                    className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-md shadow-emerald-950"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Add Channel</span>
+                  </button>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {Object.values(channels).map((ch, idx) => (
-                <div
-                  key={ch.id}
-                  className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex flex-col justify-between gap-2.5 hover:border-slate-700 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm">
-                          {idx + 1}. {ch.name}
-                        </span>
-                        {ch.isCustom ? (
-                          <span className="text-[9px] px-1.5 py-0.2 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded font-mono">
-                            Custom
-                          </span>
-                        ) : (
-                          <span className="text-[9px] px-1.5 py-0.2 bg-slate-800 text-slate-400 border border-slate-700 rounded font-mono">
-                            Default
-                          </span>
-                        )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {channelList.map((ch, idx) => {
+                const isSelectedForEdit = editingChannelId === ch.id;
+                return (
+                  <div
+                    key={ch.id}
+                    className={`p-3.5 rounded-xl border transition-all ${
+                      isSelectedForEdit
+                        ? 'bg-emerald-950/40 border-emerald-400 ring-1 ring-emerald-400/40 shadow-lg'
+                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h5 className="font-bold text-white text-sm truncate">
+                            {idx + 1}. {ch.name}
+                          </h5>
+                          {ch.isCustom ? (
+                            <span className="text-[9px] bg-purple-500/10 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded font-mono">
+                              Custom
+                            </span>
+                          ) : (
+                            <span className="text-[9px] bg-blue-500/10 text-blue-300 border border-blue-500/30 px-1.5 py-0.2 rounded font-mono">
+                              Default
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          Presenter: <span className="text-slate-200">{ch.presenter}</span> • Niche:{' '}
+                          <span className="text-slate-200">{ch.niche}</span>
+                        </p>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        Presenter: <span className="text-slate-200">{ch.presenter}</span> • Niche: <span className="text-slate-200">{ch.niche}</span>
-                      </p>
+
+                      {/* Action buttons: Edit & Delete for EVERY channel as requested */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(ch)}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 transition-colors"
+                          title="Is Channel ko Modify / Edit karein"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(ch.id)}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 transition-colors"
+                          title="Channel ko Delete karein"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    {ch.isCustom && (
-                      <button
-                        onClick={() => handleDelete(ch.id)}
-                        className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors"
-                        title="Delete custom channel"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-400 pt-2 border-t border-slate-800/80">
+                      <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                        Tag:{' '}
+                        <span className="text-cyan-300 font-mono">
+                          {ch.hasCharacterTag
+                            ? ch.defaultTag || ch.tags?.[0]?.value || 'Active'
+                            : 'Faceless / AI Story'}
+                        </span>
+                      </span>
+                      <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                        {ch.categories.length} Categories
+                      </span>
+                      <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                        {ch.defaultSceneCount || 10} Scenes
+                      </span>
+                      {ch.platform && (
+                        <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-slate-300">
+                          {ch.platform}
+                        </span>
+                      )}
+                    </div>
                   </div>
-
-                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Tag: <strong className="text-cyan-400 font-mono">{ch.defaultTag}</strong></span>
-                    <span>{ch.categories.length} Categories</span>
-                    <span>{ch.defaultSceneCount} Scenes</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {/* Add New Channel Form */}
-          {showAddForm && (
-            <form
-              onSubmit={handleCreateChannel}
-              className="mt-4 p-4 bg-slate-950 border border-emerald-500/40 rounded-2xl space-y-3.5 shadow-xl animate-in fade-in zoom-in-95 duration-150"
-            >
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <h4 className="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
-                  <Plus className="w-4 h-4" />
-                  Naye Channel Ki Configuration
-                </h4>
+          {/* Edit / Add Channel Form */}
+          {showForm && (
+            <div className="border border-emerald-500/40 bg-slate-950/90 rounded-2xl p-4 sm:p-5 shadow-xl animate-in fade-in duration-200">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                    {editingChannelId ? <Edit2 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white text-sm">
+                      {editingChannelId ? `Channel Modify Karein (${name || 'Channel'})` : 'Naye Channel Ki Configuration'}
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      {editingChannelId
+                        ? 'Details update karke Save Changes dabayein'
+                        : 'Channel ka naam, presenter aur settings darj karein'}
+                    </p>
+                  </div>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="text-slate-400 hover:text-white text-xs"
+                  onClick={resetFormFields}
+                  className="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg hover:bg-slate-800"
                 >
                   Cancel
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <form onSubmit={handleSaveChannel} className="space-y-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">
+                      Channel Ka Naam <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. IT Cafeteria Shorts ya Waqar Tech AI"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">
+                      Host / Presenter Ka Naam
+                    </label>
+                    <input
+                      type="text"
+                      value={presenter}
+                      onChange={(e) => setPresenter(e.target.value)}
+                      placeholder="e.g. Waqar Majeed ya Mehr Zadi"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">Niche / Topic</label>
+                    <input
+                      type="text"
+                      value={niche}
+                      onChange={(e) => setNiche(e.target.value)}
+                      placeholder="e.g. AI & Tech Workflows, Daily Hacks"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Character Tag Feature: Checkbox Toggle (Inactive by default as requested!) */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                        Character Tag (Google Flow)
+                      </label>
+                      <label className="flex items-center gap-1.5 text-[11px] text-cyan-300 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={hasCharacterTag}
+                          onChange={(e) => setHasCharacterTag(e.target.checked)}
+                          className="rounded border-slate-700 text-emerald-500 focus:ring-0 cursor-pointer"
+                        />
+                        <span>Enable Character Avatar</span>
+                      </label>
+                    </div>
+
+                    {hasCharacterTag ? (
+                      <input
+                        type="text"
+                        value={tag}
+                        onChange={(e) => setTag(e.target.value)}
+                        placeholder="e.g. @WM25-Live ya @CharacterTag"
+                        className="w-full bg-slate-900 border border-cyan-500/50 rounded-lg px-3 py-2 text-cyan-300 font-mono focus:outline-none focus:border-cyan-400"
+                      />
+                    ) : (
+                      <div className="w-full bg-slate-900/60 border border-dashed border-slate-800 rounded-lg px-3 py-2 text-slate-400 italic text-[11px]">
+                        Faceless Storyboard Mode (Bina character tag ke story generate hogi)
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">Target Platform</label>
+                    <select
+                      value={platform}
+                      onChange={(e) => setPlatform(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="Multi-Platform MCN (YouTube Shorts + TikTok + Reels)">
+                        Multi-Platform MCN (YouTube Shorts + TikTok + Reels)
+                      </option>
+                      <option value="YouTube Shorts Only (9:16 Vertical)">
+                        YouTube Shorts Only (9:16 Vertical)
+                      </option>
+                      <option value="TikTok Viral Short (9:16 Vertical)">
+                        TikTok Viral Short (9:16 Vertical)
+                      </option>
+                      <option value="Instagram Reels (9:16 Vertical)">
+                        Instagram Reels (9:16 Vertical)
+                      </option>
+                      <option value="Facebook Reels (9:16 Vertical)">
+                        Facebook Reels (9:16 Vertical)
+                      </option>
+                      <option value="LinkedIn Video (1:1 / 4:5 Vertical)">
+                        LinkedIn Video (1:1 / 4:5 Vertical)
+                      </option>
+                      <option value="YouTube Longform (16:9 Landscape)">
+                        YouTube Longform (16:9 Landscape)
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">Default Scene Count</label>
+                    <select
+                      value={sceneCount}
+                      onChange={(e) => setSceneCount(parseInt(e.target.value) || 10)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value={7}>7 Scenes (70s — Minimal Threshold)</option>
+                      <option value={10}>10 Scenes (100s — Standard Short)</option>
+                      <option value={12}>12 Scenes (120s — Extended)</option>
+                      <option value={15}>15 Scenes (150s — Max Format)</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="text-slate-300 font-medium block mb-1">
-                    Channel Ka Naam <span className="text-rose-400">*</span>
+                  <label className="text-slate-300 font-semibold block mb-1">
+                    Channel Categories (Commas se alag karein)
                   </label>
                   <input
                     type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. IT Cafeteria Shorts ya Waqar Tech AI"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-emerald-400"
+                    value={categoriesText}
+                    onChange={(e) => setCategoriesText(e.target.value)}
+                    placeholder="e.g. AI Tools & Agents, Windows & Cloud Hacks, Remote Income Skills"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Har category par AI Story Engine rotation aur specific prompts chalata hai.
+                  </p>
                 </div>
 
-                <div>
-                  <label className="text-slate-300 font-medium block mb-1">
-                    Host / Presenter Ka Naam
-                  </label>
-                  <input
-                    type="text"
-                    value={presenter}
-                    onChange={(e) => setPresenter(e.target.value)}
-                    placeholder="e.g. Waqar Majeed"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-slate-300 font-medium block mb-1">Niche / Topic</label>
-                  <input
-                    type="text"
-                    value={niche}
-                    onChange={(e) => setNiche(e.target.value)}
-                    placeholder="e.g. AI Tools & Automation"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-slate-300 font-medium block mb-1">
-                    Default Character Tag (Google Flow)
-                  </label>
-                  <input
-                    type="text"
-                    value={tag}
-                    onChange={(e) => setTag(e.target.value)}
-                    placeholder="e.g. @WM25-Live"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-cyan-300 font-mono focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-slate-300 font-medium block mb-1">Target Platform</label>
-                  <select
-                    value={platform}
-                    onChange={(e) => setPlatform(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-emerald-400"
+                {/* Form Action Buttons: Distinct Save Changes vs Channel Creation buttons! */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={resetFormFields}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer"
                   >
-                    <option value="YouTube + TikTok">YouTube + TikTok</option>
-                    <option value="YouTube Shorts Only">YouTube Shorts Only</option>
-                    <option value="TikTok Viral">TikTok Viral</option>
-                    <option value="Instagram Reels">Instagram Reels</option>
-                    <option value="Multi-Platform MCN">Multi-Platform MCN</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-slate-300 font-medium block mb-1">Default Scene Count</label>
-                  <select
-                    value={sceneCount}
-                    onChange={(e) => setSceneCount(parseInt(e.target.value) || 10)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-emerald-400"
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-950 cursor-pointer"
                   >
-                    <option value={7}>7 Scenes (70s)</option>
-                    <option value={10}>10 Scenes (100s Standard)</option>
-                    <option value={12}>12 Scenes (120s Extended)</option>
-                    <option value={15}>15 Scenes (150s Max)</option>
-                  </select>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{editingChannelId ? 'Save Changes' : 'Channel Create Karein'}</span>
+                  </button>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-slate-300 font-medium block mb-1">
-                  Channel Categories (Commas se alag karein)
-                </label>
-                <input
-                  type="text"
-                  value={categoriesText}
-                  onChange={(e) => setCategoriesText(e.target.value)}
-                  placeholder="e.g. AI Tools, Windows Tricks, Automation, Tutorials"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-emerald-400"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-md shadow-emerald-950/60"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  Channel Create Karein
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
-          <p className="text-[11px] text-slate-400">
-            Naye add kiye gaye channels Agent Simulator aur Calendar ke dropdowns mein foran sync ho jate hain.
-          </p>
-
+        <div className="px-5 py-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
+          <span>Naye aur modified channels Agent Simulator aur Calendar me foran sync ho jate hain.</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors"
+            className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer"
           >
             Close
           </button>
@@ -356,4 +562,6 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };

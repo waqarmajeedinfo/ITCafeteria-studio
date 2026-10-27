@@ -380,6 +380,15 @@ export default function App() {
     window.addEventListener('itcafeteria_open_banner_modal', openBannerHandler);
     window.addEventListener('itcafeteria_open_menu_customizer', openMenuCustomizerHandler);
 
+    const handleMenuCustomizerUpdated = (e: any) => {
+      if (e.detail) {
+        setMenuConfig(e.detail);
+      } else {
+        setMenuConfig(loadMenuConfig());
+      }
+    };
+    window.addEventListener('itcafeteria_menu_customizer_updated', handleMenuCustomizerUpdated);
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
@@ -387,6 +396,7 @@ export default function App() {
       window.removeEventListener('itcafeteria_open_theme_customizer', openCustomizerHandler);
       window.removeEventListener('itcafeteria_open_banner_modal', openBannerHandler);
       window.removeEventListener('itcafeteria_open_menu_customizer', openMenuCustomizerHandler);
+      window.removeEventListener('itcafeteria_menu_customizer_updated', handleMenuCustomizerUpdated);
     };
   }, []);
 
@@ -749,25 +759,6 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Desktop Navbar with 4 Interactive Dropdown Menus */}
           <div className="hidden md:flex items-center gap-3 py-2.5">
-            {/* Scrolled Mini Brand Anchor to quickly jump back to Header */}
-            {isScrolled && (
-              <button
-                onClick={scrollToTop}
-                className="hidden xl:flex items-center gap-2 pr-3 mr-1 border-r border-slate-800 text-slate-300 hover:text-cyan-300 transition-colors cursor-pointer group"
-                title="Header par wapis jayein (Scroll to Top)"
-              >
-                <img
-                  src="/brand/logo.jpeg"
-                  alt="Logo"
-                  className="w-7 h-7 rounded-lg object-cover ring-1 ring-cyan-500/40 group-hover:ring-cyan-400 transition-all"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-                <span className="font-bold text-xs tracking-tight text-white group-hover:text-cyan-300">IT Cafeteria</span>
-              </button>
-            )}
-
             {groups.map((group) => {
               const isGroupActive = activeGroup === group.id;
               const isMenuOpen = openMenu === group.id;
@@ -835,10 +826,10 @@ export default function App() {
               <button
                 onClick={() => setShowMenuCustomizer(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-400 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer transition-all shadow-md group shrink-0"
-                title="Menu Bar Customizer (Rename, Shift/Move Items, Lock/Unlock)"
+                title="Menu Settings (Rename, Shift/Move Items, Lock/Unlock)"
               >
                 <FolderTree className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform" />
-                <span className="hidden sm:inline text-xs font-semibold text-slate-200">Menu Settings</span>
+                <span className="hidden sm:inline text-xs font-semibold text-slate-200">Settings</span>
               </button>
 
               {/* Scroll To Top Jump Button when Scrolled */}

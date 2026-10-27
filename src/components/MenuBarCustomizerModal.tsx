@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Lock,
@@ -13,7 +14,8 @@ import {
   Layers,
   Sparkles,
   ShieldCheck,
-  ArrowRight
+  ArrowRight,
+  CheckCircle2
 } from 'lucide-react';
 import type { TabType } from '../App';
 
@@ -93,6 +95,9 @@ export function loadMenuConfig(): MenuCustomizerState {
 export function saveMenuConfig(config: MenuCustomizerState) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('itcafeteria_menu_customizer_updated', { detail: config }));
+    }
   } catch (e) {
     console.error('Failed to save menu config', e);
   }
@@ -122,7 +127,13 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
   const [saveToast, setSaveToast] = useState(false);
 
   useEffect(() => {
-    setLocalConfig(config);
+    if (isOpen) {
+      setLocalConfig(config);
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = 'unset';
+      };
+    }
   }, [config, isOpen]);
 
   if (!isOpen) return null;
@@ -143,7 +154,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     }));
   };
 
-  // Move an item to a new group (Ensures STRICT NO-DUPLICATES: moved cleanly!)
+  // Move an item to a new group (STRICT NO-DUPLICATE RULE)
   const handleMoveItem = (itemId: TabType, targetGroupId: string) => {
     const item = localConfig.items.find((i) => i.id === itemId);
     if (!item) return;
@@ -191,11 +202,15 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     setTempLabel(group.label);
   };
 
-  const saveEditGroup = (groupId: string) => {
-    if (!tempLabel.trim()) return;
+  const saveEditGroup = (groupId: string, newLabel?: string) => {
+    const labelToSave = (newLabel !== undefined ? newLabel : tempLabel).trim();
+    if (!labelToSave) {
+      setEditingGroupId(null);
+      return;
+    }
     setLocalConfig((prev) => ({
       ...prev,
-      groups: prev.groups.map((g) => (g.id === groupId ? { ...g, label: tempLabel.trim() } : g))
+      groups: prev.groups.map((g) => (g.id === groupId ? { ...g, label: labelToSave } : g))
     }));
     setEditingGroupId(null);
     setTempLabel('');
@@ -212,11 +227,15 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     setTempLabel(item.label);
   };
 
-  const saveEditItem = (itemId: TabType) => {
-    if (!tempLabel.trim()) return;
+  const saveEditItem = (itemId: TabType, newLabel?: string) => {
+    const labelToSave = (newLabel !== undefined ? newLabel : tempLabel).trim();
+    if (!labelToSave) {
+      setEditingItemId(null);
+      return;
+    }
     setLocalConfig((prev) => ({
       ...prev,
-      items: prev.items.map((i) => (i.id === itemId ? { ...i, label: tempLabel.trim() } : i))
+      items: prev.items.map((i) => (i.id === itemId ? { ...i, label: labelToSave } : i))
     }));
     setEditingItemId(null);
     setTempLabel('');
@@ -231,27 +250,49 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
   };
 
   const handleApply = () => {
-    saveMenuConfig(localConfig);
-    onSave(localConfig);
+    // Commit any currently open editing inputs before saving!
+    let finalConfig = { ...localConfig };
+
+    if (editingItemId && tempLabel.trim()) {
+      finalConfig = {
+        ...finalConfig,
+        items: finalConfig.items.map((i) =>
+          i.id === editingItemId ? { ...i, label: tempLabel.trim() } : i
+        )
+      };
+    }
+
+    if (editingGroupId && tempLabel.trim()) {
+      finalConfig = {
+        ...finalConfig,
+        groups: finalConfig.groups.map((g) =>
+          g.id === editingGroupId ? { ...g, label: tempLabel.trim() } : g
+        )
+      };
+    }
+
+    saveMenuConfig(finalConfig);
+    onSave(finalConfig);
     setSaveToast(true);
     setTimeout(() => {
       setSaveToast(false);
       onClose();
-    }, 600);
+    }, 500);
   };
 
   const handleResetDefaults = () => {
     if (window.confirm('Kya aap menu bar ko default settings par reset karna chahte hain?')) {
       onReset();
       setLocalConfig(DEFAULT_MENU_STATE);
+      saveMenuConfig(DEFAULT_MENU_STATE);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden text-slate-100">
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden text-slate-100">
         {/* Header */}
-        <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-cyan-500/20 text-cyan-400 rounded-xl border border-cyan-500/30">
               <FolderTree className="w-5 h-5" />
@@ -272,6 +313,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
           <button
             onClick={onClose}
             className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Band Karein"
           >
             <X className="w-5 h-5" />
           </button>
@@ -279,7 +321,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
 
         {/* Lock Warning Toast / Notice */}
         {lockWarning && (
-          <div className="mx-5 mt-4 p-3 bg-rose-950/80 border border-rose-500/60 rounded-xl text-xs text-rose-200 flex items-start justify-between gap-3 shadow-lg shadow-rose-950/40 animate-in fade-in duration-150">
+          <div className="mx-5 mt-4 p-3 bg-rose-950/80 border border-rose-500/60 rounded-xl text-xs text-rose-200 flex items-start justify-between gap-3 shadow-lg shadow-rose-950/40 animate-in fade-in duration-150 shrink-0">
             <div className="flex items-start gap-2 min-w-0">
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <div>
@@ -291,10 +333,9 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
               {selectedItemId && (
                 <button
                   onClick={unlockItemFromWarning}
-                  className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-semibold cursor-pointer"
                 >
-                  <Unlock className="w-3 h-3" />
-                  Unlock Karein
+                  Unlock Item
                 </button>
               )}
               <button
@@ -307,7 +348,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
           </div>
         )}
 
-        {/* Content Body — Interactive Grid of 4 Menu Categories */}
+        {/* Content Body — Interactive Grid of 4 Menu Categories (Scrollable only within modal) */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {localConfig.groups.map((group) => {
@@ -335,12 +376,15 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                             type="text"
                             value={tempLabel}
                             onChange={(e) => setTempLabel(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && saveEditGroup(group.id)}
+                            onBlur={() => saveEditGroup(group.id)}
                             className="bg-slate-800 border border-cyan-400 text-white rounded-lg px-2 py-0.5 text-xs font-semibold focus:outline-none"
                             autoFocus
                           />
                           <button
-                            onClick={() => saveEditGroup(group.id)}
+                            onMouseDown={() => saveEditGroup(group.id)}
                             className="p-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-[10px]"
+                            title="Save Rename"
                           >
                             <Save className="w-3 h-3" />
                           </button>
@@ -350,7 +394,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                           <h4 className="font-bold text-sm text-white truncate">{group.label}</h4>
                           <button
                             onClick={() => startEditGroup(group)}
-                            className="p-1 text-slate-400 hover:text-cyan-300 transition-colors"
+                            className="p-1 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
                             title="Rename Menu"
                           >
                             <Edit2 className="w-3 h-3" />
@@ -400,27 +444,30 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <span
-                                className={`w-2 h-2 rounded-full ${
+                                className={`w-2 h-2 rounded-full shrink-0 ${
                                   item.isLocked ? 'bg-amber-400' : 'bg-emerald-400'
                                 }`}
                               />
 
                               {editingItemId === item.id ? (
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
                                   <input
                                     type="text"
                                     value={tempLabel}
                                     onChange={(e) => setTempLabel(e.target.value)}
-                                    className="bg-slate-800 border border-cyan-400 text-white rounded px-2 py-0.5 text-xs font-medium focus:outline-none"
+                                    onKeyDown={(e) => e.key === 'Enter' && saveEditItem(item.id)}
+                                    onBlur={() => saveEditItem(item.id)}
+                                    className="bg-slate-800 border border-cyan-400 text-white rounded px-2 py-0.5 text-xs font-medium focus:outline-none w-44"
                                     autoFocus
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                   <button
-                                    onClick={(e) => {
+                                    onMouseDown={(e) => {
                                       e.stopPropagation();
                                       saveEditItem(item.id);
                                     }}
-                                    className="p-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white"
+                                    className="p-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white shrink-0 cursor-pointer"
+                                    title="Save Rename"
                                   >
                                     <Save className="w-3 h-3" />
                                   </button>
@@ -435,7 +482,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                                       e.stopPropagation();
                                       startEditItem(item);
                                     }}
-                                    className="p-0.5 text-slate-400 hover:text-cyan-300"
+                                    className="p-0.5 text-slate-400 hover:text-cyan-300 cursor-pointer"
                                     title="Rename item"
                                   >
                                     <Edit2 className="w-2.5 h-2.5" />
@@ -448,29 +495,34 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                             <div className="flex items-center gap-1.5 shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => toggleItemLock(item.id)}
-                                className={`p-1 rounded border text-[10px] transition-colors ${
+                                className={`p-1 rounded-lg border text-xs cursor-pointer transition-colors ${
                                   item.isLocked
                                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                                     : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                                 }`}
-                                title={item.isLocked ? 'Item Locked' : 'Item Unlocked'}
+                                title={item.isLocked ? 'Locked (Click to Unlock)' : 'Unlocked (Click to Lock)'}
                               >
                                 {item.isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
                               </button>
 
-                              {/* Shift / Move To Destination Menu Selector */}
-                              <select
-                                value={item.groupId}
-                                onChange={(e) => handleMoveItem(item.id, e.target.value)}
-                                className="bg-slate-800 border border-slate-700 hover:border-cyan-500/60 rounded px-2 py-1 text-[11px] text-slate-300 font-medium focus:outline-none focus:border-cyan-400"
-                                title="Move this item to another menu (No Duplicates)"
-                              >
-                                {localConfig.groups.map((g) => (
-                                  <option key={g.id} value={g.id} disabled={g.id === item.groupId}>
-                                    {g.id === item.groupId ? `Current: ${g.label}` : `Move ➔ ${g.label}`}
-                                  </option>
-                                ))}
-                              </select>
+                              {/* Move / Shift Dropdown */}
+                              <div className="relative flex items-center gap-1 text-[11px] bg-slate-800/80 border border-slate-700 rounded-lg px-1.5 py-0.5">
+                                <span className="text-slate-400 text-[10px]">Move to:</span>
+                                <select
+                                  value={item.groupId}
+                                  onChange={(e) => handleMoveItem(item.id, e.target.value)}
+                                  disabled={item.isLocked}
+                                  className={`bg-transparent text-slate-200 text-[11px] focus:outline-none cursor-pointer ${
+                                    item.isLocked ? 'opacity-40 cursor-not-allowed' : ''
+                                  }`}
+                                >
+                                  {localConfig.groups.map((g) => (
+                                    <option key={g.id} value={g.id} className="bg-slate-900 text-white">
+                                      {g.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
                           </div>
                         );
@@ -483,34 +535,38 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
           </div>
         </div>
 
-        {/* Footer with Reset and Save Controls */}
-        <div className="px-5 py-4 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>
-              <strong>Zero Duplicate Rule:</strong> Har option sirf ek hi menu ke andar rehti hai. Move karne par previous menu se shift ho jati hai.
-            </span>
-          </div>
+        {/* Footer */}
+        <div className="px-5 py-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between shrink-0">
+          <button
+            type="button"
+            onClick={handleResetDefaults}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer text-xs"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset Defaults</span>
+          </button>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-2">
             <button
-              onClick={handleResetDefaults}
-              className="px-3.5 py-2 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Reset Defaults
+              Cancel
             </button>
-
             <button
+              type="button"
               onClick={handleApply}
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-cyan-950/60 transition-all cursor-pointer flex items-center gap-1.5"
+              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-semibold text-xs shadow-lg shadow-cyan-950 cursor-pointer"
             >
-              <Check className="w-4 h-4" />
-              {saveToast ? 'Saved!' : 'Save & Lock Changes'}
+              <Check className="w-3.5 h-3.5" />
+              <span>Save Menu Layout</span>
             </button>
           </div>
         </div>
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };

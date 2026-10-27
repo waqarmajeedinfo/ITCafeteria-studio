@@ -1,66 +1,106 @@
 import { CHANNEL_PROFILES, type ChannelProfile } from '../data/channelData';
 
-const STORAGE_KEY = 'itcafeteria_channels_store_v1';
+const STORAGE_KEY = 'itcafeteria_channels_store_v2';
+const HISTORY_KEY = 'itcafeteria_channels_history_v2';
 
 export interface ExtendedChannelProfile extends ChannelProfile {
   isCustom?: boolean;
   platform?: string;
+  hasCharacterTag?: boolean;
 }
 
-export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
-  const baseChannels: Record<string, ExtendedChannelProfile> = {
-    itcafeteria: { ...CHANNEL_PROFILES.itcafeteria, isCustom: false, platform: 'YouTube + TikTok' },
-    beautyhub: { ...CHANNEL_PROFILES.beautyhub, isCustom: false, platform: 'YouTube Shorts' }
-  };
+export const DEFAULT_CHANNELS: Record<string, ExtendedChannelProfile> = {
+  itcafeteria: {
+    ...CHANNEL_PROFILES.itcafeteria,
+    isCustom: false,
+    platform: 'YouTube + TikTok',
+    hasCharacterTag: true
+  },
+  beautyhub: {
+    ...CHANNEL_PROFILES.beautyhub,
+    isCustom: false,
+    platform: 'YouTube Shorts',
+    hasCharacterTag: true
+  }
+};
 
-  if (typeof window === 'undefined') return baseChannels;
+export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
+  if (typeof window === 'undefined') return DEFAULT_CHANNELS;
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const customChannels = JSON.parse(raw);
-      if (customChannels && typeof customChannels === 'object') {
-        return { ...baseChannels, ...customChannels };
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+        return parsed;
       }
     }
   } catch (e) {
-    console.error('Error loading custom channels', e);
+    console.error('Error loading channels', e);
   }
 
-  return baseChannels;
+  return DEFAULT_CHANNELS;
 }
 
-export function saveCustomChannel(profile: ExtendedChannelProfile) {
+function saveHistoryState(currentChannels: Record<string, ExtendedChannelProfile>) {
   try {
-    const all = loadAllChannels();
-    const customOnly: Record<string, ExtendedChannelProfile> = {};
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(currentChannels));
+  } catch {}
+}
 
-    Object.keys(all).forEach((key) => {
-      if (all[key].isCustom) {
-        customOnly[key] = all[key];
-      }
-    });
-
-    customOnly[profile.id] = { ...profile, isCustom: true };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(customOnly));
+export function saveAllChannels(channels: Record<string, ExtendedChannelProfile>) {
+  try {
+    const previous = loadAllChannels();
+    saveHistoryState(previous);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(channels));
   } catch (e) {
-    console.error('Error saving custom channel', e);
+    console.error('Error saving channels', e);
   }
 }
 
-export function deleteCustomChannel(channelId: string) {
+export function saveOrUpdateChannel(profile: ExtendedChannelProfile) {
+  const current = loadAllChannels();
+  const updated = {
+    ...current,
+    [profile.id]: profile
+  };
+  saveAllChannels(updated);
+  return updated;
+}
+
+export function deleteChannel(channelId: string) {
+  const current = loadAllChannels();
+  const updated: Record<string, ExtendedChannelProfile> = {};
+  Object.keys(current).forEach((key) => {
+    if (key !== channelId) {
+      updated[key] = current[key];
+    }
+  });
+  saveAllChannels(updated);
+  return updated;
+}
+
+export function undoLastChannelAction(): Record<string, ExtendedChannelProfile> | null {
   try {
-    const all = loadAllChannels();
-    const customOnly: Record<string, ExtendedChannelProfile> = {};
-
-    Object.keys(all).forEach((key) => {
-      if (all[key].isCustom && key !== channelId) {
-        customOnly[key] = all[key];
-      }
-    });
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(customOnly));
+    const historyRaw = localStorage.getItem(HISTORY_KEY);
+    if (!historyRaw) return null;
+    const historyState = JSON.parse(historyRaw);
+    if (historyState && typeof historyState === 'object') {
+      const current = loadAllChannels();
+      // Swap history
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(current));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(historyState));
+      return historyState;
+    }
   } catch (e) {
-    console.error('Error deleting custom channel', e);
+    console.error('Error undoing channel action', e);
   }
+  return null;
+}
+
+export function resetChannelsToDefault(): Record<string, ExtendedChannelProfile> {
+  const current = loadAllChannels();
+  saveHistoryState(current);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_CHANNELS));
+  return DEFAULT_CHANNELS;
 }
