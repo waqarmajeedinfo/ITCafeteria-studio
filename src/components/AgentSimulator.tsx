@@ -7,7 +7,10 @@ import {
   Loader2,
   Sparkles,
   Film,
-  RefreshCw
+  RefreshCw,
+  Sliders,
+  Plus,
+  Settings
 } from 'lucide-react';
 import { CHANNEL_PROFILES, type ChannelProfile } from '../data/channelData';
 import {
@@ -18,6 +21,14 @@ import {
 } from './AgentFlowScreen';
 import { StoryPackageView, type GeneratedStory } from './StoryPackageView';
 import { loadPendingQueue, savePendingQueue, getNextTargetStory, type PendingStoryRecord } from '../lib/pendingQueueStore';
+import {
+  SimulatorConfigModal,
+  loadSimulatorConfig,
+  DEFAULT_SIMULATOR_CONFIG,
+  type SimulatorConfig
+} from './SimulatorConfigModal';
+import { ChannelManagerModal } from './ChannelManagerModal';
+import { loadAllChannels, type ExtendedChannelProfile } from '../lib/channelStore';
 
 const LATEST_STORY_KEY = 'itcafeteria_latest_story';
 const MEMORY_RECORDS_KEY = 'itcafeteria_memory_records';
@@ -103,6 +114,11 @@ function loadMemoryRecords(): AgentMemoryRecord[] {
 }
 
 export const AgentSimulator: React.FC = () => {
+  const [channels, setChannels] = useState<Record<string, ExtendedChannelProfile>>(loadAllChannels);
+  const [simulatorConfig, setSimulatorConfig] = useState<SimulatorConfig>(loadSimulatorConfig);
+  const [showSimulatorConfig, setShowSimulatorConfig] = useState(false);
+  const [showChannelManager, setShowChannelManager] = useState(false);
+
   const [initialRotation] = useState<SavedRotation>(loadRotationState);
   const [draftChannel, setDraftChannel] = useState<ChannelProfile['id']>('itcafeteria');
   const [draftTag, setDraftTag] = useState<string>(() =>
@@ -111,20 +127,25 @@ export const AgentSimulator: React.FC = () => {
   const [draftCategory, setDraftCategory] = useState<number>(() =>
     resolveSavedCategory(CHANNEL_PROFILES.itcafeteria, initialRotation.itcafeteria?.categoryId)
   );
-  const [draftSceneCount, setDraftSceneCount] = useState<number>(CHANNEL_PROFILES.itcafeteria.defaultSceneCount);
+  const [draftSceneCount, setDraftSceneCount] = useState<number>(
+    () => simulatorConfig.defaultSceneCount || CHANNEL_PROFILES.itcafeteria.defaultSceneCount
+  );
   const [appliedSelection, setAppliedSelection] = useState<AgentTriggerSelection | null>(null);
   const [triggerOutcome, setTriggerOutcome] = useState<AgentTriggerOutcome | null>(null);
   const [memoryRecords, setMemoryRecords] = useState<AgentMemoryRecord[]>(loadMemoryRecords);
   const [latestStory, setLatestStory] = useState<GeneratedStory | null>(loadLatestStory);
   const [flowOpen, setFlowOpen] = useState(false);
 
-  const draftProfile = CHANNEL_PROFILES[draftChannel];
+  const profilesMap = CHANNEL_PROFILES as unknown as Record<string, ChannelProfile>;
+  const draftProfile = (channels[draftChannel] || profilesMap[draftChannel] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile;
   const draftCategoryMeta = draftProfile.categories.find((cat) => cat.id === draftCategory) ?? draftProfile.categories[0];
   const nextDraftTagValue = getNextTag(draftProfile, draftTag);
   const nextDraftTagLabel = draftProfile.tags.find((tag) => tag.value === nextDraftTagValue)?.label ?? nextDraftTagValue;
   const nextDraftCategoryId = getNextCategoryId(draftProfile, draftCategory);
   const nextDraftCategoryMeta = draftProfile.categories.find((cat) => cat.id === nextDraftCategoryId) ?? draftProfile.categories[0];
-  const appliedProfile = appliedSelection ? CHANNEL_PROFILES[appliedSelection.channelId] : null;
+  const appliedProfile = appliedSelection
+    ? ((channels[appliedSelection.channelId] || profilesMap[appliedSelection.channelId] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile)
+    : null;
   const appliedCategory = appliedSelection && appliedProfile
     ? appliedProfile.categories.find((cat) => cat.id === appliedSelection.categoryId) ?? appliedProfile.categories[0]
     : null;
@@ -164,13 +185,13 @@ export const AgentSimulator: React.FC = () => {
     saveRotationForChannel(draftChannel, draftTag, draftCategory);
   }, [draftChannel, draftTag, draftCategory]);
 
-  const handleDraftChannelChange = (channelId: ChannelProfile['id']) => {
-    const nextProfile = CHANNEL_PROFILES[channelId];
-    const saved = loadRotationState()[channelId];
+  const handleDraftChannelChange = (channelId: string) => {
+    const nextProfile = (channels[channelId] || profilesMap[channelId] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile;
+    const saved = loadRotationState()[channelId as ChannelProfile['id']];
     setDraftChannel(channelId);
     setDraftTag(resolveSavedTag(nextProfile, saved?.tag));
     setDraftCategory(resolveSavedCategory(nextProfile, saved?.categoryId));
-    setDraftSceneCount(nextProfile.defaultSceneCount);
+    setDraftSceneCount(simulatorConfig.defaultSceneCount || nextProfile.defaultSceneCount);
   };
 
   const handleTrigger = () => {
@@ -189,7 +210,7 @@ export const AgentSimulator: React.FC = () => {
     if (outcome.status !== 'generated' || !outcome.story) return;
 
     const generatedStory = outcome.story;
-    const outcomeProfile = CHANNEL_PROFILES[outcome.selection.channelId];
+    const outcomeProfile = (channels[outcome.selection.channelId] || profilesMap[outcome.selection.channelId] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile;
     setLatestStory(generatedStory);
 
     // Auto-save generated story into the unified Pending Stories Queue so it's tracked in the new tab!
@@ -269,13 +290,23 @@ export const AgentSimulator: React.FC = () => {
               <Bot className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-white text-base">Multi-Channel Content Agent Studio (v3.42 AI Story Engine)</h3>
-                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono">
-                  Active Baseline
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-white text-base">
+                  Multi-Channel Content Agent Studio ({simulatorConfig.versionLabel})
+                </h3>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
+                  {simulatorConfig.baselineTag}
                 </span>
+                <button
+                  onClick={() => setShowSimulatorConfig(true)}
+                  className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 transition-colors cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-medium shadow-sm hover:border-cyan-500/40"
+                  title="Configure Agent Simulator Engine (Baseline, Dialect, Prompts, Scene Count)"
+                >
+                  <Sliders className="w-3 h-3 text-cyan-400" />
+                  <span>Configure Engine</span>
+                </button>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-400 mt-0.5">
                 Idea → duplicate check → discussion chat → AI scene-by-scene Roman Urdu story + Google Flow scripts
               </p>
             </div>
@@ -304,14 +335,28 @@ export const AgentSimulator: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-slate-800 text-xs">
           {/* Channel */}
           <div>
-            <label className="text-slate-400 block mb-1">Active Channel (Q1)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-slate-400 block font-medium">Active Channel (Q1)</label>
+              <button
+                type="button"
+                onClick={() => setShowChannelManager(true)}
+                className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold hover:underline cursor-pointer bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-500/30"
+                title="Manage channels or add a new channel"
+              >
+                <Plus className="w-3 h-3" />
+                <span>+ Channel</span>
+              </button>
+            </div>
             <select
               value={draftChannel}
-              onChange={(e) => handleDraftChannelChange(e.target.value as ChannelProfile['id'])}
+              onChange={(e) => handleDraftChannelChange(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
             >
-              <option value="itcafeteria">1. IT Cafeteria (Waqar Majeed)</option>
-              <option value="beautyhub">2. Beauty Hub (Mehr Zadi)</option>
+              {Object.values(channels).map((ch, idx) => (
+                <option key={ch.id} value={ch.id}>
+                  {idx + 1}. {ch.name} ({ch.presenter})
+                </option>
+              ))}
             </select>
           </div>
 
@@ -498,13 +543,37 @@ export const AgentSimulator: React.FC = () => {
 
       {flowOpen && appliedSelection && (
         <AgentFlowScreen
-          profile={CHANNEL_PROFILES[appliedSelection.channelId]}
+          profile={appliedProfile || CHANNEL_PROFILES.itcafeteria}
           selection={appliedSelection}
           memoryRecords={memoryRecords}
           onClose={() => setFlowOpen(false)}
           onOutcome={handleFlowOutcome}
         />
       )}
+
+      {/* Engine & Baseline Configuration Modal */}
+      <SimulatorConfigModal
+        isOpen={showSimulatorConfig}
+        onClose={() => setShowSimulatorConfig(false)}
+        config={simulatorConfig}
+        onReset={() => setSimulatorConfig(DEFAULT_SIMULATOR_CONFIG)}
+        onSave={(newCfg) => {
+          setSimulatorConfig(newCfg);
+          if (newCfg.defaultSceneCount) {
+            setDraftSceneCount(newCfg.defaultSceneCount);
+          }
+        }}
+      />
+
+      {/* Multi-Channel Manager Modal (+ Add Channel) */}
+      <ChannelManagerModal
+        isOpen={showChannelManager}
+        onClose={() => setShowChannelManager(false)}
+        onChannelsUpdated={() => {
+          const updated = loadAllChannels();
+          setChannels(updated);
+        }}
+      />
     </div>
   );
 };

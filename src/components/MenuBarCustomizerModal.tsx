@@ -1,0 +1,516 @@
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  Lock,
+  Unlock,
+  MoveRight,
+  RotateCcw,
+  Check,
+  AlertTriangle,
+  FolderTree,
+  Edit2,
+  Save,
+  Layers,
+  Sparkles,
+  ShieldCheck,
+  ArrowRight
+} from 'lucide-react';
+import type { TabType } from '../App';
+
+export interface MenuGroupConfig {
+  id: string;
+  label: string;
+  isLocked: boolean;
+}
+
+export interface MenuItemConfig {
+  id: TabType;
+  label: string;
+  groupId: string;
+  isLocked: boolean;
+}
+
+export interface MenuCustomizerState {
+  groups: MenuGroupConfig[];
+  items: MenuItemConfig[];
+}
+
+export const DEFAULT_MENU_STATE: MenuCustomizerState = {
+  groups: [
+    { id: 'core', label: 'Core Channel', isLocked: true },
+    { id: 'automation', label: 'Autopilot & Agents', isLocked: true },
+    { id: 'management', label: 'Management & Queue', isLocked: true },
+    { id: 'ai', label: 'AI Studios', isLocked: true },
+  ],
+  items: [
+    // Core Channel (4)
+    { id: 'analytics', label: 'Channel Diagnostics', groupId: 'core', isLocked: true },
+    { id: 'live', label: 'Live Insights (YouTube + TikTok)', groupId: 'core', isLocked: true },
+    { id: 'signals', label: 'Growth Signals & Anomalies', groupId: 'core', isLocked: true },
+    { id: 'benchmarking', label: 'Competitor Benchmarks', groupId: 'core', isLocked: true },
+
+    // Autopilot & Agents (3)
+    { id: 'autopilot', label: 'Autopilot Coordinator', groupId: 'automation', isLocked: true },
+    { id: 'simulator', label: 'Agent Flow Simulator', groupId: 'automation', isLocked: true },
+    { id: 'community', label: 'Community Polls', groupId: 'automation', isLocked: true },
+
+    // Management & Queue (5)
+    { id: 'pending', label: 'Pending Stories & Target Queue', groupId: 'management', isLocked: true },
+    { id: 'calendar', label: 'Content Calendar', groupId: 'management', isLocked: true },
+    { id: 'duplicates', label: 'Duplicate Checker (58)', groupId: 'management', isLocked: true },
+    { id: 'masterlist', label: 'Master List', groupId: 'management', isLocked: true },
+    { id: 'roadmap', label: 'Upscaling (v3.42+)', groupId: 'management', isLocked: true },
+
+    // AI Studios (7)
+    { id: 'chat', label: 'AI Script Chatbot', groupId: 'ai', isLocked: true },
+    { id: 'search', label: 'Search Grounding', groupId: 'ai', isLocked: true },
+    { id: 'video', label: 'Omni Flash Video', groupId: 'ai', isLocked: true },
+    { id: 'image', label: 'Thumbnails (Nano Banana)', groupId: 'ai', isLocked: true },
+    { id: 'transcribe', label: 'Voice Dictation', groupId: 'ai', isLocked: true },
+    { id: 'music', label: 'Music Generator', groupId: 'ai', isLocked: true },
+    { id: '3d', label: '3D Virtual Studio', groupId: 'ai', isLocked: true },
+  ]
+};
+
+const STORAGE_KEY = 'itcafeteria_menu_customizer_config';
+
+export function loadMenuConfig(): MenuCustomizerState {
+  if (typeof window === 'undefined') return DEFAULT_MENU_STATE;
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed.groups) && Array.isArray(parsed.items)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load menu config', e);
+  }
+  return DEFAULT_MENU_STATE;
+}
+
+export function saveMenuConfig(config: MenuCustomizerState) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.error('Failed to save menu config', e);
+  }
+}
+
+interface MenuBarCustomizerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  config: MenuCustomizerState;
+  onSave: (updated: MenuCustomizerState) => void;
+  onReset: () => void;
+}
+
+export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
+  isOpen,
+  onClose,
+  config,
+  onSave,
+  onReset
+}) => {
+  const [localConfig, setLocalConfig] = useState<MenuCustomizerState>(config);
+  const [selectedItemId, setSelectedItemId] = useState<TabType | null>(null);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingItemId, setEditingItemId] = useState<TabType | null>(null);
+  const [tempLabel, setTempLabel] = useState<string>('');
+  const [lockWarning, setLockWarning] = useState<string | null>(null);
+  const [saveToast, setSaveToast] = useState(false);
+
+  useEffect(() => {
+    setLocalConfig(config);
+  }, [config, isOpen]);
+
+  if (!isOpen) return null;
+
+  // Toggle Lock for a Group
+  const toggleGroupLock = (groupId: string) => {
+    setLocalConfig((prev) => ({
+      ...prev,
+      groups: prev.groups.map((g) => (g.id === groupId ? { ...g, isLocked: !g.isLocked } : g))
+    }));
+  };
+
+  // Toggle Lock for an Item
+  const toggleItemLock = (itemId: TabType) => {
+    setLocalConfig((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => (item.id === itemId ? { ...item, isLocked: !item.isLocked } : item))
+    }));
+  };
+
+  // Move an item to a new group (Ensures STRICT NO-DUPLICATES: moved cleanly!)
+  const handleMoveItem = (itemId: TabType, targetGroupId: string) => {
+    const item = localConfig.items.find((i) => i.id === itemId);
+    if (!item) return;
+
+    if (item.isLocked) {
+      setLockWarning(
+        `"${item.label}" is waqt LOCKED hai! Ghalti se move hone se bachane ke liye isay pehle unlock karein.`
+      );
+      return;
+    }
+
+    const currentGroup = localConfig.groups.find((g) => g.id === item.groupId);
+    if (currentGroup?.isLocked) {
+      setLockWarning(
+        `Parent Menu "${currentGroup.label}" is waqt LOCKED hai! Pehle parent menu ko unlock karein.`
+      );
+      return;
+    }
+
+    const targetGroup = localConfig.groups.find((g) => g.id === targetGroupId);
+    if (targetGroup?.isLocked) {
+      setLockWarning(
+        `Destination Menu "${targetGroup.label}" is waqt LOCKED hai! Pehle destination menu ko unlock karein.`
+      );
+      return;
+    }
+
+    setLockWarning(null);
+
+    // Update assignment (item stays unique across the whole app)
+    setLocalConfig((prev) => ({
+      ...prev,
+      items: prev.items.map((i) => (i.id === itemId ? { ...i, groupId: targetGroupId } : i))
+    }));
+  };
+
+  // Start renaming a group
+  const startEditGroup = (group: MenuGroupConfig) => {
+    if (group.isLocked) {
+      setLockWarning(`"${group.label}" locked hai. Rename karne ke liye pehle unlock karein.`);
+      return;
+    }
+    setLockWarning(null);
+    setEditingGroupId(group.id);
+    setTempLabel(group.label);
+  };
+
+  const saveEditGroup = (groupId: string) => {
+    if (!tempLabel.trim()) return;
+    setLocalConfig((prev) => ({
+      ...prev,
+      groups: prev.groups.map((g) => (g.id === groupId ? { ...g, label: tempLabel.trim() } : g))
+    }));
+    setEditingGroupId(null);
+    setTempLabel('');
+  };
+
+  // Start renaming an item
+  const startEditItem = (item: MenuItemConfig) => {
+    if (item.isLocked) {
+      setLockWarning(`"${item.label}" locked hai. Rename karne ke liye pehle unlock karein.`);
+      return;
+    }
+    setLockWarning(null);
+    setEditingItemId(item.id);
+    setTempLabel(item.label);
+  };
+
+  const saveEditItem = (itemId: TabType) => {
+    if (!tempLabel.trim()) return;
+    setLocalConfig((prev) => ({
+      ...prev,
+      items: prev.items.map((i) => (i.id === itemId ? { ...i, label: tempLabel.trim() } : i))
+    }));
+    setEditingItemId(null);
+    setTempLabel('');
+  };
+
+  // Unlock item on warning prompt
+  const unlockItemFromWarning = () => {
+    if (selectedItemId) {
+      toggleItemLock(selectedItemId);
+      setLockWarning(null);
+    }
+  };
+
+  const handleApply = () => {
+    saveMenuConfig(localConfig);
+    onSave(localConfig);
+    setSaveToast(true);
+    setTimeout(() => {
+      setSaveToast(false);
+      onClose();
+    }, 600);
+  };
+
+  const handleResetDefaults = () => {
+    if (window.confirm('Kya aap menu bar ko default settings par reset karna chahte hain?')) {
+      onReset();
+      setLocalConfig(DEFAULT_MENU_STATE);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden text-slate-100">
+        {/* Header */}
+        <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-cyan-500/20 text-cyan-400 rounded-xl border border-cyan-500/30">
+              <FolderTree className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-white text-base">Menu Bar Handler & Customizer</h3>
+                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-mono">
+                  WordPress Style
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Menus ko rename karein, sub-menu items ko shift/move karein, aur ghalti se bachne ke liye Lock/Unlock karein.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Lock Warning Toast / Notice */}
+        {lockWarning && (
+          <div className="mx-5 mt-4 p-3 bg-rose-950/80 border border-rose-500/60 rounded-xl text-xs text-rose-200 flex items-start justify-between gap-3 shadow-lg shadow-rose-950/40 animate-in fade-in duration-150">
+            <div className="flex items-start gap-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-rose-300">Action Blocked (Protection Active):</p>
+                <p className="text-slate-300 mt-0.5">{lockWarning}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {selectedItemId && (
+                <button
+                  onClick={unlockItemFromWarning}
+                  className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <Unlock className="w-3 h-3" />
+                  Unlock Karein
+                </button>
+              )}
+              <button
+                onClick={() => setLockWarning(null)}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Content Body — Interactive Grid of 4 Menu Categories */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {localConfig.groups.map((group) => {
+              const groupItems = localConfig.items.filter((i) => i.groupId === group.id);
+
+              return (
+                <div
+                  key={group.id}
+                  className={`border rounded-2xl p-4 flex flex-col transition-all ${
+                    group.isLocked
+                      ? 'bg-slate-950/70 border-slate-800 shadow-md'
+                      : 'bg-slate-900/90 border-cyan-500/40 shadow-lg shadow-cyan-950/30'
+                  }`}
+                >
+                  {/* Category Header with Lock & Rename */}
+                  <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="p-1 rounded-lg bg-slate-800 text-cyan-400">
+                        <Layers className="w-4 h-4" />
+                      </span>
+
+                      {editingGroupId === group.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={tempLabel}
+                            onChange={(e) => setTempLabel(e.target.value)}
+                            className="bg-slate-800 border border-cyan-400 text-white rounded-lg px-2 py-0.5 text-xs font-semibold focus:outline-none"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => saveEditGroup(group.id)}
+                            className="p-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white text-[10px]"
+                          >
+                            <Save className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 truncate">
+                          <h4 className="font-bold text-sm text-white truncate">{group.label}</h4>
+                          <button
+                            onClick={() => startEditGroup(group)}
+                            className="p-1 text-slate-400 hover:text-cyan-300 transition-colors"
+                            title="Rename Menu"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                        {groupItems.length} items
+                      </span>
+
+                      <button
+                        onClick={() => toggleGroupLock(group.id)}
+                        className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer flex items-center gap-1 ${
+                          group.isLocked
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+                            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                        }`}
+                        title={group.isLocked ? 'Menu Locked (Click to Unlock)' : 'Menu Unlocked (Click to Lock)'}
+                      >
+                        {group.isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Items in this Menu */}
+                  <div className="mt-3 space-y-2 flex-1">
+                    {groupItems.length === 0 ? (
+                      <div className="p-4 border border-dashed border-slate-800 rounded-xl text-center text-xs text-slate-500">
+                        Is menu mein koi item nahi hai. Doosre menu se shift karein.
+                      </div>
+                    ) : (
+                      groupItems.map((item) => {
+                        const isSelected = selectedItemId === item.id;
+
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => setSelectedItemId(item.id)}
+                            className={`p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-cyan-950/60 border-cyan-400 ring-1 ring-cyan-400/40 shadow-md shadow-cyan-950/60'
+                                : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className={`w-2 h-2 rounded-full ${
+                                  item.isLocked ? 'bg-amber-400' : 'bg-emerald-400'
+                                }`}
+                              />
+
+                              {editingItemId === item.id ? (
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="text"
+                                    value={tempLabel}
+                                    onChange={(e) => setTempLabel(e.target.value)}
+                                    className="bg-slate-800 border border-cyan-400 text-white rounded px-2 py-0.5 text-xs font-medium focus:outline-none"
+                                    autoFocus
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      saveEditItem(item.id);
+                                    }}
+                                    className="p-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white"
+                                  >
+                                    <Save className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className="text-xs font-semibold text-slate-200 truncate">
+                                    {item.label}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      startEditItem(item);
+                                    }}
+                                    className="p-0.5 text-slate-400 hover:text-cyan-300"
+                                    title="Rename item"
+                                  >
+                                    <Edit2 className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Item Actions: Lock/Unlock & Shift dropdown */}
+                            <div className="flex items-center gap-1.5 shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => toggleItemLock(item.id)}
+                                className={`p-1 rounded border text-[10px] transition-colors ${
+                                  item.isLocked
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                }`}
+                                title={item.isLocked ? 'Item Locked' : 'Item Unlocked'}
+                              >
+                                {item.isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                              </button>
+
+                              {/* Shift / Move To Destination Menu Selector */}
+                              <select
+                                value={item.groupId}
+                                onChange={(e) => handleMoveItem(item.id, e.target.value)}
+                                className="bg-slate-800 border border-slate-700 hover:border-cyan-500/60 rounded px-2 py-1 text-[11px] text-slate-300 font-medium focus:outline-none focus:border-cyan-400"
+                                title="Move this item to another menu (No Duplicates)"
+                              >
+                                {localConfig.groups.map((g) => (
+                                  <option key={g.id} value={g.id} disabled={g.id === item.groupId}>
+                                    {g.id === item.groupId ? `Current: ${g.label}` : `Move ➔ ${g.label}`}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Footer with Reset and Save Controls */}
+        <div className="px-5 py-4 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>
+              <strong>Zero Duplicate Rule:</strong> Har option sirf ek hi menu ke andar rehti hai. Move karne par previous menu se shift ho jati hai.
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+            <button
+              onClick={handleResetDefaults}
+              className="px-3.5 py-2 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset Defaults
+            </button>
+
+            <button
+              onClick={handleApply}
+              className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-cyan-950/60 transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <Check className="w-4 h-4" />
+              {saveToast ? 'Saved!' : 'Save & Lock Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

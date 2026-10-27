@@ -606,7 +606,7 @@ export interface ChannelDurationOption {
 }
 
 export interface ChannelProfile {
-  id: "itcafeteria" | "beautyhub";
+  id: "itcafeteria" | "beautyhub" | string;
   name: string;
   presenter: string;
   niche: string;

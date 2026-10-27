@@ -38,7 +38,8 @@ import {
   RotateCcw,
   Upload,
   Clock,
-  ArrowUp
+  ArrowUp,
+  FolderTree
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -69,6 +70,12 @@ import {
   DEFAULT_THEME_CONFIG,
   ACCENT_COLORS
 } from './components/ThemeCustomizerModal';
+import {
+  MenuBarCustomizerModal,
+  loadMenuConfig,
+  DEFAULT_MENU_STATE,
+  type MenuCustomizerState
+} from './components/MenuBarCustomizerModal';
 
 type TabType = 
   | 'analytics'
@@ -121,7 +128,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>(launch.tab);
   const [oauthNotice, setOauthNotice] = useState<OAuthNotice | null>(launch.notice);
   const [showDictionary, setShowDictionary] = useState(false);
-  const [openMenu, setOpenMenu] = useState<'core' | 'automation' | 'management' | 'ai' | null>(null);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLiveActive, setIsLiveActive] = useState(false);
   const navRef = useRef<HTMLDivElement>(null);
@@ -163,6 +170,10 @@ export default function App() {
     return DEFAULT_THEME_CONFIG;
   });
   const [showThemeCustomizer, setShowThemeCustomizer] = useState(false);
+
+  // Menu Bar Customizer Configuration State (WordPress Style Menu Manager)
+  const [menuConfig, setMenuConfig] = useState<MenuCustomizerState>(loadMenuConfig);
+  const [showMenuCustomizer, setShowMenuCustomizer] = useState(false);
 
   // Holographic background theme & animation states
   const [holoTheme, setHoloTheme] = useState<HolographicTheme>(() => {
@@ -358,9 +369,24 @@ export default function App() {
     };
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
+
+    const openDictHandler = () => setShowDictionary(true);
+    const openCustomizerHandler = () => setShowThemeCustomizer(true);
+    const openBannerHandler = () => setShowBannerModal(true);
+    const openMenuCustomizerHandler = () => setShowMenuCustomizer(true);
+
+    window.addEventListener('itcafeteria_open_dictionary', openDictHandler);
+    window.addEventListener('itcafeteria_open_theme_customizer', openCustomizerHandler);
+    window.addEventListener('itcafeteria_open_banner_modal', openBannerHandler);
+    window.addEventListener('itcafeteria_open_menu_customizer', openMenuCustomizerHandler);
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('itcafeteria_open_dictionary', openDictHandler);
+      window.removeEventListener('itcafeteria_open_theme_customizer', openCustomizerHandler);
+      window.removeEventListener('itcafeteria_open_banner_modal', openBannerHandler);
+      window.removeEventListener('itcafeteria_open_menu_customizer', openMenuCustomizerHandler);
     };
   }, []);
 
@@ -452,43 +478,54 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  type TabGroup = 'core' | 'automation' | 'management' | 'ai';
+  type TabGroup = string;
 
-  const tabs: { id: TabType; label: string; icon: React.ReactNode; group: TabGroup }[] = [
-    // 1. Core Channel Tabs (4)
-    { id: 'analytics', label: 'Channel Diagnostics', icon: <BarChart3 className="w-4 h-4 text-cyan-400" />, group: 'core' },
-    { id: 'live', label: 'Live Insights (YouTube + TikTok)', icon: <Activity className="w-4 h-4 text-emerald-400" />, group: 'core' },
-    { id: 'signals', label: 'Growth Signals & Anomalies', icon: <Rocket className="w-4 h-4 text-amber-400" />, group: 'core' },
-    { id: 'benchmarking', label: 'Competitor Benchmarks', icon: <Users className="w-4 h-4 text-indigo-400" />, group: 'core' },
+  const TAB_ICONS: Record<TabType, React.ReactNode> = {
+    analytics: <BarChart3 className="w-4 h-4 text-cyan-400" />,
+    live: <Activity className="w-4 h-4 text-emerald-400" />,
+    signals: <Rocket className="w-4 h-4 text-amber-400" />,
+    benchmarking: <Users className="w-4 h-4 text-indigo-400" />,
+    autopilot: <Cpu className="w-4 h-4 text-emerald-400" />,
+    simulator: <Bot className="w-4 h-4 text-cyan-400" />,
+    community: <Vote className="w-4 h-4 text-rose-400" />,
+    pending: <Clock className="w-4 h-4 text-amber-400" />,
+    calendar: <CalendarIcon className="w-4 h-4 text-cyan-400" />,
+    duplicates: <ShieldAlert className="w-4 h-4 text-rose-400" />,
+    masterlist: <ListTodo className="w-4 h-4 text-slate-300" />,
+    roadmap: <Rocket className="w-4 h-4 text-purple-400" />,
+    chat: <MessageSquare className="w-4 h-4 text-cyan-300" />,
+    search: <Globe2 className="w-4 h-4 text-emerald-300" />,
+    video: <Video className="w-4 h-4 text-blue-400" />,
+    image: <ImageIcon className="w-4 h-4 text-amber-400" />,
+    transcribe: <Mic className="w-4 h-4 text-fuchsia-400" />,
+    music: <Music className="w-4 h-4 text-pink-400" />,
+    '3d': <Box className="w-4 h-4 text-violet-400" />
+  };
 
-    // 2. Autopilot & Agents (3)
-    { id: 'autopilot', label: 'Autopilot Coordinator', icon: <Cpu className="w-4 h-4 text-emerald-400" />, group: 'automation' },
-    { id: 'simulator', label: 'Agent Flow Simulator', icon: <Bot className="w-4 h-4 text-cyan-400" />, group: 'automation' },
-    { id: 'community', label: 'Community Polls', icon: <Vote className="w-4 h-4 text-rose-400" />, group: 'automation' },
+  const GROUP_ICONS: Record<string, React.ReactNode> = {
+    core: <BarChart3 className="w-4 h-4 text-cyan-400" />,
+    automation: <Cpu className="w-4 h-4 text-emerald-400" />,
+    management: <Layers className="w-4 h-4 text-indigo-400" />,
+    ai: <Sparkles className="w-4 h-4 text-amber-400" />
+  };
 
-    // 3. Management & Queue (5)
-    { id: 'pending', label: 'Pending Stories & Target Queue', icon: <Clock className="w-4 h-4 text-amber-400" />, group: 'management' },
-    { id: 'calendar', label: 'Content Calendar', icon: <CalendarIcon className="w-4 h-4 text-cyan-400" />, group: 'management' },
-    { id: 'duplicates', label: 'Duplicate Checker (58)', icon: <ShieldAlert className="w-4 h-4 text-rose-400" />, group: 'management' },
-    { id: 'masterlist', label: 'Master List', icon: <ListTodo className="w-4 h-4 text-slate-300" />, group: 'management' },
-    { id: 'roadmap', label: 'Upscaling (v3.42+)', icon: <Rocket className="w-4 h-4 text-purple-400" />, group: 'management' },
+  // Dynamically generated tabs and groups from Menu Customizer Configuration
+  const tabs = menuConfig.items.map((item) => ({
+    id: item.id,
+    label: item.label,
+    icon: TAB_ICONS[item.id] || <Sparkles className="w-4 h-4" />,
+    group: item.groupId
+  }));
 
-    // 4. AI Studios (7)
-    { id: 'chat', label: 'AI Script Chatbot', icon: <MessageSquare className="w-4 h-4 text-cyan-300" />, group: 'ai' },
-    { id: 'search', label: 'Search Grounding', icon: <Globe2 className="w-4 h-4 text-emerald-300" />, group: 'ai' },
-    { id: 'video', label: 'Omni Flash Video', icon: <Video className="w-4 h-4 text-blue-400" />, group: 'ai' },
-    { id: 'image', label: 'Thumbnails (Nano Banana)', icon: <ImageIcon className="w-4 h-4 text-amber-400" />, group: 'ai' },
-    { id: 'transcribe', label: 'Voice Dictation', icon: <Mic className="w-4 h-4 text-fuchsia-400" />, group: 'ai' },
-    { id: 'music', label: 'Music Generator', icon: <Music className="w-4 h-4 text-pink-400" />, group: 'ai' },
-    { id: '3d', label: '3D Virtual Studio', icon: <Box className="w-4 h-4 text-violet-400" />, group: 'ai' },
-  ];
-
-  const groups: { id: TabGroup; label: string; icon: React.ReactNode; count: number }[] = [
-    { id: 'core', label: 'Core Channel', icon: <BarChart3 className="w-4 h-4 text-cyan-400" />, count: 4 },
-    { id: 'automation', label: 'Autopilot & Agents', icon: <Cpu className="w-4 h-4 text-emerald-400" />, count: 3 },
-    { id: 'management', label: 'Management & Queue', icon: <Layers className="w-4 h-4 text-indigo-400" />, count: 5 },
-    { id: 'ai', label: 'AI Studios', icon: <Sparkles className="w-4 h-4 text-amber-400" />, count: 7 },
-  ];
+  const groups = menuConfig.groups.map((g) => {
+    const count = tabs.filter((t) => t.group === g.id).length;
+    return {
+      id: g.id,
+      label: g.label,
+      icon: GROUP_ICONS[g.id] || <Layers className="w-4 h-4 text-cyan-400" />,
+      count
+    };
+  });
 
   const activeGroup = tabs.find((t) => t.id === activeTab)?.group || 'core';
   const activeTabMeta = tabs.find((t) => t.id === activeTab);
@@ -794,6 +831,16 @@ export default function App() {
                 <span className="font-semibold text-xs sm:text-sm">{activeTabMeta?.label}</span>
               </div>
 
+              {/* Menu Bar Handler / Customizer Button (Right-side corner of menu bar) */}
+              <button
+                onClick={() => setShowMenuCustomizer(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-400 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer transition-all shadow-md group shrink-0"
+                title="Menu Bar Customizer (Rename, Shift/Move Items, Lock/Unlock)"
+              >
+                <FolderTree className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform" />
+                <span className="hidden sm:inline text-xs font-semibold text-slate-200">Menu Settings</span>
+              </button>
+
               {/* Scroll To Top Jump Button when Scrolled */}
               {isScrolled && (
                 <button
@@ -819,9 +866,16 @@ export default function App() {
               <ChevronDown className={`w-3 h-3 transition-transform ${mobileMenuOpen ? 'rotate-180' : ''}`} />
             </button>
             <div className="flex items-center gap-2">
-              <span className="text-cyan-300 font-medium truncate max-w-[45vw] flex items-center gap-1.5">
+              <span className="text-cyan-300 font-medium truncate max-w-[36vw] flex items-center gap-1.5">
                 {activeTabMeta?.icon} {activeTabMeta?.label}
               </span>
+              <button
+                onClick={() => setShowMenuCustomizer(true)}
+                className="p-1 rounded-md bg-slate-900 border border-slate-700 text-cyan-400 hover:text-white cursor-pointer"
+                title="Menu Settings"
+              >
+                <FolderTree className="w-3.5 h-3.5" />
+              </button>
               {isScrolled && (
                 <button
                   onClick={scrollToTop}
@@ -1271,6 +1325,18 @@ export default function App() {
         config={themeConfig}
         onChange={updateThemeConfig}
         onReset={resetThemeConfig}
+      />
+
+      {/* WordPress-style Menu Bar Customizer & Hierarchy Modal */}
+      <MenuBarCustomizerModal
+        isOpen={showMenuCustomizer}
+        onClose={() => setShowMenuCustomizer(false)}
+        config={menuConfig}
+        onSave={(updated) => setMenuConfig(updated)}
+        onReset={() => {
+          setMenuConfig(DEFAULT_MENU_STATE);
+          localStorage.removeItem('itcafeteria_menu_customizer_config');
+        }}
       />
 
       <StudioAssistant

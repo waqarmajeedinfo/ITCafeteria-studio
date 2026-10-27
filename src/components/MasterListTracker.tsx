@@ -21,6 +21,28 @@ interface TaskItem {
 export const MasterListTracker: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'done' | 'pending' | 'input_needed'>('all');
   const [search, setSearch] = useState('');
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.filter) setFilter(e.detail.filter);
+      if (e.detail?.highlightFirstPending) {
+        setFilter('all');
+        const firstPending = masterList.find(t => t.status === 'pending');
+        if (firstPending) {
+          setHighlightedId(firstPending.id);
+          setTimeout(() => {
+            const el = document.getElementById(`task-item-${firstPending.id}`);
+            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 150);
+          // remove highlight after 5 seconds
+          setTimeout(() => setHighlightedId(null), 5000);
+        }
+      }
+    };
+    window.addEventListener('itcafeteria_highlight_masterlist_task', handler);
+    return () => window.removeEventListener('itcafeteria_highlight_masterlist_task', handler);
+  }, []);
 
   const masterList: TaskItem[] = [
     // A. YouTube settings
@@ -159,15 +181,26 @@ export const MasterListTracker: React.FC = () => {
 
       {/* Task List Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredTasks.map((task) => (
-          <div 
-            key={task.id}
-            className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 hover:border-slate-700 transition-colors"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded">
-                {task.section}
-              </span>
+        {filteredTasks.map((task) => {
+          const isHighlighted = highlightedId === task.id;
+          return (
+            <div 
+              key={task.id}
+              id={`task-item-${task.id}`}
+              className={`bg-slate-900 border rounded-xl p-4 space-y-2 transition-all duration-300 ${
+                isHighlighted
+                  ? 'border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-500/20 bg-slate-900/95 scale-[1.02]'
+                  : 'border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
+                  isHighlighted 
+                    ? 'text-cyan-300 bg-cyan-900/60 border-cyan-400' 
+                    : 'text-cyan-400 bg-cyan-950/40 border-cyan-800/40'
+                }`}>
+                  {task.section} {isHighlighted && '⚡ Focused by Voice'}
+                </span>
               <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${
                 task.status === 'done' 
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
@@ -190,7 +223,8 @@ export const MasterListTracker: React.FC = () => {
               {task.details}
             </p>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

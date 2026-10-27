@@ -133,6 +133,361 @@ interface StudioAssistantProps {
   onToggleLive?: (active: boolean) => void;
 }
 
+export interface AutonomousIntentResult {
+  tab?: TabType;
+  label?: string;
+  action?: 'highlight_masterlist_pending' | 'select_autopilot_task' | 'open_dictionary' | 'open_theme_customizer' | 'open_banner_modal' | 'toggle_live';
+  isPendingTaskQuery?: boolean;
+}
+
+export function transliterateUrduToRoman(text: string): string {
+  if (!text) return '';
+  const hasUrdu = /[\u0600-\u06FF]/.test(text);
+  if (!hasUrdu) return text;
+
+  let res = text;
+  const phraseMap: [RegExp, string][] = [
+    [/ایجنٹ\s*س[یے]م[یو]?لیٹر/gi, 'Agent Simulator'],
+    [/ایجنٹ\s*فلو/gi, 'Agent Flow'],
+    [/ایجنٹ/gi, 'Agent'],
+    [/س[یے]م[یو]?لیٹر/gi, 'Simulator'],
+    [/ماسٹر\s*لسٹ/gi, 'Master List'],
+    [/ماسٹرلسٹ/gi, 'Master List'],
+    [/مینیج\s*لسٹ/gi, 'Master List'],
+    [/مینجمنٹ/gi, 'Management'],
+    [/پینڈنگ\s*سٹوریز/gi, 'Pending Stories'],
+    [/پینڈنگ\s*لسٹ/gi, 'Pending List'],
+    [/پینڈنگ\s*ٹاسک/gi, 'Pending Task'],
+    [/پینڈنگ/gi, 'Pending'],
+    [/ٹارگٹ\s*کیو/gi, 'Target Queue'],
+    [/کیو/gi, 'Queue'],
+    [/آٹو\s*پائلٹ/gi, 'Autopilot'],
+    [/آٹوپائلٹ/gi, 'Autopilot'],
+    [/کوآرڈینیٹر/gi, 'Coordinator'],
+    [/ڈپلیکیٹ\s*چیکر/gi, 'Duplicate Checker'],
+    [/ڈپلیکیٹ/gi, 'Duplicate'],
+    [/کنٹینٹ\s*کیلنڈر/gi, 'Content Calendar'],
+    [/کیلنڈر/gi, 'Calendar'],
+    [/شیڈول/gi, 'Schedule'],
+    [/چینل\s*ڈائیگنوسٹکس?/gi, 'Channel Diagnostics'],
+    [/ڈائیگنوسٹکس?/gi, 'Diagnostics'],
+    [/اینالیٹکس/gi, 'Analytics'],
+    [/لائیو\s*انسائٹس?/gi, 'Live Insights'],
+    [/گو\s*لائیو/gi, 'Go Live'],
+    [/گروتھ\s*سگنلز?/gi, 'Growth Signals'],
+    [/سگنلز?/gi, 'Signals'],
+    [/کمپیٹیٹر\s*بینچ\s*مارکس?/gi, 'Competitor Benchmarks'],
+    [/بینچ\s*مارک/gi, 'Benchmarks'],
+    [/کمیونٹی\s*پولز?/gi, 'Community Polls'],
+    [/پولز?/gi, 'Polls'],
+    [/اسکرپٹ\s*چیٹ\s*باٹ/gi, 'AI Script Chatbot'],
+    [/چیٹ\s*باٹ/gi, 'Chatbot'],
+    [/سرچ\s*گراؤنڈنگ/gi, 'Search Grounding'],
+    [/اومنی\s*فلیش\s*ویڈیو/gi, 'Omni Flash Video'],
+    [/اومنی\s*فلیش/gi, 'Omni Flash'],
+    [/ویڈیو\s*اسٹوڈیو/gi, 'Video Studio'],
+    [/تھمب\s*نیل/gi, 'Thumbnail'],
+    [/تھمبنیل/gi, 'Thumbnail'],
+    [/نانو\s*بنانا/gi, 'Nano Banana'],
+    [/امیج\s*ٹول/gi, 'Image Tool'],
+    [/وائس\s*ڈکٹیشن/gi, 'Voice Dictation'],
+    [/ڈکٹیشن/gi, 'Dictation'],
+    [/ٹرانسکرائب/gi, 'Transcribe'],
+    [/میوزک\s*جنریٹر/gi, 'Music Generator'],
+    [/میوزک/gi, 'Music'],
+    [/ورچوئل\s*اسٹوڈیو/gi, '3D Virtual Studio'],
+    [/تھری\s*ڈی\s*اسٹوڈیو/gi, '3D Studio'],
+    [/تھری\s*ڈی/gi, '3D'],
+    [/اپ\s*سکیلنگ/gi, 'Upscaling'],
+    [/روڈ\s*میپ/gi, 'Roadmap'],
+    [/فنیٹک\s*رولز/gi, 'Phonetic Rules'],
+    [/فنیٹک\s*ڈکشنری/gi, 'Phonetic Dictionary'],
+    [/ڈکشنری/gi, 'Dictionary'],
+    [/تھیم\s*کسٹمائزر?/gi, 'Theme Customizer'],
+    [/تھیم\s*سیٹنگ/gi, 'Theme Setting'],
+    [/بینر\s*ایڈٹ/gi, 'Edit Banner'],
+    [/اوپن\s*کرو/gi, 'open karo'],
+    [/اوپن/gi, 'open'],
+    [/کھولو/gi, 'kholo'],
+    [/دکھاؤ/gi, 'dikhao'],
+    [/دیکھاؤ/gi, 'dikhao'],
+    [/بند\s*کرو/gi, 'band karo'],
+    [/چلاؤ/gi, 'chalao'],
+    [/بناؤ/gi, 'banao'],
+    [/کر\s*دو/gi, 'kar do'],
+    [/کیا\s*حال\s*ہے/gi, 'kya haal hai'],
+    [/کیسے\s*ہو/gi, 'kaise ho'],
+    [/سلام/gi, 'Salam'],
+    [/السلام\s*علیکم/gi, 'Asalam-u-Alikum'],
+    [/شکریہ/gi, 'shukriya'],
+    [/پہلا/gi, 'pehla'],
+    [/سب\s*سے\s*پہلا/gi, 'sab se pehla'],
+    [/دوسرا/gi, 'doosra'],
+    [/تیسرا/gi, 'teesra'],
+    [/چینل/gi, 'Channel']
+  ];
+
+  for (const [pattern, repl] of phraseMap) {
+    res = res.replace(pattern, repl);
+  }
+
+  // Letter by letter fallback transliteration for remaining Arabic/Urdu unicode characters
+  if (/[\u0600-\u06FF]/.test(res)) {
+    const charMap: Record<string, string> = {
+      'ا': 'a', 'آ': 'aa', 'ب': 'b', 'پ': 'p', 'ت': 't', 'ٹ': 't',
+      'ث': 's', 'ج': 'j', 'چ': 'ch', 'ح': 'h', 'خ': 'kh', 'د': 'd',
+      'ڈ': 'd', 'ذ': 'z', 'ر': 'r', 'ڑ': 'r', 'ز': 'z', 'ژ': 'zh',
+      'س': 's', 'ش': 'sh', 'ص': 's', 'ض': 'z', 'ط': 't', 'ظ': 'z',
+      'ع': 'a', 'غ': 'gh', 'ف': 'f', 'ق': 'q', 'ک': 'k', 'گ': 'g',
+      'ل': 'l', 'م': 'm', 'ن': 'n', 'ں': 'n', 'و': 'o', 'ہ': 'h',
+      'ھ': 'h', 'ء': '', 'ی': 'i', 'ے': 'e', 'ۂ': 'h', 'ۃ': 't',
+      '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5',
+      '۶': '6', '۷': '7', '۸': '8', '۹': '9', '؟': '?', '،': ',',
+      '؛': ';', '۔': '.'
+    };
+    let transliterated = '';
+    for (const ch of res) {
+      transliterated += charMap[ch] !== undefined ? charMap[ch] : ch;
+    }
+    res = transliterated;
+  }
+
+  return res.replace(/\s+/g, ' ').trim();
+}
+
+export function detectAutonomousVoiceIntent(rawQuery: string): AutonomousIntentResult | null {
+  const normalized = transliterateUrduToRoman(rawQuery).toLowerCase();
+
+  // 1. Simulator & Agents
+  if (
+    normalized.includes('simulator') ||
+    normalized.includes('agent flow') ||
+    normalized.includes('agent simulator') ||
+    normalized.includes('agent open') ||
+    normalized.includes('agent kholo') ||
+    normalized.includes('agent dikhao')
+  ) {
+    return { tab: 'simulator', label: 'Agent Flow Simulator' };
+  }
+
+  // 2. Master List Tracker
+  if (
+    normalized.includes('master list') ||
+    normalized.includes('masterlist') ||
+    normalized.includes('manage list') ||
+    normalized.includes('management list') ||
+    (normalized.includes('management') && normalized.includes('list'))
+  ) {
+    const isPending =
+      normalized.includes('pending') ||
+      normalized.includes('task') ||
+      normalized.includes('pehla') ||
+      normalized.includes('urdu') ||
+      normalized.includes('setting');
+    return {
+      tab: 'masterlist',
+      label: 'Master List Tracker',
+      action: isPending ? 'highlight_masterlist_pending' : undefined,
+      isPendingTaskQuery: isPending
+    };
+  }
+
+  // 3. Thumbnail & Image Tool (Nano Banana)
+  if (
+    normalized.includes('thumbnail') ||
+    normalized.includes('nano banana') ||
+    normalized.includes('image tool') ||
+    normalized.includes('poster') ||
+    normalized.includes('banner image') ||
+    normalized.includes('image creation')
+  ) {
+    return { tab: 'image', label: 'Thumbnails (Nano Banana)' };
+  }
+
+  // 4. Pending Stories & Target Queue
+  if (
+    (normalized.includes('pending') && (normalized.includes('queue') || normalized.includes('stories') || normalized.includes('target') || normalized.includes('list') || normalized.includes('kholo'))) ||
+    normalized.includes('target queue') ||
+    normalized.includes('pending stories') ||
+    normalized.includes('backlog')
+  ) {
+    return { tab: 'pending', label: 'Pending Stories & Target Queue' };
+  }
+
+  // 5. Autopilot Coordinator
+  if (
+    normalized.includes('autopilot coordinator') ||
+    normalized.includes('coordinator') ||
+    normalized.includes('autopilot manager') ||
+    (normalized.includes('autopilot') && !normalized.includes('short bana'))
+  ) {
+    return {
+      tab: 'autopilot',
+      label: 'Autopilot Coordinator',
+      action: 'select_autopilot_task'
+    };
+  }
+
+  // 6. Duplicate Checker (58 Catalog)
+  if (
+    normalized.includes('duplicate') ||
+    normalized.includes('58 video') ||
+    normalized.includes('catalog 58') ||
+    normalized.includes('copy check')
+  ) {
+    return { tab: 'duplicates', label: 'Duplicate Checker (58)' };
+  }
+
+  // 7. Content Calendar
+  if (
+    normalized.includes('calendar') ||
+    normalized.includes('content calendar') ||
+    normalized.includes('schedule') ||
+    normalized.includes('slot') ||
+    normalized.includes('aaj ki post')
+  ) {
+    return { tab: 'calendar', label: 'Content Calendar' };
+  }
+
+  // 8. Channel Diagnostics & Stats
+  if (
+    normalized.includes('diagnostic') ||
+    normalized.includes('channel health') ||
+    normalized.includes('analytics') ||
+    normalized.includes('views') ||
+    normalized.includes('stats')
+  ) {
+    return { tab: 'analytics', label: 'Channel Diagnostics' };
+  }
+
+  // 9. Live Insights
+  if (
+    normalized.includes('live insight') ||
+    normalized.includes('tiktok') ||
+    normalized.includes('youtube live') ||
+    normalized.includes('stream insight')
+  ) {
+    return { tab: 'live', label: 'Live Insights' };
+  }
+
+  // 10. Growth Signals & Anomalies
+  if (
+    normalized.includes('signals') ||
+    normalized.includes('growth') ||
+    normalized.includes('anomal') ||
+    normalized.includes('viral alert')
+  ) {
+    return { tab: 'signals', label: 'Growth Signals & Anomalies' };
+  }
+
+  // 11. AI Script Chatbot
+  if (
+    normalized.includes('chatbot') ||
+    normalized.includes('script generator') ||
+    normalized.includes('chat studio') ||
+    normalized.includes('script bot')
+  ) {
+    return { tab: 'chat', label: 'AI Script Chatbot' };
+  }
+
+  // 12. Search Grounding Engine
+  if (
+    normalized.includes('search grounding') ||
+    normalized.includes('grounding') ||
+    (normalized.includes('search') && normalized.includes('tool'))
+  ) {
+    return { tab: 'search', label: 'Search Grounding Engine' };
+  }
+
+  // 13. Omni Flash Video
+  if (
+    normalized.includes('omni flash') ||
+    normalized.includes('video studio') ||
+    normalized.includes('omni video')
+  ) {
+    return { tab: 'video', label: 'Omni Flash Video' };
+  }
+
+  // 14. Voice Dictation
+  if (
+    normalized.includes('dictation') ||
+    normalized.includes('transcribe') ||
+    normalized.includes('voice dictation') ||
+    normalized.includes('speech to text')
+  ) {
+    return { tab: 'transcribe', label: 'Voice Dictation' };
+  }
+
+  // 15. Music Generator
+  if (
+    normalized.includes('music') ||
+    normalized.includes('soundtrack') ||
+    normalized.includes('bg music') ||
+    normalized.includes('audio generator')
+  ) {
+    return { tab: 'music', label: 'Music Generator' };
+  }
+
+  // 16. 3D Virtual Studio
+  if (
+    normalized.includes('3d') ||
+    normalized.includes('virtual studio') ||
+    normalized.includes('virtual set')
+  ) {
+    return { tab: '3d', label: '3D Virtual Studio' };
+  }
+
+  // 17. Upscaling Roadmap
+  if (
+    normalized.includes('roadmap') ||
+    normalized.includes('upscaling') ||
+    normalized.includes('v3.42')
+  ) {
+    return { tab: 'roadmap', label: 'Upscaling Roadmap' };
+  }
+
+  // 18. Competitor Benchmarks
+  if (
+    normalized.includes('competitor') ||
+    normalized.includes('benchmark') ||
+    normalized.includes('rival channel')
+  ) {
+    return { tab: 'benchmarking', label: 'Competitor Benchmarks' };
+  }
+
+  // 19. Community Polls
+  if (
+    normalized.includes('community') ||
+    normalized.includes('poll') ||
+    normalized.includes('vote')
+  ) {
+    return { tab: 'community', label: 'Community Polls' };
+  }
+
+  // Modals & Action Controls
+  if (
+    normalized.includes('dictionary') ||
+    normalized.includes('phonetic') ||
+    normalized.includes('rules dictionary')
+  ) {
+    return { label: 'Phonetic Rules Dictionary', action: 'open_dictionary' };
+  }
+
+  if (
+    normalized.includes('theme') && (normalized.includes('custom') || normalized.includes('setting') || normalized.includes('kholo') || normalized.includes('open'))
+  ) {
+    return { label: 'Theme Customizer', action: 'open_theme_customizer' };
+  }
+
+  if (
+    normalized.includes('banner') && (normalized.includes('edit') || normalized.includes('setting') || normalized.includes('kholo') || normalized.includes('change'))
+  ) {
+    return { label: 'Edit Banner', action: 'open_banner_modal' };
+  }
+
+  return null;
+}
+
 const DEFAULT_VOICE_PERSONA =
   'He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. Native Lahore / Punjab cadence. Friendly tech YouTuber persona. No word or syllable is repeated.';
 
@@ -220,6 +575,14 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
   const micStreamRef = useRef<MediaStream | null>(null);
   const isLiveActiveRef = useRef(isLiveActive);
   isLiveActiveRef.current = isLiveActive;
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
+  const isListeningPausedRef = useRef(isListeningPaused);
+  isListeningPausedRef.current = isListeningPaused;
+  const navigatedTabRef = useRef<string>(currentTab);
+  navigatedTabRef.current = currentTab;
+  const [instantNavNotice, setInstantNavNotice] = useState<string | null>(null);
+
   const isAiProcessingOrSpeakingRef = useRef<boolean>(false);
   const startHandsFreeListeningRef = useRef<() => void>(() => {});
   const stopHandsFreeListeningRef = useRef<() => void>(() => {});
@@ -231,16 +594,14 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, liveInterimText, isLoading, isOpen]);
 
-  // Sync external isLiveActive prop (from top header)
-  // CRITICAL: Do NOT force open the large chat drawer (setIsOpen(true))!
-  // Instead, start hands-free voice co-pilot with floating upper HUD.
+  // Synchronize continuous hands-free listening whenever drawer is open or live mode is active
   useEffect(() => {
-    if (isLiveActive) {
+    if ((isOpen || isLiveActive) && !isListeningPaused) {
       startHandsFreeListeningRef.current?.();
-    } else {
+    } else if (!isOpen && !isLiveActive) {
       stopHandsFreeListeningRef.current?.();
     }
-  }, [isLiveActive]);
+  }, [isOpen, isLiveActive, isListeningPaused]);
 
   useEffect(() => {
     try {
@@ -321,8 +682,8 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
         setIsSpeakingAudio(false);
         isAiProcessingOrSpeakingRef.current = false;
         setVadState('idle');
-        if (isLiveActiveRef.current) {
-          setTimeout(() => startHandsFreeListeningRef.current?.(), 300);
+        if ((isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current) {
+          setTimeout(() => startHandsFreeListeningRef.current?.(), 200);
         }
         return;
       }
@@ -339,8 +700,8 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       if (!cleanText) {
         isAiProcessingOrSpeakingRef.current = false;
         setVadState('idle');
-        if (isLiveActiveRef.current) {
-          setTimeout(() => startHandsFreeListeningRef.current?.(), 300);
+        if ((isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current) {
+          setTimeout(() => startHandsFreeListeningRef.current?.(), 200);
         }
         return;
       }
@@ -371,11 +732,11 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
               isAiProcessingOrSpeakingRef.current = false;
               currentAudioRef.current = null;
               setVadState('idle');
-              // Automatically resume listening hands-free for user's next turn (Gemini Flow)
-              if (isLiveActiveRef.current) {
+              // Automatically resume listening hands-free for user's next turn continuously
+              if ((isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current) {
                 setTimeout(() => {
                   startHandsFreeListeningRef.current?.();
-                }, 300);
+                }, 200);
               }
             };
 
@@ -384,10 +745,10 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
               isAiProcessingOrSpeakingRef.current = false;
               currentAudioRef.current = null;
               setVadState('idle');
-              if (isLiveActiveRef.current) {
+              if ((isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current) {
                 setTimeout(() => {
                   startHandsFreeListeningRef.current?.();
-                }, 300);
+                }, 200);
               }
             };
 
@@ -417,10 +778,10 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
           setIsSpeakingAudio(false);
           isAiProcessingOrSpeakingRef.current = false;
           setVadState('idle');
-          if (isLiveActiveRef.current) {
+          if ((isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current) {
             setTimeout(() => {
               startHandsFreeListeningRef.current?.();
-            }, 300);
+            }, 200);
           }
         };
         window.speechSynthesis.speak(utterance);
@@ -428,10 +789,10 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
         setIsSpeakingAudio(false);
         isAiProcessingOrSpeakingRef.current = false;
         setVadState('idle');
-        if (isLiveActiveRef.current) {
+        if ((isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current) {
           setTimeout(() => {
             startHandsFreeListeningRef.current?.();
-          }, 300);
+          }, 200);
         }
       }
     },
@@ -805,73 +1166,149 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       return;
     }
 
-    // 4. Voice Navigation Commands — Physical Screen Tab Switching
-    let navigatedTab: TabType | null = null;
-    let navLabel = '';
+    // 4. Autonomous Voice Navigation & Menu Commands (0ms Instant Synchronization)
+    const voiceIntent = detectAutonomousVoiceIntent(trimmed);
 
-    if (lower.includes('calendar') || lower.includes('schedule') || lower.includes('slot') || lower.includes('aaj ki post')) {
-      navigatedTab = 'calendar';
-      navLabel = 'Content Calendar';
-    } else if (lower.includes('diagnostic') || lower.includes('channel health') || lower.includes('analytics') || lower.includes('views') || lower.includes('stats')) {
-      navigatedTab = 'analytics';
-      navLabel = 'Channel Diagnostics';
-    } else if (lower.includes('autopilot manager') || lower.includes('task queue') || lower.includes('coordinator')) {
-      navigatedTab = 'autopilot';
-      navLabel = 'Autopilot Coordinator';
-    } else if (lower.includes('live insight') || lower.includes('tiktok') || lower.includes('youtube live')) {
-      navigatedTab = 'live';
-      navLabel = 'Live Insights';
-    } else if (lower.includes('signals') || lower.includes('growth') || lower.includes('viral') || lower.includes('anomal')) {
-      navigatedTab = 'signals';
-      navLabel = 'Growth Signals & Anomalies';
-    } else if (lower.includes('thumbnail') || lower.includes('nano banana') || lower.includes('poster') || lower.includes('image')) {
-      navigatedTab = 'image';
-      navLabel = 'Thumbnail Studio';
-    } else if (lower.includes('duplicate') || lower.includes('58 video') || lower.includes('copy check')) {
-      navigatedTab = 'duplicates';
-      navLabel = 'Duplicate Checker (58)';
-    } else if (lower.includes('master list') || lower.includes('masterlist') || lower.includes('tracker')) {
-      navigatedTab = 'masterlist';
-      navLabel = 'Master List Tracker';
-    } else if (lower.includes('script generator') || lower.includes('chat studio') || lower.includes('chatbot kholo')) {
-      navigatedTab = 'chat';
-      navLabel = 'AI Script Chatbot';
-    } else if (lower.includes('competitor') || lower.includes('benchmark')) {
-      navigatedTab = 'benchmarking';
-      navLabel = 'Competitor Benchmarks';
-    } else if (lower.includes('community') || lower.includes('poll')) {
-      navigatedTab = 'community';
-      navLabel = 'Community Polls';
-    } else if (lower.includes('simulator') || lower.includes('agent flow')) {
-      navigatedTab = 'simulator';
-      navLabel = 'Agent Flow Simulator';
-    } else if (lower.includes('video studio') || lower.includes('omni flash')) {
-      navigatedTab = 'video';
-      navLabel = 'Omni Flash Video';
-    } else if (lower.includes('dictation') || lower.includes('transcribe')) {
-      navigatedTab = 'transcribe';
-      navLabel = 'Voice Dictation';
-    } else if (lower.includes('music') || lower.includes('soundtrack')) {
-      navigatedTab = 'music';
-      navLabel = 'Music Generator';
-    } else if (lower.includes('3d') || lower.includes('virtual studio')) {
-      navigatedTab = '3d';
-      navLabel = '3D Virtual Studio';
-    } else if (lower.includes('roadmap') || lower.includes('upscaling')) {
-      navigatedTab = 'roadmap';
-      navLabel = 'Upscaling Roadmap';
+    if (voiceIntent) {
+      if (voiceIntent.tab) {
+        onNavigate(voiceIntent.tab);
+        navigatedTabRef.current = voiceIntent.tab;
+        setInstantNavNotice(`⚡ 0ms Voice Nav: Switched to ${voiceIntent.label}`);
+        setTimeout(() => setInstantNavNotice(null), 3500);
+      }
+
+      // Special action: Master List with pending task focus
+      if (voiceIntent.tab === 'masterlist') {
+        setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent('itcafeteria_highlight_masterlist_task', {
+              detail: { highlightFirstPending: true }
+            })
+          );
+        }, 150);
+
+        const masterReply = `${operator.honorific}! Screen par Master List Tracker 0ms mein open kar diya hai aur Section A ka pehla pending task "Default video language set to Urdu" highlight kar diya hai.\n\nYeh task YouTube Studio Settings > Upload defaults > Advanced settings mein video language ko Urdu set karne ke liye hai taake global Hindi/Urdu search audience maximize ho sake. Agla hukm karein!`;
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            text: masterReply,
+            card: {
+              type: 'action_done',
+              title: 'Master List: Default video language set to Urdu (Pending)',
+              nextStepText: 'YouTube Studio settings mein ja kar Urdu language set karein.',
+              targetTab: 'masterlist'
+            }
+          }
+        ]);
+
+        await speakNaturalUrdu(masterReply);
+        setIsLoading(false);
+        return;
+      }
+
+      // Special action: Agent Simulator
+      if (voiceIntent.tab === 'simulator') {
+        const simReply = `Ji ${operator.honorific}! Screen par Agent Flow Simulator 0ms latency ke sath open ho gaya hai. CPU bilkul chill hai, agla script test run karne ke liye tayar hoon!`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            text: simReply,
+            card: {
+              type: 'action_done',
+              title: 'Agent Flow Simulator Active',
+              nextStepText: 'Simulator flow step test karein!',
+              targetTab: 'simulator'
+            }
+          }
+        ]);
+        await speakNaturalUrdu(simReply);
+        setIsLoading(false);
+        return;
+      }
+
+      // Special action: Thumbnail Studio (Nano Banana)
+      if (voiceIntent.tab === 'image') {
+        const imgReply = `Ji ${operator.honorific}! Thumbnails (Nano Banana) studio screen par khol diya hai. Master headline aur 3D hologram prompt engine tayar hai!`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            text: imgReply,
+            card: {
+              type: 'action_done',
+              title: 'Thumbnails (Nano Banana) Ready',
+              nextStepText: 'Thumbnail generate karein!',
+              targetTab: 'image'
+            }
+          }
+        ]);
+        await speakNaturalUrdu(imgReply);
+        setIsLoading(false);
+        return;
+      }
+
+      // Modals & Action Controls
+      if (voiceIntent.action === 'open_dictionary') {
+        window.dispatchEvent(new CustomEvent('itcafeteria_open_dictionary', { detail: {} }));
+        const dictReply = `Ji ${operator.honorific}! Screen par Phonetic Rules Dictionary modal khol diya hai. Yahan YouTube content casing aur rules check kar sakte hain.`;
+        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', text: dictReply }]);
+        await speakNaturalUrdu(dictReply);
+        setIsLoading(false);
+        return;
+      }
+
+      if (voiceIntent.action === 'open_theme_customizer') {
+        window.dispatchEvent(new CustomEvent('itcafeteria_open_theme_customizer', { detail: {} }));
+        const themeReply = `Ji ${operator.honorific}! WordPress-style Theme Customizer modal open kar diya hai. Color palette, holographic mode aur block settings adjust karein.`;
+        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', text: themeReply }]);
+        await speakNaturalUrdu(themeReply);
+        setIsLoading(false);
+        return;
+      }
+
+      if (voiceIntent.action === 'open_banner_modal') {
+        window.dispatchEvent(new CustomEvent('itcafeteria_open_banner_modal', { detail: {} }));
+        const bannerReply = `Ji ${operator.honorific}! Edit Banner modal open kar diya hai. Yahan se custom banner URL aur height adjust karein.`;
+        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', text: bannerReply }]);
+        await speakNaturalUrdu(bannerReply);
+        setIsLoading(false);
+        return;
+      }
+
+      // Generic tab navigation response
+      if (voiceIntent.tab) {
+        const genericNavReply = `Ji ${operator.honorific}! Screen par foran "${voiceIntent.label}" open kar diya hai. Screen par check karein, agla hukm farmayein!`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            text: genericNavReply,
+            card: {
+              type: 'action_done',
+              title: `${voiceIntent.label} Opened`,
+              targetTab: voiceIntent.tab
+            }
+          }
+        ]);
+        await speakNaturalUrdu(genericNavReply);
+        setIsLoading(false);
+        return;
+      }
     }
 
-    if (navigatedTab) {
-      onNavigate(navigatedTab);
-    }
-
-    // 5. Intelligent Model Chat Generation
+    // 5. Intelligent Model Chat Generation with Snappy Fallback
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
 
-      const currentPortion = getApplicationPortion(navigatedTab || currentTab);
+      const currentPortion = getApplicationPortion(currentTab);
 
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
@@ -887,10 +1324,10 @@ Address them respectfully as "${operator.honorific}".
 Current Application Portion in use: "${currentPortion.group} > ${currentPortion.name}".
 ${operator.isTrainee ? 'Note: Operator is a new trainee. Explain everything in clear, friendly 3-step beginner Roman Urdu.' : ''}
 Core rules:
-1. Speak in natural, warm, conversational Pakistani Roman Urdu with a friendly Lahore tech YouTuber cadence.
-2. Maintain engaging responsiveness and a refined, witty sense of humor (e.g. clever tech metaphors, light smiling YouTube creator banter like "Waqar bhai CPU bilkul chill hai, agla script viral karwane ke liye tayar hoon!").
-3. Always helpful, sharp, and practical — if asked to make a video or schedule, note that Autopilot can do it automatically.
-4. Keep answers concise, punchy, and under 75 words so spoken audio sounds lively and crisp.`,
+1. Speak exclusively in natural, warm Pakistani Roman Urdu with a friendly Lahore tech YouTuber cadence.
+2. Maintain engaging responsiveness and a refined, witty sense of humor (e.g. "Waqar bhai CPU bilkul chill hai, agla script viral karwane ke liye tayar hoon!").
+3. Always helpful, sharp, and practical — if asked to switch menus or check tasks, note that you can operate the dashboard directly.
+4. Keep answers concise, punchy, and under 50 words so spoken audio sounds lively and crisp.`,
         }),
       }).finally(() => clearTimeout(timeoutId));
 
@@ -911,8 +1348,8 @@ Core rules:
       await speakNaturalUrdu(replyText);
     } catch (err: any) {
       console.warn('Chat error:', err);
-      const currentPortion = getApplicationPortion(navigatedTab || currentTab);
-      const fallbackReply = `${operator.honorific}! Main active listening mode mein aapke sath hoon. Is waqt hum "${currentPortion.group} > ${currentPortion.name}" portion mein hain. CPU chill hai aur coffee garam! Agar aap chahein to main foran aaj ka viral short generate kar ke Content Calendar mein schedule kar sakta hoon.`;
+      const currentPortion = getApplicationPortion(currentTab);
+      const fallbackReply = `${operator.honorific}! Main active listening mode mein aapke sath hoon. Is waqt hum "${currentPortion.group} > ${currentPortion.name}" portion mein hain. CPU chill hai aur coffee garam! Agla hukm karein, main foran screen update karunga.`;
       setMessages((prev) => [
         ...prev,
         {
@@ -944,7 +1381,7 @@ Core rules:
         recognitionRef.current = recognition;
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = 'ur-PK';
+        recognition.lang = 'en-US';
 
         let accumulatedTranscript = '';
 
@@ -963,12 +1400,13 @@ Core rules:
             }
           }
 
-          const currentWords = (accumulatedTranscript + ' ' + interim).trim();
-          if (!currentWords) return;
+          const rawWords = (accumulatedTranscript + ' ' + interim).trim();
+          if (!rawWords) return;
+
+          // Convert any Urdu script instantly to clean Roman Urdu
+          const currentWords = transliterateUrduToRoman(rawWords);
 
           // CRITICAL: True Barge-in Voice Interruption!
-          // If the AI is currently speaking audio or processing when user starts speaking,
-          // instantly cut off the AI's audio mid-sentence and hand the microphone to the user!
           if (isSpeakingAudio || currentAudioRef.current) {
             stopAudioPlayback();
             isAiProcessingOrSpeakingRef.current = false;
@@ -978,6 +1416,31 @@ Core rules:
           setLiveInterimText(currentWords);
           setVadState('speaking');
 
+          // ⚡ Real-Time Instant 0ms Intent Dispatcher while user is still speaking!
+          const realTimeIntent = detectAutonomousVoiceIntent(currentWords);
+          if (realTimeIntent && realTimeIntent.tab && realTimeIntent.tab !== navigatedTabRef.current) {
+            navigatedTabRef.current = realTimeIntent.tab;
+            onNavigate(realTimeIntent.tab);
+            setInstantNavNotice(`⚡ 0ms Voice Nav: Switched to ${realTimeIntent.label}`);
+            setTimeout(() => setInstantNavNotice(null), 3500);
+
+            if (realTimeIntent.action === 'highlight_masterlist_pending') {
+              setTimeout(() => {
+                window.dispatchEvent(
+                  new CustomEvent('itcafeteria_highlight_masterlist_task', {
+                    detail: { highlightFirstPending: true }
+                  })
+                );
+              }, 150);
+            } else if (realTimeIntent.action === 'select_autopilot_task') {
+              setTimeout(() => {
+                window.dispatchEvent(
+                  new CustomEvent('itcafeteria_select_autopilot_task', { detail: {} })
+                );
+              }, 150);
+            }
+          }
+
           // Reset silence timer on any newly spoken token
           if (silenceTimerRef.current) {
             clearInterval(silenceTimerRef.current);
@@ -985,10 +1448,10 @@ Core rules:
           }
           setSilenceProgress(0);
 
-          // Once user has spoken, activate Gemini Auto-Silence Detection
+          // Snappy 700ms silence detection for fast, responsive natural dialogue
           if (currentWords.length >= 2) {
             const startTime = Date.now();
-            const durationMs = 1200; // 1.2s silence pause threshold
+            const durationMs = 700; // 0.7s silence threshold (snappy & real-time)
 
             silenceTimerRef.current = setInterval(() => {
               const elapsed = Date.now() - startTime;
@@ -1015,7 +1478,7 @@ Core rules:
                 setSilenceProgress(0);
                 sendMessageRef.current(finalQuery);
               }
-            }, 80);
+            }, 60);
           }
         };
 
@@ -1034,14 +1497,23 @@ Core rules:
           if (isAiProcessingOrSpeakingRef.current) {
             return;
           }
-          // If Live mode is active, restart continuous recognition loop
-          if (isLiveActiveRef.current) {
+          // Automatically resume continuous recognition loop if drawer is open or live mode active
+          const shouldKeepListening = (isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current;
+          if (shouldKeepListening) {
             try {
               recognition.start();
               setIsHandsFreeListening(true);
               setVadState('listening');
             } catch {
-              setIsHandsFreeListening(false);
+              setTimeout(() => {
+                if ((isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current && !isAiProcessingOrSpeakingRef.current) {
+                  try {
+                    recognition.start();
+                    setIsHandsFreeListening(true);
+                    setVadState('listening');
+                  } catch {}
+                }
+              }, 250);
             }
           } else {
             setIsHandsFreeListening(false);
@@ -1465,6 +1937,22 @@ Core rules:
               </div>
             );
           })()}
+
+          {/* ⚡ 0ms Instant Navigation Notification Pill */}
+          {instantNavNotice && (
+            <div className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-950/95 via-cyan-950/95 to-slate-950 border-b border-cyan-400/40 text-xs text-cyan-200 font-mono flex items-center justify-between shadow-inner">
+              <div className="flex items-center gap-1.5 truncate">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                </span>
+                <span className="font-semibold text-cyan-300 truncate">{instantNavNotice}</span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[9px] font-bold border border-cyan-400/40 shrink-0">
+                0ms Sync
+              </span>
+            </div>
+          )}
 
           {/* Active Listening State Soundwave Mirror & Real-Time Dialogue Transcriptions */}
           <div className="p-3 bg-gradient-to-b from-slate-950/95 to-slate-900/90 border-b border-slate-800/80 space-y-2">
