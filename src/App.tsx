@@ -63,6 +63,7 @@ import { CommunityPollWidget } from './components/CommunityPollWidget';
 import { StudioAssistant } from './components/StudioAssistant';
 import { HolographicBackground, type HolographicTheme, HOLOGRAPHIC_THEMES } from './components/HolographicBackground';
 import { PendingQueueTracker } from './components/PendingQueueTracker';
+import { DiagnosticVisualGuidance } from './components/DiagnosticVisualGuidance';
 import { PHONETIC_DICTIONARY } from './data/channelData';
 import { 
   ThemeCustomizerModal, 
@@ -793,6 +794,7 @@ export default function App() {
                         return (
                           <button
                             key={tab.id}
+                            data-guide-target={`tab-${tab.id}`}
                             onClick={() => selectTab(tab.id)}
                             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left text-sm transition-colors cursor-pointer ${
                               isActive
@@ -1329,6 +1331,8 @@ export default function App() {
           localStorage.removeItem('itcafeteria_menu_customizer_config');
         }}
       />
+
+      <DiagnosticVisualGuidance />
 
       <StudioAssistant
         currentTab={activeTab}

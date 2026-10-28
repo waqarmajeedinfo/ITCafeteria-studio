@@ -520,6 +520,47 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
     setIsWorkerBusy(true);
     addLog('DECISION', `[Autonomous Worker] Claimed task #${task.id}: "${task.title}"`);
 
+    // Diagnostic Visual Guidance: beacon the active task and radar
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('itcafeteria_diagnostic_guide', {
+          detail: {
+            steps: [
+              {
+                selector: `[data-guide-target="task-card-${task.id}"]`,
+                label: `Executing: ${task.title.slice(0, 36)}...`,
+                description: `Running 10-scene generation, phonetic validation, and cross-studio sync.`
+              },
+              {
+                selector: `[data-guide-target="autopilot-radar"]`,
+                label: 'Cross-Studio Sync Health Radar',
+                description: 'Verifying sync across Agent Simulator, Content Calendar, and Thumbnail Studio.'
+              }
+            ]
+          }
+        })
+      );
+    }
+
+    // Backend Action Command Execution immediately
+    try {
+      fetch('/api/autopilot/execute-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'EXECUTE_TASK_NOW',
+          payload: {
+            taskId: task.id,
+            title: task.title,
+            category: task.category,
+            characterTag: task.characterTag
+          }
+        })
+      }).catch((e) => console.warn('Action API warning:', e));
+    } catch (e) {
+      console.warn('Backend execution warning:', e);
+    }
+
     // 1. Mark task as processing
     setTasks((prev) =>
       prev.map((t) => (t.id === task.id ? { ...t, status: 'processing', progress: 15 } : t))
@@ -951,7 +992,26 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
           </div>
 
           {/* Quick Daemon Controls */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-950/80 p-4 rounded-xl border border-slate-800 shrink-0">
+          <div data-guide-target="autopilot-daemon-hud" className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-950/80 p-4 rounded-xl border border-slate-800 shrink-0">
+            {/* Floating Overlay Button */}
+            <button
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent('itcafeteria_open_assistant_overlay', {
+                    detail: { mode: 'span' }
+                  })
+                );
+              }}
+              data-guide-target="autopilot-overlay-btn"
+              className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-cyan-500/20 cursor-pointer transition-all border border-cyan-400/30"
+              title="Open floating adjustable overlay across active page"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-cyan-200 animate-pulse" />
+              <span>⚡ Open Floating Overlay</span>
+            </button>
+
+            <div className="h-10 w-px bg-slate-800 hidden sm:block" />
+
             <div className="flex flex-col gap-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Daemon Heartbeat</span>
               <div className="flex items-center gap-2">
@@ -1003,7 +1063,7 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
       </div>
 
       {/* Cross-Studio Data Synchronization Health Radar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div data-guide-target="autopilot-radar" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
@@ -1115,6 +1175,7 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
 
               <div className="flex items-center gap-2">
                 <button
+                  data-guide-target="autopilot-execute-next-btn"
                   onClick={() => {
                     const next = tasks.find((t) => t.status === 'queued');
                     if (next) void executeTaskWorker(next);
@@ -1135,6 +1196,7 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
                 return (
                   <div
                     key={task.id}
+                    data-guide-target={`task-card-${task.id}`}
                     className={`p-4 rounded-xl border transition-all ${
                       isProcessing
                         ? 'bg-slate-950 border-cyan-500/80 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-500'

@@ -187,6 +187,7 @@ export const MasterListTracker: React.FC = () => {
             <div 
               key={task.id}
               id={`task-item-${task.id}`}
+              data-guide-target={`masterlist-task-${task.id}`}
               className={`bg-slate-900 border rounded-xl p-4 space-y-2 transition-all duration-300 ${
                 isHighlighted
                   ? 'border-cyan-400 ring-2 ring-cyan-400/50 shadow-lg shadow-cyan-500/20 bg-slate-900/95 scale-[1.02]'
