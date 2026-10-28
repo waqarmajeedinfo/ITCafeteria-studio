@@ -1259,7 +1259,19 @@ Return STRICT valid JSON only, no markdown fences:
       .map((scene: any, index: number) => {
         const dialogue = safeString(scene.dialogue);
         const visual = safeString(scene.visual);
-        const script = safeString(scene.script) || `${tag} — ${visual}\nHe says: "${dialogue}"`;
+        let script = safeString(scene.script);
+        if (!script.includes('[DIRECTOR') || !script.includes('DIALOGUE:')) {
+          const cameraDir = index === 0
+            ? 'Master Cinematic 9:16 vertical 4K direction. Dynamic medium-close front angle with a smooth 10s dramatic slow push-in zoom (0.8x to 1.1x). Cyber dark navy studio background with vibrant neon cyan and amber volumetric rim lights.'
+            : index === rawScenes.length - 1
+            ? 'Warm approachable eye-level medium shot. Friendly direct eye contact with camera, smooth pull-out with floating animated subscribe bell icon.'
+            : 'Dynamic tracking camera with eye-level perspective, 3/4 angle, balanced 5600K studio fill light, high-end visual tech demonstration.';
+
+          script = `[DIRECTOR CAMERA & LIGHTING]: ${cameraDir} Duration: 10s.
+[SCENE VISUAL & PROPS]: ${visual}
+[PRESENTER & ACTION]: ${tag} (${presenter}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence.
+DIALOGUE: "${dialogue}"`;
+        }
         const computedWords = dialogue ? dialogue.split(/\s+/).filter(Boolean).length : 0;
         return {
           num: index + 1,
@@ -1332,6 +1344,133 @@ Return STRICT valid JSON only, no markdown fences:
   } catch (err: any) {
     console.error('Story generation error:', err);
     res.status(500).json({ error: friendlyGeminiError(err, 'Story generate nahi ho saki. Dobara try karein.') });
+  }
+});
+
+// 10. Agent — Refresh / Modify Story with Creator Directives & Date Verification
+app.post('/api/ai/refresh-story', async (req, res) => {
+  try {
+    const { story, customDirectives = '', verifyDate = 'Today' } = req.body || {};
+    if (!story || !story.title) {
+      return res.status(400).json({ error: 'Valid story package required' });
+    }
+    const ai = getAiClient();
+    const scenes = Array.isArray(story.scenes) ? story.scenes : [];
+    const scenesOutline = scenes.map((s: any, idx: number) => `Scene ${idx + 1} (${s.duration || '10s'}) [${s.purpose || ''}]: Visual: ${s.visual || ''} | Dialogue: "${s.dialogue || ''}"`).join('\n');
+
+    const prompt = `You are the lead story architect and editor for YouTube channel "${story.channelName || 'IT Cafeteria'}", presenter "${story.presenter || 'Waqar Majeed'}".
+The creator has an existing pending story package and wants to REFRESH, VERIFY, and MODIFY it as of ${verifyDate}.
+
+Current Story:
+- Title: ${story.title}
+- Hook: ${story.hook}
+- Category: ${story.categoryName}
+- Presenter Tag: ${story.characterTag}
+- Existing Scenes Outline:
+${scenesOutline}
+
+Creator Directives / Modification Instructions:
+"${customDirectives || 'Refresh the facts, sharpen the hooks, update date relevance, and ensure high-retention Roman Urdu dialogue with master Google Flow cinematic director prompts.'}"
+
+Task:
+1. Apply the creator's directives to update/refine the story.
+2. Ensure each scene is exactly 10s and dialogue is 22-25 words in natural Roman Urdu.
+3. Each scene's "script" MUST be a master cinematic Google Flow prompt with 4 parts:
+   [DIRECTOR CAMERA & LIGHTING]: Detailed camera direction (dynamic zoom-in, 15-degree side angle, 3/4 isometric screencast, or snap-zoom), 9:16 vertical 4K setup, cyber dark studio lighting with neon cyan and amber rim lights.
+   [SCENE VISUAL & PROPS]: Detailed visual action with props (3D holographic elements, glowing UI, physical props).
+   [PRESENTER & ACTION]: ${story.characterTag || '@WM25-1'} (${story.presenter || 'Waqar Majeed'}) in studio with natural hand gestures and conversational tech cadence.
+   DIALOGUE: "<exact dialogue in double quotes>"
+4. Update title, hook, description, and thumbnail if improved by directives.
+
+Return STRICT valid JSON only with NO markdown fences:
+{
+  "title": "...",
+  "hook": "...",
+  "thumbnailHeadline": "...",
+  "thumbnailSubBadge": "...",
+  "thumbnailHologram": "...",
+  "hashtags": ["#shorts", "..."],
+  "description": "...",
+  "tags": ["..."],
+  "tiktokCaption": "...",
+  "seriesPlan": "...",
+  "scenes": [
+    {
+      "num": 1,
+      "duration": "10s",
+      "purpose": "...",
+      "isCTA": false,
+      "words": 24,
+      "visual": "...",
+      "dialogue": "...",
+      "script": "[DIRECTOR CAMERA & LIGHTING]: ...\\n[SCENE VISUAL & PROPS]: ...\\n[PRESENTER & ACTION]: ...\\nDIALOGUE: \\"...\\""
+    }
+  ]
+}`;
+
+    const response = await withTimeout(
+      ai.models.generateContent({
+        model: 'gemini-3.5-flash-lite',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.7,
+        },
+      }),
+      45000,
+      'Story refresh'
+    );
+
+    const parsed = extractJsonObject(response.text || '');
+    if (!parsed || !Array.isArray(parsed.scenes) || !parsed.scenes.length) {
+      throw new Error('AI could not parse refreshed story');
+    }
+
+    const safeString = (value: any) => String(value || '').trim();
+    const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+    const refreshedScenes = rawScenes.map((scene: any, index: number) => {
+      const dialogue = safeString(scene.dialogue);
+      const visual = safeString(scene.visual);
+      let script = safeString(scene.script);
+      if (!script.includes('[DIRECTOR') || !script.includes('DIALOGUE:')) {
+        script = `[DIRECTOR CAMERA & LIGHTING]: Master Cinematic 9:16 vertical 4K direction. Dynamic camera angle with dramatic zoom and neon cyan-amber cyber studio rim lights. Duration: 10s.
+[SCENE VISUAL & PROPS]: ${visual}
+[PRESENTER & ACTION]: ${story.characterTag || '@WM25-1'} (${story.presenter || 'Waqar Majeed'}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence.
+DIALOGUE: "${dialogue}"`;
+      }
+      return {
+        num: index + 1,
+        duration: '10s',
+        purpose: safeString(scene.purpose) || `Scene ${index + 1}`,
+        isCTA: Boolean(scene.isCTA) || index === rawScenes.length - 1,
+        words: dialogue ? dialogue.split(/\s+/).filter(Boolean).length : Number(scene.words) || 0,
+        visual,
+        dialogue,
+        script
+      };
+    });
+
+    const refreshedStory = {
+      ...story,
+      title: safeString(parsed.title) || story.title,
+      hook: safeString(parsed.hook) || story.hook,
+      dateLabel: `${verifyDate} (Verified)`,
+      sceneCount: refreshedScenes.length,
+      scenes: refreshedScenes,
+      thumbnailHeadline: safeString(parsed.thumbnailHeadline) || story.thumbnailHeadline,
+      thumbnailSubBadge: safeString(parsed.thumbnailSubBadge) || story.thumbnailSubBadge,
+      thumbnailHologram: safeString(parsed.thumbnailHologram) || story.thumbnailHologram,
+      description: safeString(parsed.description) || story.description,
+      hashtags: Array.isArray(parsed.hashtags) && parsed.hashtags.length ? parsed.hashtags : story.hashtags,
+      tags: Array.isArray(parsed.tags) && parsed.tags.length ? parsed.tags : story.tags,
+      tiktokCaption: safeString(parsed.tiktokCaption) || story.tiktokCaption,
+      seriesPlan: safeString(parsed.seriesPlan) || story.seriesPlan,
+    };
+
+    res.json({ story: refreshedStory });
+  } catch (err: any) {
+    console.error('Story refresh error:', err);
+    res.status(500).json({ error: friendlyGeminiError(err, 'Story refresh nahi ho saki. Dobara try karein.') });
   }
 });
 

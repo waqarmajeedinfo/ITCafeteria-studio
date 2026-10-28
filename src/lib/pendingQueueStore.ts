@@ -6,6 +6,7 @@
  */
 
 import type { GeneratedStory } from '../components/StoryPackageView';
+import { upgradeStoryScenesToCinematic } from './flowPromptBuilder';
 
 export type StoryPublishStatus = 'pending' | 'published' | 'draft' | 'overdue';
 
@@ -522,20 +523,40 @@ export const INITIAL_PENDING_QUEUE: PendingStoryRecord[] = [
 
 export function loadPendingQueue(): PendingStoryRecord[] {
   try {
-    if (typeof window === 'undefined') return INITIAL_PENDING_QUEUE;
+    if (typeof window === 'undefined') {
+      return INITIAL_PENDING_QUEUE.map((item) => ({
+        ...item,
+        storyPackage: upgradeStoryScenesToCinematic(item.storyPackage)
+      }));
+    }
     const raw = localStorage.getItem(PENDING_QUEUE_STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(PENDING_QUEUE_STORAGE_KEY, JSON.stringify(INITIAL_PENDING_QUEUE));
-      return INITIAL_PENDING_QUEUE;
+      const initialUpgraded = INITIAL_PENDING_QUEUE.map((item) => ({
+        ...item,
+        storyPackage: upgradeStoryScenesToCinematic(item.storyPackage)
+      }));
+      localStorage.setItem(PENDING_QUEUE_STORAGE_KEY, JSON.stringify(initialUpgraded));
+      return initialUpgraded;
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed as PendingStoryRecord[];
+      return parsed.map((item: PendingStoryRecord) => {
+        if (item && item.storyPackage) {
+          return {
+            ...item,
+            storyPackage: upgradeStoryScenesToCinematic(item.storyPackage)
+          };
+        }
+        return item;
+      });
     }
   } catch (e) {
     console.error('Error loading pending queue', e);
   }
-  return INITIAL_PENDING_QUEUE;
+  return INITIAL_PENDING_QUEUE.map((item) => ({
+    ...item,
+    storyPackage: upgradeStoryScenesToCinematic(item.storyPackage)
+  }));
 }
 
 export function savePendingQueue(queue: PendingStoryRecord[]): void {

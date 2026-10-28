@@ -546,7 +546,10 @@ export const AgentSimulator: React.FC = () => {
                 Saved locally • {latestStory.sceneCount} scenes
               </span>
             </div>
-            <StoryPackageView story={latestStory} />
+            <StoryPackageView
+              story={latestStory}
+              onUpdateStory={(updated) => setLatestStory(updated)}
+            />
           </>
         ) : (
           <div className="py-12 px-4 text-center space-y-3">
