@@ -39,7 +39,10 @@ import {
   Upload,
   Clock,
   ArrowUp,
-  FolderTree
+  FolderTree,
+  Square,
+  Pause,
+  Play
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -655,16 +658,48 @@ export default function App() {
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-xs font-bold text-white tracking-wide">IT CAFETERIA</span>
                     {themeConfig.showStudioBadge && (
                       <BadgeCheck className="w-3.5 h-3.5 text-cyan-400" />
                     )}
-                    {themeConfig.showTopLiveBadge && (
-                      <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-[9px] font-bold text-rose-300 tracking-wider">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                        LIVE
-                      </span>
+                    {/* Interactive Autopilot / Live Manual Control Pill */}
+                    {isLiveActive ? (
+                      <div className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/50 text-[10px] font-bold text-rose-300 tracking-wider">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                          LIVE ACTIVE
+                        </span>
+                        <button
+                          onClick={() => {
+                            setIsLiveActive(false);
+                            window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
+                          }}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold cursor-pointer transition-all shadow-md shadow-rose-950"
+                          title="Click to STOP Live Autopilot immediately"
+                        >
+                          <Square className="w-2.5 h-2.5 fill-current" />
+                          <span>STOP</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-[10px] font-semibold text-slate-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
+                          AUTOPILOT: STOPPED
+                        </span>
+                        <button
+                          onClick={() => {
+                            setIsLiveActive(true);
+                            window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_start_all'));
+                          }}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/80 hover:bg-emerald-500 text-white text-[10px] font-bold cursor-pointer transition-all shadow-sm"
+                          title="Click to Start Autopilot Manually"
+                        >
+                          <Play className="w-2.5 h-2.5 fill-current" />
+                          <span>Start</span>
+                        </button>
+                      </div>
                     )}
                   </div>
                   {themeConfig.showTagline && (
@@ -772,19 +807,43 @@ export default function App() {
                 <span>Phonetic Rules Dictionary</span>
               </button>
 
-              {/* 3. Go Live Voice Co-Pilot Button (identical slate-border styling) */}
-              <button
-                onClick={() => setIsLiveActive((prev) => !prev)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-medium transition-all cursor-pointer backdrop-blur-md shadow-md ${
-                  isLiveActive
-                    ? 'bg-slate-900/95 border-rose-500/80 text-rose-300 ring-2 ring-rose-500/40 shadow-rose-950/50'
-                    : 'bg-slate-900/85 hover:bg-slate-800/90 border-slate-700/80 text-slate-200 hover:text-white'
-                }`}
-                title="Go Live: Real-time Hands-Free Voice Co-Pilot"
-              >
-                <Radio className={`w-4 h-4 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
-                <span>{isLiveActive ? 'Live Voice Active' : 'Go Live'}</span>
-              </button>
+              {/* 3. Go Live Voice Co-Pilot Manual Control Button */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    const next = !isLiveActive;
+                    setIsLiveActive(next);
+                    if (!next) {
+                      window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
+                    } else {
+                      window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_start_all'));
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-all cursor-pointer backdrop-blur-md shadow-md ${
+                    isLiveActive
+                      ? 'bg-rose-950/90 border-rose-500 text-rose-200 ring-2 ring-rose-500/50 shadow-rose-950/70'
+                      : 'bg-slate-900/85 hover:bg-slate-800/90 border-slate-700/80 text-slate-200 hover:text-white'
+                  }`}
+                  title={isLiveActive ? 'Live Voice is Active. Click to STOP' : 'Click to Go Live (Voice Co-Pilot)'}
+                >
+                  <Radio className={`w-4 h-4 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
+                  <span>{isLiveActive ? 'Live Active' : 'Go Live'}</span>
+                </button>
+
+                {isLiveActive && (
+                  <button
+                    onClick={() => {
+                      setIsLiveActive(false);
+                      window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-950 cursor-pointer transition-all"
+                    title="Stop Live Co-Pilot & Autopilot immediately"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                    <span>Stop</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* WordPress Theme & Studio Customizer Button (Circled in user screenshot) */}

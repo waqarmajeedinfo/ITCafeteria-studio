@@ -198,6 +198,25 @@ export const AiChatbot: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Global Remote Stop Listener
+  useEffect(() => {
+    const handleRemoteStop = () => {
+      stopAudioPlayback();
+      setIsRecordingVoice(false);
+      setVadState('idle');
+      if (silenceTimerRef.current) {
+        clearInterval(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch {}
+        recognitionRef.current = null;
+      }
+    };
+    window.addEventListener('itcafeteria_autopilot_stop_all', handleRemoteStop);
+    return () => window.removeEventListener('itcafeteria_autopilot_stop_all', handleRemoteStop);
+  }, []);
+
   // Stop current audio playback immediately (Interruption Logic)
   const stopAudioPlayback = () => {
     if (currentAudioRef.current) {

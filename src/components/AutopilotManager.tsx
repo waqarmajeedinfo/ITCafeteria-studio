@@ -31,6 +31,7 @@ import {
   Tag,
   Wand2,
   Settings2,
+  Square,
   X
 } from 'lucide-react';
 
@@ -334,16 +335,28 @@ function getInitialTasks(): AutopilotTask[] {
 }
 
 export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTab, onOpenStory }) => {
-  // Autopilot Daemon & Execution Mode
+  // Autopilot Daemon & Execution Mode (Default: STOPPED / MANUAL)
   const [isDaemonActive, setIsDaemonActive] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      if (saved) return JSON.parse(saved).isDaemonActive ?? false;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.isDaemonActive === 'boolean') return parsed.isDaemonActive;
+      }
     } catch {}
-    return true; // Active by default for hands-free automation
+    return false; // Default: STOPPED (Full Manual Control)
   });
 
-  const [automationMode, setAutomationMode] = useState<'autonomous' | 'supervised'>('autonomous');
+  const [automationMode, setAutomationMode] = useState<'autonomous' | 'supervised'>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.automationMode) return parsed.automationMode;
+      }
+    } catch {}
+    return 'supervised'; // Default: Supervised (Manual trigger only)
+  });
   const [cadenceSeconds, setCadenceSeconds] = useState<number>(30);
   const [countdown, setCountdown] = useState<number>(30);
   const [isWorkerBusy, setIsWorkerBusy] = useState<boolean>(false);
@@ -513,6 +526,35 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
       window.removeEventListener('itcafeteria_select_autopilot_task', handleSelectEvent);
     };
   }, [tasks]);
+
+  // Global Remote Control Listeners (Top Bar / Chatbot Stop & Start)
+  useEffect(() => {
+    const handleStopAll = () => {
+      setIsDaemonActive(false);
+      setIsWorkerBusy(false);
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) || '{}');
+        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({ ...saved, isDaemonActive: false }));
+      } catch {}
+      addLog('DECISION', '🛑 Autopilot Daemon stopped via manual control.');
+    };
+
+    const handleStartAll = () => {
+      setIsDaemonActive(true);
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) || '{}');
+        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({ ...saved, isDaemonActive: true }));
+      } catch {}
+      addLog('DECISION', '▶️ Autopilot Daemon started via manual control.');
+    };
+
+    window.addEventListener('itcafeteria_autopilot_stop_all', handleStopAll);
+    window.addEventListener('itcafeteria_autopilot_start_all', handleStartAll);
+    return () => {
+      window.removeEventListener('itcafeteria_autopilot_stop_all', handleStopAll);
+      window.removeEventListener('itcafeteria_autopilot_start_all', handleStartAll);
+    };
+  }, [addLog]);
 
   // --- Autonomous Decision & Execution Worker ---
 
@@ -1013,19 +1055,33 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
             <div className="h-10 w-px bg-slate-800 hidden sm:block" />
 
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Daemon Heartbeat</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Manual Control</span>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsDaemonActive(!isDaemonActive)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    isDaemonActive
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
-                      : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700'
-                  }`}
-                >
-                  {isDaemonActive ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                  {isDaemonActive ? 'Pause Autopilot' : 'Resume Autopilot'}
-                </button>
+                {isDaemonActive ? (
+                  <button
+                    onClick={() => {
+                      setIsDaemonActive(false);
+                      window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-950 animate-pulse"
+                    title="Click to STOP Autopilot Daemon immediately"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                    <span>STOP AUTOPILOT</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setIsDaemonActive(true);
+                      window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_start_all'));
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                    title="Click to Start Autopilot"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Start Autopilot</span>
+                  </button>
+                )}
 
                 <button
                   onClick={forceSyncAll}
@@ -1059,6 +1115,66 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Prominent Manual Control & Status Strip */}
+      <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg transition-all ${
+        isDaemonActive
+          ? 'bg-rose-950/70 border-rose-500/60 shadow-rose-950/40 text-rose-200'
+          : 'bg-slate-900/90 border-emerald-500/40 shadow-slate-950 text-slate-200'
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className={`p-2.5 rounded-xl border ${
+            isDaemonActive ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+          }`}>
+            {isDaemonActive ? <Radio className="w-5 h-5 animate-pulse" /> : <ShieldCheck className="w-5 h-5" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="font-bold text-sm text-white">
+                {isDaemonActive ? '⚠️ Autopilot Active (Background Execution On)' : '✅ Manual Mode Active (Autopilot STOPPED)'}
+              </h4>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono ${
+                isDaemonActive ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+              }`}>
+                {isDaemonActive ? 'RUNNING' : 'STOPPED'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              {isDaemonActive
+                ? 'Autopilot is running background cycles every 30s. Click STOP to halt all background tasks.'
+                : 'Zero background actions are executing. The system is completely quiet and only responds to your manual clicks.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {isDaemonActive ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsDaemonActive(false);
+                window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
+              }}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-rose-950 cursor-pointer transition-all"
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
+              <span>STOP AUTOPILOT NOW</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setIsDaemonActive(true);
+                window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_start_all'));
+              }}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950 cursor-pointer transition-all"
+            >
+              <Play className="w-3.5 h-3.5 fill-current" />
+              <span>START AUTOPILOT</span>
+            </button>
+          )}
         </div>
       </div>
 

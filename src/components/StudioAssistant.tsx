@@ -47,7 +47,8 @@ import {
   LayoutGrid,
   Zap,
   Target,
-  ChevronRight
+  ChevronRight,
+  Square
 } from 'lucide-react';
 import type { TabType } from '../App';
 import { PUBLISHED_VIDEOS, PHONETIC_DICTIONARY } from '../data/channelData';
@@ -524,7 +525,8 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
   const [showOperatorModal, setShowOperatorModal] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showKeyboardInput, setShowKeyboardInput] = useState(false);
-  const [isListeningPaused, setIsListeningPaused] = useState(false);
+  // Default: PAUSED / MANUAL (User must manually click Start to activate listening)
+  const [isListeningPaused, setIsListeningPaused] = useState(true);
   const optionsMenuRef = useRef<HTMLDivElement>(null);
 
   // Adaptive UI Overlay Behavior ('drawer' | 'wide' | 'span')
@@ -546,9 +548,9 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
   // Primary Anchor Voice Consistency Lock (Waqar Majeed Profile)
   const [primaryAnchorVoiceLocked, setPrimaryAnchorVoiceLocked] = useState<boolean>(true);
 
-  // Persistent Microphone & Voice Activity Detection (Always Active)
-  const [persistentMic, setPersistentMic] = useState<boolean>(true);
-  const persistentMicRef = useRef<boolean>(true);
+  // Persistent Microphone & Voice Activity Detection (Manual: default false)
+  const [persistentMic, setPersistentMic] = useState<boolean>(false);
+  const persistentMicRef = useRef<boolean>(false);
   persistentMicRef.current = persistentMic;
 
   // Active Operator Profile State
@@ -637,14 +639,48 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, liveInterimText, isLoading, isOpen]);
 
-  // Synchronize continuous hands-free listening whenever drawer is open, live mode is active, or persistent mic is enabled
+  // Synchronize continuous hands-free listening strictly when explicitly unpaused AND either live mode or persistent mic is manually enabled
   useEffect(() => {
-    if ((isOpen || isLiveActive || persistentMic) && !isListeningPaused) {
+    if (!isListeningPaused && (isLiveActive || persistentMic)) {
       startHandsFreeListeningRef.current?.();
-    } else if (!isOpen && !isLiveActive && !persistentMic) {
+    } else {
       stopHandsFreeListeningRef.current?.();
     }
   }, [isOpen, isLiveActive, persistentMic, isListeningPaused]);
+
+  // Global Remote Stop/Start Listeners
+  useEffect(() => {
+    const handleRemoteStopAll = () => {
+      setIsListeningPaused(true);
+      setPersistentMic(false);
+      stopHandsFreeListeningRef.current?.();
+      if (currentAudioRef.current) {
+        try {
+          currentAudioRef.current.pause();
+          currentAudioRef.current = null;
+        } catch {}
+      }
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setIsSpeakingAudio(false);
+      setVadState('idle');
+      if (onToggleLive) onToggleLive(false);
+    };
+
+    const handleRemoteStartAll = () => {
+      setIsListeningPaused(false);
+      setPersistentMic(true);
+      if (onToggleLive) onToggleLive(true);
+    };
+
+    window.addEventListener('itcafeteria_autopilot_stop_all', handleRemoteStopAll);
+    window.addEventListener('itcafeteria_autopilot_start_all', handleRemoteStartAll);
+    return () => {
+      window.removeEventListener('itcafeteria_autopilot_stop_all', handleRemoteStopAll);
+      window.removeEventListener('itcafeteria_autopilot_start_all', handleRemoteStartAll);
+    };
+  }, [onToggleLive]);
 
   useEffect(() => {
     const handleOpenOverlay = (e: any) => {
@@ -706,12 +742,23 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
   const handleTogglePause = () => {
     if (isListeningPaused) {
       setIsListeningPaused(false);
+      setPersistentMic(true);
       startHandsFreeListening();
     } else {
       setIsListeningPaused(true);
+      setPersistentMic(false);
       stopHandsFreeListening();
       stopAudioPlayback();
     }
+  };
+
+  const handleEmergencyStopAll = () => {
+    setIsListeningPaused(true);
+    setPersistentMic(false);
+    stopHandsFreeListening();
+    stopAudioPlayback();
+    if (onToggleLive) onToggleLive(false);
+    window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
   };
 
   // Stop current audio playback immediately (Instant Barge-In Interruption)
@@ -1834,14 +1881,13 @@ Core rules:
             {/* End Live Button */}
             <button
               onClick={() => {
-                stopAudioPlayback();
-                if (onToggleLive) onToggleLive(false);
+                handleEmergencyStopAll();
               }}
-              className="px-2 py-0.5 rounded-full bg-rose-600/80 hover:bg-rose-500 text-white text-[10px] font-bold transition-colors cursor-pointer shrink-0 flex items-center gap-1"
-              title="Live Voice Co-Pilot band karein"
+              className="px-2.5 py-1 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 shadow-md shadow-rose-950"
+              title="Live Voice Co-Pilot aur Autopilot foran band karein"
             >
-              <X className="w-3 h-3" />
-              <span className="hidden sm:inline">Stop</span>
+              <Square className="w-3 h-3 fill-current" />
+              <span>STOP LIVE</span>
             </button>
           </div>
 
@@ -2117,6 +2163,58 @@ Core rules:
               </span>
             </div>
           )}
+
+          {/* Autopilot & Voice Manual Control Bar inside Chatbot */}
+          <div className="px-3.5 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${
+                isListeningPaused ? 'bg-amber-400' : 'bg-emerald-400 animate-ping'
+              }`} />
+              <div className="truncate">
+                <span className="font-semibold text-slate-200 text-xs">
+                  {isListeningPaused ? 'Autopilot: PAUSED (Manual)' : 'Autopilot: ACTIVE (Listening)'}
+                </span>
+                <span className="text-[10px] text-slate-400 block sm:inline sm:ml-1.5">
+                  {isListeningPaused ? 'Zero background tasks' : 'Voice & Agent active'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleTogglePause}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                  isListeningPaused
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm'
+                    : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40'
+                }`}
+                title={isListeningPaused ? 'Click to Start Voice Listening' : 'Click to Pause Voice Listening'}
+              >
+                {isListeningPaused ? (
+                  <>
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Start Listening</span>
+                  </>
+                ) : (
+                  <>
+                    <Pause className="w-3 h-3 fill-current" />
+                    <span>Pause</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleEmergencyStopAll}
+                className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md shadow-rose-950"
+                title="Stop all Autopilot and listening across the entire application"
+              >
+                <Square className="w-3 h-3 fill-current" />
+                <span>Stop All</span>
+              </button>
+            </div>
+          </div>
 
           {/* Main Adaptive Overlay Body */}
           <div className={`flex-1 min-h-0 flex ${overlayMode === 'span' ? 'flex-col lg:flex-row' : 'flex-col'}`}>
@@ -2441,6 +2539,17 @@ Core rules:
                       <span>Pause</span>
                     </>
                   )}
+                </button>
+
+                {/* Emergency Stop All Button */}
+                <button
+                  type="button"
+                  onClick={handleEmergencyStopAll}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-rose-600/90 hover:bg-rose-500 text-white shadow-sm shadow-rose-950"
+                  title="Halt all background listening, speech, and autopilot actions"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                  <span>Stop All</span>
                 </button>
 
                 {/* 2. Keyboard Toggle Button */}
