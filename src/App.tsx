@@ -74,6 +74,7 @@ import {
 import {
   MenuBarCustomizerModal,
   loadMenuConfig,
+  saveMenuConfig,
   DEFAULT_MENU_STATE,
   type MenuCustomizerState
 } from './components/MenuBarCustomizerModal';
@@ -175,6 +176,18 @@ export default function App() {
   // Menu Bar Customizer Configuration State (WordPress Style Menu Manager)
   const [menuConfig, setMenuConfig] = useState<MenuCustomizerState>(loadMenuConfig);
   const [showMenuCustomizer, setShowMenuCustomizer] = useState(false);
+  const [draggedNavbarGroupId, setDraggedNavbarGroupId] = useState<string | null>(null);
+  const [dragOverNavbarGroupId, setDragOverNavbarGroupId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleMenuUpdate = (e: any) => {
+      if (e.detail) {
+        setMenuConfig(e.detail);
+      }
+    };
+    window.addEventListener('itcafeteria_menu_customizer_updated', handleMenuUpdate);
+    return () => window.removeEventListener('itcafeteria_menu_customizer_updated', handleMenuUpdate);
+  }, []);
 
   // Holographic background theme & animation states
   const [holoTheme, setHoloTheme] = useState<HolographicTheme>(() => {
@@ -534,9 +547,48 @@ export default function App() {
       id: g.id,
       label: g.label,
       icon: GROUP_ICONS[g.id] || <Layers className="w-4 h-4 text-cyan-400" />,
-      count
+      count,
+      isLocked: g.isLocked
     };
   });
+
+  const handleNavbarGroupDragStart = (e: React.DragEvent, groupId: string, isLocked: boolean) => {
+    if (isLocked) {
+      e.preventDefault();
+      return;
+    }
+    setDraggedNavbarGroupId(groupId);
+    e.dataTransfer.setData('text/plain', `navgroup:${groupId}`);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleNavbarGroupDrop = (e: React.DragEvent, targetGroupId: string, targetLocked: boolean) => {
+    e.preventDefault();
+    if (!draggedNavbarGroupId || draggedNavbarGroupId === targetGroupId) {
+      setDraggedNavbarGroupId(null);
+      setDragOverNavbarGroupId(null);
+      return;
+    }
+    if (targetLocked) {
+      setDraggedNavbarGroupId(null);
+      setDragOverNavbarGroupId(null);
+      return;
+    }
+
+    const fromIndex = menuConfig.groups.findIndex((g) => g.id === draggedNavbarGroupId);
+    const toIndex = menuConfig.groups.findIndex((g) => g.id === targetGroupId);
+    if (fromIndex !== -1 && toIndex !== -1) {
+      const newGroups = [...menuConfig.groups];
+      const [moved] = newGroups.splice(fromIndex, 1);
+      newGroups.splice(toIndex, 0, moved);
+      const updated = { ...menuConfig, groups: newGroups };
+      setMenuConfig(updated);
+      saveMenuConfig(updated);
+    }
+
+    setDraggedNavbarGroupId(null);
+    setDragOverNavbarGroupId(null);
+  };
 
   const activeGroup = tabs.find((t) => t.id === activeTab)?.group || 'core';
   const activeTabMeta = tabs.find((t) => t.id === activeTab);
@@ -764,17 +816,43 @@ export default function App() {
               const isGroupActive = activeGroup === group.id;
               const isMenuOpen = openMenu === group.id;
               const groupTabs = tabs.filter((t) => t.group === group.id);
+              const isNavDragOver = dragOverNavbarGroupId === group.id;
 
               return (
-                <div key={group.id} className="relative">
+                <div
+                  key={group.id}
+                  draggable={!group.isLocked}
+                  onDragStart={(e) => handleNavbarGroupDragStart(e, group.id, group.isLocked)}
+                  onDragOver={(e) => {
+                    if (draggedNavbarGroupId && !group.isLocked) {
+                      e.preventDefault();
+                      setDragOverNavbarGroupId(group.id);
+                    }
+                  }}
+                  onDrop={(e) => handleNavbarGroupDrop(e, group.id, group.isLocked)}
+                  onDragEnd={() => {
+                    setDraggedNavbarGroupId(null);
+                    setDragOverNavbarGroupId(null);
+                  }}
+                  className={`relative transition-all ${
+                    isNavDragOver ? 'ring-2 ring-cyan-400 rounded-xl scale-105 shadow-lg shadow-cyan-950' : ''
+                  }`}
+                >
                   <button
                     onClick={() => setOpenMenu(isMenuOpen ? null : group.id)}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-all cursor-pointer border ${
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-all border ${
+                      !group.isLocked ? 'cursor-grab active:cursor-grabbing hover:border-cyan-400' : 'cursor-pointer'
+                    } ${
                       isMenuOpen || isGroupActive
                         ? 'text-cyan-300 bg-cyan-950/40 border-cyan-500/50 shadow-md shadow-cyan-950/50'
                         : 'text-slate-300 hover:text-white bg-slate-900/60 hover:bg-slate-900 border-slate-800 hover:border-slate-700'
                     }`}
                     aria-expanded={isMenuOpen}
+                    title={
+                      !group.isLocked
+                        ? `UNLOCKED: Drag karke navbar tabs ki sequence badlein (Left-to-Right)`
+                        : `${group.label} (Click karke menu dekhein)`
+                    }
                   >
                     <span className="shrink-0">{group.icon}</span>
                     <span>{group.label}</span>
