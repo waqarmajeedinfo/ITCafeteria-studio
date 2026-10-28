@@ -1073,6 +1073,9 @@ app.post('/api/ai/generate-story', async (req, res) => {
       discussionNotes = '',
       discussionTranscript = [],
       excludeTitles = [],
+      customInstructions = '',
+      dialectTone = 'conversational',
+      flowPromptFormat = 'cinematic_3d'
     } = req.body || {};
 
     const ideaTitle = String(idea.title || '').trim();
@@ -1080,14 +1083,39 @@ app.post('/api/ai/generate-story', async (req, res) => {
       return res.status(400).json({ error: 'Story idea ka title required hai' });
     }
 
-    const totalScenes = Math.min(Math.max(Number(sceneCount) || 10, 4), 15);
+    const totalScenes = Math.min(Math.max(Number(sceneCount) || 10, 4), 30);
     const beatGuide = totalScenes <= 4
       ? 'Hook; Problem + Reveal; Demonstration + Proof; Benefit + Save CTA'
       : totalScenes <= 7
       ? 'Hook; Problem; Agitate; Reveal; Demonstration; Proof / Result; Conclusion + Save CTA'
       : totalScenes <= 10
       ? 'Hook; Problem; Agitate; Reveal; Demonstrate 1; Demonstrate 2; Proof / Result; Benefit; Curiosity Loop; Conclusion + Save CTA'
-      : 'Hook; Problem; Agitate; Reveal; multiple Demonstration scenes; Proof / Result; Benefit; common mistakes; recap; Curiosity Loop; Conclusion + Save CTA';
+      : totalScenes <= 15
+      ? 'Hook; Problem; Agitate; Reveal; multiple Demonstration scenes; Proof / Result; Benefit; common mistakes; recap; Curiosity Loop; Conclusion + Save CTA'
+      : totalScenes <= 20
+      ? 'Hook; Problem Breakdown; Context & Prerequisites; Multi-step Detailed Demonstrations (Scenes 4-12); Proof & Results; Edge-cases & Troubleshooting; Pro-tips; Recap; Next Episode Teaser; Final CTA'
+      : 'Hook; Deep Problem Overview; Context & Architecture; In-depth Comprehensive Step-by-Step Hands-On Workshop (Scenes 4-22); Comprehensive Validation & Speed Test; Pitfalls & Edge Cases; Advanced Tips; Full Summary Recap; Series Teaser; Final Save & Follow CTA';
+
+    const dialectDescriptions: Record<string, string> = {
+      conversational: 'Natural Lahori conversational Pakistani Urdu, friendly tech YouTuber cadence, approachable brotherly tone.',
+      formal: 'Neutral semi-formal tech Urdu, clear articulate phrasing.',
+      fast_paced: 'Fast-paced, high-energy viral TikTok style, punchy sentences, zero pause.',
+      documentary: 'Deep-dive documentary explainer cadence, authoritative, serious investigative tone.',
+      brotherly: 'Casual senior brotherly / Bhai advice cadence, trustworthy mentor tone.',
+      urgent_tech: 'High-stakes urgent breaking tech alert tone, high energy, crisp hook.',
+      workshop: 'Step-by-step hands-on workshop pace, calm structured instructor tone.'
+    };
+    const dialectGuide = dialectDescriptions[dialectTone] || dialectDescriptions.conversational;
+
+    const flowDescriptions: Record<string, string> = {
+      cinematic_3d: 'Cinematic 3D Hologram + Anchor split-screen studio visuals.',
+      motion_graphics: 'Minimalist clean motion graphics & crisp code/software screencast visuals.',
+      split_screen: 'Live split-screen hands-on demo & facecam reaction.',
+      kinetic: 'Kinetic typography & dynamic fast-zoom cutaways.',
+      standard: 'Standard YouTube studio setup with anchor at desk.',
+      minimal: 'Minimal direct prompt.'
+    };
+    const flowGuide = flowDescriptions[flowPromptFormat] || flowDescriptions.cinematic_3d;
 
     const transcript = (Array.isArray(discussionTranscript) ? discussionTranscript : [])
       .filter((message: any) => message && String(message.text || '').trim())
@@ -1104,7 +1132,7 @@ app.post('/api/ai/generate-story', async (req, res) => {
     const primaryHashtag = channelName.toLowerCase().includes('beauty') ? '#BeautyHub' : '#ITCafeteria';
 
     const prompt = `You are the lead story architect for "${channelName}" (${niche}), presenter "${presenter}".
-Create a complete ${totalScenes}-scene vertical YouTube Shorts story package in Roman Urdu (Pakistani Urdu in Latin script), with English tech/beauty keywords where natural.
+Create a complete ${totalScenes}-scene vertical video story package in Roman Urdu (Pakistani Urdu in Latin script), with English tech/beauty keywords where natural. Total duration: ${totalScenes * 10} seconds (${Math.floor((totalScenes * 10) / 60)}m ${(totalScenes * 10) % 60}s).
 
 CREATOR BRIEF
 - Category: "${category}" | Playlist: "${playlist}"
@@ -1118,13 +1146,16 @@ CREATOR BRIEF
 ${transcript || '(none)'}
 - Already published titles to avoid: ${excluded || '(none)'}
 - Primary hashtag: ${primaryHashtag}
+- Dialect & Tone Cadence: ${dialectGuide}
+- Visual Direction for Flow Prompts: ${flowGuide}
+${customInstructions ? `- Custom Creator Directives & Pattern Rules:\n${customInstructions}` : ''}
 
 STORY RULES (strict)
 1. Exactly ${totalScenes} scenes. Beat guide: ${beatGuide}
 2. Every scene is exactly 10 seconds and the spoken "dialogue" must be 22 to 25 Roman Urdu words (2.7 words per second). Count carefully. "words" field must match the actual dialogue word count.
 3. Scene 1 Hook: no greeting, immediate pattern interrupt in the first line. Final scene must be a Save/Follow CTA.
 4. Dialogue must be Roman Urdu in Latin script. No Devanagari. English only for tool names/tech terms. No repeated word or syllable, no filler.
-5. Each "script" is a paste-ready Google Flow prompt for that scene:
+5. Each "script" is a paste-ready Google Flow prompt for that scene following "${flowGuide}":
    - Character scenes start with "${tag}" and include: sitting/standing anchor pose (0.5s), studio setting, gesture/visual overlay, voice instruction line ("He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated."), then the exact dialogue in double quotes, then the closing anchor pose.
    - Screen-demo scenes start with "The camera cuts to a full-screen..." and include ${tag}'s voiceover plus the exact dialogue in quotes.
    - The dialogue inside script must be word-for-word identical to the "dialogue" field.

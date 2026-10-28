@@ -651,10 +651,12 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
     defaultTag: "@WM25-1",
     defaultCategoryId: 4,
     durations: [
-      { value: 10, label: "10 Scenes (100s — Standard Short)" },
-      { value: 12, label: "12 Scenes (120s — Extended)" },
-      { value: 15, label: "15 Scenes (150s — Max Short)" },
-      { value: 7, label: "7 Scenes (70s — Minimal Threshold)" }
+      { value: 7, label: "7 Scenes (70s — 1m 10s)" },
+      { value: 10, label: "10 Scenes (100s — 1m 40s Standard Short)" },
+      { value: 12, label: "12 Scenes (120s — 2m 00s Video)" },
+      { value: 15, label: "15 Scenes (150s — 2m 30s Video)" },
+      { value: 18, label: "18 Scenes (180s — 3m 00s Video)" },
+      { value: 30, label: "30 Scenes (300s — 5m 00s Deep Dive)" }
     ],
     defaultSceneCount: 10,
     sampleNotes: {
@@ -681,10 +683,12 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
     defaultTag: "@MZ22-1",
     defaultCategoryId: 1,
     durations: [
-      { value: 10, label: "10 Scenes (100s — Standard Short)" },
-      { value: 12, label: "12 Scenes (120s — Extended Look)" },
-      { value: 15, label: "15 Scenes (150s — Max Short)" },
-      { value: 8, label: "8 Scenes (80s — Quick Look)" }
+      { value: 7, label: "7 Scenes (70s — 1m 10s)" },
+      { value: 10, label: "10 Scenes (100s — 1m 40s Standard Short)" },
+      { value: 12, label: "12 Scenes (120s — 2m 00s Video)" },
+      { value: 15, label: "15 Scenes (150s — 2m 30s Video)" },
+      { value: 18, label: "18 Scenes (180s — 3m 00s Video)" },
+      { value: 30, label: "30 Scenes (300s — 5m 00s Deep Dive)" }
     ],
     defaultSceneCount: 10,
     sampleNotes: {

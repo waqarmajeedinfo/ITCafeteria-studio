@@ -309,10 +309,10 @@ export const AgentSimulator: React.FC = () => {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-bold text-white text-base">
-                  Multi-Channel Content Agent Studio ({simulatorConfig.versionLabel})
+                  Multi-Channel Content Agent Studio
                 </h3>
-                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono font-semibold">
-                  {simulatorConfig.baselineTag}
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-md font-mono font-semibold">
+                  {simulatorConfig.baselineTag || 'Active Baseline'}
                 </span>
                 <button
                   onClick={() => setShowSimulatorConfig(true)}
