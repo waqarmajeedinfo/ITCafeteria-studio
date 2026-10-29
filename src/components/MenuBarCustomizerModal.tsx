@@ -175,26 +175,22 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
 
   // Toggle Lock for a Group
   const toggleGroupLock = (groupId: string) => {
-    setLocalConfig((prev) => {
-      const next = {
-        ...prev,
-        groups: prev.groups.map((g) => (g.id === groupId ? { ...g, isLocked: !g.isLocked } : g))
-      };
-      markDirty(next);
-      return next;
-    });
+    const next = {
+      ...localConfig,
+      groups: localConfig.groups.map((g) => (g.id === groupId ? { ...g, isLocked: !g.isLocked } : g))
+    };
+    setLocalConfig(next);
+    markDirty(next);
   };
 
   // Toggle Lock for an Item
   const toggleItemLock = (itemId: TabType) => {
-    setLocalConfig((prev) => {
-      const next = {
-        ...prev,
-        items: prev.items.map((item) => (item.id === itemId ? { ...item, isLocked: !item.isLocked } : item))
-      };
-      markDirty(next);
-      return next;
-    });
+    const next = {
+      ...localConfig,
+      items: localConfig.items.map((item) => (item.id === itemId ? { ...item, isLocked: !item.isLocked } : item))
+    };
+    setLocalConfig(next);
+    markDirty(next);
   };
 
   // Move an item to a new group (STRICT NO-DUPLICATE RULE)
@@ -228,14 +224,12 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     setLockWarning(null);
 
     // Update assignment (item stays unique across the whole app)
-    setLocalConfig((prev) => {
-      const next = {
-        ...prev,
-        items: prev.items.map((i) => (i.id === itemId ? { ...i, groupId: targetGroupId } : i))
-      };
-      markDirty(next);
-      return next;
-    });
+    const next = {
+      ...localConfig,
+      items: localConfig.items.map((i) => (i.id === itemId ? { ...i, groupId: targetGroupId } : i))
+    };
+    setLocalConfig(next);
+    markDirty(next);
   };
 
   // Start renaming a group
@@ -258,14 +252,12 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
       editingGroupIdRef.current = null;
       return;
     }
-    setLocalConfig((prev) => {
-      const next = {
-        ...prev,
-        groups: prev.groups.map((g) => (g.id === groupId ? { ...g, label: labelToSave } : g))
-      };
-      markDirty(next);
-      return next;
-    });
+    const next = {
+      ...localConfig,
+      groups: localConfig.groups.map((g) => (g.id === groupId ? { ...g, label: labelToSave } : g))
+    };
+    setLocalConfig(next);
+    markDirty(next);
     setEditingGroupId(null);
     editingGroupIdRef.current = null;
     setTempLabel('');
@@ -292,14 +284,12 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
       editingItemIdRef.current = null;
       return;
     }
-    setLocalConfig((prev) => {
-      const next = {
-        ...prev,
-        items: prev.items.map((i) => (i.id === itemId ? { ...i, label: labelToSave } : i))
-      };
-      markDirty(next);
-      return next;
-    });
+    const next = {
+      ...localConfig,
+      items: localConfig.items.map((i) => (i.id === itemId ? { ...i, label: labelToSave } : i))
+    };
+    setLocalConfig(next);
+    markDirty(next);
     setEditingItemId(null);
     editingItemIdRef.current = null;
     setTempLabel('');

@@ -423,17 +423,41 @@ export const AgentSimulator: React.FC = () => {
             </select>
           </div>
 
-          {/* Scene Count */}
+          {/* Scene Count (Configurable Presets 7-30) */}
           <div>
-            <label className="text-slate-400 block mb-1">Duration & Scenes (Sec 12)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-slate-400 block">Duration & Scenes</label>
+              <button
+                type="button"
+                onClick={() => setShowSimulatorConfig(true)}
+                className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
+                title="Configure scene presets"
+              >
+                Config ({draftSceneCount}s)
+              </button>
+            </div>
             <select
               value={draftSceneCount}
               onChange={(e) => setDraftSceneCount(Number(e.target.value))}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono text-xs"
             >
-              {draftProfile.durations.map((duration) => (
-                <option key={duration.value} value={duration.value}>{duration.label}</option>
+              {(simulatorConfig.scenePresets || [
+                { id: '1', count: 7, label: '7 Scenes (70s — Minimal Threshold)' },
+                { id: '2', count: 10, label: '10 Scenes (100s — Standard Short)' },
+                { id: '3', count: 12, label: '12 Scenes (120s — Extended)' },
+                { id: '4', count: 15, label: '15 Scenes (150s — Deep Tutorial)' },
+                { id: '5', count: 20, label: '20 Scenes (200s — Masterclass)' },
+                { id: '6', count: 25, label: '25 Scenes (250s — Extended Series)' },
+                { id: '7', count: 30, label: '30 Scenes (300s — Max Long-form Short)' }
+              ]).map((sp) => (
+                <option key={sp.id || sp.count} value={sp.count}>
+                  {sp.label}
+                </option>
               ))}
+              {/* Fallback if current draftSceneCount is a custom number not in presets */}
+              {!(simulatorConfig.scenePresets || []).some((sp) => sp.count === draftSceneCount) && (
+                <option value={draftSceneCount}>{draftSceneCount} Scenes ({draftSceneCount * 10}s — Custom)</option>
+              )}
             </select>
           </div>
         </div>
@@ -548,7 +572,7 @@ export const AgentSimulator: React.FC = () => {
             </div>
             <StoryPackageView
               story={latestStory}
-              onUpdateStory={(updated) => setLatestStory(updated)}
+              onUpdateStory={(updated: GeneratedStory) => setLatestStory(updated)}
             />
           </>
         ) : (

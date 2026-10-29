@@ -176,14 +176,16 @@ ${story.memoryBlock}`;
 
 export interface StoryPackageViewProps {
   story: GeneratedStory;
-  publishStatus?: 'pending' | 'published' | 'draft' | 'overdue';
+  publishStatus?: 'pending' | 'published' | 'draft' | 'overdue' | string;
   onTogglePublish?: () => void;
+  onUpdateStory?: (updatedStory: GeneratedStory) => void;
 }
 
 export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
   story,
   publishStatus,
-  onTogglePublish
+  onTogglePublish,
+  onUpdateStory
 }) => {
   const [copiedScene, setCopiedScene] = useState<number | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);

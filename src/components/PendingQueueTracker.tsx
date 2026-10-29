@@ -690,7 +690,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                   story={selectedRecord.storyPackage}
                   publishStatus={selectedRecord.status}
                   onTogglePublish={() => togglePublishStatus(selectedRecord.id)}
-                  onUpdateStory={(updatedStory) => {
+                  onUpdateStory={(updatedStory: GeneratedStory) => {
                     setQueue((prevQueue) => {
                       const updated = prevQueue.map((item) => {
                         if (item.id === selectedRecord.id) {

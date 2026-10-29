@@ -52,12 +52,15 @@ class DirtyStateManager {
         })
       );
     }
-    this.listeners.forEach((fn) => {
-      try {
-        fn(this.activeDirty);
-      } catch (err) {
-        console.error('Dirty listener error:', err);
-      }
+    // Defer listener execution to microtask so React render cycles never clash
+    Promise.resolve().then(() => {
+      this.listeners.forEach((fn) => {
+        try {
+          fn(this.activeDirty);
+        } catch (err) {
+          console.error('Dirty listener error:', err);
+        }
+      });
     });
   }
 }

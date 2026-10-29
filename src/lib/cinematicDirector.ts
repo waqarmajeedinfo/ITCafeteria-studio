@@ -20,7 +20,27 @@ export const CINEMATIC_STAGE_DIRECTIONS: Record<number, string> = {
   7: 'As a cinematic director, visualize this scene with an orbital camera sweep, 8K octane render clarity, and vibrant 3D holographic wireframes revolving around the anchor',
   8: 'As a cinematic director, visualize this scene with a rapid rack focus from presenter to futuristic glass terminal screen, highlighting actionable step-by-step milestones',
   9: 'As a cinematic director, visualize this scene with a confident center-framed steady-cam push-in, rich cinematic bokeh in the background, and glowing warning/takeaway callouts',
-  10: 'As a cinematic director, visualize this scene with an impactful center-frame slow push-in, cinematic warm bokeh, and an animated 3D subscriber bell & milestone badge with clear visual punch'
+  10: 'As a cinematic director, visualize this scene with an impactful center-frame slow push-in, cinematic warm bokeh, and an animated 3D subscriber bell & milestone badge with clear visual punch',
+  11: 'As a cinematic director, visualize this scene with a crane jib overhead angle descending into the workstation with pulsating cyan circuitry',
+  12: 'As a cinematic director, visualize this scene with a tight extreme close-up macro lens on cursor execution and instant holographic feedback triggers',
+  13: 'As a cinematic director, visualize this scene with a dynamic 45-degree angle profile shot, neon edge lighting, and floating multi-layer timeline nodes',
+  14: 'As a cinematic director, visualize this scene with a rapid whip-pan transition into a split screen illustrating real-time speed benchmarking',
+  15: 'As a cinematic director, visualize this scene with an anamorphic lens flare sweep across a floating glass tablet interface with tactile interaction',
+  16: 'As a cinematic director, visualize this scene with an eye-level steady tracking shot as the presenter walks toward a glowing 3D command dashboard',
+  17: 'As a cinematic director, visualize this scene with dramatic chiaroscuro high-contrast lighting highlighting the breakthrough automation result',
+  18: 'As a cinematic director, visualize this scene with an isometric 3D architectural wireframe perspective exploding the hidden software layer',
+  19: 'As a cinematic director, visualize this scene with a smooth vertical pedestal reveal, showing the finished asset rendered in ultra-sharp 8K detail',
+  20: 'As a cinematic director, visualize this scene with a 180-degree semicircular tracking rotation focusing on the single-click shortcut execution',
+  21: 'As a cinematic director, visualize this scene with ambient volumetric atmospheric smoke, soft amber key light, and floating floating numeric badges',
+  22: 'As a cinematic director, visualize this scene with a high-angle top-down glass table perspective displaying synchronized dual-cloud pipelines',
+  23: 'As a cinematic director, visualize this scene with an energetic snap zoom highlighting critical parameters and mistake prevention warning rings',
+  24: 'As a cinematic director, visualize this scene with a sweeping low-slung dolly shot emphasizing authority, precision, and frictionless workflow speed',
+  25: 'As a cinematic director, visualize this scene with a soft-focus background transition to crystal-clear foreground interface verification',
+  26: 'As a cinematic director, visualize this scene with a dual-camera split-perspective framing the anchor on the left and dynamic live execution on the right',
+  27: 'As a cinematic director, visualize this scene with a slow-motion particle dissipation effect transitioning into the executive summary',
+  28: 'As a cinematic director, visualize this scene with an intense cinematic push-in onto the anchor delivering the decisive strategic insight',
+  29: 'As a cinematic director, visualize this scene with a vibrant glowing holographic countdown timer leading directly into the climax demonstration',
+  30: 'As a cinematic director, visualize this scene with a grand final cinematic pullback, ultra-crisp studio lighting, and animated 3D follow/subscribe badge with magnetic loop closure'
 };
 
 export const CINEMATIC_PRESETS = [

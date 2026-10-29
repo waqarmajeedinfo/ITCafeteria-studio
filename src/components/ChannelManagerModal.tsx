@@ -534,17 +534,53 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="text-slate-300 font-semibold block mb-1">Default Scene Count</label>
-                    <select
-                      value={sceneCount}
-                      onChange={(e) => setSceneCount(parseInt(e.target.value) || 10)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-                    >
-                      <option value={7}>7 Scenes (70s — Minimal Threshold)</option>
-                      <option value={10}>10 Scenes (100s — Standard Short)</option>
-                      <option value={12}>12 Scenes (120s — Extended)</option>
-                      <option value={15}>15 Scenes (150s — Max Format)</option>
-                    </select>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-slate-300 font-semibold text-xs">Default Scene Count (7–30)</label>
+                      <span className="text-[10px] text-cyan-300 font-mono font-bold">{sceneCount} Scenes ({sceneCount * 10}s)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSceneCount(Math.max(7, sceneCount - 1))}
+                        className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center cursor-pointer border border-slate-700"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="number"
+                        min={7}
+                        max={30}
+                        value={sceneCount}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val)) setSceneCount(Math.max(7, Math.min(30, val)));
+                        }}
+                        className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-center text-white font-mono font-bold focus:outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSceneCount(Math.min(30, sceneCount + 1))}
+                        className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center cursor-pointer border border-slate-700"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      {[7, 10, 12, 15, 20, 25, 30].map((num) => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => setSceneCount(num)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono border cursor-pointer transition-colors ${
+                            sceneCount === num
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 font-bold'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {num}s
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 

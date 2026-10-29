@@ -53,6 +53,8 @@ import {
 import { buildMasterThumbnailPrompt, splitHeadline } from '../lib/thumbnailMaster';
 import { StoryPackageView, buildStoryPackageText, type GeneratedStory, type StoryScene } from './StoryPackageView';
 import { updatePendingStoryStatus, upsertPendingStoryRecord } from '../lib/pendingQueueStore';
+import { applyCinematicDirecting } from '../lib/cinematicDirector';
+import { loadSimulatorConfig } from './SimulatorConfigModal';
 import {
   loadAutopilotConfig,
   updateAutopilotConfig,
@@ -146,17 +148,84 @@ const STORAGE_KEYS = {
   AI_DRAFT: 'itcafeteria_latest_ai_draft',
 };
 
-export function createFullAutopilotStoryPackage(task: {
-  id: string;
-  title: string;
-  category: string;
-  characterTag: string;
-  scheduledSlot: string;
-  scheduledDate: string;
-  priority: string;
-}): GeneratedStory {
+export function createFullAutopilotStoryPackage(
+  task: {
+    id: string;
+    title: string;
+    category: string;
+    characterTag: string;
+    scheduledSlot: string;
+    scheduledDate: string;
+    priority: string;
+  },
+  sceneCountOverride?: number
+): GeneratedStory {
   const [line1, line2] = splitHeadline(task.title.toUpperCase());
-  const tag = task.characterTag.replace('@', '');
+  const tag = task.characterTag ? task.characterTag.replace('@', '') : 'WM25-1';
+  const cfg = loadSimulatorConfig();
+  const targetSceneCount = Math.max(7, Math.min(30, sceneCountOverride || cfg.defaultSceneCount || 10));
+
+  // Beat descriptions and purposes for up to 30 scenes
+  const BEAT_PURPOSES: { purpose: string; hook: string; action: string }[] = [
+    { purpose: 'Disruptive Hook', hook: 'Bhai, kya aapka kaam ghanton tak phansa rehta hai?', action: 'points directly at camera with intense urgency' },
+    { purpose: 'The Bottleneck Exposed', hook: 'Aksar dost purana manual tareeqa use karke apna bohot waqt zaya karte hain.', action: 'indicates red slow-progress error popup on transparent terminal' },
+    { purpose: 'Pattern Interrupt & Reveal', hook: 'Lekin IT Cafeteria par aaj mein aapko ek aesa secret tool dikha raha hoon jo 100% free hai.', action: 'activates floating 3D neon holographic workflow panel' },
+    { purpose: 'Step 1: Rapid Initialization', hook: 'Pehla step note karein: Apne browser ya tool mein yeh hidden switch turn on karein.', action: 'clicks glowing emerald trigger setting on workspace screen' },
+    { purpose: 'Step 2: Core Automation Execution', hook: 'Doosra step: Sirf yeh one-line shortcut enter karein aur automatic run dabayein.', action: 'triggers script execution with cyan circuit ripple effect' },
+    { purpose: 'Visual Transformation & Verification', hook: 'Check karein! Sara raw data bina kisi ghalti ke instantly structured ho chuka hai.', action: 'presents high-contrast before vs after visual comparison' },
+    { purpose: 'Pro Tip: Daily Scheduler', hook: 'Pro tip: Is process ko background timer par set karein taake rozana khud chale.', action: 'leans in with confident smile, highlighting auto-scheduler' },
+    { purpose: 'Cross-Platform Verification', hook: 'Yeh trick Windows, Mac aur Cloud teeno par barabar fast execute hoti hai.', action: 'displays dual-device synchronized terminal outputs side-by-side' },
+    { purpose: 'Optimization & Mistake Warning', hook: 'Dhyan rahe, purani extension delete karna na bhoolein warna conflict aa sakta hai.', action: 'highlights warning border around legacy conflicting software' },
+    { purpose: 'Deep Dive: AI Prompt Injection', hook: 'Iske sath custom AI parameter jorhein taake summary aur categorization bhi auto ho.', action: 'drags neural logic node into active timeline' },
+    { purpose: 'Real-Time Benchmark Test', hook: 'Ab speed test karein: 10,000 rows ka data sirf 4 seconds mein clean!', action: 'launches countdown benchmarking stopwatch with glowing numbers' },
+    { purpose: 'Security & Privacy Check', hook: 'Local privacy safe hai — aapka koi data external server par leak nahi hoga.', action: 'activates green shield security badge over data storage card' },
+    { purpose: 'Multi-Format Export', hook: 'Aik click se Excel, CSV aur JSON teeno formats mein instant export karein.', action: 'taps floating export menu with animated particle confirmation' },
+    { purpose: 'Cloud Sync & Backup', hook: 'Direct Google Drive ya OneDrive folder ke sath automatic link banayein.', action: 'connects cloud pipeline wireframe with smooth camera dolly' },
+    { purpose: 'Workflow Integration Shortcut', hook: 'Desktop par custom shortcut banayein taake double-click se sab chale.', action: 'creates tactile desktop hotkey widget with neon cyan rim' },
+    { purpose: 'Batch Processing Demo', hook: 'Aik file nahi, poora folder drag karein aur multi-batch automation dekhein.', action: 'drags multiple files into ingestion hopper simultaneously' },
+    { purpose: 'Edge Case Error Handling', hook: 'Agar kabhi formula break ho to yeh backup formula automatically restore karega.', action: 'demonstrates fail-safe recovery switch on monitor' },
+    { purpose: 'Mobile Remote Trigger', hook: 'Office ke bahar hon to apne smartphone se bhi yeh script run kar sakte hain.', action: 'holds futuristic glass smartphone showing remote command success' },
+    { purpose: 'Team Sharing & Collaboration', hook: 'Poori team ko invite karein aur shared dashboard par real-time results dekhein.', action: 'expands collaborative network nodes in 3D holographic space' },
+    { purpose: 'Performance Audit', hook: 'Memory usage sirf 5% hai, CPU par koi heavy load nahi parta.', action: 'points to low-consumption diagnostic gauge on screen' },
+    { purpose: 'Custom Styling & Polish', hook: 'Report ka visual layout branded colors mein auto-format ho jata hai.', action: 'swipes hand across table transforming raw numbers to sleek charts' },
+    { purpose: 'Notification Hook', hook: 'Task complete hote hi WhatsApp ya Telegram par instant notification milega.', action: 'receives simulated green push notification ping on wrist device' },
+    { purpose: 'Archival & Version Control', hook: 'Har din ka version auto-save rehta hai, koi purana data lose nahi hoga.', action: 'scrolls through chronological version tree with ease' },
+    { purpose: 'Speed Acceleration Hack', hook: 'Cache flush command lagayein aur execution speed 2x aur tez karein.', action: 'executes turbo-boost toggle with glowing amber pulse' },
+    { purpose: 'User Questions Resolved', hook: 'Comment mein sab se zyada pooche jane wale maslay ka yeh exact hal hai.', action: 'addresses floating audience question bubble with direct answer' },
+    { purpose: 'Executive Summary', hook: 'To summary yeh hai: Ghanton ka manual kaam ab sirf seconds mein done.', action: 'stands center-stage framing the 3 golden rules on screen' },
+    { purpose: 'Episodic Bridge / Part 2 Teaser', hook: 'Agli video mein hum iska full autonomous agent banayein ge jo khud faislay karega.', action: 'points to teaser holographic thumbnail for next episode' },
+    { purpose: 'Subscriber Milestone Callout', hook: 'IT Cafeteria family ke 142K tech creators ka hissa banne ke liye shukriya!', action: 'celebrates with 3D glowing YouTube silver badge in background' },
+    { purpose: 'Pre-CTA Retention Hook', hook: 'Yeh script aur template description mein di gayi link se download karein.', action: 'gestures toward video description pin with glowing pointer' },
+    { purpose: 'Seamless Loop CTA', hook: 'Aisi daily Urdu tech hacks ke liye IT Cafeteria ko follow karein aur doston se share karein!', action: 'outro gesture with magnetic loop cue blending directly into opening' }
+  ];
+
+  const generatedScenes: StoryScene[] = [];
+
+  for (let i = 1; i <= targetSceneCount; i++) {
+    const isLastScene = i === targetSceneCount;
+    const beatIndex = isLastScene ? BEAT_PURPOSES.length - 1 : Math.min(i - 1, BEAT_PURPOSES.length - 2);
+    const beat = BEAT_PURPOSES[beatIndex] || BEAT_PURPOSES[0];
+
+    // Single consistent anchor persona maintained across EVERY scene!
+    const visual = `${tag} stands in cyber studio workstation, ${beat.action}. Floating 3D holographic interface elements on right.`;
+    const dialogue = isLastScene
+      ? `Aisi daily viral tech shortcuts ke liye IT Cafeteria ko subscribe karein aur abhi check karein!`
+      : `${beat.hook} Seedhi baat yeh hai ke is trick se aapka daily production 10x tezi se run hoga.`;
+
+    const rawScript = `${tag} — standing anchor presentation.\nDialogue (Lahori Conversational Urdu): "${dialogue}"\nVisual details: ${visual}`;
+    const directedScript = applyCinematicDirecting(i, rawScript, undefined, beat.purpose);
+
+    generatedScenes.push({
+      num: i,
+      duration: '10s',
+      purpose: beat.purpose,
+      isCTA: isLastScene,
+      words: dialogue.split(/\s+/).filter(Boolean).length,
+      visual,
+      dialogue,
+      script: directedScript
+    });
+  }
 
   return {
     title: `${task.title} #shorts #itcafeteria`,
@@ -167,7 +236,7 @@ export function createFullAutopilotStoryPackage(task: {
     playlist: 'Autopilot Co-Pilot Series',
     characterTag: tag,
     dateLabel: `${task.scheduledDate} • ${task.scheduledSlot}`,
-    sceneCount: 10,
+    sceneCount: targetSceneCount,
     hashtags: ['#shorts', '#itcafeteria', '#techurdu', '#pakistantech', '#automation'],
     description: `${task.title} — IT Cafeteria production guide by Waqar Majeed.\n\nKey Steps:\n1. Open target tool settings\n2. Run automated shortcut\n3. Save clean output instantly\n\nSubscribe for daily Urdu tech shortcuts!\n#itcafeteria #pakistantech #shorts`,
     tags: ['it cafeteria', 'waqar majeed', 'tech tips', 'urdu tech', 'automation', 'productivity', 'shorts'],
@@ -187,116 +256,15 @@ export function createFullAutopilotStoryPackage(task: {
       characterTag: tag
     }),
     seriesPlan: 'Episode in Autopilot Co-Pilot Series',
-    memoryBlock: `Autopilot Task #${task.id} — Priority ${task.priority}. 10-Scene Structure. Zero-duplicate verified.`,
+    memoryBlock: `Autopilot Task #${task.id} — Priority ${task.priority}. ${targetSceneCount}-Scene Structure. Zero-duplicate verified.`,
     idea: {
       title: task.title,
       hook: 'Pattern interrupt opening hook',
       angle: 'High-utility viral tech productivity',
-      points: '10 scenes structured for 104% retention loop'
+      points: `${targetSceneCount} scenes structured for 104% retention loop with strict persona lock`
     },
-    discussionNotes: 'Generated via Autonomous Multi-Agent Pipeline with 10-scene pacing.',
-    scenes: [
-      {
-        num: 1,
-        duration: '6s',
-        purpose: 'Disruptive Hook',
-        isCTA: false,
-        words: 22,
-        visual: `${tag} stands in dark cyber studio, points directly at screen with intense alert expression.`,
-        dialogue: `Kya aapka kaam ghanton tak phansa rehta hai? Sirf yeh secret trick lagayein aur seconds mein complete karein!`,
-        script: `${tag} — standing anchor pose. Conversational Roman Urdu: "Kya aapka kaam ghanton tak phansa rehta hai? Sirf yeh secret trick lagayein aur seconds mein complete karein!"`
-      },
-      {
-        num: 2,
-        duration: '6s',
-        purpose: 'The Problem Exposed',
-        isCTA: false,
-        words: 23,
-        visual: 'Screen demonstration showing red error popup and slow manual dragging.',
-        dialogue: 'Aksar log is task ke liye purana manual rasta use karte hain aur apna bohot zyada waqt zaya karte hain.',
-        script: `Screen demonstration. Voiceover: "Aksar log is task ke liye purana manual rasta use karte hain aur apna bohot zyada waqt zaya karte hain."`
-      },
-      {
-        num: 3,
-        duration: '6s',
-        purpose: 'Pattern Interrupt',
-        isCTA: false,
-        words: 24,
-        visual: 'Glowing cyan circuit animation cuts across the screen with camera zoom.',
-        dialogue: 'Lekin IT Cafeteria par aaj mein aapko ek aesa hidden tool batane ja raha hoon jo totally free aur fast hai.',
-        script: `${tag} appears in half split-screen: "Lekin IT Cafeteria par aaj mein aapko ek aesa hidden tool batane ja raha hoon jo totally free aur fast hai."`
-      },
-      {
-        num: 4,
-        duration: '6s',
-        purpose: 'Step 1: Setup',
-        isCTA: false,
-        words: 24,
-        visual: 'Direct mouse click highlighting the secret option with glowing emerald ring.',
-        dialogue: 'Pehla step: Apne browser ya software mein is setting ko open karein aur automatic mode enable karein.',
-        script: `Screen recording showing cursor clicking the hidden toggle: "Pehla step: Apne browser ya software mein is setting ko open karein aur automatic mode enable karein."`
-      },
-      {
-        num: 5,
-        duration: '6s',
-        purpose: 'Step 2: Execution',
-        isCTA: false,
-        words: 23,
-        visual: 'Command line or keyboard shortcut pressed with neon overlay effect.',
-        dialogue: 'Doosra step: Yeh command enter karein ya single click se execution trigger kar dein.',
-        script: `Close up on keyboard and UI execution: "Doosra step: Yeh command enter karein ya single click se execution trigger kar dein."`
-      },
-      {
-        num: 6,
-        duration: '6s',
-        purpose: 'Visual Transformation',
-        isCTA: false,
-        words: 22,
-        visual: 'Before vs After split screen showing 10x faster clean results in real time.',
-        dialogue: 'Aur dekhein! Sara data khud-ba-khud clean ho kar seconds mein ready ho chuka hai.',
-        script: `Split screen Before/After comparison: "Aur dekhein! Sara data khud-ba-khud clean ho kar seconds mein ready ho chuka hai."`
-      },
-      {
-        num: 7,
-        duration: '6s',
-        purpose: 'Pro Level Tip',
-        isCTA: false,
-        words: 24,
-        visual: `${tag} leans in with confident smile, holding up index finger.`,
-        dialogue: 'Pro tip: Is process ko daily schedule par bhi laga sakte hain taake aapko baar baar na karna parhe.',
-        script: `${tag} close shot: "Pro tip: Is process ko daily schedule par bhi laga sakte hain taake aapko baar baar na karna parhe."`
-      },
-      {
-        num: 8,
-        duration: '6s',
-        purpose: 'Cross-Device Verification',
-        isCTA: false,
-        words: 21,
-        visual: 'Mobile phone and laptop screens running side by side seamlessly.',
-        dialogue: 'Yeh trick Windows, Mac aur mobile sab par barabar tezi se kaam karti hai.',
-        script: `Dual device mockup animation: "Yeh trick Windows, Mac aur mobile sab par barabar tezi se kaam karti hai."`
-      },
-      {
-        num: 9,
-        duration: '6s',
-        purpose: 'Episodic Hook',
-        isCTA: false,
-        words: 22,
-        visual: 'Next episode teaser thumbnail flashing with glowing mystery question mark.',
-        dialogue: 'Iske Part 2 mein hum iska advanced AI automation dekhein ge jo aur bhi zordar hai.',
-        script: `Teaser badge: "Iske Part 2 mein hum iska advanced AI automation dekhein ge jo aur bhi zordar hai."`
-      },
-      {
-        num: 10,
-        duration: '6s',
-        purpose: 'Seamless Loop CTA',
-        isCTA: true,
-        words: 22,
-        visual: 'IT Cafeteria subscribe bell animation seamlessly blending back into opening scene.',
-        dialogue: 'Aisi daily tech tricks ke liye IT Cafeteria ko follow karein aur video doston ke sath share karein!',
-        script: `${tag} outro gesture: "Aisi daily tech tricks ke liye IT Cafeteria ko follow karein aur video doston ke sath share karein!"`
-      }
-    ]
+    discussionNotes: `Generated via Autonomous Multi-Agent Pipeline with ${targetSceneCount}-scene pacing and Lahori conversational dialect.`,
+    scenes: generatedScenes
   };
 }
 
@@ -1249,8 +1217,12 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-rose-400" /> Duplicate Defense
             </span>
-            <div className="text-sm font-bold text-white">58 Catalog Videos</div>
-            <div className="text-[11px] text-emerald-400 font-mono">0% Duplicate Guarantee</div>
+            <div className="text-sm font-bold text-white">
+              {PUBLISHED_VIDEOS.length + tasks.filter((t) => t.status === 'completed').length} Catalog Videos
+            </div>
+            <div className="text-[11px] text-emerald-400 font-mono">
+              0% Duplicate Guarantee • {tasks.filter((t) => t.status === 'completed').length} Published Synced
+            </div>
           </div>
           <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold uppercase">
             Active
@@ -1405,10 +1377,10 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
                             setShowTaskModal(true);
                           }}
                           className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm hover:border-cyan-500/40"
-                          title="Pura 10-scene package aur YouTube details open karein"
+                          title="Complete story package aur YouTube production details open karein"
                         >
                           <FileText className="w-3.5 h-3.5 text-cyan-400" />
-                          <span>Open Full Story (10 سینز)</span>
+                          <span>Open Story ({task.storyPackage?.sceneCount || 10} Scenes)</span>
                         </button>
 
                         {!isCompleted && !isProcessing && (
