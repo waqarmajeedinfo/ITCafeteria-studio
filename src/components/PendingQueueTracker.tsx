@@ -44,6 +44,7 @@ import {
   type StoryPublishStatus
 } from '../lib/pendingQueueStore';
 import { StoryPackageView, buildStoryPackageText, type GeneratedStory } from './StoryPackageView';
+import { publishStoryDirectly } from '../lib/publishedLibraryStore';
 import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
 import { CATEGORIES_IT_CAFETERIA } from '../data/channelData';
 import {
@@ -63,7 +64,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     const next = getNextTargetStory(loadPendingQueue());
     return next ? next.id : '';
   });
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'overdue' | 'draft' | 'published'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'overdue' | 'draft' | 'published'>('pending');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -93,18 +94,19 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
   const selectedRecord = queue.find((item) => item.id === selectedStoryId) || queue[0];
   const nextTarget = getNextTargetStory(queue);
 
-  // Toggle Publish Status
+  // Toggle Publish Status & Forward to Published Library
   const togglePublishStatus = (id: string) => {
     setQueue((prev) =>
       prev.map((item) => {
         if (item.id === id) {
           const newStatus: StoryPublishStatus = item.status === 'published' ? 'pending' : 'published';
           const nowStr = new Date().toISOString();
-          showToast(
-            newStatus === 'published'
-              ? `"${item.title.slice(0, 30)}..." ko Published mark kar diya gaya!`
-              : `"${item.title.slice(0, 30)}..." wapas Pending mein shift ho gaya.`
-          );
+          if (newStatus === 'published') {
+            publishStoryDirectly(item.storyPackage, item.id);
+            showToast(`"${item.title.slice(0, 30)}..." Published Videos Library mein forward ho gayi!`);
+          } else {
+            showToast(`"${item.title.slice(0, 30)}..." wapas Pending mein shift ho gaya.`);
+          }
           return {
             ...item,
             status: newStatus,
@@ -394,10 +396,23 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
             <div className="text-[10px] text-slate-500 mt-0.5">Missed schedule review</div>
           </div>
 
-          <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3">
-            <div className="text-[11px] text-slate-400">Published & Synced</div>
+          <div
+            onClick={() => {
+              if (onNavigateTab) {
+                onNavigateTab('duplicate');
+              } else {
+                setFilterStatus('published');
+              }
+            }}
+            className="bg-slate-950/70 border border-emerald-500/30 hover:border-emerald-400/60 rounded-xl p-3 cursor-pointer transition-all group"
+            title="Published Videos Library & Audit tab par jayein"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">Published & Synced</span>
+              <span className="text-[10px] text-emerald-400 group-hover:translate-x-0.5 transition-transform">View Library →</span>
+            </div>
             <div className="text-2xl font-bold text-emerald-400 mt-0.5">{publishedCount}</div>
-            <div className="text-[10px] text-emerald-500 mt-0.5">Verified on channel record</div>
+            <div className="text-[10px] text-emerald-500 mt-0.5">Forwarded to Published Library</div>
           </div>
         </div>
       </div>
@@ -477,9 +492,24 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                         </span>
 
                         {isPublished ? (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Published
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> Published & Synced
+                            </span>
+                            {onNavigateTab && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onNavigateTab('duplicate');
+                                }}
+                                className="text-[10px] text-cyan-400 hover:text-cyan-200 underline font-semibold cursor-pointer"
+                                title="Published Library mein check karein"
+                              >
+                                View in Library →
+                              </button>
+                            )}
+                          </div>
                         ) : isOverdue ? (
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-950/60 text-rose-400 border border-rose-800/40 flex items-center gap-1 animate-pulse">
                             <AlertTriangle className="w-3 h-3" /> Overdue

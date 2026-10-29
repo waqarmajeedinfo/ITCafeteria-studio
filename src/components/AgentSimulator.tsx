@@ -314,6 +314,10 @@ export const AgentSimulator: React.FC = () => {
                 <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-md font-mono font-semibold">
                   {simulatorConfig.baselineTag || 'Active Baseline'}
                 </span>
+                <span className="text-[10px] bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 px-2.5 py-0.5 rounded-md font-bold flex items-center gap-1">
+                  <Sparkles className="w-2.5 h-2.5 text-cyan-400" />
+                  YouTube Growth Engine (38.8% Retention & Shorts Feed Boost)
+                </span>
                 <button
                   onClick={() => setShowSimulatorConfig(true)}
                   className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 transition-colors cursor-pointer inline-flex items-center gap-1.5 text-[11px] font-medium shadow-sm hover:border-cyan-500/40"

@@ -1150,18 +1150,27 @@ ${transcript || '(none)'}
 - Visual Direction for Flow Prompts: ${flowGuide}
 ${customInstructions ? `- Custom Creator Directives & Pattern Rules:\n${customInstructions}` : ''}
 
+YOUTUBE CHANNEL ANALYTICS & 4-PILLAR GROWTH OPTIMIZATION (STRICT MANDATORY RULES):
+Live channel metrics for IT Cafeteria show: Retention 38.8% (Target: 50%+), Shorts Feed 6.7% (Major Bottleneck - Search is 68.8%), Subscriber conversion 3.99/1k (Target: 5+), Engagement 2.62% (Target: 4%+).
+To mathematically boost channel velocity and fix these leaks, every generated story MUST embed these 4 tactical pillars:
+1. PILLAR 1 (First 2 Seconds Instant Payoff - Boost Retention to 50%+): Scene 1 must show the finished visual result or an intense curiosity gap within the first 2 seconds. Zero welcome greeting, zero channel name intro, zero slow animations. First frame prompt MUST describe a visual pattern interrupt with a bold 3-5 word on-screen text overlay.
+2. PILLAR 2 (Shorts Feed Discovery & Infinite Loop - Break 6.7% Bottleneck): The final scene's concluding dialogue and visual must connect smoothly and loop back to the opening phrase of Scene 1, making the short seamlessly replayable without a jarring stop.
+3. PILLAR 3 (Mid-Story Subscriber Trigger at 60-75% Mark - Lift Subs from 3.99 to 5+/1k): In Scene 4 or 5 (approx. 35-45s in), deliver an explicit high-value reason to subscribe (e.g. "Is trick ka automated script agle episode mein share karunga — channel subscribe karke bell daba lein!").
+4. PILLAR 4 (High-Engagement A/B Dilemma - Push Engagement from 2.62% to 4%+): In the final CTA scene, ask the audience a direct 2-option question or dilemma (e.g. "Aap konsa tool prefer karte hain, A ya B? Comment mein batayein!"), and prompt a reply-worthy question in the description.
+
 STORY RULES (strict)
 1. Exactly ${totalScenes} scenes. Beat guide: ${beatGuide}
 2. Every scene is exactly 10 seconds and the spoken "dialogue" must be 22 to 25 Roman Urdu words (2.7 words per second). Count carefully. "words" field must match the actual dialogue word count.
-3. Scene 1 Hook: no greeting, immediate pattern interrupt in the first line. Final scene must be a Save/Follow CTA.
+3. Scene 1 Hook: no greeting, immediate pattern interrupt in the first line. Final scene must be a Save/Follow CTA with high-engagement question.
 4. Dialogue must be Roman Urdu in Latin script. No Devanagari. English only for tool names/tech terms. No repeated word or syllable, no filler.
 5. Each "script" is a paste-ready Google Flow prompt for that scene following "${flowGuide}":
    - Character scenes start with "${tag}" and include: sitting/standing anchor pose (0.5s), studio setting, gesture/visual overlay, voice instruction line ("He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated."), then the exact dialogue in double quotes, then the closing anchor pose.
    - Screen-demo scenes start with "The camera cuts to a full-screen..." and include ${tag}'s voiceover plus the exact dialogue in quotes.
    - The dialogue inside script must be word-for-word identical to the "dialogue" field.
+   - Every scene script must include strictly "Duration: 0-10s."
 6. The story must follow the creator's idea and discussion notes. Do not drift to an unrelated topic.
 7. Title must NOT be the raw topic sentence. Max 65 characters, curiosity + search keyword. Do not reuse excluded titles.
-8. Description: 2-3 Roman Urdu lines + a "PRACTICAL STEPS / COMMANDS:" block with 3-6 concrete steps when the topic is a tech tutorial. For beauty, give a short step routine instead.
+8. Description: 2-3 Roman Urdu lines + a "PRACTICAL STEPS / COMMANDS:" block with 3-6 concrete steps when the topic is a tech tutorial + a Pinned Comment engagement prompt.
 9. THUMBNAIL AGENT v3.45 structured output (server master prompt khud banayega, is liye poora image prompt mat likho):
    - thumbnailLine1 + thumbnailLine2: total 3-5 UPPERCASE words, har line maximum 14 characters. Line 1 white aur line 2 neon-cyan render hogi. Raw topic sentence kabhi nahi.
    - thumbnailSubBanner: 2-4 word punchy yellow-banner hook, Roman Urdu + English mix allowed.
