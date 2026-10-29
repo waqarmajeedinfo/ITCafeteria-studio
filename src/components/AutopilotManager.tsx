@@ -32,7 +32,15 @@ import {
   Wand2,
   Settings2,
   Square,
-  X
+  X,
+  Undo2,
+  Redo2,
+  Sliders,
+  Tv,
+  Plus,
+  Trash2,
+  Edit2,
+  Save
 } from 'lucide-react';
 
 import {
@@ -45,6 +53,23 @@ import {
 import { buildMasterThumbnailPrompt, splitHeadline } from '../lib/thumbnailMaster';
 import { StoryPackageView, buildStoryPackageText, type GeneratedStory, type StoryScene } from './StoryPackageView';
 import { updatePendingStoryStatus, upsertPendingStoryRecord } from '../lib/pendingQueueStore';
+import {
+  loadAutopilotConfig,
+  updateAutopilotConfig,
+  undoAutopilotConfig,
+  redoAutopilotConfig,
+  restoreDefaultAutopilotConfig,
+  getAutopilotHistoryStacks,
+  DEFAULT_AUTOPILOT_CONFIG,
+  type AutopilotConfiguration
+} from '../lib/autopilotConfigStore';
+import {
+  loadAllChannels,
+  saveOrUpdateChannel,
+  deleteChannel,
+  type ExtendedChannelProfile
+} from '../lib/channelStore';
+import { dirtyManager } from '../lib/dirtyStore';
 import type { TabType } from '../App';
 
 // --- Task & Queue Types ---

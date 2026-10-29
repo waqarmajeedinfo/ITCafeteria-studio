@@ -441,34 +441,61 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
                     />
                   </div>
 
-                  {/* Character Tag Feature: Checkbox Toggle (Inactive by default as requested!) */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-slate-300 font-semibold flex items-center gap-1.5">
-                        Character Tag (Google Flow)
-                      </label>
-                      <label className="flex items-center gap-1.5 text-[11px] text-cyan-300 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={hasCharacterTag}
-                          onChange={(e) => setHasCharacterTag(e.target.checked)}
-                          className="rounded border-slate-700 text-emerald-500 focus:ring-0 cursor-pointer"
+                  {/* Character Tag Feature: Conditional Toggle for Character-based story generation */}
+                  <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                        <label className="text-slate-200 font-semibold text-xs">
+                          Character-Based Story Generation
+                        </label>
+                      </div>
+
+                      {/* Stylish Toggle Switch */}
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={hasCharacterTag}
+                        onClick={() => {
+                          const next = !hasCharacterTag;
+                          setHasCharacterTag(next);
+                          if (next && !tag) setTag('@WM25-Live');
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          hasCharacterTag ? 'bg-cyan-500' : 'bg-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                            hasCharacterTag ? 'translate-x-4' : 'translate-x-0'
+                          }`}
                         />
-                        <span>Enable Character Avatar</span>
-                      </label>
+                      </button>
                     </div>
 
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      {hasCharacterTag
+                        ? 'Active: Yeh channel character anchor tag use karega. Tag field niche active hai.'
+                        : 'Disabled: Faceless / voiceover format ke liye tag ki zaroorat nahi hai.'}
+                    </p>
+
                     {hasCharacterTag ? (
-                      <input
-                        type="text"
-                        value={tag}
-                        onChange={(e) => setTag(e.target.value)}
-                        placeholder="e.g. @WM25-Live ya @CharacterTag"
-                        className="w-full bg-slate-900 border border-cyan-500/50 rounded-lg px-3 py-2 text-cyan-300 font-mono focus:outline-none focus:border-cyan-400"
-                      />
+                      <div className="pt-1">
+                        <label className="text-[11px] font-semibold text-cyan-300 block mb-1">
+                          Default Character Tag (Google Flow) <span className="text-cyan-400 font-mono">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={tag}
+                          onChange={(e) => setTag(e.target.value)}
+                          placeholder="e.g. @WM25-Live ya @CharacterTag"
+                          className="w-full bg-slate-950 border border-cyan-500/60 rounded-lg px-3 py-1.5 text-cyan-300 font-mono text-xs focus:outline-none focus:border-cyan-400 shadow-inner"
+                        />
+                      </div>
                     ) : (
-                      <div className="w-full bg-slate-900/60 border border-dashed border-slate-800 rounded-lg px-3 py-2 text-slate-400 italic text-[11px]">
-                        Faceless Storyboard Mode (Bina character tag ke story generate hogi)
+                      <div className="w-full bg-slate-950/70 border border-dashed border-slate-800 rounded-lg px-3 py-2 text-slate-400 italic text-[11px] flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-slate-600" />
+                        <span>Faceless Storyboard Mode — Tag input disabled for non-character format</span>
                       </div>
                     )}
                   </div>
