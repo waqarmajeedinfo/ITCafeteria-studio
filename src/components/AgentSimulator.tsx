@@ -572,6 +572,7 @@ export const AgentSimulator: React.FC = () => {
             </div>
             <StoryPackageView
               story={latestStory}
+              onDeleteStory={() => setLatestStory(null)}
               onUpdateStory={(updated: GeneratedStory) => setLatestStory(updated)}
             />
           </>

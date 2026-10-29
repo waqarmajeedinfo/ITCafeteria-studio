@@ -609,3 +609,12 @@ export function upsertPendingStoryRecord(record: PendingStoryRecord): PendingSto
   return updated;
 }
 
+export function deletePendingStoryRecord(idOrTitle: string): PendingStoryRecord[] {
+  const current = loadPendingQueue();
+  const updated = current.filter(
+    (item) => item.id !== idOrTitle && item.title !== idOrTitle && item.storyPackage?.title !== idOrTitle
+  );
+  savePendingQueue(updated);
+  return updated;
+}
+

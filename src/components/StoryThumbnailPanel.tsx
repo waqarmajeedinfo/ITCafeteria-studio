@@ -10,7 +10,9 @@ import {
   Sparkles,
   Upload,
   Wand2,
-  X
+  X,
+  Edit2,
+  Save
 } from 'lucide-react';
 import type { GeneratedStory } from './StoryPackageView';
 import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
@@ -91,7 +93,10 @@ const downscaleImageFile = async (file: File): Promise<string> => {
   return canvas.toDataURL('image/jpeg', 0.85);
 };
 
-export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story }) => {
+export const StoryThumbnailPanel: React.FC<{
+  story: GeneratedStory;
+  onUpdateStory?: (updated: GeneratedStory) => void;
+}> = ({ story, onUpdateStory }) => {
   const [copied, setCopied] = useState(false);
   const [model, setModel] = useState<ImageModel>('gemini-nano-banana-2.1');
   const [loading, setLoading] = useState(false);
@@ -105,6 +110,27 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
   const fileInputRef = useRef<HTMLInputElement>(null);
   const referenceImage = reference?.image || '';
   const referenceName = reference?.name || '';
+
+  // Inline Thumbnail Editing State
+  const initialSpec = resolveThumbnailSpec({
+    channelName: story.channelName,
+    presenter: story.presenter,
+    title: story.title,
+    ideaTitle: story.idea?.title,
+    headline: story.thumbnailHeadline,
+    line1: story.thumbnailLine1,
+    line2: story.thumbnailLine2,
+    subBanner: story.thumbnailSubBadge,
+    hologram: story.thumbnailHologram,
+    characterTag: story.characterTag
+  });
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editLine1, setEditLine1] = useState(initialSpec.line1 || '');
+  const [editLine2, setEditLine2] = useState(initialSpec.line2 || '');
+  const [editSubBanner, setEditSubBanner] = useState(initialSpec.subBanner || '');
+  const [editHologram, setEditHologram] = useState(initialSpec.hologram || '');
+  const [editPrompt, setEditPrompt] = useState(initialSpec.prompt || '');
 
   useEffect(() => {
     const tag = story.characterTag || 'default';
@@ -325,6 +351,18 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
             {copied ? 'Prompt Copied!' : 'Copy Prompt'}
           </button>
           <button
+            onClick={() => setIsEditing(!isEditing)}
+            className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-semibold transition-colors ${
+              isEditing
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+            }`}
+            title="Thumbnail Headline, Sub-banner aur Prompt edit karein"
+          >
+            <Edit2 className="w-4 h-4 text-amber-400" />
+            <span>{isEditing ? 'Cancel Edit' : 'Edit'}</span>
+          </button>
+          <button
             onClick={() => fileInputRef.current?.click()}
             disabled={loading || referenceBusy}
             title={referenceImage ? 'Change character reference image' : 'Upload character reference image'}
@@ -349,6 +387,99 @@ export const StoryThumbnailPanel: React.FC<{ story: GeneratedStory }> = ({ story
           </button>
         </div>
       </div>
+
+      {/* Inline Thumbnail Edit Panel */}
+      {isEditing && (
+        <div className="p-4 bg-slate-950/90 border border-amber-500/40 rounded-xl space-y-3 animate-in fade-in duration-150">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+            <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+              <Edit2 className="w-3.5 h-3.5" /> Edit Thumbnail Package Spec & Master Prompt
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="text-slate-400 hover:text-white text-xs cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label className="text-slate-400 block mb-1">Headline Part 1 (Bold White)</label>
+              <input
+                type="text"
+                value={editLine1}
+                onChange={(e) => setEditLine1(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-bold"
+              />
+            </div>
+            <div>
+              <label className="text-slate-400 block mb-1">Headline Part 2 (Cyan Accent)</label>
+              <input
+                type="text"
+                value={editLine2}
+                onChange={(e) => setEditLine2(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-cyan-300 font-bold"
+              />
+            </div>
+            <div>
+              <label className="text-slate-400 block mb-1">Yellow Sub-Banner Badge</label>
+              <input
+                type="text"
+                value={editSubBanner}
+                onChange={(e) => setEditSubBanner(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-amber-300 font-bold"
+              />
+            </div>
+            <div>
+              <label className="text-slate-400 block mb-1">Floating 3D Hologram Prop</label>
+              <input
+                type="text"
+                value={editHologram}
+                onChange={(e) => setEditHologram(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-slate-400 block mb-1 text-xs">Master Thumbnail Prompt</label>
+            <textarea
+              rows={3}
+              value={editPrompt}
+              onChange={(e) => setEditPrompt(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono text-[11px]"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const updatedStory: GeneratedStory = {
+                  ...story,
+                  thumbnailHeadline: `${editLine1.trim()} ${editLine2.trim()}`.trim(),
+                  thumbnailLine1: editLine1.trim(),
+                  thumbnailLine2: editLine2.trim(),
+                  thumbnailSubBadge: editSubBanner.trim(),
+                  thumbnailHologram: editHologram.trim(),
+                  thumbnailPrompt: editPrompt.trim()
+                };
+                onUpdateStory?.(updatedStory);
+                setIsEditing(false);
+              }}
+              className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" /> Save Thumbnail Spec
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3 space-y-3">

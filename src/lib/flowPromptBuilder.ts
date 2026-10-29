@@ -112,9 +112,12 @@ export function buildFlowCinematicScript(params: {
   presenter?: string;
   storyTitle?: string;
 }): string {
-  const tag = params.characterTag || '@WM25-1';
-  const presenter = params.presenter || (tag.startsWith('@MZ') ? 'Mehr Zadi' : 'Waqar Majeed');
-  const duration = params.duration || '10s';
+  const rawTag = (params.characterTag || '@WM25-1').trim();
+  const isFaceless = !rawTag || rawTag === 'No-Character' || rawTag.toLowerCase().includes('faceless');
+  const normalizedTag = isFaceless ? '' : rawTag.startsWith('@') ? rawTag : `@${rawTag}`;
+
+  const presenter = params.presenter || (normalizedTag.startsWith('@MZ') ? 'Mehr Zadi' : 'Waqar Majeed');
+  const duration = '0-10s'; // Strictly 10 seconds
   const purpose = params.purpose || `Scene ${params.sceneNum}`;
   const isCTA = Boolean(params.isCTA);
   const dialogue = params.dialogue ? params.dialogue.trim() : '';
@@ -122,7 +125,9 @@ export function buildFlowCinematicScript(params: {
   const cameraAndLighting = getCameraAndLightingDirection(params.sceneNum, purpose, isCTA);
   const visualAndProps = getVisualSceneAndProps(params.visual || '', purpose, params.storyTitle || '');
 
-  const presenterDirection = `${tag} (${presenter}) in modern tech creator studio. Professional, engaged posture, natural hand gestures explaining the concept with confidence. Natural warm Pakistani tech YouTuber conversational cadence, zero robotic pauses or repetitive syllables.`;
+  const presenterDirection = isFaceless
+    ? `Faceless / AI Voiceover Presenter (${presenter}) in modern tech creator studio. Natural warm Pakistani tech YouTuber conversational cadence, zero robotic pauses or repetitive syllables.`
+    : `${normalizedTag} (${presenter}) in modern tech creator studio. Professional, engaged posture, natural hand gestures explaining the concept with confidence. Natural warm Pakistani tech YouTuber conversational cadence, zero robotic pauses or repetitive syllables.`;
 
   return `[DIRECTOR CAMERA & LIGHTING]: ${cameraAndLighting} Duration: ${duration}.
 [SCENE VISUAL & PROPS]: ${visualAndProps}
@@ -132,19 +137,29 @@ DIALOGUE: "${dialogue}"`;
 
 /**
  * Ensures a scene's script is in full cinematic director format.
- * If already formatted, returns as is. Otherwise transforms it.
+ * If already formatted, returns with normalized @tag and 10s duration. Otherwise transforms it.
  */
 export function ensureFlowCinematicScript(
   scene: StoryScene,
   context: FlowPromptContext = {}
 ): StoryScene {
   if (isAlreadyCinematicFlowScript(scene.script)) {
-    return scene;
+    // Normalize existing script to ensure @ symbol on tags and strictly 0-10s duration
+    const normalizedScript = scene.script
+      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
+      .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
+      .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+
+    return {
+      ...scene,
+      duration: '0-10s',
+      script: normalizedScript
+    };
   }
 
   const enhancedScript = buildFlowCinematicScript({
     sceneNum: scene.num,
-    duration: scene.duration,
+    duration: '0-10s',
     purpose: scene.purpose,
     isCTA: scene.isCTA,
     visual: scene.visual,
@@ -157,6 +172,7 @@ export function ensureFlowCinematicScript(
 
   return {
     ...scene,
+    duration: '0-10s',
     script: enhancedScript
   };
 }

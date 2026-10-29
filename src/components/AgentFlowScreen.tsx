@@ -1153,7 +1153,11 @@ Rules:
           )}
 
           {phase === 'complete' && story && (
-            <StoryPackageView story={story} />
+            <StoryPackageView
+              story={story}
+              onUpdateStory={(updated) => setStory(updated)}
+              onDeleteStory={() => setStory(null)}
+            />
           )}
 
           {phase === 'error' && (

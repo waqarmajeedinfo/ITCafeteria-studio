@@ -1554,8 +1554,22 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
             <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
               <StoryPackageView
                 story={selectedTask.storyPackage || createFullAutopilotStoryPackage(selectedTask)}
+                storyId={selectedTask.id}
                 publishStatus={selectedTask.status === 'completed' ? 'published' : 'pending'}
                 onTogglePublish={() => toggleTaskPublish(selectedTask.id)}
+                onDeleteStory={() => {
+                  setTasks((prev) => prev.filter((t) => t.id !== selectedTask.id));
+                  setShowTaskModal(false);
+                }}
+                onUpdateStory={(updatedStory: GeneratedStory) => {
+                  setTasks((prev) =>
+                    prev.map((t) =>
+                      t.id === selectedTask.id
+                        ? { ...t, title: updatedStory.title, storyPackage: updatedStory }
+                        : t
+                    )
+                  );
+                }}
               />
             </div>
 

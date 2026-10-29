@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
   Check,
   Copy,
-  Database,
+  Edit2,
+  Edit3,
   FileText,
   Film,
   Image as ImageIcon,
@@ -12,11 +13,22 @@ import {
   Tag,
   Youtube,
   Clapperboard,
-  Camera
+  Trash2,
+  Save,
+  X,
+  BookmarkCheck,
+  CheckCircle2,
+  RotateCcw
 } from 'lucide-react';
 import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
 import { StoryThumbnailPanel } from './StoryThumbnailPanel';
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
+import {
+  upsertPendingStoryRecord,
+  deletePendingStoryRecord,
+  updatePendingStoryStatus,
+  type PendingStoryRecord
+} from '../lib/pendingQueueStore';
 
 export interface StoryIdea {
   title: string;
@@ -68,10 +80,24 @@ export interface GeneratedStory {
   lastRefreshedAt?: string;
 }
 
+/**
+ * Normalizes any tag to start with '@' (e.g. '@WM25-4').
+ * If faceless, returns empty string.
+ */
+export function formatCharacterTag(tag?: string): string {
+  if (!tag) return '';
+  const clean = tag.trim();
+  if (clean === 'No-Character' || clean.toLowerCase().includes('faceless')) return '';
+  return clean.startsWith('@') ? clean : `@${clean}`;
+}
+
 export function buildStoryPackageText(story: GeneratedStory): string {
+  const normTag = formatCharacterTag(story.characterTag);
+  const presenter = story.presenter || (normTag.startsWith('@MZ') ? 'Mehr Zadi' : 'Waqar Majeed');
+
   const thumbnail = resolveThumbnailSpec({
     channelName: story.channelName,
-    presenter: story.presenter,
+    presenter,
     title: story.title,
     ideaTitle: story.idea?.title,
     headline: story.thumbnailHeadline,
@@ -79,15 +105,20 @@ export function buildStoryPackageText(story: GeneratedStory): string {
     line2: story.thumbnailLine2,
     subBanner: story.thumbnailSubBadge,
     hologram: story.thumbnailHologram,
-    characterTag: story.characterTag,
+    characterTag: normTag,
   });
 
   const scenesText = story.scenes.map((scene) => {
-    const directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
-    return `Scene ${scene.num} — ${scene.duration} [${scene.purpose}]${scene.isCTA ? ' — CTA' : ''} (${scene.words} words)
+    let directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
+    // Enforce strictly 0-10s duration and @tag
+    directedScript = directedScript
+      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
+      .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+
+    return `Scene ${scene.num} — 0-10s [${scene.purpose}]${scene.isCTA ? ' — CTA' : ''} (${scene.words} words)
 Visual: ${scene.visual || '—'}
 Dialogue: "${scene.dialogue}"
-Flow Script (Cinematic Directing Prepend):
+Flow Script (Cinematic Directing Layer Pre-pended, Strictly 10s):
 ${directedScript}`;
   }).join('\n\n');
 
@@ -96,10 +127,10 @@ Date: ${story.dateLabel}
 Category: ${story.categoryName} | Playlist: ${story.playlist}
 Title: ${story.title}
 Hook: ${story.hook}
-Character Tag: ${story.characterTag}
+Presenter: ${presenter}${normTag ? ` (${normTag})` : ''}
 Length: ${story.sceneCount} scenes (${story.sceneCount * 10}s)
 Duplicate Check: PASSED
-Cinematic Directing: MANDATORY APPLIED (Google Flow Ready)
+Cinematic Directing: MANDATORY APPLIED (Google Flow Ready • Strictly 10s per scene)
 Thumbnail: ${thumbnail.line1}${thumbnail.line2 ? ` / ${thumbnail.line2}` : ''} (Sub-banner: ${thumbnail.subBanner})
 Hashtags: ${story.hashtags.join(' ')}
 
@@ -112,28 +143,30 @@ ${scenesText}
 ${story.description}
 3. Tags: ${story.tags.join(', ')}
 4. TikTok Block: ${story.tiktokCaption}
-5. Thumbnail Prompt (Master Thumbnail Agent v3.45):
-${thumbnail.prompt}
-
-Memory Block (v3.41):
-${story.memoryBlock}
-
-Series Plan: ${story.seriesPlan || '—'}`;
+5. Thumbnail Prompt:
+${thumbnail.prompt}`;
 }
 
 export function buildScenesOnlyText(story: GeneratedStory): string {
+  const normTag = formatCharacterTag(story.characterTag);
+  const presenter = story.presenter || (normTag.startsWith('@MZ') ? 'Mehr Zadi' : 'Waqar Majeed');
+
   const scenesText = story.scenes.map((scene) => {
-    const directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
-    return `Scene ${scene.num} — ${scene.duration} [${scene.purpose}]${scene.isCTA ? ' — CTA' : ''} (${scene.words} words)
+    let directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
+    directedScript = directedScript
+      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
+      .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+
+    return `Scene ${scene.num} — 0-10s [${scene.purpose}]${scene.isCTA ? ' — CTA' : ''} (${scene.words} words)
 Visual: ${scene.visual || '—'}
 Dialogue: "${scene.dialogue}"
-Flow Script:
+Flow Script (Strictly 10s):
 ${directedScript}`;
   }).join('\n\n');
 
-  return `STORY SCRIPT (${story.scenes.length} SCENES) — ${story.title}
+  return `STORY SCRIPT (${story.scenes.length} SCENES • STRICTLY 10s EACH) — ${story.title}
 Hook: ${story.hook}
-Presenter: ${story.presenter} (${story.characterTag})
+Presenter: ${presenter}${normTag ? ` (${normTag})` : ''}
 Category: ${story.categoryName}
 Cinematic Directing Layer: Active
 
@@ -141,9 +174,12 @@ ${scenesText}`;
 }
 
 export function buildYouTubePackageOnlyText(story: GeneratedStory): string {
+  const normTag = formatCharacterTag(story.characterTag);
+  const presenter = story.presenter || (normTag.startsWith('@MZ') ? 'Mehr Zadi' : 'Waqar Majeed');
+
   const thumbnail = resolveThumbnailSpec({
     channelName: story.channelName,
-    presenter: story.presenter,
+    presenter,
     title: story.title,
     ideaTitle: story.idea?.title,
     headline: story.thumbnailHeadline,
@@ -151,7 +187,7 @@ export function buildYouTubePackageOnlyText(story: GeneratedStory): string {
     line2: story.thumbnailLine2,
     subBanner: story.thumbnailSubBadge,
     hologram: story.thumbnailHologram,
-    characterTag: story.characterTag,
+    characterTag: normTag,
   });
 
   return `YOUTUBE UPLOAD PACKAGE — ${story.title}
@@ -160,18 +196,15 @@ export function buildYouTubePackageOnlyText(story: GeneratedStory): string {
 2. Description:
 ${story.description}
 
-3. Search Tags:
+3. Tags:
 ${story.tags.join(', ')}
 
 4. TikTok Block:
 ${story.tiktokCaption}
 
-5. Master Thumbnail Prompt:
+5. Thumbnail Prompt:
 ${thumbnail.prompt}
-Headline: ${thumbnail.line1} ${thumbnail.line2 || ''} (Sub-banner: ${thumbnail.subBanner})
-
-Memory Block:
-${story.memoryBlock}`;
+Headline: ${thumbnail.line1} ${thumbnail.line2 || ''} (Sub-banner: ${thumbnail.subBanner})`;
 }
 
 export interface StoryPackageViewProps {
@@ -179,16 +212,44 @@ export interface StoryPackageViewProps {
   publishStatus?: 'pending' | 'published' | 'draft' | 'overdue' | string;
   onTogglePublish?: () => void;
   onUpdateStory?: (updatedStory: GeneratedStory) => void;
+  onDeleteStory?: () => void;
+  storyId?: string;
 }
 
 export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
   story,
   publishStatus,
   onTogglePublish,
-  onUpdateStory
+  onUpdateStory,
+  onDeleteStory,
+  storyId
 }) => {
   const [copiedScene, setCopiedScene] = useState<number | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [statusToast, setStatusToast] = useState<string | null>(null);
+
+  // Scene Editing State
+  const [editingSceneNum, setEditingSceneNum] = useState<number | null>(null);
+  const [sceneEditPurpose, setSceneEditPurpose] = useState('');
+  const [sceneEditVisual, setSceneEditVisual] = useState('');
+  const [sceneEditDialogue, setSceneEditDialogue] = useState('');
+  const [sceneEditScript, setSceneEditScript] = useState('');
+
+  // Upload Package Editing State
+  const [editingField, setEditingField] = useState<'title' | 'description' | 'tags' | 'tiktok' | null>(null);
+  const [editTitle, setEditTitle] = useState(story.title);
+  const [editHashtags, setEditHashtags] = useState(story.hashtags.join(' '));
+  const [editDescription, setEditDescription] = useState(story.description);
+  const [editTags, setEditTags] = useState(story.tags.join(', '));
+  const [editTiktok, setEditTiktok] = useState(story.tiktokCaption);
+
+  const normTag = formatCharacterTag(story.characterTag);
+  const effectivePresenter = story.presenter || (normTag.startsWith('@MZ') ? 'Mehr Zadi' : 'Waqar Majeed');
+
+  const showToast = (msg: string) => {
+    setStatusToast(msg);
+    setTimeout(() => setStatusToast(null), 3000);
+  };
 
   const copyText = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -197,14 +258,127 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
   };
 
   const copyScene = (scene: StoryScene) => {
-    const directed = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
+    let directed = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
+    // Strictly format duration to 0-10s and tag with @
+    directed = directed
+      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
+      .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
+      .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+
     navigator.clipboard.writeText(directed);
     setCopiedScene(scene.num);
     setTimeout(() => setCopiedScene(null), 2000);
   };
 
+  // Start Editing a Scene
+  const handleStartEditScene = (scene: StoryScene) => {
+    setEditingSceneNum(scene.num);
+    setSceneEditPurpose(scene.purpose);
+    setSceneEditVisual(scene.visual);
+    setSceneEditDialogue(scene.dialogue);
+    let s = scene.script;
+    if (s) {
+      s = s.replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1');
+      s = s.replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+    }
+    setSceneEditScript(s);
+  };
+
+  // Save Scene Edits
+  const handleSaveScene = (num: number) => {
+    const updatedScenes = story.scenes.map((sc) => {
+      if (sc.num === num) {
+        return {
+          ...sc,
+          duration: '0-10s', // strictly 10 seconds
+          purpose: sceneEditPurpose.trim() || sc.purpose,
+          visual: sceneEditVisual.trim(),
+          dialogue: sceneEditDialogue.trim(),
+          script: sceneEditScript.trim(),
+          words: sceneEditDialogue.trim() ? sceneEditDialogue.trim().split(/\s+/).filter(Boolean).length : sc.words
+        };
+      }
+      return sc;
+    });
+
+    const updatedStory: GeneratedStory = {
+      ...story,
+      scenes: updatedScenes
+    };
+
+    onUpdateStory?.(updatedStory);
+    setEditingSceneNum(null);
+    showToast(`Scene ${num} update ho gaya!`);
+  };
+
+  // Save Upload Package Item Edits
+  const handleSavePackageItem = (field: 'title' | 'description' | 'tags' | 'tiktok') => {
+    let updatedStory: GeneratedStory = { ...story };
+
+    if (field === 'title') {
+      const tagsArray = editHashtags.split(/\s+/).filter((t) => t.trim().length > 0);
+      updatedStory.title = editTitle.trim();
+      updatedStory.hashtags = tagsArray.length ? tagsArray : ['#shorts', '#itcafeteria'];
+    } else if (field === 'description') {
+      updatedStory.description = editDescription.trim();
+    } else if (field === 'tags') {
+      updatedStory.tags = editTags.split(',').map((t) => t.trim()).filter(Boolean);
+    } else if (field === 'tiktok') {
+      updatedStory.tiktokCaption = editTiktok.trim();
+    }
+
+    onUpdateStory?.(updatedStory);
+    setEditingField(null);
+    showToast(`${field.toUpperCase()} save ho gaya!`);
+  };
+
+  // Current Status Controls: Save to Pending Queue
+  const handleSaveToPendingQueue = () => {
+    const id = storyId || `pq-${Date.now()}`;
+    const newRecord: PendingStoryRecord = {
+      id,
+      title: story.title,
+      hook: story.hook,
+      category: story.categoryName,
+      categoryId: 1,
+      characterTag: normTag || '@WM25-1',
+      scheduledTime: '6:00 PM PKT',
+      scheduledDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      targetSlotReason: 'User Saved Story to Production Queue',
+      status: (publishStatus as any) === 'published' ? 'published' : 'pending',
+      source: 'simulator',
+      priority: 'HIGH',
+      createdAt: new Date().toISOString(),
+      storyPackage: story
+    };
+
+    upsertPendingStoryRecord(newRecord);
+    showToast('Story Pending Queue mein kamyabi se save ho gayi!');
+  };
+
+  // Current Status Controls: Delete Story
+  const handleDeleteStory = () => {
+    if (window.confirm(`Kya aap waqai is story ko delete karna chahte hain?\n"${story.title}"`)) {
+      if (storyId) {
+        deletePendingStoryRecord(storyId);
+      }
+      deletePendingStoryRecord(story.title);
+      showToast('Story delete kar di gayi.');
+      onDeleteStory?.();
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Toast Notification */}
+      {statusToast && (
+        <div className="p-3 bg-emerald-950/90 border border-emerald-500/50 rounded-xl text-xs text-emerald-200 flex items-center gap-2 shadow-lg animate-in fade-in duration-150">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{statusToast}</span>
+        </div>
+      )}
+
+      {/* Story Summary Card */}
       <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-slate-900 to-slate-950 p-4 sm:p-5 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div className="min-w-0">
@@ -218,8 +392,13 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
               <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                 {story.categoryName}
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700">
-                {story.characterTag}
+              {normTag && (
+                <span className="px-2 py-0.5 rounded-full bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 font-bold font-mono">
+                  {normTag}
+                </span>
+              )}
+              <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                Presenter: {effectivePresenter}
               </span>
               <span className="text-slate-500">{story.dateLabel}</span>
             </div>
@@ -229,14 +408,14 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
             <p className="text-xs text-slate-300 mt-1">
               Hook: <span className="text-cyan-300">{story.hook}</span>
               <span className="text-slate-500"> • </span>
-              {story.sceneCount} scenes ({story.sceneCount * 10}s)
+              {story.sceneCount} scenes ({story.sceneCount * 10}s — Strictly 10s each)
               <span className="text-slate-500"> • </span>
               Thumbnail: <span className="text-amber-300">{story.thumbnailHeadline}</span>
               {story.thumbnailSubBadge ? ` — ${story.thumbnailSubBadge}` : ''}
             </p>
           </div>
 
-          {/* Dedicated Copy Actions */}
+          {/* Copy Actions */}
           <div className="flex flex-wrap sm:flex-col items-stretch gap-1.5 shrink-0">
             <button
               onClick={() => copyText(buildStoryPackageText(story), 'all')}
@@ -268,148 +447,392 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
             </div>
           </div>
         </div>
-        {story.idea?.title && (
-          <p className="text-[11px] text-slate-400 bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2">
-            Story idea: <strong className="text-slate-200">{story.idea.title}</strong>
-            {story.idea.angle ? <span className="text-slate-500"> — {story.idea.angle}</span> : null}
-            {story.discussionNotes ? (
-              <span className="block mt-1 text-fuchsia-300/90">Discussion notes: {story.discussionNotes}</span>
-            ) : null}
-          </p>
-        )}
       </div>
 
+      {/* 1. SCENE-BY-SCENE STORY WITH EDIT SCENE + COPY SCENE BUTTONS */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
             <Film className="w-4 h-4 text-cyan-400" />
-            Scene-by-Scene Story ({story.scenes.length} scenes)
+            Scene-by-Scene Story ({story.scenes.length} scenes • Strictly 10s Duration)
           </h4>
           <span className="text-[10px] text-slate-400 font-mono">
-            Section 19: 1 header + 1 label + paste script • 22–25 words/scene
+            Duration: 0-10s per scene • Format: @WM25-[number]
           </span>
         </div>
 
-        {story.scenes.map((scene) => (
-          <div
-            key={scene.num}
-            className="bg-gradient-to-br from-slate-950/95 via-slate-950/85 to-slate-900/60 border border-slate-800/80 rounded-xl p-4 sm:p-5 shadow-[0_10px_30px_rgba(2,6,23,0.25)] hover:border-cyan-500/40 transition-colors"
-          >
-            <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-bold text-white text-base">
-                  Scene {scene.num} — {scene.duration} [{scene.purpose}]{scene.isCTA ? ' — CTA' : ''}
-                </span>
-                {scene.isCTA && (
-                  <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-mono">
-                    SAVE CTA
+        {story.scenes.map((scene) => {
+          const isThisEditing = editingSceneNum === scene.num;
+          let directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
+          directedScript = directedScript
+            .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
+            .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
+            .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+
+          return (
+            <div
+              key={scene.num}
+              className="bg-gradient-to-br from-slate-950/95 via-slate-950/85 to-slate-900/60 border border-slate-800/80 rounded-xl p-4 sm:p-5 shadow-[0_10px_30px_rgba(2,6,23,0.25)] hover:border-cyan-500/40 transition-colors"
+            >
+              {/* Scene Header with Copy Scene & Edit Scene Buttons */}
+              <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-white text-base">
+                    Scene {scene.num} — 0-10s [{scene.purpose}]{scene.isCTA ? ' — CTA' : ''}
                   </span>
-                )}
-                <span className="text-[11px] text-slate-400 font-mono">
-                  ({scene.words} words • ~2.7 w/s)
-                </span>
+                  {scene.isCTA && (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-mono">
+                      SAVE CTA
+                    </span>
+                  )}
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    ({scene.words} words • ~2.7 w/s • Duration: 0-10s)
+                  </span>
+                </div>
+
+                {/* Header Action Buttons: Copy Scene AND Edit Scene */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (isThisEditing) {
+                        setEditingSceneNum(null);
+                      } else {
+                        handleStartEditScene(scene);
+                      }
+                    }}
+                    className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors border cursor-pointer ${
+                      isThisEditing
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                    }`}
+                    title="Is scene ka dialogue, visual ya script modify karein"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{isThisEditing ? 'Cancel Edit' : 'Edit Scene'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => copyScene(scene)}
+                    className="flex items-center gap-1 text-xs px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700 cursor-pointer"
+                    title="Google Flow copy-paste script copy karein"
+                  >
+                    {copiedScene === scene.num ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-slate-400" /> Copy Scene
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
+
+              {/* Inline Scene Edit Form */}
+              {isThisEditing ? (
+                <div className="p-4 bg-slate-900 border border-amber-500/40 rounded-xl space-y-3 animate-in fade-in duration-150 mb-3 text-xs">
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-800">
+                    <span className="font-bold text-amber-300">Scene {scene.num} Modification</span>
+                    <span className="text-[10px] text-slate-400 font-mono">Duration strictly locked to 0-10s</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-400 font-semibold block mb-1">Scene Purpose / Beat</label>
+                      <input
+                        type="text"
+                        value={sceneEditPurpose}
+                        onChange={(e) => setSceneEditPurpose(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
+                        placeholder="e.g. Curiosity Shock Hook"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-slate-400 font-semibold block mb-1">Visual Cues & Action</label>
+                      <input
+                        type="text"
+                        value={sceneEditVisual}
+                        onChange={(e) => setSceneEditVisual(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white"
+                        placeholder="e.g. Chrome icon cracking open..."
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-fuchsia-300 font-semibold block mb-1">Dialogue (Roman Urdu)</label>
+                    <textarea
+                      rows={2}
+                      value={sceneEditDialogue}
+                      onChange={(e) => setSceneEditDialogue(e.target.value)}
+                      className="w-full bg-slate-950 border border-fuchsia-500/30 rounded-lg p-2.5 text-fuchsia-200"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-cyan-300 font-semibold block mb-1">
+                      Google Flow Script (Cinematic Directing, Strictly 10s, @WM25 Tag)
+                    </label>
+                    <textarea
+                      rows={5}
+                      value={sceneEditScript}
+                      onChange={(e) => setSceneEditScript(e.target.value)}
+                      className="w-full bg-slate-950 border border-cyan-500/30 rounded-lg p-2.5 text-slate-200 font-mono text-[11px]"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditingSceneNum(null)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveScene(scene.num)}
+                      className="px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                    >
+                      <Save className="w-3.5 h-3.5" /> Save Scene
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {scene.visual && (
+                    <p className="text-xs text-slate-400 mb-2.5">
+                      <span className="text-slate-500 uppercase font-mono text-[10px] mr-1">Visual:</span>
+                      {scene.visual}
+                    </p>
+                  )}
+
+                  {scene.dialogue && (
+                    <p className="text-sm text-fuchsia-200/90 bg-fuchsia-950/20 border border-fuchsia-500/20 rounded-lg px-3.5 py-2.5 mb-2.5">
+                      <span className="text-fuchsia-400/80 uppercase font-mono text-[10px] mr-1">Dialogue:</span>
+                      “{scene.dialogue}”
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-cyan-400/90 font-mono mb-1.5">
+                    <span className="flex items-center gap-1.5 font-semibold text-cyan-300">
+                      <Clapperboard className="w-3.5 h-3.5 text-cyan-400" />
+                      Google Flow Script (Cinematic Directing Layer Pre-pended)
+                    </span>
+                    <span className="text-[10px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-mono">
+                      Duration: 0-10s Strictly Set
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-slate-300 font-mono leading-relaxed bg-slate-900/90 p-4 sm:p-5 rounded-xl border border-slate-800/60 selection:bg-blue-600 selection:text-white whitespace-pre-wrap min-h-[9rem] sm:min-h-[11rem]">
+                    {directedScript}
+                  </p>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 2. THUMBNAIL PANEL WITH EDIT BUTTON */}
+      <StoryThumbnailPanel
+        key={`${story.characterTag}-${story.title}`}
+        story={story}
+        onUpdateStory={onUpdateStory}
+      />
+
+      {/* 3. POST-STORY UPLOAD PACKAGE — ALL ITEMS EDITABLE (MEMORY BLOCK REMOVED) */}
+      <div className="pt-4 border-t border-slate-800 space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+            <Layers className="w-4 h-4 text-cyan-400" />
+            Post-Story Upload Package (All Items Editable)
+          </h4>
+          <span className="text-[10px] text-slate-400">Click Edit on any card to customize details</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          {/* Item 1: YouTube Title + Hashtags */}
+          <div className="bg-cyan-950/20 border border-cyan-500/30 p-4 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-cyan-300 uppercase flex items-center gap-1.5">
+                <Youtube className="w-3.5 h-3.5" /> Item 1: YouTube Title + Hashtags
+              </span>
               <button
-                onClick={() => copyScene(scene)}
-                className="flex items-center gap-1 text-xs px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700"
+                type="button"
+                onClick={() => setEditingField(editingField === 'title' ? null : 'title')}
+                className="text-[10px] text-cyan-400 hover:text-cyan-200 flex items-center gap-1 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/40 cursor-pointer"
               >
-                {copiedScene === scene.num ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" /> Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5 text-slate-400" /> Copy Scene
-                  </>
-                )}
+                <Edit2 className="w-3 h-3" /> {editingField === 'title' ? 'Cancel' : 'Edit'}
               </button>
             </div>
 
-            {scene.visual && (
-              <p className="text-xs text-slate-400 mb-2.5">
-                <span className="text-slate-500 uppercase font-mono text-[10px] mr-1">Visual:</span>
-                {scene.visual}
-              </p>
+            {editingField === 'title' ? (
+              <div className="space-y-2 pt-1 animate-in fade-in duration-150">
+                <div>
+                  <label className="text-[10px] text-slate-400 block mb-0.5">Video Title</label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-medium text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 block mb-0.5">Hashtags</label>
+                  <input
+                    type="text"
+                    value={editHashtags}
+                    onChange={(e) => setEditHashtags(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-cyan-300 font-mono text-xs"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleSavePackageItem('title')}
+                    className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                  >
+                    <Save className="w-3 h-3" /> Save Title
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-white font-medium text-sm leading-snug">{story.title}</p>
+                <p className="text-cyan-300 font-mono text-xs">{story.hashtags.join(' ')}</p>
+              </>
             )}
+          </div>
 
-            {scene.dialogue && (
-              <p className="text-sm text-fuchsia-200/90 bg-fuchsia-950/20 border border-fuchsia-500/20 rounded-lg px-3.5 py-2.5 mb-2.5">
-                <span className="text-fuchsia-400/80 uppercase font-mono text-[10px] mr-1">Dialogue:</span>
-                “{scene.dialogue}”
-              </p>
-            )}
-
-            <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-cyan-400/90 font-mono mb-1.5">
-              <span className="flex items-center gap-1.5 font-semibold text-cyan-300">
-                <Clapperboard className="w-3.5 h-3.5 text-cyan-400" />
-                Google Flow Script (Cinematic Directing Layer Pre-pended)
+          {/* Item 5: Thumbnail Spec Card */}
+          <div className="bg-amber-950/20 border border-amber-500/30 p-4 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-amber-300 uppercase flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5" /> Item 5: Thumbnail Headline & Specs
               </span>
-              <span className="text-[10px] bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-mono">
-                Visual Direction Pre-pended
-              </span>
+              <span className="text-[10px] text-amber-400/80 font-mono">9:16 Vertical</span>
             </div>
-            <p className="text-sm text-slate-300 font-mono leading-relaxed bg-slate-900/90 p-4 sm:p-5 rounded-xl border border-slate-800/60 selection:bg-blue-600 selection:text-white whitespace-pre-wrap min-h-[9rem] sm:min-h-[11rem]">
-              {applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose)}
+            <p className="text-amber-200 font-semibold text-sm leading-snug">{story.thumbnailHeadline}</p>
+            <p className="text-amber-100/70 text-xs">
+              Sub-banner: {story.thumbnailSubBadge || '—'} • Hologram: {story.thumbnailHologram || '—'}
             </p>
           </div>
-        ))}
-      </div>
 
-      <StoryThumbnailPanel key={`${story.characterTag}-${story.title}`} story={story} />
+          {/* Item 3: YouTube Tags */}
+          <div className="bg-indigo-950/20 border border-indigo-500/30 p-4 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-indigo-300 uppercase flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" /> Item 3: YouTube Tags
+              </span>
+              <button
+                type="button"
+                onClick={() => setEditingField(editingField === 'tags' ? null : 'tags')}
+                className="text-[10px] text-indigo-400 hover:text-indigo-200 flex items-center gap-1 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-500/40 cursor-pointer"
+              >
+                <Edit2 className="w-3 h-3" /> {editingField === 'tags' ? 'Cancel' : 'Edit'}
+              </button>
+            </div>
 
-      <div className="pt-4 border-t border-slate-800 space-y-3">
-        <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-          <Layers className="w-4 h-4 text-cyan-400" />
-          Post-Story Upload Package (5 Items + Memory Block)
-        </h4>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          <div className="bg-cyan-950/20 border border-cyan-500/30 p-4 rounded-xl space-y-1.5">
-            <span className="text-[11px] font-semibold text-cyan-300 uppercase flex items-center gap-1.5">
-              <Youtube className="w-3.5 h-3.5" /> Item 1: YouTube Title + Hashtags
-            </span>
-            <p className="text-white font-medium text-sm leading-snug">{story.title}</p>
-            <p className="text-cyan-300 font-mono text-xs">{story.hashtags.join(' ')}</p>
+            {editingField === 'tags' ? (
+              <div className="space-y-2 pt-1 animate-in fade-in duration-150">
+                <textarea
+                  rows={2}
+                  value={editTags}
+                  onChange={(e) => setEditTags(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-indigo-200 font-mono text-xs"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleSavePackageItem('tags')}
+                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                  >
+                    <Save className="w-3 h-3" /> Save Tags
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-indigo-100/85 font-mono text-xs leading-relaxed">{story.tags.join(', ')}</p>
+            )}
           </div>
 
-          <div className="bg-amber-950/20 border border-amber-500/30 p-4 rounded-xl space-y-1.5">
-            <span className="text-[11px] font-semibold text-amber-300 uppercase flex items-center gap-1.5">
-              <ImageIcon className="w-3.5 h-3.5" /> Item 5: Thumbnail
-            </span>
-            <p className="text-amber-200 font-semibold text-sm leading-snug">{story.thumbnailHeadline}</p>
-            <p className="text-amber-100/70 text-xs">Sub-banner: {story.thumbnailSubBadge || '—'} • 9:16 • Master v3.45</p>
-          </div>
+          {/* Item 4: TikTok Block */}
+          <div className="bg-fuchsia-950/20 border border-fuchsia-500/30 p-4 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-fuchsia-300 uppercase flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5" /> Item 4: TikTok Block
+              </span>
+              <button
+                type="button"
+                onClick={() => setEditingField(editingField === 'tiktok' ? null : 'tiktok')}
+                className="text-[10px] text-fuchsia-400 hover:text-fuchsia-200 flex items-center gap-1 bg-fuchsia-950/60 px-2 py-0.5 rounded border border-fuchsia-500/40 cursor-pointer"
+              >
+                <Edit2 className="w-3 h-3" /> {editingField === 'tiktok' ? 'Cancel' : 'Edit'}
+              </button>
+            </div>
 
-          <div className="bg-indigo-950/20 border border-indigo-500/30 p-4 rounded-xl space-y-1.5">
-            <span className="text-[11px] font-semibold text-indigo-300 uppercase flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5" /> Item 3: YouTube Tags
-            </span>
-            <p className="text-indigo-100/85 font-mono text-xs leading-relaxed">{story.tags.join(', ')}</p>
-          </div>
-
-          <div className="bg-fuchsia-950/20 border border-fuchsia-500/30 p-4 rounded-xl space-y-1.5">
-            <span className="text-[11px] font-semibold text-fuchsia-300 uppercase flex items-center gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5" /> Item 4: TikTok Block
-            </span>
-            <p className="text-fuchsia-100/90 text-[13px] leading-relaxed">{story.tiktokCaption}</p>
+            {editingField === 'tiktok' ? (
+              <div className="space-y-2 pt-1 animate-in fade-in duration-150">
+                <textarea
+                  rows={2}
+                  value={editTiktok}
+                  onChange={(e) => setEditTiktok(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-fuchsia-200 text-xs"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleSavePackageItem('tiktok')}
+                    className="px-3 py-1 bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                  >
+                    <Save className="w-3 h-3" /> Save TikTok
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-fuchsia-100/90 text-[13px] leading-relaxed">{story.tiktokCaption}</p>
+            )}
           </div>
         </div>
 
-        <div className="bg-blue-950/20 border border-blue-500/30 p-4 rounded-xl space-y-2">
-          <span className="text-[11px] font-semibold text-blue-300 uppercase flex items-center gap-1.5">
-            <FileText className="w-3.5 h-3.5" /> Item 2: Description + Practical Steps
-          </span>
-          <p className="text-slate-200 text-[13px] whitespace-pre-wrap leading-relaxed">{story.description}</p>
-        </div>
+        {/* Item 2: Description + Practical Steps */}
+        <div className="bg-blue-950/20 border border-blue-500/30 p-4 rounded-xl space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-blue-300 uppercase flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5" /> Item 2: Description + Practical Steps
+            </span>
+            <button
+              type="button"
+              onClick={() => setEditingField(editingField === 'description' ? null : 'description')}
+              className="text-[10px] text-blue-400 hover:text-blue-200 flex items-center gap-1 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-500/40 cursor-pointer"
+            >
+              <Edit2 className="w-3 h-3" /> {editingField === 'description' ? 'Cancel' : 'Edit'}
+            </button>
+          </div>
 
-        <div className="bg-gradient-to-r from-violet-950/40 via-slate-950/80 to-slate-950 border border-violet-500/30 p-4 rounded-xl space-y-2">
-          <span className="font-bold text-violet-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-            <Database className="w-3.5 h-3.5 text-violet-400" />
-            Memory Block (v3.41)
-          </span>
-          <p className="text-slate-300 font-mono text-xs whitespace-pre-wrap leading-relaxed">
-            {story.memoryBlock}
-          </p>
+          {editingField === 'description' ? (
+            <div className="space-y-2 pt-1 animate-in fade-in duration-150">
+              <textarea
+                rows={5}
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-200 leading-relaxed text-xs"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleSavePackageItem('description')}
+                  className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                >
+                  <Save className="w-3 h-3" /> Save Description
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-slate-200 text-[13px] whitespace-pre-wrap leading-relaxed">{story.description}</p>
+          )}
         </div>
 
         {story.seriesPlan && (
@@ -418,43 +841,72 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
           </p>
         )}
 
-        {/* Publication Status Card & Action Button */}
-        {onTogglePublish && (
-          <div className={`mt-5 p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg ${
-            publishStatus === 'published'
-              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
-              : 'bg-slate-900 border-amber-500/40 text-amber-200'
-          }`}>
-            <div className="flex items-center gap-3">
-              <span className={`w-3.5 h-3.5 rounded-full ${publishStatus === 'published' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-ping'}`} />
-              <div>
-                <div className="font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <span>Current Status:</span>
-                  <span className={publishStatus === 'published' ? 'text-emerald-300' : 'text-amber-300'}>
-                    {publishStatus === 'published' ? '✅ PUBLISHED (پبلش ہو چکی ہے)' : '⏳ PENDING (ابھی تک پبلش نہیں کی گئی)'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  {publishStatus === 'published'
-                    ? 'Yeh story channel par publish ho chuki hai aur record me update hai.'
-                    : 'Jab tak aap publish button nahi dabayein ge, yeh story Pending rahe gi.'}
-                </p>
+        {/* 4. CURRENT STATUS SECTION — MERGED CONTROLS (SAVE, PUBLISH, DELETE) */}
+        <div className={`mt-5 p-4 rounded-2xl border flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl ${
+          publishStatus === 'published'
+            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+            : 'bg-slate-900/90 border-amber-500/40 text-amber-200'
+        }`}>
+          {/* Status Details */}
+          <div className="flex items-center gap-3">
+            <span className={`w-3.5 h-3.5 rounded-full shrink-0 ${
+              publishStatus === 'published' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-ping'
+            }`} />
+            <div>
+              <div className="font-bold text-xs uppercase tracking-wider flex items-center gap-2">
+                <span className="text-slate-300">CURRENT STATUS:</span>
+                <span className={publishStatus === 'published' ? 'text-emerald-300 font-bold' : 'text-amber-300 font-bold'}>
+                  {publishStatus === 'published' ? '✅ PUBLISHED (پبلش ہو چکی ہے)' : '⏳ PENDING (پینڈنگ میں محفوظ ہے)'}
+                </span>
               </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {publishStatus === 'published'
+                  ? 'Yeh story channel par publish ho chuki hai aur record me update hai.'
+                  : 'Story production queue mein pending hai. Yahan se Save, Publish ya Delete karein.'}
+              </p>
             </div>
+          </div>
 
+          {/* Unified Controls: 1. Save (Pending me bhejein), 2. Publish / Revert, 3. Delete */}
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            {/* Control 1: Save to Pending Queue */}
             <button
-              onClick={onTogglePublish}
-              className={`px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg transition-all cursor-pointer ${
-                publishStatus === 'published'
-                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/40'
-              }`}
+              type="button"
+              onClick={handleSaveToPendingQueue}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer hover:border-cyan-400"
+              title="Story ko Pending Queue aur state mein save karein"
             >
-              <Check className="w-4 h-4" />
-              <span>{publishStatus === 'published' ? 'Wapas Pending Karein' : 'Mark as Published (پبلش ہو چکی ہے)'}</span>
+              <BookmarkCheck className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Save (Pending me bhejein)</span>
+            </button>
+
+            {/* Control 2: Publish / Toggle Publish */}
+            {onTogglePublish && (
+              <button
+                type="button"
+                onClick={onTogglePublish}
+                className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-lg transition-all cursor-pointer ${
+                  publishStatus === 'published'
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/40'
+                }`}
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>{publishStatus === 'published' ? 'Wapas Pending Karein' : 'Publish (پبلش کریں)'}</span>
+              </button>
+            )}
+
+            {/* Control 3: Delete Story */}
+            <button
+              type="button"
+              onClick={handleDeleteStory}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 transition-colors cursor-pointer"
+              title="Story ko remove / delete karein"
+            >
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

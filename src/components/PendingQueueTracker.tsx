@@ -688,8 +688,20 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
               <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-1 overflow-hidden">
                 <StoryPackageView
                   story={selectedRecord.storyPackage}
+                  storyId={selectedRecord.id}
                   publishStatus={selectedRecord.status}
                   onTogglePublish={() => togglePublishStatus(selectedRecord.id)}
+                  onDeleteStory={() => {
+                    setQueue((prevQueue) => {
+                      const updated = prevQueue.filter((item) => item.id !== selectedRecord.id);
+                      savePendingQueue(updated);
+                      if (selectedStoryId === selectedRecord.id) {
+                        setSelectedStoryId(updated[0]?.id || '');
+                      }
+                      return updated;
+                    });
+                    showToast('Story delete kar di gayi!');
+                  }}
                   onUpdateStory={(updatedStory: GeneratedStory) => {
                     setQueue((prevQueue) => {
                       const updated = prevQueue.map((item) => {
