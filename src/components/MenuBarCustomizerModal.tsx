@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X,
   Lock,
   Unlock,
+  MoveRight,
   RotateCcw,
   Check,
   AlertTriangle,
@@ -12,16 +13,13 @@ import {
   Save,
   Layers,
   Sparkles,
+  ShieldCheck,
   ArrowRight,
-  ArrowLeft,
-  ChevronUp,
-  ChevronDown,
-  GripVertical,
-  MoveHorizontal,
-  Info,
   CheckCircle2
 } from 'lucide-react';
 import type { TabType } from '../App';
+import { dirtyManager } from '../lib/dirtyStore';
+
 
 export interface MenuGroupConfig {
   id: string;
@@ -130,19 +128,45 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
   const [lockWarning, setLockWarning] = useState<string | null>(null);
   const [saveToast, setSaveToast] = useState(false);
 
-  // Drag and Drop States
-  const [draggedItemId, setDraggedItemId] = useState<TabType | null>(null);
-  const [dragOverItemId, setDragOverItemId] = useState<TabType | null>(null);
-  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
-  const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
-  const [dragOverCategoryRibbonId, setDragOverCategoryRibbonId] = useState<string | null>(null);
+  // References to guarantee no typed label is ever lost during click/blur race condition
+  const tempLabelRef = useRef<string>('');
+  const editingItemIdRef = useRef<TabType | null>(null);
+  const editingGroupIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    tempLabelRef.current = tempLabel;
+  }, [tempLabel]);
+
+  useEffect(() => {
+    editingItemIdRef.current = editingItemId;
+  }, [editingItemId]);
+
+  useEffect(() => {
+    editingGroupIdRef.current = editingGroupId;
+  }, [editingGroupId]);
+
+  const markDirty = (newConfig: MenuCustomizerState) => {
+    dirtyManager.setDirty({
+      id: 'menu_customizer',
+      title: 'Menu Bar Customizer',
+      description: 'Menu layout aur sub-menu names ki tabdeeliyaan ghair mehfooz hain.',
+      onSave: () => handleApply(newConfig),
+      onDiscard: () => {
+        setLocalConfig(config);
+        dirtyManager.clearDirty('menu_customizer');
+      }
+    });
+  };
 
   useEffect(() => {
     if (isOpen) {
       setLocalConfig(config);
-      document.body.style.overflow = 'hidden';
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
       return () => {
-        document.body.style.overflow = 'unset';
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+        dirtyManager.clearDirty('menu_customizer');
       };
     }
   }, [config, isOpen]);
@@ -151,156 +175,29 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
 
   // Toggle Lock for a Group
   const toggleGroupLock = (groupId: string) => {
-    setLocalConfig((prev) => ({
-      ...prev,
-      groups: prev.groups.map((g) => (g.id === groupId ? { ...g, isLocked: !g.isLocked } : g))
-    }));
+    setLocalConfig((prev) => {
+      const next = {
+        ...prev,
+        groups: prev.groups.map((g) => (g.id === groupId ? { ...g, isLocked: !g.isLocked } : g))
+      };
+      markDirty(next);
+      return next;
+    });
   };
 
   // Toggle Lock for an Item
   const toggleItemLock = (itemId: TabType) => {
-    setLocalConfig((prev) => ({
-      ...prev,
-      items: prev.items.map((item) => (item.id === itemId ? { ...item, isLocked: !item.isLocked } : item))
-    }));
+    setLocalConfig((prev) => {
+      const next = {
+        ...prev,
+        items: prev.items.map((item) => (item.id === itemId ? { ...item, isLocked: !item.isLocked } : item))
+      };
+      markDirty(next);
+      return next;
+    });
   };
 
-  // Move category sequence Left or Right
-  const moveGroupSequence = (groupId: string, direction: 'left' | 'right') => {
-    const currentIndex = localConfig.groups.findIndex((g) => g.id === groupId);
-    if (currentIndex === -1) return;
-
-    const group = localConfig.groups[currentIndex];
-    if (group.isLocked) {
-      setLockWarning(`"${group.label}" is waqt LOCKED hai! Sequence tabdeel karne ke liye pehle iska Lock kholein.`);
-      return;
-    }
-
-    const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= localConfig.groups.length) return;
-
-    const targetGroup = localConfig.groups[targetIndex];
-    if (targetGroup.isLocked) {
-      setLockWarning(`Saath wali category "${targetGroup.label}" LOCKED hai! Sequence switch karne ke liye dono categories ka Unlock hona zaroori hai.`);
-      return;
-    }
-
-    setLockWarning(null);
-    const newGroups = [...localConfig.groups];
-    const [moved] = newGroups.splice(currentIndex, 1);
-    newGroups.splice(targetIndex, 0, moved);
-
-    setLocalConfig((prev) => ({
-      ...prev,
-      groups: newGroups
-    }));
-  };
-
-  // Drag and drop for Category Sequence Reordering
-  const handleCategoryDragStart = (e: React.DragEvent, groupId: string) => {
-    const group = localConfig.groups.find((g) => g.id === groupId);
-    if (group?.isLocked) {
-      e.preventDefault();
-      setLockWarning(`Menu category "${group.label}" LOCKED hai! Drag karke sequence tabdeel karne ke liye pehle iska Lock kholein.`);
-      return;
-    }
-    setLockWarning(null);
-    setDraggedGroupId(groupId);
-    e.dataTransfer.setData('text/plain', `category:${groupId}`);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleCategoryDragOverRibbon = (e: React.DragEvent, targetGroupId: string) => {
-    e.preventDefault();
-    if (draggedGroupId && draggedGroupId !== targetGroupId) {
-      setDragOverCategoryRibbonId(targetGroupId);
-    }
-  };
-
-  const handleCategoryDropRibbon = (e: React.DragEvent, targetGroupId: string) => {
-    e.preventDefault();
-    if (!draggedGroupId || draggedGroupId === targetGroupId) {
-      setDraggedGroupId(null);
-      setDragOverCategoryRibbonId(null);
-      return;
-    }
-
-    const sourceGroup = localConfig.groups.find((g) => g.id === draggedGroupId);
-    const targetGroup = localConfig.groups.find((g) => g.id === targetGroupId);
-
-    if (sourceGroup?.isLocked) {
-      setLockWarning(`"${sourceGroup.label}" locked hai! Pehle unlock karein.`);
-      setDraggedGroupId(null);
-      setDragOverCategoryRibbonId(null);
-      return;
-    }
-    if (targetGroup?.isLocked) {
-      setLockWarning(`Destination category "${targetGroup.label}" locked hai! Pehle unlock karein.`);
-      setDraggedGroupId(null);
-      setDragOverCategoryRibbonId(null);
-      return;
-    }
-
-    setLockWarning(null);
-    const fromIndex = localConfig.groups.findIndex((g) => g.id === draggedGroupId);
-    const toIndex = localConfig.groups.findIndex((g) => g.id === targetGroupId);
-
-    if (fromIndex !== -1 && toIndex !== -1) {
-      const newGroups = [...localConfig.groups];
-      const [moved] = newGroups.splice(fromIndex, 1);
-      newGroups.splice(toIndex, 0, moved);
-      setLocalConfig((prev) => ({ ...prev, groups: newGroups }));
-    }
-
-    setDraggedGroupId(null);
-    setDragOverCategoryRibbonId(null);
-  };
-
-  // Move item Up or Down within the same category
-  const moveItemUpDown = (itemId: TabType, direction: 'up' | 'down') => {
-    const item = localConfig.items.find((i) => i.id === itemId);
-    if (!item) return;
-
-    if (item.isLocked) {
-      setLockWarning(`"${item.label}" is waqt LOCKED hai! Reorder karne ke liye pehle iska Lock kholein.`);
-      return;
-    }
-
-    const parentGroup = localConfig.groups.find((g) => g.id === item.groupId);
-    if (parentGroup?.isLocked) {
-      setLockWarning(`Parent category "${parentGroup.label}" is waqt LOCKED hai! Pehle parent category ko unlock karein.`);
-      return;
-    }
-
-    // Get group items in their current sequential order
-    const groupItems = localConfig.items.filter((i) => i.groupId === item.groupId);
-    const currentIndexInGroup = groupItems.findIndex((i) => i.id === itemId);
-    const targetIndexInGroup = direction === 'up' ? currentIndexInGroup - 1 : currentIndexInGroup + 1;
-
-    if (targetIndexInGroup < 0 || targetIndexInGroup >= groupItems.length) return;
-
-    const targetItem = groupItems[targetIndexInGroup];
-    if (targetItem.isLocked) {
-      setLockWarning(`Target item "${targetItem.label}" LOCKED hai! Position switch karne ke liye dono items ka unlock hona zaroori hai.`);
-      return;
-    }
-
-    // Reorder in master items array
-    const fromIndex = localConfig.items.findIndex((i) => i.id === itemId);
-    const toIndex = localConfig.items.findIndex((i) => i.id === targetItem.id);
-
-    const newItems = [...localConfig.items];
-    const [moved] = newItems.splice(fromIndex, 1);
-    newItems.splice(toIndex, 0, moved);
-
-    setLockWarning(null);
-    setLocalConfig((prev) => ({
-      ...prev,
-      items: newItems
-    }));
-  };
-
-  // Move an item to a new group via Dropdown (STRICT NO-DUPLICATE RULE)
+  // Move an item to a new group (STRICT NO-DUPLICATE RULE)
   const handleMoveItem = (itemId: TabType, targetGroupId: string) => {
     const item = localConfig.items.find((i) => i.id === itemId);
     if (!item) return;
@@ -331,143 +228,14 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     setLockWarning(null);
 
     // Update assignment (item stays unique across the whole app)
-    setLocalConfig((prev) => ({
-      ...prev,
-      items: prev.items.map((i) => (i.id === itemId ? { ...i, groupId: targetGroupId } : i))
-    }));
-  };
-
-  // Item Drag & Drop Handlers
-  const handleItemDragStart = (e: React.DragEvent, item: MenuItemConfig) => {
-    const parentGroup = localConfig.groups.find((g) => g.id === item.groupId);
-    if (item.isLocked || parentGroup?.isLocked) {
-      e.preventDefault();
-      setLockWarning(
-        `"${item.label}" ya iski parent category LOCKED hai! Mouse se drag karke move ya up/down karne ke liye pehle Lock kholein.`
-      );
-      return;
-    }
-    setLockWarning(null);
-    setDraggedItemId(item.id);
-    e.dataTransfer.setData('text/plain', `item:${item.id}`);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleItemDragOverItem = (e: React.DragEvent, targetItemId: TabType) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (draggedItemId && draggedItemId !== targetItemId) {
-      setDragOverItemId(targetItemId);
-    }
-  };
-
-  const handleItemDropOnItem = (e: React.DragEvent, targetItem: MenuItemConfig) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!draggedItemId || draggedItemId === targetItem.id) {
-      setDraggedItemId(null);
-      setDragOverItemId(null);
-      return;
-    }
-
-    const draggedItem = localConfig.items.find((i) => i.id === draggedItemId);
-    if (!draggedItem) return;
-
-    const sourceGroup = localConfig.groups.find((g) => g.id === draggedItem.groupId);
-    const targetGroup = localConfig.groups.find((g) => g.id === targetItem.groupId);
-
-    if (draggedItem.isLocked || sourceGroup?.isLocked) {
-      setLockWarning(`"${draggedItem.label}" ya iski category locked hai! Move karne ke liye unlock karein.`);
-      setDraggedItemId(null);
-      setDragOverItemId(null);
-      return;
-    }
-
-    if (targetItem.isLocked || targetGroup?.isLocked) {
-      setLockWarning(`Target "${targetItem.label}" ya destination category locked hai! Pehle unlock karein.`);
-      setDraggedItemId(null);
-      setDragOverItemId(null);
-      return;
-    }
-
-    setLockWarning(null);
-
-    // Splice dragged item and insert at target item position
-    const fromIndex = localConfig.items.findIndex((i) => i.id === draggedItemId);
-    const newItems = [...localConfig.items];
-    const [moved] = newItems.splice(fromIndex, 1);
-
-    // Update its groupId to destination if cross-category
-    moved.groupId = targetItem.groupId;
-
-    const toIndex = newItems.findIndex((i) => i.id === targetItem.id);
-    newItems.splice(toIndex, 0, moved);
-
-    setLocalConfig((prev) => ({
-      ...prev,
-      items: newItems
-    }));
-
-    setDraggedItemId(null);
-    setDragOverItemId(null);
-  };
-
-  // Dropping an item directly onto a Category card body
-  const handleItemDragOverCategory = (e: React.DragEvent, groupId: string) => {
-    e.preventDefault();
-    if (draggedItemId) {
-      setDragOverGroupId(groupId);
-    }
-  };
-
-  const handleItemDropOnCategory = (e: React.DragEvent, targetGroupId: string) => {
-    e.preventDefault();
-    if (!draggedItemId) {
-      setDragOverGroupId(null);
-      return;
-    }
-
-    const draggedItem = localConfig.items.find((i) => i.id === draggedItemId);
-    if (!draggedItem) {
-      setDraggedItemId(null);
-      setDragOverGroupId(null);
-      return;
-    }
-
-    // If dropped into the same category body and not on a specific item, nothing to change
-    if (draggedItem.groupId === targetGroupId) {
-      setDraggedItemId(null);
-      setDragOverGroupId(null);
-      return;
-    }
-
-    const sourceGroup = localConfig.groups.find((g) => g.id === draggedItem.groupId);
-    const targetGroup = localConfig.groups.find((g) => g.id === targetGroupId);
-
-    if (draggedItem.isLocked || sourceGroup?.isLocked) {
-      setLockWarning(`"${draggedItem.label}" ya iski category locked hai! Pehle unlock karein.`);
-      setDraggedItemId(null);
-      setDragOverGroupId(null);
-      return;
-    }
-
-    if (targetGroup?.isLocked) {
-      setLockWarning(`Destination category "${targetGroup.label}" locked hai! Pehle unlock karein.`);
-      setDraggedItemId(null);
-      setDragOverGroupId(null);
-      return;
-    }
-
-    setLockWarning(null);
-    // Move to target group at the end
-    setLocalConfig((prev) => ({
-      ...prev,
-      items: prev.items.map((i) => (i.id === draggedItemId ? { ...i, groupId: targetGroupId } : i))
-    }));
-
-    setDraggedItemId(null);
-    setDragOverGroupId(null);
+    setLocalConfig((prev) => {
+      const next = {
+        ...prev,
+        items: prev.items.map((i) => (i.id === itemId ? { ...i, groupId: targetGroupId } : i))
+      };
+      markDirty(next);
+      return next;
+    });
   };
 
   // Start renaming a group
@@ -479,20 +247,29 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     setLockWarning(null);
     setEditingGroupId(group.id);
     setTempLabel(group.label);
+    tempLabelRef.current = group.label;
+    editingGroupIdRef.current = group.id;
   };
 
   const saveEditGroup = (groupId: string, newLabel?: string) => {
-    const labelToSave = (newLabel !== undefined ? newLabel : tempLabel).trim();
+    const labelToSave = (newLabel !== undefined ? newLabel : tempLabelRef.current || tempLabel).trim();
     if (!labelToSave) {
       setEditingGroupId(null);
+      editingGroupIdRef.current = null;
       return;
     }
-    setLocalConfig((prev) => ({
-      ...prev,
-      groups: prev.groups.map((g) => (g.id === groupId ? { ...g, label: labelToSave } : g))
-    }));
+    setLocalConfig((prev) => {
+      const next = {
+        ...prev,
+        groups: prev.groups.map((g) => (g.id === groupId ? { ...g, label: labelToSave } : g))
+      };
+      markDirty(next);
+      return next;
+    });
     setEditingGroupId(null);
+    editingGroupIdRef.current = null;
     setTempLabel('');
+    tempLabelRef.current = '';
   };
 
   // Start renaming an item
@@ -504,20 +281,29 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     setLockWarning(null);
     setEditingItemId(item.id);
     setTempLabel(item.label);
+    tempLabelRef.current = item.label;
+    editingItemIdRef.current = item.id;
   };
 
   const saveEditItem = (itemId: TabType, newLabel?: string) => {
-    const labelToSave = (newLabel !== undefined ? newLabel : tempLabel).trim();
+    const labelToSave = (newLabel !== undefined ? newLabel : tempLabelRef.current || tempLabel).trim();
     if (!labelToSave) {
       setEditingItemId(null);
+      editingItemIdRef.current = null;
       return;
     }
-    setLocalConfig((prev) => ({
-      ...prev,
-      items: prev.items.map((i) => (i.id === itemId ? { ...i, label: labelToSave } : i))
-    }));
+    setLocalConfig((prev) => {
+      const next = {
+        ...prev,
+        items: prev.items.map((i) => (i.id === itemId ? { ...i, label: labelToSave } : i))
+      };
+      markDirty(next);
+      return next;
+    });
     setEditingItemId(null);
+    editingItemIdRef.current = null;
     setTempLabel('');
+    tempLabelRef.current = '';
   };
 
   // Unlock item on warning prompt
@@ -528,35 +314,41 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     }
   };
 
-  const handleApply = () => {
-    // Commit any currently open editing inputs before saving!
-    let finalConfig = { ...localConfig };
+  const handleApply = (overrideConfig?: MenuCustomizerState) => {
+    const base = overrideConfig || localConfig;
+    let finalConfig = { ...base };
 
-    if (editingItemId && tempLabel.trim()) {
+    // Commit any currently open editing inputs before saving via refs to eliminate blur race conditions!
+    const activeItemId = editingItemIdRef.current || editingItemId;
+    const activeGroupId = editingGroupIdRef.current || editingGroupId;
+    const activeLabel = (tempLabelRef.current || tempLabel).trim();
+
+    if (activeItemId && activeLabel) {
       finalConfig = {
         ...finalConfig,
         items: finalConfig.items.map((i) =>
-          i.id === editingItemId ? { ...i, label: tempLabel.trim() } : i
+          i.id === activeItemId ? { ...i, label: activeLabel } : i
         )
       };
     }
 
-    if (editingGroupId && tempLabel.trim()) {
+    if (activeGroupId && activeLabel) {
       finalConfig = {
         ...finalConfig,
         groups: finalConfig.groups.map((g) =>
-          g.id === editingGroupId ? { ...g, label: tempLabel.trim() } : g
+          g.id === activeGroupId ? { ...g, label: activeLabel } : g
         )
       };
     }
 
     saveMenuConfig(finalConfig);
     onSave(finalConfig);
+    dirtyManager.clearDirty('menu_customizer');
     setSaveToast(true);
     setTimeout(() => {
       setSaveToast(false);
       onClose();
-    }, 500);
+    }, 400);
   };
 
   const handleResetDefaults = () => {
@@ -564,12 +356,14 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
       onReset();
       setLocalConfig(DEFAULT_MENU_STATE);
       saveMenuConfig(DEFAULT_MENU_STATE);
+      dirtyManager.clearDirty('menu_customizer');
     }
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-4xl max-h-[85vh] h-full sm:h-auto flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden overscroll-contain text-slate-100">
+
         {/* Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -582,12 +376,9 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                 <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-mono">
                   WordPress Style
                 </span>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-sans hidden sm:inline">
-                  Drag & Drop Enabled
-                </span>
               </div>
               <p className="text-xs text-slate-400">
-                Menus ko Drag & Drop karein (Left-to-Right sequence), sub-items ko Up/Down shift karein, aur ghalti se bachne ke liye Lock/Unlock karein.
+                Menus ko rename karein, sub-menu items ko shift/move karein, aur ghalti se bachne ke liye Lock/Unlock karein.
               </p>
             </div>
           </div>
@@ -603,15 +394,12 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
 
         {/* Lock Warning Toast / Notice */}
         {lockWarning && (
-          <div className="mx-5 mt-4 p-3 bg-rose-950/85 border border-rose-500/60 rounded-xl text-xs text-rose-200 flex items-start justify-between gap-3 shadow-lg shadow-rose-950/40 animate-in fade-in duration-150 shrink-0">
-            <div className="flex items-start gap-2.5 min-w-0">
+          <div className="mx-5 mt-4 p-3 bg-rose-950/80 border border-rose-500/60 rounded-xl text-xs text-rose-200 flex items-start justify-between gap-3 shadow-lg shadow-rose-950/40 animate-in fade-in duration-150 shrink-0">
+            <div className="flex items-start gap-2 min-w-0">
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold text-rose-300">Action Blocked (Lock Protection Active):</p>
+                <p className="font-semibold text-rose-300">Action Blocked (Protection Active):</p>
                 <p className="text-slate-300 mt-0.5">{lockWarning}</p>
-                <p className="text-[11px] text-amber-300/90 mt-1">
-                  💡 Move ya drag karne ke liye pehle yellow Lock icon par click karke usay Green Unlock karein.
-                </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -625,7 +413,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
               )}
               <button
                 onClick={() => setLockWarning(null)}
-                className="p-1 text-slate-400 hover:text-white cursor-pointer"
+                className="p-1 text-slate-400 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -633,176 +421,27 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
           </div>
         )}
 
-        {/* Content Body (Scrollable only within modal) */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* TOP LAYER: Menu Tabs Sequence Reordering (Left-to-Right) */}
-          <div className="bg-slate-950/80 border border-cyan-500/30 rounded-2xl p-4 shadow-lg shadow-black/40">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                  <MoveHorizontal className="w-4 h-4" />
-                </span>
-                <div>
-                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    Top Navigation Tabs Sequence (Left → Right)
-                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-md font-mono">
-                      Main Menu Order
-                    </span>
-                  </h4>
-                  <p className="text-[11px] text-slate-400">
-                    Menu tabs ki position adjust karein (e.g. Core Channel 1st, Autopilot 2nd). Mouse se drag karein ya arrows dabayein.
-                  </p>
-                </div>
-              </div>
+        {/* Content Body — Interactive Grid of 4 Menu Categories (Scrollable only within modal) */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll p-4 sm:p-5 space-y-4">
 
-              <div className="flex items-center gap-2 text-[11px] text-slate-400 bg-slate-900/90 border border-slate-800 px-2.5 py-1 rounded-lg">
-                <Info className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                <span>Move karne ke liye Lock khula hona zaroori hai</span>
-              </div>
-            </div>
-
-            {/* Horizontal Tabs Sequence Strip (Interactive Drag & Drop + Left/Right sequence buttons) */}
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {localConfig.groups.map((group, index) => {
-                const groupItems = localConfig.items.filter((i) => i.groupId === group.id);
-                const isFirst = index === 0;
-                const isLast = index === localConfig.groups.length - 1;
-                const isDragOver = dragOverCategoryRibbonId === group.id;
-
-                return (
-                  <div
-                    key={group.id}
-                    draggable={!group.isLocked}
-                    onDragStart={(e) => handleCategoryDragStart(e, group.id)}
-                    onDragOver={(e) => handleCategoryDragOverRibbon(e, group.id)}
-                    onDrop={(e) => handleCategoryDropRibbon(e, group.id)}
-                    onDragEnd={() => {
-                      setDraggedGroupId(null);
-                      setDragOverCategoryRibbonId(null);
-                    }}
-                    className={`relative p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all ${
-                      group.isLocked
-                        ? 'bg-slate-900/70 border-slate-800 text-slate-300 cursor-default'
-                        : 'bg-slate-900/95 border-cyan-500/40 text-white cursor-grab active:cursor-grabbing hover:border-cyan-400 hover:shadow-md hover:shadow-cyan-950/40'
-                    } ${
-                      isDragOver ? 'ring-2 ring-cyan-400 bg-cyan-950/70 scale-[1.02]' : ''
-                    }`}
-                    title={
-                      group.isLocked
-                        ? `LOCKED: ${group.label}. Unlock karke drag ya move karein.`
-                        : `UNLOCKED: Mouse se pakad kar Left/Right drag karein`
-                    }
-                  >
-                    {/* Left: Sequence index badge & Drag grip */}
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div
-                        className={`p-1 rounded-lg text-xs font-mono font-bold flex items-center justify-center shrink-0 w-6 h-6 ${
-                          group.isLocked
-                            ? 'bg-slate-800 text-slate-400 border border-slate-700'
-                            : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                        }`}
-                      >
-                        #{index + 1}
-                      </div>
-
-                      {!group.isLocked ? (
-                        <GripVertical className="w-3.5 h-3.5 text-cyan-400 shrink-0 cursor-grab" />
-                      ) : (
-                        <GripVertical className="w-3.5 h-3.5 text-slate-600 shrink-0 opacity-40 cursor-not-allowed" />
-                      )}
-
-                      <div className="min-w-0 truncate">
-                        <p className="text-xs font-bold text-white truncate">{group.label}</p>
-                        <p className="text-[10px] text-slate-400">{groupItems.length} items</p>
-                      </div>
-                    </div>
-
-                    {/* Right: Sequence Arrows & Lock Toggle */}
-                    <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      {/* Left Arrow Button */}
-                      <button
-                        type="button"
-                        onClick={() => moveGroupSequence(group.id, 'left')}
-                        disabled={isFirst || group.isLocked}
-                        className={`p-1 rounded-md border text-[10px] transition-colors ${
-                          isFirst || group.isLocked
-                            ? 'opacity-30 border-slate-800 text-slate-600 cursor-not-allowed'
-                            : 'border-slate-700 bg-slate-800 hover:bg-cyan-950 hover:text-cyan-300 text-slate-300 cursor-pointer'
-                        }`}
-                        title={
-                          group.isLocked
-                            ? 'Locked: Unlock karein'
-                            : isFirst
-                            ? 'First position par hai'
-                            : 'Left shift karein (Move Left)'
-                        }
-                      >
-                        <ArrowLeft className="w-3 h-3" />
-                      </button>
-
-                      {/* Right Arrow Button */}
-                      <button
-                        type="button"
-                        onClick={() => moveGroupSequence(group.id, 'right')}
-                        disabled={isLast || group.isLocked}
-                        className={`p-1 rounded-md border text-[10px] transition-colors ${
-                          isLast || group.isLocked
-                            ? 'opacity-30 border-slate-800 text-slate-600 cursor-not-allowed'
-                            : 'border-slate-700 bg-slate-800 hover:bg-cyan-950 hover:text-cyan-300 text-slate-300 cursor-pointer'
-                        }`}
-                        title={
-                          group.isLocked
-                            ? 'Locked: Unlock karein'
-                            : isLast
-                            ? 'Last position par hai'
-                            : 'Right shift karein (Move Right)'
-                        }
-                      >
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
-
-                      {/* Lock Toggle */}
-                      <button
-                        type="button"
-                        onClick={() => toggleGroupLock(group.id)}
-                        className={`p-1 rounded-md border transition-colors cursor-pointer ${
-                          group.isLocked
-                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
-                            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-                        }`}
-                        title={group.isLocked ? 'Locked (Click to Unlock)' : 'Unlocked (Click to Lock)'}
-                      >
-                        {group.isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* LOWER LAYER: Interactive Grid of Menu Categories & Items */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {localConfig.groups.map((group, groupIndex) => {
+            {localConfig.groups.map((group) => {
               const groupItems = localConfig.items.filter((i) => i.groupId === group.id);
-              const isGroupDragOver = dragOverGroupId === group.id;
 
               return (
                 <div
                   key={group.id}
-                  onDragOver={(e) => handleItemDragOverCategory(e, group.id)}
-                  onDrop={(e) => handleItemDropOnCategory(e, group.id)}
                   className={`border rounded-2xl p-4 flex flex-col transition-all ${
                     group.isLocked
                       ? 'bg-slate-950/70 border-slate-800 shadow-md'
                       : 'bg-slate-900/90 border-cyan-500/40 shadow-lg shadow-cyan-950/30'
-                  } ${isGroupDragOver ? 'ring-2 ring-cyan-400/80 bg-slate-900' : ''}`}
+                  }`}
                 >
-                  {/* Category Header with Lock, Sequence Nudge & Rename */}
+                  {/* Category Header with Lock & Rename */}
                   <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="px-2 py-0.5 rounded-lg bg-slate-800 border border-slate-700 text-cyan-400 text-xs font-mono font-bold shrink-0">
-                        Tab #{groupIndex + 1}
+                      <span className="p-1 rounded-lg bg-slate-800 text-cyan-400">
+                        <Layers className="w-4 h-4" />
                       </span>
 
                       {editingGroupId === group.id ? (
@@ -839,32 +478,6 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Sequence Left / Right Arrows on Category Header */}
-                      <div className="flex items-center gap-0.5 bg-slate-800/60 p-0.5 rounded-lg border border-slate-700/60">
-                        <button
-                          type="button"
-                          onClick={() => moveGroupSequence(group.id, 'left')}
-                          disabled={groupIndex === 0 || group.isLocked}
-                          className={`p-1 rounded text-slate-400 hover:text-white transition-colors ${
-                            groupIndex === 0 || group.isLocked ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-700'
-                          }`}
-                          title="Sequence Left"
-                        >
-                          <ArrowLeft className="w-3 h-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveGroupSequence(group.id, 'right')}
-                          disabled={groupIndex === localConfig.groups.length - 1 || group.isLocked}
-                          className={`p-1 rounded text-slate-400 hover:text-white transition-colors ${
-                            groupIndex === localConfig.groups.length - 1 || group.isLocked ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-700'
-                          }`}
-                          title="Sequence Right"
-                        >
-                          <ArrowRight className="w-3 h-3" />
-                        </button>
-                      </div>
-
                       <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
                         {groupItems.length} items
                       </span>
@@ -883,91 +496,27 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Items in this Menu (Interactive Drag & Drop Up/Down) */}
+                  {/* Items in this Menu */}
                   <div className="mt-3 space-y-2 flex-1">
                     {groupItems.length === 0 ? (
                       <div className="p-4 border border-dashed border-slate-800 rounded-xl text-center text-xs text-slate-500">
-                        Is menu mein koi item nahi hai. Yahan doosre menu se drag karke drop karein ya shift karein.
+                        Is menu mein koi item nahi hai. Doosre menu se shift karein.
                       </div>
                     ) : (
-                      groupItems.map((item, itemIndex) => {
+                      groupItems.map((item) => {
                         const isSelected = selectedItemId === item.id;
-                        const isItemDragOver = dragOverItemId === item.id;
-                        const canDrag = !item.isLocked && !group.isLocked;
 
                         return (
                           <div
                             key={item.id}
-                            draggable={canDrag}
-                            onDragStart={(e) => handleItemDragStart(e, item)}
-                            onDragOver={(e) => handleItemDragOverItem(e, item.id)}
-                            onDrop={(e) => handleItemDropOnItem(e, item)}
-                            onDragEnd={() => {
-                              setDraggedItemId(null);
-                              setDragOverItemId(null);
-                            }}
                             onClick={() => setSelectedItemId(item.id)}
-                            className={`p-2 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-all select-none ${
+                            className={`p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-all cursor-pointer ${
                               isSelected
                                 ? 'bg-cyan-950/60 border-cyan-400 ring-1 ring-cyan-400/40 shadow-md shadow-cyan-950/60'
                                 : 'bg-slate-900 border-slate-800 hover:border-slate-700'
-                            } ${
-                              isItemDragOver ? 'ring-2 ring-cyan-400 bg-cyan-950/80 scale-[1.01]' : ''
-                            } ${
-                              canDrag
-                                ? 'cursor-grab active:cursor-grabbing hover:border-cyan-500/50'
-                                : 'cursor-pointer'
                             }`}
-                            title={
-                              canDrag
-                                ? 'Mouse se pakad kar upar ya neeche drag karein (Up/Down reorder) ya kisi doosri category mein drop karein'
-                                : item.isLocked
-                                ? 'Item locked hai: Pehle unlock karein'
-                                : 'Parent category locked hai: Pehle unlock karein'
-                            }
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              {/* Drag Handle & Quick Up/Down Nudge Controls */}
-                              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                {canDrag ? (
-                                  <div className="flex items-center gap-0.5">
-                                    <GripVertical className="w-3.5 h-3.5 text-cyan-400 cursor-grab hover:text-cyan-300" />
-                                    {/* Up & Down Arrows for precision 1-click nudge inside same category */}
-                                    <div className="flex flex-col">
-                                      <button
-                                        type="button"
-                                        onClick={() => moveItemUpDown(item.id, 'up')}
-                                        disabled={itemIndex === 0}
-                                        className={`p-0.5 hover:text-cyan-300 text-slate-400 cursor-pointer ${
-                                          itemIndex === 0 ? 'opacity-20 cursor-not-allowed' : ''
-                                        }`}
-                                        title="Move Up 1 step"
-                                      >
-                                        <ChevronUp className="w-2.5 h-2.5" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => moveItemUpDown(item.id, 'down')}
-                                        disabled={itemIndex === groupItems.length - 1}
-                                        className={`p-0.5 hover:text-cyan-300 text-slate-400 cursor-pointer ${
-                                          itemIndex === groupItems.length - 1 ? 'opacity-20 cursor-not-allowed' : ''
-                                        }`}
-                                        title="Move Down 1 step"
-                                      >
-                                        <ChevronDown className="w-2.5 h-2.5" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div
-                                    className="p-1 text-slate-600 opacity-40 cursor-not-allowed"
-                                    title="Locked: Pehle lock open karein"
-                                  >
-                                    <GripVertical className="w-3.5 h-3.5" />
-                                  </div>
-                                )}
-                              </div>
-
                               <span
                                 className={`w-2 h-2 rounded-full shrink-0 ${
                                   item.isLocked ? 'bg-amber-400' : 'bg-emerald-400'
@@ -1022,15 +571,15 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                                 onClick={() => toggleItemLock(item.id)}
                                 className={`p-1 rounded-lg border text-xs cursor-pointer transition-colors ${
                                   item.isLocked
-                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
-                                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                                 }`}
-                                title={item.isLocked ? 'Locked (Click to Unlock for Drag & Move)' : 'Unlocked (Ready to Drag & Move)'}
+                                title={item.isLocked ? 'Locked (Click to Unlock)' : 'Unlocked (Click to Lock)'}
                               >
                                 {item.isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
                               </button>
 
-                              {/* Move / Shift Dropdown (Maintained as requested) */}
+                              {/* Move / Shift Dropdown */}
                               <div className="relative flex items-center gap-1 text-[11px] bg-slate-800/80 border border-slate-700 rounded-lg px-1.5 py-0.5">
                                 <span className="text-slate-400 text-[10px]">Move to:</span>
                                 <select
@@ -1081,9 +630,10 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={handleApply}
+              onClick={() => handleApply()}
               className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-semibold text-xs shadow-lg shadow-cyan-950 cursor-pointer"
             >
+
               <Check className="w-3.5 h-3.5" />
               <span>Save Menu Layout</span>
             </button>

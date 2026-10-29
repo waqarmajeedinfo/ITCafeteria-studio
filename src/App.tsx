@@ -39,10 +39,7 @@ import {
   Upload,
   Clock,
   ArrowUp,
-  FolderTree,
-  Square,
-  Pause,
-  Play
+  FolderTree
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -66,7 +63,6 @@ import { CommunityPollWidget } from './components/CommunityPollWidget';
 import { StudioAssistant } from './components/StudioAssistant';
 import { HolographicBackground, type HolographicTheme, HOLOGRAPHIC_THEMES } from './components/HolographicBackground';
 import { PendingQueueTracker } from './components/PendingQueueTracker';
-import { DiagnosticVisualGuidance } from './components/DiagnosticVisualGuidance';
 import { PHONETIC_DICTIONARY } from './data/channelData';
 import { 
   ThemeCustomizerModal, 
@@ -77,10 +73,12 @@ import {
 import {
   MenuBarCustomizerModal,
   loadMenuConfig,
-  saveMenuConfig,
   DEFAULT_MENU_STATE,
   type MenuCustomizerState
 } from './components/MenuBarCustomizerModal';
+import { dirtyManager, type DirtyRecord } from './lib/dirtyStore';
+import { UnsavedChangesModal } from './components/UnsavedChangesModal';
+
 
 type TabType = 
   | 'analytics'
@@ -136,6 +134,12 @@ export default function App() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLiveActive, setIsLiveActive] = useState(false);
+  const [diagnosticGuidance, setDiagnosticGuidance] = useState<{
+    tab?: TabType;
+    label: string;
+    stepNumber?: number;
+    description?: string;
+  } | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
 
   // Banner customization state
@@ -179,18 +183,30 @@ export default function App() {
   // Menu Bar Customizer Configuration State (WordPress Style Menu Manager)
   const [menuConfig, setMenuConfig] = useState<MenuCustomizerState>(loadMenuConfig);
   const [showMenuCustomizer, setShowMenuCustomizer] = useState(false);
-  const [draggedNavbarGroupId, setDraggedNavbarGroupId] = useState<string | null>(null);
-  const [dragOverNavbarGroupId, setDragOverNavbarGroupId] = useState<string | null>(null);
+
+  // Dirty State Management: Tab-Switch Unsaved Changes Guard
+  const [pendingTab, setPendingTab] = useState<TabType | null>(null);
+  const [showUnsavedModal, setShowUnsavedModal] = useState<boolean>(false);
+  const [activeDirtyRecord, setActiveDirtyRecord] = useState<DirtyRecord | null>(() => dirtyManager.getDirty());
 
   useEffect(() => {
-    const handleMenuUpdate = (e: any) => {
-      if (e.detail) {
-        setMenuConfig(e.detail);
-      }
-    };
-    window.addEventListener('itcafeteria_menu_customizer_updated', handleMenuUpdate);
-    return () => window.removeEventListener('itcafeteria_menu_customizer_updated', handleMenuUpdate);
+    return dirtyManager.subscribe((record) => {
+      setActiveDirtyRecord(record);
+    });
   }, []);
+
+  // Prevent full-page scroll when Banner, Dictionary or Unsaved modal is open
+  useEffect(() => {
+    if (showDictionary || showBannerModal || showUnsavedModal) {
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
+      return () => {
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+      };
+    }
+  }, [showDictionary, showBannerModal, showUnsavedModal]);
+
 
   // Holographic background theme & animation states
   const [holoTheme, setHoloTheme] = useState<HolographicTheme>(() => {
@@ -406,6 +422,19 @@ export default function App() {
     };
     window.addEventListener('itcafeteria_menu_customizer_updated', handleMenuCustomizerUpdated);
 
+    const handleDiagnosticHighlight = (e: any) => {
+      if (e.detail) {
+        setDiagnosticGuidance(e.detail);
+        if (e.detail.tab) {
+          selectTab(e.detail.tab);
+        }
+        setTimeout(() => {
+          setDiagnosticGuidance((curr) => (curr?.label === e.detail.label ? null : curr));
+        }, 7000);
+      }
+    };
+    window.addEventListener('itcafeteria_diagnostic_highlight', handleDiagnosticHighlight);
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
@@ -414,6 +443,7 @@ export default function App() {
       window.removeEventListener('itcafeteria_open_banner_modal', openBannerHandler);
       window.removeEventListener('itcafeteria_open_menu_customizer', openMenuCustomizerHandler);
       window.removeEventListener('itcafeteria_menu_customizer_updated', handleMenuCustomizerUpdated);
+      window.removeEventListener('itcafeteria_diagnostic_highlight', handleDiagnosticHighlight);
     };
   }, []);
 
@@ -550,48 +580,9 @@ export default function App() {
       id: g.id,
       label: g.label,
       icon: GROUP_ICONS[g.id] || <Layers className="w-4 h-4 text-cyan-400" />,
-      count,
-      isLocked: g.isLocked
+      count
     };
   });
-
-  const handleNavbarGroupDragStart = (e: React.DragEvent, groupId: string, isLocked: boolean) => {
-    if (isLocked) {
-      e.preventDefault();
-      return;
-    }
-    setDraggedNavbarGroupId(groupId);
-    e.dataTransfer.setData('text/plain', `navgroup:${groupId}`);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleNavbarGroupDrop = (e: React.DragEvent, targetGroupId: string, targetLocked: boolean) => {
-    e.preventDefault();
-    if (!draggedNavbarGroupId || draggedNavbarGroupId === targetGroupId) {
-      setDraggedNavbarGroupId(null);
-      setDragOverNavbarGroupId(null);
-      return;
-    }
-    if (targetLocked) {
-      setDraggedNavbarGroupId(null);
-      setDragOverNavbarGroupId(null);
-      return;
-    }
-
-    const fromIndex = menuConfig.groups.findIndex((g) => g.id === draggedNavbarGroupId);
-    const toIndex = menuConfig.groups.findIndex((g) => g.id === targetGroupId);
-    if (fromIndex !== -1 && toIndex !== -1) {
-      const newGroups = [...menuConfig.groups];
-      const [moved] = newGroups.splice(fromIndex, 1);
-      newGroups.splice(toIndex, 0, moved);
-      const updated = { ...menuConfig, groups: newGroups };
-      setMenuConfig(updated);
-      saveMenuConfig(updated);
-    }
-
-    setDraggedNavbarGroupId(null);
-    setDragOverNavbarGroupId(null);
-  };
 
   const activeGroup = tabs.find((t) => t.id === activeTab)?.group || 'core';
   const activeTabMeta = tabs.find((t) => t.id === activeTab);
@@ -603,6 +594,20 @@ export default function App() {
       return;
     }
 
+    // Dirty State Guard: Check if user has unsaved changes before switching tabs!
+    if (dirtyManager.isDirty()) {
+      setPendingTab(id);
+      setActiveDirtyRecord(dirtyManager.getDirty());
+      setShowUnsavedModal(true);
+      setOpenMenu(null);
+      setMobileMenuOpen(false);
+      return;
+    }
+
+    proceedWithTabSwitch(id);
+  };
+
+  const proceedWithTabSwitch = (id: TabType) => {
     // Cache leaving tab's scroll position before navigation
     scrollPositionsRef.current[activeTab] = window.scrollY;
     isSwitchingTabRef.current = true;
@@ -611,6 +616,42 @@ export default function App() {
     setOpenMenu(null);
     setMobileMenuOpen(false);
   };
+
+  const handleConfirmSaveAndSwitch = async () => {
+    const current = activeDirtyRecord || dirtyManager.getDirty();
+    if (current?.onSave) {
+      try {
+        await current.onSave();
+      } catch (e) {
+        console.error('Error during auto-save before tab switch:', e);
+      }
+    }
+    dirtyManager.clearDirty();
+    setShowUnsavedModal(false);
+    if (pendingTab) {
+      proceedWithTabSwitch(pendingTab);
+      setPendingTab(null);
+    }
+  };
+
+  const handleDiscardAndSwitch = () => {
+    const current = activeDirtyRecord || dirtyManager.getDirty();
+    if (current?.onDiscard) {
+      current.onDiscard();
+    }
+    dirtyManager.clearDirty();
+    setShowUnsavedModal(false);
+    if (pendingTab) {
+      proceedWithTabSwitch(pendingTab);
+      setPendingTab(null);
+    }
+  };
+
+  const handleCancelTabSwitch = () => {
+    setShowUnsavedModal(false);
+    setPendingTab(null);
+  };
+
 
   return (
     <div className="min-h-screen app-shell-bg text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white relative">
@@ -658,48 +699,16 @@ export default function App() {
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-white tracking-wide">IT CAFETERIA</span>
                     {themeConfig.showStudioBadge && (
                       <BadgeCheck className="w-3.5 h-3.5 text-cyan-400" />
                     )}
-                    {/* Interactive Autopilot / Live Manual Control Pill */}
-                    {isLiveActive ? (
-                      <div className="flex items-center gap-1">
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/50 text-[10px] font-bold text-rose-300 tracking-wider">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                          LIVE ACTIVE
-                        </span>
-                        <button
-                          onClick={() => {
-                            setIsLiveActive(false);
-                            window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
-                          }}
-                          className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold cursor-pointer transition-all shadow-md shadow-rose-950"
-                          title="Click to STOP Live Autopilot immediately"
-                        >
-                          <Square className="w-2.5 h-2.5 fill-current" />
-                          <span>STOP</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-[10px] font-semibold text-slate-400">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                          AUTOPILOT: STOPPED
-                        </span>
-                        <button
-                          onClick={() => {
-                            setIsLiveActive(true);
-                            window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_start_all'));
-                          }}
-                          className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600/80 hover:bg-emerald-500 text-white text-[10px] font-bold cursor-pointer transition-all shadow-sm"
-                          title="Click to Start Autopilot Manually"
-                        >
-                          <Play className="w-2.5 h-2.5 fill-current" />
-                          <span>Start</span>
-                        </button>
-                      </div>
+                    {themeConfig.showTopLiveBadge && (
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-[9px] font-bold text-rose-300 tracking-wider">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                        LIVE
+                      </span>
                     )}
                   </div>
                   {themeConfig.showTagline && (
@@ -807,43 +816,19 @@ export default function App() {
                 <span>Phonetic Rules Dictionary</span>
               </button>
 
-              {/* 3. Go Live Voice Co-Pilot Manual Control Button */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => {
-                    const next = !isLiveActive;
-                    setIsLiveActive(next);
-                    if (!next) {
-                      window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
-                    } else {
-                      window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_start_all'));
-                    }
-                  }}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-all cursor-pointer backdrop-blur-md shadow-md ${
-                    isLiveActive
-                      ? 'bg-rose-950/90 border-rose-500 text-rose-200 ring-2 ring-rose-500/50 shadow-rose-950/70'
-                      : 'bg-slate-900/85 hover:bg-slate-800/90 border-slate-700/80 text-slate-200 hover:text-white'
-                  }`}
-                  title={isLiveActive ? 'Live Voice is Active. Click to STOP' : 'Click to Go Live (Voice Co-Pilot)'}
-                >
-                  <Radio className={`w-4 h-4 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
-                  <span>{isLiveActive ? 'Live Active' : 'Go Live'}</span>
-                </button>
-
-                {isLiveActive && (
-                  <button
-                    onClick={() => {
-                      setIsLiveActive(false);
-                      window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md shadow-rose-950 cursor-pointer transition-all"
-                    title="Stop Live Co-Pilot & Autopilot immediately"
-                  >
-                    <Square className="w-3.5 h-3.5 fill-current" />
-                    <span>Stop</span>
-                  </button>
-                )}
-              </div>
+              {/* 3. Go Live Voice Co-Pilot Button (identical slate-border styling) */}
+              <button
+                onClick={() => setIsLiveActive((prev) => !prev)}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-medium transition-all cursor-pointer backdrop-blur-md shadow-md ${
+                  isLiveActive
+                    ? 'bg-slate-900/95 border-rose-500/80 text-rose-300 ring-2 ring-rose-500/40 shadow-rose-950/50'
+                    : 'bg-slate-900/85 hover:bg-slate-800/90 border-slate-700/80 text-slate-200 hover:text-white'
+                }`}
+                title="Go Live: Real-time Hands-Free Voice Co-Pilot"
+              >
+                <Radio className={`w-4 h-4 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
+                <span>{isLiveActive ? 'Live Voice Active' : 'Go Live'}</span>
+              </button>
             </div>
 
             {/* WordPress Theme & Studio Customizer Button (Circled in user screenshot) */}
@@ -875,43 +860,17 @@ export default function App() {
               const isGroupActive = activeGroup === group.id;
               const isMenuOpen = openMenu === group.id;
               const groupTabs = tabs.filter((t) => t.group === group.id);
-              const isNavDragOver = dragOverNavbarGroupId === group.id;
 
               return (
-                <div
-                  key={group.id}
-                  draggable={!group.isLocked}
-                  onDragStart={(e) => handleNavbarGroupDragStart(e, group.id, group.isLocked)}
-                  onDragOver={(e) => {
-                    if (draggedNavbarGroupId && !group.isLocked) {
-                      e.preventDefault();
-                      setDragOverNavbarGroupId(group.id);
-                    }
-                  }}
-                  onDrop={(e) => handleNavbarGroupDrop(e, group.id, group.isLocked)}
-                  onDragEnd={() => {
-                    setDraggedNavbarGroupId(null);
-                    setDragOverNavbarGroupId(null);
-                  }}
-                  className={`relative transition-all ${
-                    isNavDragOver ? 'ring-2 ring-cyan-400 rounded-xl scale-105 shadow-lg shadow-cyan-950' : ''
-                  }`}
-                >
+                <div key={group.id} className="relative">
                   <button
                     onClick={() => setOpenMenu(isMenuOpen ? null : group.id)}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-all border ${
-                      !group.isLocked ? 'cursor-grab active:cursor-grabbing hover:border-cyan-400' : 'cursor-pointer'
-                    } ${
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-all cursor-pointer border ${
                       isMenuOpen || isGroupActive
                         ? 'text-cyan-300 bg-cyan-950/40 border-cyan-500/50 shadow-md shadow-cyan-950/50'
                         : 'text-slate-300 hover:text-white bg-slate-900/60 hover:bg-slate-900 border-slate-800 hover:border-slate-700'
                     }`}
                     aria-expanded={isMenuOpen}
-                    title={
-                      !group.isLocked
-                        ? `UNLOCKED: Drag karke navbar tabs ki sequence badlein (Left-to-Right)`
-                        : `${group.label} (Click karke menu dekhein)`
-                    }
                   >
                     <span className="shrink-0">{group.icon}</span>
                     <span>{group.label}</span>
@@ -931,7 +890,6 @@ export default function App() {
                         return (
                           <button
                             key={tab.id}
-                            data-guide-target={`tab-${tab.id}`}
                             onClick={() => selectTab(tab.id)}
                             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left text-sm transition-colors cursor-pointer ${
                               isActive
@@ -1058,13 +1016,48 @@ export default function App() {
       </nav>
 
       {/* Main Container with Staggered Entrance Animation */}
-      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full">
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full relative">
+        {/* Diagnostic Visual Guidance Floating Banner */}
+        {diagnosticGuidance && (
+          <div className="mb-4 p-3 rounded-2xl bg-slate-950/95 border-2 border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.35)] flex items-center justify-between gap-3 text-xs text-white animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-6 h-6 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-500 text-slate-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md">
+                {diagnosticGuidance.stepNumber || 1}
+              </span>
+              <div className="min-w-0">
+                <div className="font-bold text-cyan-300 flex items-center gap-2 truncate">
+                  <span>🎯 Diagnostic Visual Guidance:</span>
+                  <span className="text-white font-mono bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">
+                    {diagnosticGuidance.label}
+                  </span>
+                </div>
+                {diagnosticGuidance.description && (
+                  <p className="text-slate-300 text-[11px] truncate mt-0.5">
+                    {diagnosticGuidance.description}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => setDiagnosticGuidance(null)}
+              className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 shrink-0 cursor-pointer"
+              title="Dismiss Guidance Highlight"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         <motion.div
           key={activeTab}
           variants={tabContentVariants}
           initial="hidden"
           animate="visible"
-          className="w-full"
+          className={`w-full transition-all duration-300 rounded-2xl ${
+            diagnosticGuidance
+              ? 'ring-4 ring-cyan-400 ring-offset-4 ring-offset-slate-950 p-1.5 shadow-[0_0_35px_rgba(6,182,212,0.25)]'
+              : ''
+          }`}
         >
           {activeTab === 'analytics' && <ChannelAnalytics />}
           {activeTab === 'pending' && <PendingQueueTracker onNavigateTab={(tab) => selectTab(tab as TabType)} />}
@@ -1095,9 +1088,9 @@ export default function App() {
 
       {/* Phonetic Dictionary Modal */}
       {showDictionary && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[85vh] h-full sm:h-auto flex flex-col overflow-hidden overscroll-contain shadow-2xl">
+            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950 shrink-0">
               <div className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-cyan-400" />
                 <h3 className="font-bold text-white text-sm">Roman Urdu Phonetic Living List (Section 7)</h3>
@@ -1110,7 +1103,7 @@ export default function App() {
               </button>
             </div>
 
-            <div className="p-4 overflow-y-auto space-y-3 text-xs divide-y divide-slate-800/60">
+            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll space-y-3 text-xs divide-y divide-slate-800/60">
               <p className="text-slate-400 text-xs pb-2">
                 Flow voice engine ke mispronunciations ko rokne ke liye test-verified spellings:
               </p>
@@ -1127,10 +1120,10 @@ export default function App() {
               ))}
             </div>
 
-            <div className="p-3 bg-slate-950 border-t border-slate-800 text-right">
+            <div className="p-3 bg-slate-950 border-t border-slate-800 text-right shrink-0">
               <button
                 onClick={() => setShowDictionary(false)}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-medium"
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-medium cursor-pointer"
               >
                 Theek Hai (Close)
               </button>
@@ -1141,10 +1134,10 @@ export default function App() {
 
       {/* Banner Customizer & Overlay Editor Modal */}
       {showBannerModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl shadow-cyan-950/40">
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-2xl w-full max-h-[85vh] h-full sm:h-auto flex flex-col overflow-hidden overscroll-contain shadow-2xl shadow-cyan-950/40">
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+            <div className="p-4 sm:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
                   <Camera className="w-5 h-5" />
@@ -1163,7 +1156,7 @@ export default function App() {
             </div>
 
             {/* Modal Content */}
-            <div className="p-5 overflow-y-auto space-y-5 text-xs">
+            <div className="p-4 sm:p-5 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll space-y-4 text-xs">
               {/* Live Preview Card */}
               <div>
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
@@ -1193,6 +1186,7 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
 
               {/* Banner Presets */}
               <div>
@@ -1469,7 +1463,16 @@ export default function App() {
         }}
       />
 
-      <DiagnosticVisualGuidance />
+      {/* Dirty State Guard: Unsaved Changes Confirmation Modal */}
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        dirtyRecord={activeDirtyRecord}
+        targetTabName={tabs.find((t) => t.id === pendingTab)?.label || 'Agla Tab'}
+        onConfirmSaveAndSwitch={handleConfirmSaveAndSwitch}
+        onDiscardAndSwitch={handleDiscardAndSwitch}
+        onCancel={handleCancelTabSwitch}
+      />
+
 
       <StudioAssistant
         currentTab={activeTab}

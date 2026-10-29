@@ -105,6 +105,17 @@ export function ThemeCustomizerModal({
 }: ThemeCustomizerModalProps) {
   const [activeCustomizerTab, setActiveCustomizerTab] = useState<'palette' | 'autotheme' | 'topbar' | 'structure' | 'branding'>('palette');
 
+  React.useEffect(() => {
+    if (isOpen) {
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
+      return () => {
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const update = <K extends keyof StudioThemeConfig>(key: K, value: StudioThemeConfig[K]) => {
@@ -115,11 +126,12 @@ export function ThemeCustomizerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md overscroll-contain overflow-hidden animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-4xl max-h-[92vh] bg-slate-950 border border-cyan-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 ring-1 ring-cyan-500/20"
+        className="w-full max-w-4xl max-h-[85vh] h-full sm:h-auto bg-slate-950 border border-cyan-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden overscroll-contain text-slate-100 ring-1 ring-cyan-500/20"
         onClick={(e) => e.stopPropagation()}
       >
+
         {/* Customizer Header (WordPress Style Live Theme Studio) */}
         <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950/40 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -215,7 +227,8 @@ export function ThemeCustomizerModal({
           </div>
 
           {/* Right Main Settings Area */}
-          <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-6 bg-slate-950/60">
+          <div className="flex-1 min-h-0 p-4 sm:p-6 overflow-y-auto overscroll-contain custom-modal-scroll space-y-6 bg-slate-950/60">
+
             {/* 1. COLOR SCHEME & PALETTE */}
             {activeCustomizerTab === 'palette' && (
               <div className="space-y-5 animate-in fade-in duration-200">

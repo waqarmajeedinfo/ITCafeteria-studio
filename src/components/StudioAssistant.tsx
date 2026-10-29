@@ -43,18 +43,15 @@ import {
   MicOff,
   Maximize2,
   Minimize2,
-  Columns,
-  LayoutGrid,
-  Zap,
-  Target,
-  ChevronRight,
-  Square
+  Layout,
+  Monitor,
+  Eye
 } from 'lucide-react';
+
 import type { TabType } from '../App';
 import { PUBLISHED_VIDEOS, PHONETIC_DICTIONARY } from '../data/channelData';
 import { buildMasterThumbnailPrompt, splitHeadline } from '../lib/thumbnailMaster';
 import type { GeneratedStory, StoryScene } from './StoryPackageView';
-import { triggerDiagnosticGuidance } from './DiagnosticVisualGuidance';
 
 export function getApplicationPortion(tabId: string): { group: string; name: string } {
   const map: Record<string, { group: string; name: string }> = {
@@ -115,17 +112,8 @@ export const PRESET_OPERATORS: OperatorProfile[] = [
 
 export type VoiceGenderName = 'Puck' | 'Charon' | 'Fenrir' | 'Aoede' | 'Kore';
 
-export const PRIMARY_ANCHOR_VOICE_PROFILE = {
-  voiceName: 'Puck' as VoiceGenderName,
-  persona: 'Waqar Majeed Primary Anchor Profile: Natural warm conversational Pakistani Urdu tech presenter, friendly Punjabi Pakistani accent tone, calm cadence, articulate, zero repetition',
-  label: 'Waqar Majeed Anchor (Locked)',
-  role: 'Signature Studio Host'
-};
-
-export type OverlayMode = 'drawer' | 'wide' | 'span';
-
 interface ActionCardData {
-  type: 'autopilot_result' | 'trainee_step' | 'action_done' | 'backend_action';
+  type: 'autopilot_result' | 'trainee_step' | 'action_done';
   title: string;
   category?: string;
   scheduledTime?: string;
@@ -134,8 +122,6 @@ interface ActionCardData {
   thumbnailPrompt?: string;
   nextStepText?: string;
   targetTab?: TabType;
-  backendAction?: string;
-  executionNote?: string;
 }
 
 interface AssistantMessage {
@@ -143,6 +129,13 @@ interface AssistantMessage {
   role: 'user' | 'assistant';
   text: string;
   card?: ActionCardData;
+  isStreaming?: boolean;
+  diagnosticHighlight?: {
+    tab?: TabType;
+    label: string;
+    stepNumber?: number;
+    description?: string;
+  };
 }
 
 interface StudioAssistantProps {
@@ -525,33 +518,8 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
   const [showOperatorModal, setShowOperatorModal] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showKeyboardInput, setShowKeyboardInput] = useState(false);
-  // Default: PAUSED / MANUAL (User must manually click Start to activate listening)
-  const [isListeningPaused, setIsListeningPaused] = useState(true);
+  const [isListeningPaused, setIsListeningPaused] = useState(false);
   const optionsMenuRef = useRef<HTMLDivElement>(null);
-
-  // Adaptive UI Overlay Behavior ('drawer' | 'wide' | 'span')
-  const [overlayMode, setOverlayMode] = useState<OverlayMode>(() => {
-    try {
-      return (localStorage.getItem('itcafeteria_assistant_overlay_mode') as OverlayMode) || 'drawer';
-    } catch {
-      return 'drawer';
-    }
-  });
-
-  const updateOverlayMode = (mode: OverlayMode) => {
-    setOverlayMode(mode);
-    try {
-      localStorage.setItem('itcafeteria_assistant_overlay_mode', mode);
-    } catch {}
-  };
-
-  // Primary Anchor Voice Consistency Lock (Waqar Majeed Profile)
-  const [primaryAnchorVoiceLocked, setPrimaryAnchorVoiceLocked] = useState<boolean>(true);
-
-  // Persistent Microphone & Voice Activity Detection (Manual: default false)
-  const [persistentMic, setPersistentMic] = useState<boolean>(false);
-  const persistentMicRef = useRef<boolean>(false);
-  persistentMicRef.current = persistentMic;
 
   // Active Operator Profile State
   const [operator, setOperator] = useState<OperatorProfile>(() => {
@@ -581,6 +549,17 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       return 'Puck';
     }
   });
+
+  // Adaptive UI Behavior: Floating adjustable overlay spanning active page
+  const [overlayViewMode, setOverlayViewMode] = useState<'compact' | 'cockpit' | 'spanning'>(() => {
+    try {
+      return (localStorage.getItem('itcafeteria_overlay_mode') as any) || 'compact';
+    } catch {
+      return 'compact';
+    }
+  });
+
+  const activeStreamingIntervalRef = useRef<any>(null);
 
   // Messages State
   const [messages, setMessages] = useState<AssistantMessage[]>([
@@ -639,61 +618,14 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, liveInterimText, isLoading, isOpen]);
 
-  // Synchronize continuous hands-free listening strictly when explicitly unpaused AND either live mode or persistent mic is manually enabled
+  // Synchronize continuous hands-free listening whenever drawer is open or live mode is active
   useEffect(() => {
-    if (!isListeningPaused && (isLiveActive || persistentMic)) {
+    if ((isOpen || isLiveActive) && !isListeningPaused) {
       startHandsFreeListeningRef.current?.();
-    } else {
+    } else if (!isOpen && !isLiveActive) {
       stopHandsFreeListeningRef.current?.();
     }
-  }, [isOpen, isLiveActive, persistentMic, isListeningPaused]);
-
-  // Global Remote Stop/Start Listeners
-  useEffect(() => {
-    const handleRemoteStopAll = () => {
-      setIsListeningPaused(true);
-      setPersistentMic(false);
-      stopHandsFreeListeningRef.current?.();
-      if (currentAudioRef.current) {
-        try {
-          currentAudioRef.current.pause();
-          currentAudioRef.current = null;
-        } catch {}
-      }
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-      setIsSpeakingAudio(false);
-      setVadState('idle');
-      if (onToggleLive) onToggleLive(false);
-    };
-
-    const handleRemoteStartAll = () => {
-      setIsListeningPaused(false);
-      setPersistentMic(true);
-      if (onToggleLive) onToggleLive(true);
-    };
-
-    window.addEventListener('itcafeteria_autopilot_stop_all', handleRemoteStopAll);
-    window.addEventListener('itcafeteria_autopilot_start_all', handleRemoteStartAll);
-    return () => {
-      window.removeEventListener('itcafeteria_autopilot_stop_all', handleRemoteStopAll);
-      window.removeEventListener('itcafeteria_autopilot_start_all', handleRemoteStartAll);
-    };
-  }, [onToggleLive]);
-
-  useEffect(() => {
-    const handleOpenOverlay = (e: any) => {
-      setIsOpen(true);
-      if (e?.detail?.mode) {
-        updateOverlayMode(e.detail.mode);
-      }
-    };
-    window.addEventListener('itcafeteria_open_assistant_overlay', handleOpenOverlay);
-    return () => {
-      window.removeEventListener('itcafeteria_open_assistant_overlay', handleOpenOverlay);
-    };
-  }, []);
+  }, [isOpen, isLiveActive, isListeningPaused]);
 
   useEffect(() => {
     try {
@@ -742,27 +674,30 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
   const handleTogglePause = () => {
     if (isListeningPaused) {
       setIsListeningPaused(false);
-      setPersistentMic(true);
       startHandsFreeListening();
     } else {
       setIsListeningPaused(true);
-      setPersistentMic(false);
       stopHandsFreeListening();
       stopAudioPlayback();
     }
   };
 
-  const handleEmergencyStopAll = () => {
-    setIsListeningPaused(true);
-    setPersistentMic(false);
-    stopHandsFreeListening();
-    stopAudioPlayback();
-    if (onToggleLive) onToggleLive(false);
-    window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
-  };
+  const stopStreaming = useCallback(() => {
+    if (activeStreamingIntervalRef.current) {
+      clearInterval(activeStreamingIntervalRef.current);
+      activeStreamingIntervalRef.current = null;
+    }
+    setMessages((prev) =>
+      prev.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
+    );
+  }, []);
 
   // Stop current audio playback immediately (Instant Barge-In Interruption)
   const stopAudioPlayback = useCallback(() => {
+    if (activeStreamingIntervalRef.current) {
+      clearInterval(activeStreamingIntervalRef.current);
+      activeStreamingIntervalRef.current = null;
+    }
     if (currentAudioRef.current) {
       try {
         currentAudioRef.current.pause();
@@ -814,19 +749,13 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       setVadState('ai_speaking');
 
       try {
-        const targetVoice = primaryAnchorVoiceLocked ? PRIMARY_ANCHOR_VOICE_PROFILE.voiceName : voiceGender;
-        const targetStyle = primaryAnchorVoiceLocked 
-          ? PRIMARY_ANCHOR_VOICE_PROFILE.persona 
-          : `${voicePersona}, Punjabi Pakistani dialect tone, warm friendly YouTube host, calm cadence`;
-
         const response = await fetch('/api/ai/speak', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text: cleanText.slice(0, 500),
-            voiceName: targetVoice,
-            voiceStyle: targetStyle,
-            useAnchorProfile: primaryAnchorVoiceLocked
+            voiceName: voiceGender,
+            voiceStyle: `${voicePersona}, Punjabi Pakistani dialect tone, warm friendly YouTube host, calm cadence`
           })
         });
 
@@ -842,10 +771,10 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
               currentAudioRef.current = null;
               setVadState('idle');
               // Automatically resume listening hands-free for user's next turn continuously
-              if ((isLiveActiveRef.current || isOpenRef.current || persistentMicRef.current) && !isListeningPausedRef.current) {
+              if ((isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current) {
                 setTimeout(() => {
                   startHandsFreeListeningRef.current?.();
-                }, 120);
+                }, 200);
               }
             };
 
@@ -854,7 +783,7 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
               isAiProcessingOrSpeakingRef.current = false;
               currentAudioRef.current = null;
               setVadState('idle');
-              if ((isLiveActiveRef.current || isOpenRef.current || persistentMicRef.current) && !isListeningPausedRef.current) {
+              if ((isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current) {
                 setTimeout(() => {
                   startHandsFreeListeningRef.current?.();
                 }, 200);
@@ -908,11 +837,81 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
     [voiceGender, voicePersona, stopAudioPlayback]
   );
 
-  // Test current selected voice
-  const testCurrentVoice = async () => {
-    const testPhrase = `Salam ${operator.honorific}! Main IT Cafeteria ka Live Co-Pilot hoon. Yeh voice test bilkul natural sound kar rahi hai.`;
-    await speakNaturalUrdu(testPhrase);
-  };
+  const testCurrentVoice = useCallback(() => {
+    speakNaturalUrdu('Assalam o alaikum! IT Cafeteria anchor voice bilkul active aur synced hai.');
+  }, [speakNaturalUrdu]);
+
+
+  // Diagnostic Visual Guidance Dispatcher (Step-by-step UI elements highlights)
+  const triggerDiagnosticGuidance = useCallback((tab?: TabType, label?: string, stepNumber = 1, desc?: string) => {
+    if (!label) return;
+    window.dispatchEvent(
+      new CustomEvent('itcafeteria_diagnostic_highlight', {
+        detail: { tab, label, stepNumber, description: desc }
+      })
+    );
+  }, []);
+
+  // 1. Real-time Output Streaming: Generates concurrent word-by-word responses in real-time
+  const streamAssistantResponse = useCallback((
+    fullText: string,
+    card?: ActionCardData,
+    diagnostic?: AssistantMessage['diagnosticHighlight']
+  ) => {
+    stopStreaming();
+    const msgId = (Date.now() + Math.floor(Math.random() * 1000)).toString();
+
+    // Trigger visual diagnostic highlight on target element if specified
+    if (diagnostic?.label) {
+      triggerDiagnosticGuidance(
+        diagnostic.tab,
+        diagnostic.label,
+        diagnostic.stepNumber || 1,
+        diagnostic.description
+      );
+    }
+
+    // Concurrently trigger spoken audio stream
+    speakNaturalUrdu(fullText);
+
+    // Progressive real-time concurrent word-by-word streaming
+    const words = fullText.split(' ');
+    let currentIdx = 0;
+    let streamed = '';
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: msgId,
+        role: 'assistant',
+        text: '',
+        isStreaming: true,
+        card,
+        diagnosticHighlight: diagnostic,
+      }
+    ]);
+
+    activeStreamingIntervalRef.current = setInterval(() => {
+      if (currentIdx < words.length) {
+        streamed += (currentIdx === 0 ? '' : ' ') + words[currentIdx];
+        currentIdx++;
+        const isStillStreaming = currentIdx < words.length;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId ? { ...m, text: streamed, isStreaming: isStillStreaming } : m
+          )
+        );
+      } else {
+        if (activeStreamingIntervalRef.current) {
+          clearInterval(activeStreamingIntervalRef.current);
+          activeStreamingIntervalRef.current = null;
+        }
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msgId ? { ...m, isStreaming: false } : m))
+        );
+      }
+    }, 24);
+  }, [speakNaturalUrdu, stopStreaming, triggerDiagnosticGuidance]);
 
   // Autonomous Pipeline Trigger (Creates 10-Scene Short + Schedules in Calendar)
   const runAutonomousShortSequence = async (customTopic?: string): Promise<{ story: GeneratedStory; scheduledTime: string }> => {
@@ -1123,21 +1122,11 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
 
       const switchReply = `Bilkul! Main ne active operator "Trainee Mode" par set kar diya hai.\n\nAapko har step 1-2-3 kar ke aasan Roman Urdu mein sikhaya jayega. Agar aap chahein to mujhe bolein "Pending list dikhao" ya "Aaj ka short bana do"!`;
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          text: switchReply,
-          card: {
-            type: 'trainee_step',
-            title: 'Operator Switched: Trainee Mode',
-            nextStepText: 'Try bolein: "Pending list dikhao" ya "Calendar kholo"'
-          }
-        }
-      ]);
-
-      await speakNaturalUrdu(switchReply);
+      streamAssistantResponse(switchReply, {
+        type: 'trainee_step',
+        title: 'Operator Switched: Trainee Mode',
+        nextStepText: 'Try bolein: "Pending list dikhao" ya "Calendar kholo"'
+      });
       setIsLoading(false);
       return;
     }
@@ -1165,24 +1154,23 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
 
       const pendingReply = `${operator.honorific}! Main ne aapke samne screen par Autopilot Manager khol diya hai aur sab se high-priority pending task select kar diya hai: "Power Automate Desktop: Web Scraping to Clean Excel in 60s".\n\nYeh task shaam 5:00 PM office peak slot ke liye queued hai, Dual-Platform Search Surge se backed hai aur 58 catalog videos se 0-duplicate verify shuda hai. Aap screen par iski details aur evidence check kar sakte hain!`;
 
-      setMessages((prev) => [
-        ...prev,
+      streamAssistantResponse(
+        pendingReply,
         {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          text: pendingReply,
-          card: {
-            type: 'autopilot_result',
-            title: 'Power Automate Desktop: Web Scraping to Clean Excel in 60s',
-            category: 'AI Chatbots, Workflows & AI Tools',
-            scheduledTime: '5:00 PM PKT (Tomorrow)',
-            nextStepText: 'Autopilot screen par task open ho chuka hai — "Run Task Now" dabayein ya verify karein.',
-            targetTab: 'autopilot'
-          }
+          type: 'autopilot_result',
+          title: 'Power Automate Desktop: Web Scraping to Clean Excel in 60s',
+          category: 'AI Chatbots, Workflows & AI Tools',
+          scheduledTime: '5:00 PM PKT (Tomorrow)',
+          nextStepText: 'Autopilot screen par task open ho chuka hai — "Run Task Now" dabayein ya verify karein.',
+          targetTab: 'autopilot'
+        },
+        {
+          tab: 'autopilot',
+          label: 'Autopilot Coordinator',
+          stepNumber: 1,
+          description: 'High-priority task queued for 5:00 PM peak slot'
         }
-      ]);
-
-      await speakNaturalUrdu(pendingReply);
+      );
       setIsLoading(false);
       return;
     }
@@ -1217,27 +1205,26 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
 
         const replyText = `${operator.honorific}! Main ne Autopilot Engine se pura 10-scene short tayar kar ke screen par Content Calendar khol diya hai: "${story.title}".\n\nIsay 58 catalog videos se verify kiya gaya hai (0% duplicate) aur shaam ${scheduledTime} par schedule kar diya gaya hai. Aap screen par check kar sakte hain!`;
 
-        setMessages((prev) => [
-          ...prev,
+        streamAssistantResponse(
+          replyText,
           {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            text: replyText,
-            card: {
-              type: 'autopilot_result',
-              title: story.title,
-              category: story.categoryName,
-              scheduledTime,
-              scenesCount: 10,
-              flowPrompts: flowPromptSummary,
-              thumbnailPrompt: story.thumbnailPrompt,
-              nextStepText: 'Agla step: Flow Prompts copy karein ya Content Calendar mein check karein!',
-              targetTab: 'calendar'
-            }
+            type: 'autopilot_result',
+            title: story.title,
+            category: story.categoryName,
+            scheduledTime,
+            scenesCount: 10,
+            flowPrompts: flowPromptSummary,
+            thumbnailPrompt: story.thumbnailPrompt,
+            nextStepText: 'Agla step: Flow Prompts copy karein ya Content Calendar mein check karein!',
+            targetTab: 'calendar'
+          },
+          {
+            tab: 'calendar',
+            label: 'Content Calendar',
+            stepNumber: 1,
+            description: `Scheduled slot: ${scheduledTime} (${story.title})`
           }
-        ]);
-
-        await speakNaturalUrdu(replyText);
+        );
         setIsLoading(false);
         return;
       } catch (e) {
@@ -1256,21 +1243,11 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
     if (isTrainRequest) {
       const trainReply = `${operator.honorific}! Naye user ke liye yeh 3 aasan tareeqe hain:\n\n1️⃣ **Step 1:** Mujhe bolein "Pending list dikhao" ya "Aaj ka short bana do". Main khud topic dhoond kar 10-scene Roman Urdu script tayar kar dunga.\n2️⃣ **Step 2:** Card ke "Copy Flow Prompts" button se prompt copy kar ke Google Flow mein paste karein.\n3️⃣ **Step 3:** Video shaam 6:00 PM slot mein khud-ba-khud schedule ho chuki hogi!`;
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          text: trainReply,
-          card: {
-            type: 'trainee_step',
-            title: 'Trainee Workflow: 3 Steps to Publish',
-            nextStepText: 'Abhi test karne ke liye "Aaj ka short bana do" bol kar check karein!'
-          }
-        }
-      ]);
-
-      await speakNaturalUrdu(trainReply);
+      streamAssistantResponse(trainReply, {
+        type: 'trainee_step',
+        title: 'Trainee Workflow: 3 Steps to Publish',
+        nextStepText: 'Abhi test karne ke liye "Aaj ka short bana do" bol kar check karein!'
+      });
       setIsLoading(false);
       return;
     }
@@ -1298,22 +1275,21 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
 
         const masterReply = `${operator.honorific}! Screen par Master List Tracker 0ms mein open kar diya hai aur Section A ka pehla pending task "Default video language set to Urdu" highlight kar diya hai.\n\nYeh task YouTube Studio Settings > Upload defaults > Advanced settings mein video language ko Urdu set karne ke liye hai taake global Hindi/Urdu search audience maximize ho sake. Agla hukm karein!`;
 
-        setMessages((prev) => [
-          ...prev,
+        streamAssistantResponse(
+          masterReply,
           {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            text: masterReply,
-            card: {
-              type: 'action_done',
-              title: 'Master List: Default video language set to Urdu (Pending)',
-              nextStepText: 'YouTube Studio settings mein ja kar Urdu language set karein.',
-              targetTab: 'masterlist'
-            }
+            type: 'action_done',
+            title: 'Master List: Default video language set to Urdu (Pending)',
+            nextStepText: 'YouTube Studio settings mein ja kar Urdu language set karein.',
+            targetTab: 'masterlist'
+          },
+          {
+            tab: 'masterlist',
+            label: 'Master List Tracker',
+            stepNumber: 1,
+            description: 'Section A - Video language Urdu configuration'
           }
-        ]);
-
-        await speakNaturalUrdu(masterReply);
+        );
         setIsLoading(false);
         return;
       }
@@ -1321,21 +1297,21 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       // Special action: Agent Simulator
       if (voiceIntent.tab === 'simulator') {
         const simReply = `Ji ${operator.honorific}! Screen par Agent Flow Simulator 0ms latency ke sath open ho gaya hai. CPU bilkul chill hai, agla script test run karne ke liye tayar hoon!`;
-        setMessages((prev) => [
-          ...prev,
+        streamAssistantResponse(
+          simReply,
           {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            text: simReply,
-            card: {
-              type: 'action_done',
-              title: 'Agent Flow Simulator Active',
-              nextStepText: 'Simulator flow step test karein!',
-              targetTab: 'simulator'
-            }
+            type: 'action_done',
+            title: 'Agent Flow Simulator Active',
+            nextStepText: 'Simulator flow step test karein!',
+            targetTab: 'simulator'
+          },
+          {
+            tab: 'simulator',
+            label: 'Agent Flow Simulator',
+            stepNumber: 1,
+            description: 'Multi-Agent Story Engine v3.42'
           }
-        ]);
-        await speakNaturalUrdu(simReply);
+        );
         setIsLoading(false);
         return;
       }
@@ -1343,21 +1319,21 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       // Special action: Thumbnail Studio (Nano Banana)
       if (voiceIntent.tab === 'image') {
         const imgReply = `Ji ${operator.honorific}! Thumbnails (Nano Banana) studio screen par khol diya hai. Master headline aur 3D hologram prompt engine tayar hai!`;
-        setMessages((prev) => [
-          ...prev,
+        streamAssistantResponse(
+          imgReply,
           {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            text: imgReply,
-            card: {
-              type: 'action_done',
-              title: 'Thumbnails (Nano Banana) Ready',
-              nextStepText: 'Thumbnail generate karein!',
-              targetTab: 'image'
-            }
+            type: 'action_done',
+            title: 'Thumbnails (Nano Banana) Ready',
+            nextStepText: 'Thumbnail generate karein!',
+            targetTab: 'image'
+          },
+          {
+            tab: 'image',
+            label: 'Thumbnails (Nano Banana)',
+            stepNumber: 1,
+            description: 'Master headline and 3D hologram prompt engine'
           }
-        ]);
-        await speakNaturalUrdu(imgReply);
+        );
         setIsLoading(false);
         return;
       }
@@ -1366,8 +1342,7 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       if (voiceIntent.action === 'open_dictionary') {
         window.dispatchEvent(new CustomEvent('itcafeteria_open_dictionary', { detail: {} }));
         const dictReply = `Ji ${operator.honorific}! Screen par Phonetic Rules Dictionary modal khol diya hai. Yahan YouTube content casing aur rules check kar sakte hain.`;
-        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', text: dictReply }]);
-        await speakNaturalUrdu(dictReply);
+        streamAssistantResponse(dictReply, undefined, { label: 'Phonetic Rules Dictionary', stepNumber: 1 });
         setIsLoading(false);
         return;
       }
@@ -1375,8 +1350,7 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       if (voiceIntent.action === 'open_theme_customizer') {
         window.dispatchEvent(new CustomEvent('itcafeteria_open_theme_customizer', { detail: {} }));
         const themeReply = `Ji ${operator.honorific}! WordPress-style Theme Customizer modal open kar diya hai. Color palette, holographic mode aur block settings adjust karein.`;
-        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', text: themeReply }]);
-        await speakNaturalUrdu(themeReply);
+        streamAssistantResponse(themeReply, undefined, { label: 'Theme Customizer', stepNumber: 1 });
         setIsLoading(false);
         return;
       }
@@ -1384,8 +1358,7 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       if (voiceIntent.action === 'open_banner_modal') {
         window.dispatchEvent(new CustomEvent('itcafeteria_open_banner_modal', { detail: {} }));
         const bannerReply = `Ji ${operator.honorific}! Edit Banner modal open kar diya hai. Yahan se custom banner URL aur height adjust karein.`;
-        setMessages((prev) => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', text: bannerReply }]);
-        await speakNaturalUrdu(bannerReply);
+        streamAssistantResponse(bannerReply, undefined, { label: 'Banner & Overlay Editor', stepNumber: 1 });
         setIsLoading(false);
         return;
       }
@@ -1393,47 +1366,39 @@ export const StudioAssistant: React.FC<StudioAssistantProps> = ({
       // Generic tab navigation response
       if (voiceIntent.tab) {
         const genericNavReply = `Ji ${operator.honorific}! Screen par foran "${voiceIntent.label}" open kar diya hai. Screen par check karein, agla hukm farmayein!`;
-        setMessages((prev) => [
-          ...prev,
+        streamAssistantResponse(
+          genericNavReply,
           {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            text: genericNavReply,
-            card: {
-              type: 'action_done',
-              title: `${voiceIntent.label} Opened`,
-              targetTab: voiceIntent.tab
-            }
+            type: 'action_done',
+            title: `${voiceIntent.label} Opened`,
+            targetTab: voiceIntent.tab
+          },
+          {
+            tab: voiceIntent.tab,
+            label: voiceIntent.label || 'Studio Navigation',
+            stepNumber: 1
           }
-        ]);
-        await speakNaturalUrdu(genericNavReply);
+        );
         setIsLoading(false);
         return;
       }
     }
 
-    // 5. Real-Time Output Streaming (SSE) - Word-by-word concurrent generation
-    const streamMessageId = (Date.now() + 1).toString();
-    // Insert streaming message placeholder
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: streamMessageId,
-        role: 'assistant',
-        text: '',
-      },
-    ]);
-
-    let accumulatedStreamText = '';
-    const currentPortion = getApplicationPortion(currentTab);
-
+    // 5. Intelligent Model Chat Generation with Snappy Fallback
     try {
-      const streamRes = await fetch('/api/ai/stream-chat', {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+      const currentPortion = getApplicationPortion(currentTab);
+
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           messages: newMessages.map((m) => ({ role: m.role, text: m.text })),
-          model: 'gemini-3.8-flash',
+          model: 'gemini-3.1-flash-lite',
+          fallback: true,
           systemInstruction: `You are the IT Cafeteria Live Co-Pilot & Studio Assistant for ${operator.name} (@WM25-1).
 Active Operator: ${operator.name} (${operator.role}).
 Address them respectfully as "${operator.honorific}".
@@ -1441,71 +1406,22 @@ Current Application Portion in use: "${currentPortion.group} > ${currentPortion.
 ${operator.isTrainee ? 'Note: Operator is a new trainee. Explain everything in clear, friendly 3-step beginner Roman Urdu.' : ''}
 Core rules:
 1. Speak exclusively in natural, warm Pakistani Roman Urdu with a friendly Lahore tech YouTuber cadence.
-2. Maintain engaging responsiveness and a refined, witty sense of humor.
+2. Maintain engaging responsiveness and a refined, witty sense of humor (e.g. "Waqar bhai CPU bilkul chill hai, agla script viral karwane ke liye tayar hoon!").
 3. Always helpful, sharp, and practical — if asked to switch menus or check tasks, note that you can operate the dashboard directly.
-4. Keep answers concise, punchy, and under 60 words so spoken audio sounds lively and crisp.`,
+4. Keep answers concise, punchy, and under 50 words so spoken audio sounds lively and crisp.`,
         }),
-      });
+      }).finally(() => clearTimeout(timeoutId));
 
-      if (!streamRes.ok || !streamRes.body) {
-        throw new Error('Streaming failed or response body empty');
-      }
+      if (!res.ok) throw new Error('Server error');
 
-      const reader = streamRes.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (trimmedLine.startsWith('data: ')) {
-            const dataStr = trimmedLine.slice(6);
-            if (dataStr === '[DONE]') break;
-            try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed.text) {
-                accumulatedStreamText += parsed.text;
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === streamMessageId ? { ...m, text: accumulatedStreamText } : m
-                  )
-                );
-              }
-            } catch {}
-          }
-        }
-      }
-
-      if (accumulatedStreamText.trim()) {
-        await speakNaturalUrdu(accumulatedStreamText);
-      } else {
-        throw new Error('Empty stream text');
-      }
+      const data = await res.json();
+      const replyText = data.text || `Theek hai ${operator.honorific}, main ne note kar liya hai.`;
+      streamAssistantResponse(replyText);
     } catch (err: any) {
-      console.warn('Real-time streaming fallback engaged:', err);
+      console.warn('Chat error:', err);
+      const currentPortion = getApplicationPortion(currentTab);
       const fallbackReply = `${operator.honorific}! Main active listening mode mein aapke sath hoon. Is waqt hum "${currentPortion.group} > ${currentPortion.name}" portion mein hain. CPU chill hai aur coffee garam! Agla hukm karein, main foran screen update karunga.`;
-
-      // Word-by-word streaming fallback for instant UI response
-      const words = fallbackReply.split(' ');
-      let currentWordText = '';
-      for (let i = 0; i < words.length; i++) {
-        currentWordText += (i === 0 ? '' : ' ') + words[i];
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === streamMessageId ? { ...m, text: currentWordText } : m
-          )
-        );
-        await new Promise((r) => setTimeout(r, 22));
-      }
-
-      await speakNaturalUrdu(fallbackReply);
+      streamAssistantResponse(fallbackReply);
     } finally {
       setIsLoading(false);
     }
@@ -1615,7 +1531,10 @@ Core rules:
                 setVadState('processing');
                 isAiProcessingOrSpeakingRef.current = true;
 
-                // Persistent Microphone: Maintain active listening state without disabling mic
+                try {
+                  recognition.stop();
+                } catch {}
+
                 const finalQuery = currentWords;
                 accumulatedTranscript = '';
                 setLiveInterimText('');
@@ -1637,21 +1556,12 @@ Core rules:
         };
 
         recognition.onend = () => {
-          // If AI is actively speaking, wait a short beat, then maintain active listening
+          // If AI is actively speaking, let it finish, then restart recognition
           if (isAiProcessingOrSpeakingRef.current) {
-            setTimeout(() => {
-              if (!isListeningPausedRef.current && (persistentMicRef.current || isLiveActiveRef.current || isOpenRef.current)) {
-                try {
-                  recognition.start();
-                  setIsHandsFreeListening(true);
-                  setVadState('listening');
-                } catch {}
-              }
-            }, 150);
             return;
           }
-          // Automatically resume continuous recognition loop persistently
-          const shouldKeepListening = (isLiveActiveRef.current || isOpenRef.current || persistentMicRef.current) && !isListeningPausedRef.current;
+          // Automatically resume continuous recognition loop if drawer is open or live mode active
+          const shouldKeepListening = (isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current;
           if (shouldKeepListening) {
             try {
               recognition.start();
@@ -1659,14 +1569,14 @@ Core rules:
               setVadState('listening');
             } catch {
               setTimeout(() => {
-                if ((isLiveActiveRef.current || isOpenRef.current || persistentMicRef.current) && !isListeningPausedRef.current) {
+                if ((isLiveActiveRef.current || isOpenRef.current) && !isListeningPausedRef.current && !isAiProcessingOrSpeakingRef.current) {
                   try {
                     recognition.start();
                     setIsHandsFreeListening(true);
                     setVadState('listening');
                   } catch {}
                 }
-              }, 120);
+              }, 250);
             }
           } else {
             setIsHandsFreeListening(false);
@@ -1881,13 +1791,14 @@ Core rules:
             {/* End Live Button */}
             <button
               onClick={() => {
-                handleEmergencyStopAll();
+                stopAudioPlayback();
+                if (onToggleLive) onToggleLive(false);
               }}
-              className="px-2.5 py-1 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 shadow-md shadow-rose-950"
-              title="Live Voice Co-Pilot aur Autopilot foran band karein"
+              className="px-2 py-0.5 rounded-full bg-rose-600/80 hover:bg-rose-500 text-white text-[10px] font-bold transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+              title="Live Voice Co-Pilot band karein"
             >
-              <Square className="w-3 h-3 fill-current" />
-              <span>STOP LIVE</span>
+              <X className="w-3 h-3" />
+              <span className="hidden sm:inline">Stop</span>
             </button>
           </div>
 
@@ -1914,18 +1825,18 @@ Core rules:
         </button>
       )}
 
-      {/* 3. Persistent Co-Pilot Chat Board & Live Voice Station (Adaptive Floating Overlay) */}
+      {/* 3. Persistent Co-Pilot Chat Board & Live Voice Station (Adaptive UI Floating Overlay) */}
       {isOpen && (
         <div
-          className={`fixed z-[75] transition-all duration-300 flex flex-col overflow-hidden text-slate-100 bg-slate-950/95 backdrop-blur-2xl border border-cyan-500/40 shadow-2xl shadow-black/90 ring-1 ring-cyan-500/30 ${
-            overlayMode === 'span'
-              ? 'inset-2 sm:inset-5 rounded-3xl'
-              : overlayMode === 'wide'
-              ? 'bottom-6 right-6 w-[780px] max-w-[94vw] h-[720px] max-h-[90vh] rounded-2xl'
-              : 'bottom-6 right-6 w-[22rem] sm:w-[460px] h-[670px] max-h-[88vh] rounded-2xl'
+          className={`fixed z-[60] transition-all duration-300 flex flex-col overflow-hidden text-slate-100 ring-1 ring-cyan-500/20 shadow-2xl ${
+            overlayViewMode === 'spanning'
+              ? 'inset-x-2 md:inset-x-6 bottom-3 h-[740px] max-h-[92vh] bg-slate-950/85 backdrop-blur-3xl border-2 border-cyan-400/60 rounded-3xl shadow-[0_25px_80px_rgba(6,182,212,0.3)]'
+              : overlayViewMode === 'cockpit'
+              ? 'right-3 md:right-6 bottom-4 md:bottom-6 w-[780px] max-w-[95vw] h-[700px] max-h-[90vh] bg-slate-950/90 backdrop-blur-2xl border border-cyan-400/50 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.9)]'
+              : 'right-4 sm:right-6 bottom-4 sm:bottom-6 w-[22rem] sm:w-[460px] h-[670px] max-h-[88vh] bg-slate-900/95 backdrop-blur-xl border border-cyan-500/30 rounded-2xl shadow-2xl shadow-black/90'
           }`}
         >
-          {/* Header: Logo on one side, Status Indicator + Size Selector + Options Menu + Close Icon on the other */}
+          {/* Header: Logo on one side, Status Indicator + Adaptive UI Toggle + Options Menu + Close Icon on the other */}
           <div className="p-3 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between gap-2 relative z-30">
             {/* Left: User Logo + Copilot Identity */}
             <div className="flex items-center gap-2.5 min-w-0">
@@ -1953,67 +1864,38 @@ Core rules:
                     IT Cafeteria Copilot
                   </h3>
                   <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono shrink-0">
-                    Auto-Pilot Core
+                    AI Studio
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400 truncate flex items-center gap-1">
                   <span>Host:</span>
                   <span className="text-cyan-300 font-medium truncate">{operator.honorific}</span>
+                  <span className="text-[9px] text-emerald-400 font-mono ml-1 hidden sm:inline">• Persistent VAD</span>
                 </p>
               </div>
             </div>
 
-            {/* Right: Status Indicator + Adaptive Size Controls + Anchor Voice Badge + Three-dot Options Menu + Close Icon */}
+            {/* Right: Status Indicator + Adaptive UI Mode Switcher + Three-dot Options Menu + Close Icon */}
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Adaptive Overlay Size Mode Selector */}
-              <div className="hidden sm:flex items-center gap-0.5 bg-slate-900 border border-slate-700/80 rounded-xl p-0.5 shadow-inner">
-                <button
-                  onClick={() => updateOverlayMode('drawer')}
-                  className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                    overlayMode === 'drawer'
-                      ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-500/40'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Standard Drawer View (460px)"
-                >
-                  <Minimize2 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => updateOverlayMode('wide')}
-                  className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                    overlayMode === 'wide'
-                      ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-500/40'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Wide Overlay View (780px)"
-                >
-                  <Columns className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => updateOverlayMode('span')}
-                  className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                    overlayMode === 'span'
-                      ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-500/40'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title="Full-Span Overlay (Spans Active Page)"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Primary Anchor Voice Consistency Badge */}
+              {/* Adaptive UI Mode Switcher (Compact / Cockpit / Spanning Overlay) */}
               <button
-                onClick={() => setPrimaryAnchorVoiceLocked(!primaryAnchorVoiceLocked)}
-                className={`hidden md:flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors cursor-pointer ${
-                  primaryAnchorVoiceLocked
-                    ? 'bg-cyan-950/90 border-cyan-500/50 text-cyan-300'
-                    : 'bg-slate-900 border-slate-700 text-slate-400'
-                }`}
-                title="Primary Anchor Voice Consistency Profile (Waqar Majeed Signature Tone)"
+                onClick={() => {
+                  setOverlayViewMode((prev) => {
+                    const next = prev === 'compact' ? 'cockpit' : prev === 'cockpit' ? 'spanning' : 'compact';
+                    try { localStorage.setItem('itcafeteria_overlay_mode', next); } catch {}
+                    return next;
+                  });
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1"
+                title={`Adaptive UI Mode: ${overlayViewMode.toUpperCase()} (Click to toggle Compact / Cockpit / Spanning View)`}
               >
-                <Zap className="w-3 h-3 text-cyan-400" />
-                <span>Anchor {primaryAnchorVoiceLocked ? 'LOCKED' : 'CUSTOM'}</span>
+                {overlayViewMode === 'spanning' ? (
+                  <Minimize2 className="w-4 h-4 text-cyan-400" />
+                ) : overlayViewMode === 'cockpit' ? (
+                  <Monitor className="w-4 h-4 text-purple-400" />
+                ) : (
+                  <Maximize2 className="w-4 h-4 text-slate-400" />
+                )}
               </button>
               {/* Dynamic Status Indicator */}
               <div className="flex items-center">
@@ -2078,8 +1960,47 @@ Core rules:
                       className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 text-left transition-colors cursor-pointer"
                     >
                       <Settings2 className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Voice Persona & Cadence</span>
+                      <span>Anchor Voice: {voiceGender} (Waqar Majeed)</span>
                     </button>
+
+                    <div className="px-2.5 py-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      Adaptive UI Mode:
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 px-1">
+                      <button
+                        onClick={() => {
+                          setOverlayViewMode('compact');
+                          try { localStorage.setItem('itcafeteria_overlay_mode', 'compact'); } catch {}
+                        }}
+                        className={`px-1.5 py-1 rounded text-[10px] font-bold ${
+                          overlayViewMode === 'compact' ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Compact
+                      </button>
+                      <button
+                        onClick={() => {
+                          setOverlayViewMode('cockpit');
+                          try { localStorage.setItem('itcafeteria_overlay_mode', 'cockpit'); } catch {}
+                        }}
+                        className={`px-1.5 py-1 rounded text-[10px] font-bold ${
+                          overlayViewMode === 'cockpit' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Cockpit
+                      </button>
+                      <button
+                        onClick={() => {
+                          setOverlayViewMode('spanning');
+                          try { localStorage.setItem('itcafeteria_overlay_mode', 'spanning'); } catch {}
+                        }}
+                        className={`px-1.5 py-1 rounded text-[10px] font-bold ${
+                          overlayViewMode === 'spanning' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Spanning
+                      </button>
+                    </div>
 
                     <button
                       onClick={() => {
@@ -2164,64 +2085,8 @@ Core rules:
             </div>
           )}
 
-          {/* Autopilot & Voice Manual Control Bar inside Chatbot */}
-          <div className="px-3.5 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${
-                isListeningPaused ? 'bg-amber-400' : 'bg-emerald-400 animate-ping'
-              }`} />
-              <div className="truncate">
-                <span className="font-semibold text-slate-200 text-xs">
-                  {isListeningPaused ? 'Autopilot: PAUSED (Manual)' : 'Autopilot: ACTIVE (Listening)'}
-                </span>
-                <span className="text-[10px] text-slate-400 block sm:inline sm:ml-1.5">
-                  {isListeningPaused ? 'Zero background tasks' : 'Voice & Agent active'}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={handleTogglePause}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                  isListeningPaused
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm'
-                    : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40'
-                }`}
-                title={isListeningPaused ? 'Click to Start Voice Listening' : 'Click to Pause Voice Listening'}
-              >
-                {isListeningPaused ? (
-                  <>
-                    <Play className="w-3 h-3 fill-current" />
-                    <span>Start Listening</span>
-                  </>
-                ) : (
-                  <>
-                    <Pause className="w-3 h-3 fill-current" />
-                    <span>Pause</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleEmergencyStopAll}
-                className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md shadow-rose-950"
-                title="Stop all Autopilot and listening across the entire application"
-              >
-                <Square className="w-3 h-3 fill-current" />
-                <span>Stop All</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Main Adaptive Overlay Body */}
-          <div className={`flex-1 min-h-0 flex ${overlayMode === 'span' ? 'flex-col lg:flex-row' : 'flex-col'}`}>
-            {/* Left/Main Conversation & Audio Stream Column */}
-            <div className={`flex flex-col min-h-0 ${overlayMode === 'span' ? 'flex-1 lg:w-7/12 border-b lg:border-b-0 lg:border-r border-slate-800' : 'flex-1'}`}>
-              {/* Active Listening State Soundwave Mirror & Real-Time Dialogue Transcriptions */}
-              <div className="p-3 bg-gradient-to-b from-slate-950/95 to-slate-900/90 border-b border-slate-800/80 space-y-2">
+          {/* Active Listening State Soundwave Mirror & Real-Time Dialogue Transcriptions */}
+          <div className="p-3 bg-gradient-to-b from-slate-950/95 to-slate-900/90 border-b border-slate-800/80 space-y-2">
             {/* Visual Audio Soundwave Mirror */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -2373,9 +2238,51 @@ Core rules:
                         : 'bg-slate-800/90 border border-slate-700/70 text-slate-200 rounded-tl-none'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap select-text">{msg.text}</div>
+                    <div className="whitespace-pre-wrap select-text">
+
+                      {msg.text}
+                      {msg.isStreaming && (
+                        <span className="inline-block w-2 h-3.5 ml-1 bg-cyan-400 animate-pulse rounded-sm align-middle" />
+                      )}
+                    </div>
                   </div>
                 </div>
+
+                {/* 4. Diagnostic Visual Guidance Step Highlight Chip */}
+                {msg.diagnosticHighlight && (
+                  <div className="ml-8 p-2.5 rounded-xl bg-cyan-950/50 border border-cyan-400/50 flex items-center justify-between gap-2 shadow-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-5 h-5 rounded-full bg-cyan-400 text-slate-950 font-bold text-[10px] flex items-center justify-center shrink-0">
+                        {msg.diagnosticHighlight.stepNumber || 1}
+                      </span>
+                      <div className="min-w-0">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-cyan-300 block">
+                          Diagnostic Guidance Highlight:
+                        </span>
+                        <span className="text-white text-xs font-semibold truncate block">
+                          {msg.diagnosticHighlight.label}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (msg.diagnosticHighlight?.tab) {
+                          onNavigate(msg.diagnosticHighlight.tab);
+                        }
+                        triggerDiagnosticGuidance(
+                          msg.diagnosticHighlight?.tab,
+                          msg.diagnosticHighlight?.label,
+                          msg.diagnosticHighlight?.stepNumber || 1,
+                          msg.diagnosticHighlight?.description
+                        );
+                      }}
+                      className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer shrink-0 shadow-md animate-pulse"
+                      title="UI element highlight karein"
+                    >
+                      <Eye className="w-3 h-3" /> Focus View
+                    </button>
+                  </div>
+                )}
 
                 {/* Embedded Autonomous Action Card in Chat */}
                 {msg.card && (
@@ -2541,17 +2448,6 @@ Core rules:
                   )}
                 </button>
 
-                {/* Emergency Stop All Button */}
-                <button
-                  type="button"
-                  onClick={handleEmergencyStopAll}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-rose-600/90 hover:bg-rose-500 text-white shadow-sm shadow-rose-950"
-                  title="Halt all background listening, speech, and autopilot actions"
-                >
-                  <Square className="w-3.5 h-3.5 fill-current" />
-                  <span>Stop All</span>
-                </button>
-
                 {/* 2. Keyboard Toggle Button */}
                 <button
                   type="button"
@@ -2598,205 +2494,7 @@ Core rules:
             </div>
           </div>
         </div>
-
-        {/* Right Pane: Auto-Pilot Action Command Execution & Diagnostic Visual Guidance Center */}
-        {overlayMode === 'span' && (
-            <div className="lg:w-5/12 bg-slate-900/60 p-4 overflow-y-auto space-y-4 flex flex-col">
-              {/* Header of Action Center */}
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-cyan-400" />
-                  <h4 className="font-bold text-xs uppercase tracking-wider text-cyan-300">
-                    Auto-Pilot Action & Command Center
-                  </h4>
-                </div>
-                <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 text-[10px] font-mono border border-cyan-500/20">
-                  Immediate Backend Execution
-                </span>
-              </div>
-
-              {/* 6 Core Additions Live Status Panel */}
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-cyan-500/30 flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">1. Real-time Output</span>
-                  <span className="text-cyan-300 font-semibold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                    Concurrent Word-by-Word
-                  </span>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-emerald-500/30 flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">2. Persistent Mic & VAD</span>
-                  <span className="text-emerald-300 font-semibold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Active Listening Online
-                  </span>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-purple-500/30 flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">3. Adaptive UI Overlay</span>
-                  <span className="text-purple-300 font-semibold flex items-center gap-1">
-                    <Columns className="w-3 h-3 text-purple-400" />
-                    Full Spanning Active
-                  </span>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-amber-500/30 flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">4. Diagnostic Guidance</span>
-                  <span className="text-amber-300 font-semibold flex items-center gap-1">
-                    <Target className="w-3 h-3 text-amber-400" />
-                    Step-by-Step UI Beacon
-                  </span>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-blue-500/30 col-span-2 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">5. Primary Anchor Voice Consistency</span>
-                    <span className="text-blue-200 font-semibold text-xs">
-                      {PRIMARY_ANCHOR_VOICE_PROFILE.label}
-                    </span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-mono border border-blue-400/40">
-                    LOCKED (Puck)
-                  </span>
-                </div>
-              </div>
-
-              {/* Immediate Backend Action Execution Buttons */}
-              <div className="space-y-2 pt-2 border-t border-slate-800">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                  <span>6. Action Command Execution</span>
-                  <span className="text-[10px] text-cyan-400 font-mono">Backend Immediate</span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <button
-                    onClick={async () => {
-                      setIsLoading(true);
-                      try {
-                        await fetch('/api/autopilot/execute-action', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            action: 'EXECUTE_TASK_NOW',
-                            payload: {
-                              taskId: 'task-ap-now',
-                              title: 'Power Automate Web Scraping: Any Website Table into Clean Excel',
-                              category: 'PC & Windows Hacks',
-                              slot: '6:00 PM PKT'
-                            }
-                          })
-                        });
-                        onNavigate('calendar');
-                        triggerDiagnosticGuidance({
-                          step: 1,
-                          totalSteps: 2,
-                          title: 'Backend Action Executed: Power Automate Task Queued',
-                          description: 'Task 6:00 PM slot par Content Calendar mein auto-schedule ho chuka hai (58-catalog zero duplicate verified).',
-                          targetSelector: '[data-guide-target="tab-calendar"]'
-                        });
-                        setMessages((prev) => [
-                          ...prev,
-                          {
-                            id: (Date.now() + 1).toString(),
-                            role: 'assistant',
-                            text: `Waqar Bhai! Backend action foran execute kar di gayi hai: "Power Automate Web Scraping" 6:00 PM PKT slot par Content Calendar mein auto-schedule ho chuki hai. Screen par diagnostic guidance beacon active hai!`,
-                            card: {
-                              type: 'backend_action',
-                              title: 'Power Automate Web Scraping into Excel',
-                              scheduledTime: '6:00 PM PKT',
-                              nextStepText: 'Content Calendar mein slot check karein!',
-                              targetTab: 'calendar'
-                            }
-                          }
-                        ]);
-                      } finally {
-                        setIsLoading(false);
-                      }
-                    }}
-                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-cyan-500/30 hover:border-cyan-400 text-left transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 group-hover:scale-105 transition-transform">
-                        <Zap className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-xs text-white">Execute Power Automate Task</div>
-                        <div className="text-[10px] text-slate-400">Immediate backend execution & calendar schedule</div>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400 transition-colors" />
-                  </button>
-
-                  <button
-                    onClick={async () => {
-                      setIsLoading(true);
-                      try {
-                        await fetch('/api/autopilot/execute-action', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            action: 'BATCH_SPRINT_RUN',
-                            payload: { count: 3 }
-                          })
-                        });
-                        onNavigate('autopilot');
-                        triggerDiagnosticGuidance({
-                          step: 1,
-                          totalSteps: 2,
-                          title: 'Batch Automation Sprint Initiated',
-                          description: '3 multi-category tasks claim shuda hain aur autonomous worker queue execute kar raha hai.',
-                          targetSelector: '[data-guide-target="tab-autopilot"]'
-                        });
-                      } finally {
-                        setIsLoading(false);
-                      }
-                    }}
-                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-purple-500/30 hover:border-purple-400 text-left transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-300 group-hover:scale-105 transition-transform">
-                        <Flame className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-xs text-white">Run 3-Task Batch Sprint</div>
-                        <div className="text-[10px] text-slate-400">Autonomous multi-agent sprint across categories</div>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-purple-400 transition-colors" />
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onNavigate('masterlist');
-                      triggerDiagnosticGuidance({
-                        step: 1,
-                        totalSteps: 3,
-                        title: 'Diagnostic Visual Guidance: Master List Language',
-                        description: 'Section A ka pehla pending task "Default video language set to Urdu" highlight shuda hai.',
-                        targetSelector: '[data-guide-target="tab-masterlist"]'
-                      });
-                    }}
-                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-emerald-500/30 hover:border-emerald-400 text-left transition-colors cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 group-hover:scale-105 transition-transform">
-                        <Target className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-xs text-white">Highlight Master List Pending Task</div>
-                        <div className="text-[10px] text-slate-400">Step-by-step diagnostic visual guidance beacon</div>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    )}
+      )}
 
       {/* 4. Operator Identification & Switcher Modal */}
       {showOperatorModal && (

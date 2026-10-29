@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { PUBLISHED_VIDEOS, type ChannelProfile } from '../data/channelData';
 import { StoryPackageView, type GeneratedStory, type StoryIdea, type StoryScene } from './StoryPackageView';
-import { loadSimulatorConfig } from './SimulatorConfigModal';
+import { applyCinematicDirecting } from '../lib/cinematicDirector';
 
 export interface AgentTriggerSelection {
   channelId: ChannelProfile['id'];
@@ -89,13 +89,7 @@ const STOP_WORDS = new Set([
   'top', 'easy', 'quick', 'simple', 'full', 'part', 'karein', 'karin', 'karna', 'kaise', 'kya', 'mein', 'hai',
   'hain', 'nahi', 'aur', 'ke', 'ki', 'ka', 'ko', 'se', 'ab', 'aik', 'ek', 'liye', 'aap', 'aapka', 'aapki',
   'aapke', 'yeh', 'woh', 'jo', 'par', 'tha', 'thi', 'bhi', 'sirf', 'koi', 'kuch', 'bilkul', 'baad', 'pehle',
-  'ai', 'app', 'apps', 'tool', 'tools', 'tech', 'technology', 'series', 'episode', 'hissa', 'advance', 'advanced'
-]);
-
-// Umbrella topics that represent whole platforms, not specific individual features
-const UMBRELLA_PLATFORMS = new Set([
-  'whatsapp', 'windows', 'excel', 'sheets', 'word', 'powerpoint', 'power', 'automate',
-  'gemini', 'chatgpt', 'claude', 'shopify', 'youtube', 'tiktok', 'android', 'iphone', 'ios'
+  'ai', 'app', 'apps', 'tool', 'tools', 'tech', 'technology'
 ]);
 
 function normalizeDuplicateText(text: string) {
@@ -111,38 +105,24 @@ function stemWord(word: string) {
   return word;
 }
 
-function tokenizeForMatch(text: string, includeUmbrella = false) {
+function tokenizeForMatch(text: string) {
   return Array.from(new Set(
     normalizeDuplicateText(text)
       .split(' ')
       .filter(Boolean)
       .map(stemWord)
-      .filter((token) => {
-        if (token.length < 4 || STOP_WORDS.has(token) || /^\d+$/.test(token)) return false;
-        if (!includeUmbrella && UMBRELLA_PLATFORMS.has(token)) return false;
-        return true;
-      })
+      .filter((token) => token.length >= 4 && !STOP_WORDS.has(token) && !/^\d+$/.test(token))
   ));
-}
-
-function extractPartNumber(text: string): number | null {
-  const match = text.match(/(?:part|pt|episode|ep|hissa|vol|chapter)\s*[:#\-_]?\s*(\d+)/i);
-  return match ? parseInt(match[1], 10) : null;
 }
 
 function findDuplicateMatches(
   title: string,
   points: string,
   channelId: ChannelProfile['id'],
-  memoryRecords: AgentMemoryRecord[],
-  tolerance: 'subpoints' | 'strict' | 'balanced' | 'relaxed' = 'subpoints'
+  memoryRecords: AgentMemoryRecord[]
 ) {
-  // Extract specific feature tokens (excluding umbrella tool names unless strict)
-  const candidateFeatureTokens = tokenizeForMatch(points || title, tolerance === 'strict');
-  const candidateAllTokens = tokenizeForMatch(`${title} ${points}`, tolerance === 'strict');
-  if (!candidateAllTokens.length) return [] as DuplicateMatch[];
-
-  const candidatePart = extractPartNumber(title);
+  const candidateTokens = tokenizeForMatch(`${title} ${points}`);
+  if (!candidateTokens.length) return [] as DuplicateMatch[];
 
   const catalogRecords: DuplicateMatch[] = (channelId === 'itcafeteria' ? PUBLISHED_VIDEOS : []).map((video) => ({
     source: 'Catalog',
@@ -165,60 +145,18 @@ function findDuplicateMatches(
     }));
 
   const results: DuplicateMatch[] = [];
-
   for (const record of [...catalogRecords, ...memoryMatches]) {
-    const recordPart = extractPartNumber(record.title);
+    const recordTokens = new Set(tokenizeForMatch(`${record.title} ${record.tool} ${record.points}`));
+    const matchedKeywords = candidateTokens.filter((token) => recordTokens.has(token));
+    const normalizedCandidate = normalizeDuplicateText(title);
+    const exactPhrase = normalizedCandidate.length >= 10 &&
+      normalizeDuplicateText(`${record.title} ${record.tool} ${record.points}`).includes(normalizedCandidate);
+    // Shared generic words (e.g. excel, report) alone should not block a fresh angle;
+    // require either 3+ overlapping keywords or 2 with strong keyword density.
+    const density = matchedKeywords.length / candidateTokens.length;
 
-    // If both have explicit different episode/part numbers (e.g. Part 1 vs Part 4),
-    // they belong to an ongoing series and are not duplicates unless points are identical!
-    const isDifferentPart = candidatePart !== null && recordPart !== null && candidatePart !== recordPart;
-
-    const normalizedCandidateTitle = normalizeDuplicateText(title);
-    const normalizedRecordTitle = normalizeDuplicateText(record.title);
-    const isExactTitle = normalizedCandidateTitle.length >= 10 && normalizedCandidateTitle === normalizedRecordTitle;
-
-    // Sub-point feature comparison: check tokens in the actual covered points
-    const recordPointTokens = new Set(tokenizeForMatch(record.points || record.title, tolerance === 'strict'));
-    const matchedPointKeywords = candidateFeatureTokens.filter((token) => recordPointTokens.has(token));
-
-    // Full token overlap
-    const recordAllTokens = new Set(tokenizeForMatch(`${record.title} ${record.tool} ${record.points}`, tolerance === 'strict'));
-    const matchedAllKeywords = candidateAllTokens.filter((token) => recordAllTokens.has(token));
-
-    if (tolerance === 'subpoints') {
-      // Deep Sub-Point Verification:
-      // An umbrella topic (e.g. WhatsApp, Power Automate) alone does NOT trigger a duplicate.
-      // Must have concrete feature overlap in the covered points/secrets.
-      if (isExactTitle) {
-        results.push({ ...record, matchedKeywords: matchedAllKeywords });
-      } else if (isDifferentPart) {
-        // Different part of a series: only flag if covered specific sub-points overlap heavily (3+ sub-point tokens)
-        if (matchedPointKeywords.length >= 3) {
-          results.push({ ...record, matchedKeywords: matchedPointKeywords });
-        }
-      } else {
-        // Same topic: must have at least 2 distinct specific feature keywords matching in points
-        if (matchedPointKeywords.length >= 2) {
-          results.push({ ...record, matchedKeywords: matchedPointKeywords });
-        } else if (matchedAllKeywords.length >= 4) {
-          results.push({ ...record, matchedKeywords: matchedAllKeywords });
-        }
-      }
-    } else if (tolerance === 'strict') {
-      // Strict tolerance: checks both title and points
-      if (isExactTitle || matchedAllKeywords.length >= 3 || (matchedAllKeywords.length === 2 && matchedPointKeywords.length >= 1)) {
-        results.push({ ...record, matchedKeywords: matchedAllKeywords });
-      }
-    } else if (tolerance === 'relaxed') {
-      // Relaxed: only near-exact phrase or 4+ point keywords
-      if (isExactTitle || matchedPointKeywords.length >= 4) {
-        results.push({ ...record, matchedKeywords: matchedPointKeywords });
-      }
-    } else {
-      // Balanced:
-      if (isExactTitle || (matchedPointKeywords.length >= 2 && !isDifferentPart)) {
-        results.push({ ...record, matchedKeywords: matchedPointKeywords });
-      }
+    if (exactPhrase || matchedKeywords.length >= 3 || (matchedKeywords.length === 2 && density >= 0.34)) {
+      results.push({ ...record, matchedKeywords });
     }
   }
 
@@ -420,7 +358,6 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
     });
 
     try {
-      const config = loadSimulatorConfig();
       const data = await postJson('/api/ai/generate-story', {
         channelName: profile.name,
         presenter: profile.presenter,
@@ -435,10 +372,7 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
           .filter((message) => message.text.trim())
           .slice(-10)
           .map((message) => ({ role: message.role, text: message.text.trim().slice(0, 600) })),
-        excludeTitles: buildExcludedTitles([idea.title]),
-        customInstructions: config.customInstructions,
-        dialectTone: config.dialectTone,
-        flowPromptFormat: config.flowPromptFormat
+        excludeTitles: buildExcludedTitles([idea.title])
       }, abortRef.current?.signal);
 
       const rawScenes = Array.isArray(data.scenes) ? data.scenes : [];
@@ -447,7 +381,8 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
         .map((scene: any, index: number) => {
           const dialogue = String(scene.dialogue || '').trim();
           const visual = String(scene.visual || '').trim();
-          const script = String(scene.script || '').trim() || `${selection.tag} — ${visual}\nHe says: "${dialogue}"`;
+          const rawScript = String(scene.script || '').trim() || `${selection.tag} — ${visual}\nHe says: "${dialogue}"`;
+          const script = applyCinematicDirecting(index + 1, rawScript, undefined, scene.purpose);
           const words = dialogue ? dialogue.split(/\s+/).filter(Boolean).length : Number(scene.words) || 0;
           return {
             num: index + 1,
@@ -575,8 +510,7 @@ Status: bani`;
 
     duplicateTimerRef.current = window.setTimeout(() => {
       if (!mountedRef.current) return;
-      const config = loadSimulatorConfig();
-      const matches = findDuplicateMatches(idea.title, idea.points, profile.id, memoryRecords, config.duplicateStrictness);
+      const matches = findDuplicateMatches(idea.title, idea.points, profile.id, memoryRecords);
 
       if (matches.length > 0) {
         setDuplicates(matches);

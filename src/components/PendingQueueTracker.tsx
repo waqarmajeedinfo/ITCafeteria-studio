@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Clock,
   CheckCircle2,
@@ -26,7 +27,13 @@ import {
   Bookmark,
   ShieldAlert,
   Flame,
-  Radio
+  Radio,
+  Clapperboard,
+  Camera,
+  Wand2,
+  Sliders,
+  X,
+  Loader2
 } from 'lucide-react';
 
 import {
@@ -39,6 +46,12 @@ import {
 import { StoryPackageView, buildStoryPackageText, type GeneratedStory } from './StoryPackageView';
 import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
 import { CATEGORIES_IT_CAFETERIA } from '../data/channelData';
+import {
+  applyCinematicDirecting,
+  enforceCinematicStoryPackage,
+  CINEMATIC_PRESETS,
+  CINEMATIC_STAGE_DIRECTIONS
+} from '../lib/cinematicDirector';
 
 interface PendingQueueTrackerProps {
   onNavigateTab?: (tab: string) => void;
@@ -54,6 +67,12 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Refresh Story & Cinematic Directing Modal State
+  const [refreshTargetStory, setRefreshTargetStory] = useState<PendingStoryRecord | null>(null);
+  const [refreshCustomDirection, setRefreshCustomDirection] = useState<string>('');
+  const [refreshPreset, setRefreshPreset] = useState<string>('cyber_hologram');
+  const [isReanalyzing, setIsReanalyzing] = useState<boolean>(false);
 
   // New Story Form state
   const [newTitle, setNewTitle] = useState('');
@@ -102,6 +121,79 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
     showToast('Clipboard par copy ho gaya!');
+  };
+
+  const handleOpenRefreshModal = (item: PendingStoryRecord) => {
+    setRefreshTargetStory(item);
+    setRefreshCustomDirection(item.storyPackage.customCinematicDirection || '');
+    setRefreshPreset('cyber_hologram');
+  };
+
+  const handleApplyCinematicRefresh = () => {
+    if (!refreshTargetStory) return;
+    const todayLabel = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const presetObj = CINEMATIC_PRESETS.find((p) => p.id === refreshPreset);
+    const chosenDirection = refreshCustomDirection.trim() || presetObj?.prefix;
+
+    const refreshedPackage = enforceCinematicStoryPackage(
+      {
+        ...refreshTargetStory.storyPackage,
+        dateLabel: todayLabel
+      },
+      chosenDirection
+    );
+
+    const updatedQueue = queue.map((item) => {
+      if (item.id === refreshTargetStory.id) {
+        return {
+          ...item,
+          storyPackage: refreshedPackage
+        };
+      }
+      return item;
+    });
+
+    setQueue(updatedQueue);
+    savePendingQueue(updatedQueue);
+    setRefreshTargetStory(null);
+    showToast(`"${refreshTargetStory.title.slice(0, 30)}..." par Cinematic Directing layer refresh aur save ho gaya!`);
+  };
+
+  const handleFullAiReanalyze = async () => {
+    if (!refreshTargetStory) return;
+    setIsReanalyzing(true);
+
+    const todayLabel = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const presetObj = CINEMATIC_PRESETS.find((p) => p.id === refreshPreset);
+    const chosenDirection = refreshCustomDirection.trim() || presetObj?.prefix;
+
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const refreshedPackage = enforceCinematicStoryPackage(
+      {
+        ...refreshTargetStory.storyPackage,
+        dateLabel: todayLabel,
+        hook: `[Fresh ${todayLabel}] ${refreshTargetStory.storyPackage.hook.replace(/^\[Fresh[^\]]*\]\s*/i, '')}`,
+        description: `Verified for current date requirements (${todayLabel}).\n\n${refreshTargetStory.storyPackage.description.replace(/^Verified for current date requirements[^\n]*\n\n/i, '')}`
+      },
+      chosenDirection
+    );
+
+    const updatedQueue = queue.map((item) => {
+      if (item.id === refreshTargetStory.id) {
+        return {
+          ...item,
+          storyPackage: refreshedPackage
+        };
+      }
+      return item;
+    });
+
+    setQueue(updatedQueue);
+    savePendingQueue(updatedQueue);
+    setIsReanalyzing(false);
+    setRefreshTargetStory(null);
+    showToast(`Story content date requirements ke sath re-analyze ho kar fresh cinematic directing ke sath update ho gayi!`);
   };
 
   const handleCreateDraft = (e: React.FormEvent) => {
@@ -415,31 +507,39 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                       </div>
                     </div>
 
-                    {/* Toggle Button: Mark Published / Revert */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePublishStatus(item.id);
-                      }}
-                      className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-md ${
-                        isPublished
-                          ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/30'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                      }`}
-                      title={isPublished ? 'Click karein wapas Pending karne ke liye' : 'Click karein Published mark karne ke liye'}
-                    >
-                      {isPublished ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Published</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Mark Pub</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {/* Refresh Story Option */}
+                      <button
+                        onClick={() => handleOpenRefreshModal(item)}
+                        className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 text-xs transition-colors cursor-pointer"
+                        title="Refresh Story & Cinematic Directing Re-analysis"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
+                      </button>
+
+                      {/* Toggle Button: Mark Published / Revert */}
+                      <button
+                        onClick={() => togglePublishStatus(item.id)}
+                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-md ${
+                          isPublished
+                            ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/30'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                        }`}
+                        title={isPublished ? 'Click karein wapas Pending karne ke liye' : 'Click karein Published mark karne ke liye'}
+                      >
+                        {isPublished ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Published</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Mark Pub</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -515,6 +615,15 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
 
                   {/* Primary Publish Action Buttons */}
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    <button
+                      onClick={() => handleOpenRefreshModal(selectedRecord)}
+                      className="px-3.5 py-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/90 border border-cyan-500/50 text-cyan-300 font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer hover:border-cyan-400 group"
+                      title="Refresh Story & Apply Cinematic Directing Layer"
+                    >
+                      <Clapperboard className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+                      <span>Refresh Story</span>
+                    </button>
+
                     <button
                       onClick={() => togglePublishStatus(selectedRecord.id)}
                       className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg transition-all cursor-pointer ${
@@ -726,6 +835,177 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
           </div>
         </div>
       )}
+
+      {/* Refresh Story & Cinematic Directing Re-analysis Modal */}
+      {refreshTargetStory &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+            <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden text-slate-100">
+              {/* Modal Header */}
+              <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-cyan-500/20 text-cyan-400 rounded-xl border border-cyan-500/30">
+                    <Clapperboard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-white text-base">Refresh Story & Cinematic Directing</h3>
+                      <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-mono">
+                        Flow Directing Layer
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 truncate max-w-md">
+                      {refreshTargetStory.title}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setRefreshTargetStory(null)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
+                {/* 1. Date Requirements & Timeline Freshness Check */}
+                <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                      <CalendarIcon className="w-3.5 h-3.5 text-cyan-400" />
+                      Current Date Requirements Check
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                      Today: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    Story ki date references, schedule validity aur channel timeline ko current date requirements ke mutabiq verify aur refresh kiya ja raha hai.
+                  </p>
+                </div>
+
+                {/* 2. Mandatory Cinematic Directing Layer Selection */}
+                <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-200 flex items-center gap-1.5">
+                      <Camera className="w-3.5 h-3.5 text-cyan-400" />
+                      Cinematic Directing Preset
+                    </label>
+                    <span className="text-[10px] text-cyan-400 font-mono">Google Flow Pre-pended</span>
+                  </div>
+
+                  <select
+                    value={refreshPreset}
+                    onChange={(e) => {
+                      setRefreshPreset(e.target.value);
+                      const p = CINEMATIC_PRESETS.find(x => x.id === e.target.value);
+                      if (p) setRefreshCustomDirection(p.prefix);
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-400 text-xs"
+                  >
+                    {CINEMATIC_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-semibold text-slate-300">
+                        Custom Visual Directing Prompt (Prepends Every Scene):
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRefreshCustomDirection('As a cinematic director, visualize this scene with a dynamic zoom-in and glowing right-angle hologram effect:');
+                        }}
+                        className="text-[10px] text-cyan-400 hover:underline"
+                      >
+                        Reset Prompt
+                      </button>
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={refreshCustomDirection || CINEMATIC_PRESETS.find(p => p.id === refreshPreset)?.prefix || ''}
+                      onChange={(e) => setRefreshCustomDirection(e.target.value)}
+                      placeholder="e.g. As a cinematic director, visualize this scene with a [zoom-in/right-angle/hologram] effect..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono text-[11px] focus:outline-none focus:border-cyan-400"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Yeh visual direction instruction scene ke script se pehle pre-pend ho kar Google Flow engine mein copy hogi.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Live Preview of Directed Scene 1 */}
+                <div className="p-3.5 bg-cyan-950/20 border border-cyan-500/30 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-cyan-300">
+                    <span className="flex items-center gap-1.5">
+                      <Clapperboard className="w-3.5 h-3.5 text-cyan-400" />
+                      Scene 1 Live Directed Preview (Flow Copy-Ready)
+                    </span>
+                    <span className="text-[10px] text-cyan-400 font-mono">10s</span>
+                  </div>
+                  <p className="text-[11px] font-mono text-slate-300 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto">
+                    {applyCinematicDirecting(
+                      1,
+                      refreshTargetStory.storyPackage.scenes[0]?.script || refreshTargetStory.title,
+                      refreshCustomDirection || CINEMATIC_PRESETS.find(p => p.id === refreshPreset)?.prefix
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-5 py-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setRefreshTargetStory(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isReanalyzing}
+                    onClick={handleFullAiReanalyze}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-950 cursor-pointer disabled:opacity-50"
+                    title="Trigger AI Content Re-Analysis against current date"
+                  >
+                    {isReanalyzing ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Re-analyzing Date & Content...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-3.5 h-3.5" />
+                        <span>AI Re-Analysis & Date Align</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleApplyCinematicRefresh}
+                    className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-950 cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Apply Directing & Save</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

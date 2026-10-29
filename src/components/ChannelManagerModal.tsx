@@ -25,6 +25,7 @@ import {
   resetChannelsToDefault,
   type ExtendedChannelProfile
 } from '../lib/channelStore';
+import { dirtyManager } from '../lib/dirtyStore';
 
 interface ChannelManagerModalProps {
   isOpen: boolean;
@@ -55,14 +56,18 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
   // Lock background scroll when open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
       const loaded = loadAllChannels();
       setChannels(loaded);
       return () => {
-        document.body.style.overflow = 'unset';
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+        dirtyManager.clearDirty('channel_manager');
       };
     }
   }, [isOpen]);
+
 
   if (!isOpen) return null;
 
@@ -157,6 +162,7 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     const updated = saveOrUpdateChannel(channelProfileToSave);
     setChannels(updated);
     onChannelsUpdated(updated);
+    dirtyManager.clearDirty('channel_manager');
     showStatus(editingChannelId ? `Channel "${name}" ke changes save ho gaye!` : `Naya Channel "${name}" add ho gaya!`);
     resetFormFields();
   };
@@ -168,6 +174,7 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
       const updated = deleteChannel(channelId);
       setChannels(updated);
       onChannelsUpdated(updated);
+      dirtyManager.clearDirty('channel_manager');
       showStatus(`Channel "${target.name}" remove ho gaya. (Aap Undo button se wapis la sakte hain)`);
       if (editingChannelId === channelId) {
         resetFormFields();
@@ -180,6 +187,7 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     if (reverted) {
       setChannels(reverted);
       onChannelsUpdated(reverted);
+      dirtyManager.clearDirty('channel_manager');
       showStatus('Pichla step Undo ho gaya — channels pehli halat me wapis aa gaye.');
     } else {
       showStatus('Peeche jane ke liye koi previous state nahi mili.');
@@ -191,6 +199,7 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
       const restored = resetChannelsToDefault();
       setChannels(restored);
       onChannelsUpdated(restored);
+      dirtyManager.clearDirty('channel_manager');
       showStatus('Tamam default channels restore ho gaye.');
       resetFormFields();
     }
@@ -199,8 +208,8 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
   const channelList = Object.values(channels);
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl shadow-emerald-950/80 overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl w-full max-w-3xl max-h-[85vh] h-full sm:h-auto flex flex-col shadow-2xl shadow-emerald-950/80 overflow-hidden overscroll-contain text-slate-100">
         {/* Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -238,11 +247,12 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
         )}
 
         {/* Content Body — Scrollable only within modal */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll p-4 sm:p-5 space-y-4">
           {/* Channel Cards Section */}
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h4 className="font-bold text-xs uppercase tracking-wider text-slate-300 flex items-center gap-2">
+
                 <Layers className="w-3.5 h-3.5 text-cyan-400" />
                 Configured Channels ({channelList.length})
               </h4>
