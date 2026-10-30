@@ -28,6 +28,7 @@ import {
   type SimulatorConfig
 } from './SimulatorConfigModal';
 import { ChannelManagerModal } from './ChannelManagerModal';
+import { TagManagerModal } from './TagManagerModal';
 import { loadAllChannels, type ExtendedChannelProfile } from '../lib/channelStore';
 
 const LATEST_STORY_KEY = 'itcafeteria_latest_story';
@@ -118,6 +119,7 @@ export const AgentSimulator: React.FC = () => {
   const [simulatorConfig, setSimulatorConfig] = useState<SimulatorConfig>(loadSimulatorConfig);
   const [showSimulatorConfig, setShowSimulatorConfig] = useState(false);
   const [showChannelManager, setShowChannelManager] = useState(false);
+  const [showTagManager, setShowTagManager] = useState(false);
 
   const [initialRotation] = useState<SavedRotation>(loadRotationState);
   const [draftChannel, setDraftChannel] = useState<ChannelProfile['id']>('itcafeteria');
@@ -157,7 +159,7 @@ export const AgentSimulator: React.FC = () => {
     draftSceneCount !== appliedSelection.sceneCount;
 
   const appliedNote = appliedProfile && appliedCategory
-    ? appliedProfile.sampleNotes[appliedSelection!.categoryId] ?? { title: appliedCategory.name, hook: 'Reveal' }
+    ? appliedProfile.sampleNotes?.[appliedSelection!.categoryId] ?? { title: appliedCategory.name, hook: 'Reveal' }
     : null;
   const outcomeStatus = triggerOutcome?.status;
   const decisionTitle = triggerOutcome?.story?.title || triggerOutcome?.idea?.title || triggerOutcome?.title || appliedNote?.title || 'Trigger dabayein';
@@ -199,6 +201,17 @@ export const AgentSimulator: React.FC = () => {
     window.addEventListener('itcafeteria_simulator_config_updated', handleConfigUpdated);
     return () => {
       window.removeEventListener('itcafeteria_simulator_config_updated', handleConfigUpdated);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleChannelsUpdated = (e: any) => {
+      const updated = e.detail || loadAllChannels();
+      setChannels(updated);
+    };
+    window.addEventListener('itcafeteria_channels_updated', handleChannelsUpdated);
+    return () => {
+      window.removeEventListener('itcafeteria_channels_updated', handleChannelsUpdated);
     };
   }, []);
 
@@ -383,18 +396,29 @@ export const AgentSimulator: React.FC = () => {
 
           {/* Character Tag */}
           <div>
-            <label className="flex items-center gap-1.5 text-slate-400 mb-1">
-              Character Tag Variant (Q3)
-              <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wide border ${
-                draftProfile.tags?.[0]?.value === 'No-Character' || draftProfile.defaultTag === 'No-Character'
-                  ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
-                  : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-              }`}>
-                {draftProfile.tags?.[0]?.value === 'No-Character' || draftProfile.defaultTag === 'No-Character'
-                  ? 'FACELESS'
-                  : 'AUTO'}
-              </span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="flex items-center gap-1.5 text-slate-400">
+                Character Tag Variant (Q3)
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wide border ${
+                  draftProfile.tags?.[0]?.value === 'No-Character' || draftProfile.defaultTag === 'No-Character'
+                    ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                    : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                }`}>
+                  {draftProfile.tags?.[0]?.value === 'No-Character' || draftProfile.defaultTag === 'No-Character'
+                    ? 'FACELESS'
+                    : 'AUTO'}
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowTagManager(true)}
+                className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold hover:underline cursor-pointer bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-500/30"
+                title="Register new character tag or upload photo"
+              >
+                <Plus className="w-3 h-3" />
+                <span>+ Tag</span>
+              </button>
+            </div>
             <select
               value={draftTag}
               onChange={(e) => setDraftTag(e.target.value)}
@@ -601,6 +625,7 @@ export const AgentSimulator: React.FC = () => {
           profile={appliedProfile || CHANNEL_PROFILES.itcafeteria}
           selection={appliedSelection}
           memoryRecords={memoryRecords}
+          simulatorConfig={simulatorConfig}
           onClose={() => setFlowOpen(false)}
           onOutcome={handleFlowOutcome}
         />
@@ -627,6 +652,18 @@ export const AgentSimulator: React.FC = () => {
         onChannelsUpdated={() => {
           const updated = loadAllChannels();
           setChannels(updated);
+        }}
+      />
+
+      {/* Tag Manager Modal (+ Add / Upload Tag) */}
+      <TagManagerModal
+        isOpen={showTagManager}
+        onClose={() => setShowTagManager(false)}
+        channelId={draftChannel}
+        onTagAdded={(newTagVal) => {
+          const updated = loadAllChannels();
+          setChannels(updated);
+          setDraftTag(newTagVal);
         }}
       />
     </div>

@@ -80,6 +80,7 @@ import {
 import { dirtyManager, type DirtyRecord } from './lib/dirtyStore';
 import { UnsavedChangesModal } from './components/UnsavedChangesModal';
 import { ChannelManagerModal } from './components/ChannelManagerModal';
+import { TagManagerModal } from './components/TagManagerModal';
 import { loadAllChannels, type ExtendedChannelProfile } from './lib/channelStore';
 import { getAllPublishedVideos } from './lib/publishedLibraryStore';
 import { CATEGORIES_IT_CAFETERIA, CHANNEL_PROFILES } from './data/channelData';
@@ -140,6 +141,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLiveActive, setIsLiveActive] = useState(false);
   const [showChannelManager, setShowChannelManager] = useState(false);
+  const [showTagManager, setShowTagManager] = useState(false);
   const [channels, setChannels] = useState<Record<string, ExtendedChannelProfile>>(loadAllChannels);
   const [activeChannelId, setActiveChannelId] = useState<string>('itcafeteria');
   const [characterTag, setCharacterTag] = useState<string>('@WM25-1');
@@ -518,7 +520,11 @@ export default function App() {
         }, 7000);
       }
     };
-    window.addEventListener('itcafeteria_diagnostic_highlight', handleDiagnosticHighlight);
+    const handleChannelsUpdated = (e: any) => {
+      const updated = e.detail || loadAllChannels();
+      setChannels(updated);
+    };
+    window.addEventListener('itcafeteria_channels_updated', handleChannelsUpdated);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
@@ -529,6 +535,7 @@ export default function App() {
       window.removeEventListener('itcafeteria_open_menu_customizer', openMenuCustomizerHandler);
       window.removeEventListener('itcafeteria_menu_customizer_updated', handleMenuCustomizerUpdated);
       window.removeEventListener('itcafeteria_diagnostic_highlight', handleDiagnosticHighlight);
+      window.removeEventListener('itcafeteria_channels_updated', handleChannelsUpdated);
     };
   }, []);
 
@@ -817,11 +824,22 @@ export default function App() {
 
                   {/* Character Tag Variant (Q3) */}
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <label className="text-[11px] font-semibold text-slate-300">Character Tag Variant (Q3)</label>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 font-mono">
-                        AUTO
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[11px] font-semibold text-slate-300">Character Tag Variant (Q3)</label>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 font-mono">
+                          AUTO
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowTagManager(true)}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold hover:underline cursor-pointer bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-500/30"
+                        title="Add or upload custom character tag"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>+ Tag</span>
+                      </button>
                     </div>
                     <select
                       value={characterTag}
@@ -1638,6 +1656,18 @@ export default function App() {
         isOpen={showChannelManager}
         onClose={() => setShowChannelManager(false)}
         onChannelsUpdated={(updated) => setChannels(updated)}
+      />
+
+      {/* Tag Manager Modal (+ Add / Upload Tag) */}
+      <TagManagerModal
+        isOpen={showTagManager}
+        onClose={() => setShowTagManager(false)}
+        channelId={activeChannelId}
+        onTagAdded={(newTagVal) => {
+          const updated = loadAllChannels();
+          setChannels(updated);
+          setCharacterTag(newTagVal);
+        }}
       />
 
       {/* Dirty State Guard: Unsaved Changes Confirmation Modal */}

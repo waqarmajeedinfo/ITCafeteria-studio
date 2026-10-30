@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Bot,
@@ -21,11 +22,13 @@ import {
   RefreshCw,
   ArrowRight,
   Film,
-  ArrowLeft
+  ArrowLeft,
+  Wand2
 } from 'lucide-react';
 import { PUBLISHED_VIDEOS, type ChannelProfile } from '../data/channelData';
 import { StoryPackageView, type GeneratedStory, type StoryIdea, type StoryScene } from './StoryPackageView';
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
+import type { SimulatorConfig } from './SimulatorConfigModal';
 
 export interface AgentTriggerSelection {
   channelId: ChannelProfile['id'];
@@ -69,6 +72,7 @@ interface AgentFlowScreenProps {
   profile: ChannelProfile;
   selection: AgentTriggerSelection;
   memoryRecords: AgentMemoryRecord[];
+  simulatorConfig?: SimulatorConfig;
   onClose: () => void;
   onOutcome: (outcome: AgentTriggerOutcome) => void;
 }
@@ -179,6 +183,89 @@ async function postJson(url: string, body: unknown, signal?: AbortSignal) {
   return data as Record<string, any>;
 }
 
+function createInstantFallbackStory(
+  profile: ChannelProfile,
+  selection: AgentTriggerSelection,
+  idea: StoryIdea,
+  notes: string,
+  simulatorConfig?: SimulatorConfig
+): GeneratedStory {
+  const dateLabel = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const totalScenes = Math.min(Math.max(selection.sceneCount || 10, 4), 30);
+  const title = idea.title || `${profile.name} Pro Hack`;
+  const hook = idea.hook || 'Reveal';
+  const tag = selection.tag || '@WM25-1';
+  const category = (profile?.categories && profile.categories.find((c) => c.id === selection.categoryId)) ?? { id: 1, name: 'AI & Smart Technology', playlist: 'AI' };
+
+  const sampleBeats = [
+    { purpose: 'Curiosity Shock Hook', visual: `Presenter ${tag} looking directly at camera, holding phone displaying alert badge`, dialogue: `Kya aapko maloom hai ke ${title.slice(0, 35)} ka yeh secret feature 90% log nahi jante?` },
+    { purpose: 'Problem Agitate', visual: `Split screen showing user struggling with settings and red error icon`, dialogue: `Ghanton zaya karne ke baad bhi masla theek nahi hota aur kaam atak jata hai.` },
+    { purpose: 'Instant Secret Reveal', visual: `Screen capture zooming in on secret toggle and quick shortcut`, dialogue: `Lekin aaj ka yeh 1-click tareeqa aapka kaam sirf 5 second mein asaan bana dega.` },
+    { purpose: 'Step 1: Configuration', visual: `Clean screencast highlighting first parameter with glowing cyan circle`, dialogue: `Pehle setting open karke is feature ko turn on karein aur parameters lock karein.` },
+    { purpose: 'Step 2: Execution', visual: `Live action screen demonstration executing automated workflow`, dialogue: `Ab simply execute button click karein aur background automation ko verify karein.` },
+    { purpose: 'Proof & Live Result', visual: `Green verification tick with benchmarking counter displaying 10x speed boost`, dialogue: `Yeh dekhein! Bina kisi rukawat ke poora task automatically run ho chuka hai.` },
+    { purpose: 'Pro Tip & Caution', visual: `Presenter gesturing warning hand sign with floating caution tooltip`, dialogue: `Koshish karein ke default limits ko cross na karein taake account hamesha safe rahe.` },
+    { purpose: 'Common Mistake Avoid', visual: `Red X marking wrong option vs green check on correct option`, dialogue: `Aksar log yeh pehli ghalti karte hain jis se settings reset ho jati hain.` },
+    { purpose: 'Infinite Loop Tie-in', visual: `Camera smoothly zooming in to presenter with confident smile`, dialogue: `Is trick ko azma ke dekhein aur batayein kya yeh aapke liye kaam kiya?` },
+    { purpose: 'Subscribe & Comment CTA', visual: `Subscribe animation and notification bell ringing with question overlay`, dialogue: `Aisi mazeed daily tech tricks ke liye IT Cafeteria ko abhi subscribe karein!` }
+  ];
+
+  const scenes: StoryScene[] = Array.from({ length: totalScenes }).map((_, idx) => {
+    const beat = sampleBeats[idx % sampleBeats.length];
+    const isCTA = idx === totalScenes - 1;
+    const sceneNum = idx + 1;
+    const dialogue = isCTA
+      ? `Aisi mazeed daily tech shortcuts ke liye ${profile.name} ko subscribe karke comment mein batayein!`
+      : (idx < sampleBeats.length ? beat.dialogue : `Scene ${sceneNum}: ${title} ka agla step execute karein aur live proof dekhein.`);
+    const visual = beat.visual;
+    const words = dialogue.split(/\s+/).filter(Boolean).length;
+    const rawScript = `[PRESENTER & ACTION]: ${tag} — ${visual}.\n[DIALOGUE]: "${dialogue}"\n[CAMERA & CINEMATICS]: 9:16 vertical, anamorphic cinematic lens, cyan/amber contrast rim lights. Duration: 0-10s strictly.`;
+    const script = applyCinematicDirecting(sceneNum, rawScript, undefined, beat.purpose);
+
+    return {
+      num: sceneNum,
+      duration: '10s',
+      purpose: beat.purpose,
+      isCTA,
+      words,
+      visual,
+      dialogue,
+      script
+    };
+  });
+
+  const hashtag = profile.id === 'beautyhub' ? '#BeautyHub' : '#ITCafeteria';
+  const headline = title.split(/\s+/).slice(0, 3).join(' ').toUpperCase();
+
+  return {
+    title,
+    hook,
+    channelName: profile.name,
+    presenter: profile.presenter,
+    categoryName: `${category.id}. ${category.name}`,
+    playlist: category.playlist,
+    characterTag: tag,
+    dateLabel,
+    sceneCount: scenes.length,
+    scenes,
+    hashtags: [hashtag, '#Shorts', '#ViralTech', '#UrduTech'],
+    description: `${title} — Full tutorial and secret guide in Roman Urdu by ${profile.presenter}.\n\nCategory: ${category.name}\nDuration: ${totalScenes * 10} seconds (${scenes.length} scenes).`,
+    tags: [title, category.name, profile.presenter, 'IT Cafeteria', 'Roman Urdu', 'Tech Shorts'],
+    tiktokCaption: `${title} 🔥 Secret trick revealed in Roman Urdu! #itcafeteria #shorts #pakistantech`,
+    thumbnailHeadline: headline,
+    thumbnailSubBadge: '100% WORKING',
+    thumbnailPrompt: `Professional vertical YouTube Shorts thumbnail for ${title}, presenter ${tag} on left with expressive face, glowing holographic neon UI on right, bold 3D text "${headline}".`,
+    thumbnailLine1: headline,
+    thumbnailLine2: 'SECRET TRICK',
+    thumbnailHologram: 'Floating cyan holographic shield',
+    seriesPlan: `${category.name} Series`,
+    memoryBlock: `Title: ${title}\nCategory: ${category.name}\nTag: ${tag}\nScenes: ${scenes.length}`,
+    idea,
+    discussionNotes: notes,
+    modelUsed: 'Offline Precision Generator'
+  };
+}
+
 const IdeaCard: React.FC<{ idea: StoryIdea; onSelect: (idea: StoryIdea) => void }> = ({ idea, onSelect }) => (
   <div className="rounded-xl border border-slate-700/80 bg-slate-950/70 p-3.5 space-y-2 hover:border-cyan-500/50 transition-colors">
     <div className="flex items-start justify-between gap-2">
@@ -220,13 +307,19 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
   profile,
   selection,
   memoryRecords,
+  simulatorConfig,
   onClose,
   onOutcome
 }) => {
-  const category = profile.categories.find((item) => item.id === selection.categoryId) ?? profile.categories[0];
+  const category = (profile?.categories && profile.categories.find((item) => item.id === selection.categoryId)) ??
+    profile?.categories?.[0] ??
+    { id: selection.categoryId || 1, name: 'AI & Smart Technology', playlist: 'AI & Smart Technology' };
   const isSearch = category.id === 10;
-  const initialNote = profile.sampleNotes[category.id] ?? { title: category.name, hook: 'Reveal' };
-  const channelHashtag = profile.id === 'itcafeteria' ? '#ITCafeteria' : '#BeautyHub';
+  const initialNote = profile?.sampleNotes?.[category.id] ?? {
+    title: category?.name ? `${category.name} Secrets` : 'Tech Trick',
+    hook: 'Reveal'
+  };
+  const channelHashtag = profile?.id === 'itcafeteria' ? '#ITCafeteria' : '#BeautyHub';
 
   const [phase, setPhase] = useState<Phase>('checking');
   const [checkStage, setCheckStage] = useState<CheckStage>('initial');
@@ -372,7 +465,10 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
           .filter((message) => message.text.trim())
           .slice(-10)
           .map((message) => ({ role: message.role, text: message.text.trim().slice(0, 600) })),
-        excludeTitles: buildExcludedTitles([idea.title])
+        excludeTitles: buildExcludedTitles([idea.title]),
+        dialectTone: simulatorConfig?.dialectTone || 'conversational',
+        flowPromptFormat: simulatorConfig?.flowPromptFormat || 'split_screen',
+        customInstructions: simulatorConfig?.customInstructions || ''
       }, abortRef.current?.signal);
 
       const rawScenes = Array.isArray(data.scenes) ? data.scenes : [];
@@ -735,6 +831,31 @@ Rules:
     void generateStory(selectedIdea, discussionNotes.trim(), chatMessages);
   };
 
+  const handleSynthesizeInstantStory = () => {
+    const targetIdea = selectedIdea || initialIdea();
+    const offlineStory = createInstantFallbackStory(
+      profile,
+      selection,
+      targetIdea,
+      discussionNotes.trim(),
+      simulatorConfig
+    );
+    setStory(offlineStory);
+    setPhase('complete');
+    onOutcomeRef.current({
+      status: 'generated',
+      selection,
+      title: offlineStory.title,
+      hook: offlineStory.hook,
+      duplicates: [],
+      topic: targetIdea.title,
+      discussionNotes: discussionNotes.trim() || undefined,
+      matchContext: checkStage,
+      story: offlineStory,
+      idea: targetIdea
+    });
+  };
+
   const progress = phase === 'complete' ? 100 : Math.round((stepIndex / steps.length) * 100);
   const renderIdeaList = () => (
     <div className="space-y-2">
@@ -765,9 +886,11 @@ Rules:
     </div>
   );
 
-  return (
-    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-y-auto" role="dialog" aria-modal="true">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl my-auto animate-in fade-in duration-200">
         <div className="p-4 border-b border-slate-800 bg-slate-950 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl text-white shadow-lg bg-gradient-to-tr from-blue-600 to-cyan-500 shadow-blue-500/25">
@@ -1169,16 +1292,25 @@ Rules:
                 </p>
                 <p className="text-[11px] text-rose-100/80 break-words whitespace-pre-wrap leading-relaxed">{errorMsg}</p>
                 <p className="text-[10px] text-slate-400">
-                  Idea aur discussion mehfooz hain. Neeche se dobara try karein.
+                  Aap offline precision engine se instant story synthesize kar sakte hain ya dobara AI try kar sakte hain.
                 </p>
               </div>
-              <button
-                onClick={handleRetryGenerate}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-blue-500/25 transition-opacity cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Dobara Try Karein
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleRetryGenerate}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Dobara Try Karein
+                </button>
+                <button
+                  onClick={handleSynthesizeInstantStory}
+                  className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-cyan-500 hover:opacity-90 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-emerald-500/25 transition-opacity cursor-pointer"
+                >
+                  <Wand2 className="w-3.5 h-3.5" />
+                  Instant Story Synthesize Karein ({selection.sceneCount} Scenes)
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1249,6 +1381,7 @@ Rules:
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
