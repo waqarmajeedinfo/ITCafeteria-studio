@@ -44,28 +44,58 @@ export interface StylePresetItem {
 export interface SimulatorConfig {
   baselineTag: string;
   defaultSceneCount: number;
-  duplicateStrictness: 'strict' | 'balanced' | 'relaxed' | string;
+  duplicateStrictness: 'deep' | 'balanced' | 'strict' | 'relaxed' | string;
   dialectTone: string;
   lockPersonaAcrossScenes: boolean;
   autoQueueSync: boolean;
   flowPromptFormat: string;
   customInstructions: string;
-  // User-manageable presets
   scenePresets?: ScenePresetItem[];
   dialectPresets?: DialectPresetItem[];
   stylePresets?: StylePresetItem[];
 }
 
+/**
+ * Screenshot 1: Accurate Scene Counts (7, 10, 12, 15, 18, 30)
+ */
 export const DEFAULT_SCENE_PRESETS: ScenePresetItem[] = [
-  { id: 'sc-7', count: 7, label: '7 Scenes (70s — Minimal Threshold)' },
-  { id: 'sc-10', count: 10, label: '10 Scenes (100s — Standard Short)' },
-  { id: 'sc-12', count: 12, label: '12 Scenes (120s — Extended Short)' },
-  { id: 'sc-15', count: 15, label: '15 Scenes (150s — Deep Tutorial)' },
-  { id: 'sc-20', count: 20, label: '20 Scenes (200s — Masterclass)' },
-  { id: 'sc-25', count: 25, label: '25 Scenes (250s — Extended Series)' },
-  { id: 'sc-30', count: 30, label: '30 Scenes (300s — Max Long-form Short)' }
+  { id: 'sc-7', count: 7, label: '7 Scenes (70s — 1m 10s)' },
+  { id: 'sc-10', count: 10, label: '10 Scenes (100s — 1m 40s Standard Short)' },
+  { id: 'sc-12', count: 12, label: '12 Scenes (120s — 2m 00s Video)' },
+  { id: 'sc-15', count: 15, label: '15 Scenes (150s — 2m 30s Video)' },
+  { id: 'sc-18', count: 18, label: '18 Scenes (180s — 3m 00s Video)' },
+  { id: 'sc-30', count: 30, label: '30 Scenes (300s — 5m 00s Deep Dive)' }
 ];
 
+/**
+ * Screenshot 2: Duplicate Check Tolerance Options
+ */
+export const DUPLICATE_TOLERANCE_OPTIONS = [
+  {
+    id: 'deep',
+    label: 'Deep Sub-Point & Secret Verification (Recommended)',
+    desc: 'Main tool (e.g. WhatsApp / Power Automate) par duplicate mark nahi karega, balkay andar ke specific features aur points check karega (Part 1, 2, 3 allowed).'
+  },
+  {
+    id: 'balanced',
+    label: 'Balanced (Allows fresh angle on old topics)',
+    desc: 'Allows fresh angle or distinct workflow on previously covered tools.'
+  },
+  {
+    id: 'strict',
+    label: 'Strict (0-Tolerance against 58 Videos)',
+    desc: 'Zero duplication allowed against 58+ published catalog videos.'
+  },
+  {
+    id: 'relaxed',
+    label: 'Relaxed (Experimental / Broad check)',
+    desc: 'Soft semantic threshold for testing viral variations of top videos.'
+  }
+];
+
+/**
+ * Screenshot 3: Accurate Dialect & Cadence Options
+ */
 export const DEFAULT_DIALECT_PRESETS: DialectPresetItem[] = [
   {
     id: 'lahori_conversational',
@@ -74,21 +104,59 @@ export const DEFAULT_DIALECT_PRESETS: DialectPresetItem[] = [
   },
   {
     id: 'formal',
-    label: 'Neutral Tech Urdu (Semi-formal)',
+    label: 'Natural Tech Urdu (Semi-formal)',
     description: 'Clean, professional Urdu technical vocabulary suitable for enterprise workflows.'
   },
   {
     id: 'fast_paced',
     label: 'Fast-Paced Energetic (TikTok Viral Style)',
     description: 'High-speed urgency, rapid pattern-interrupts, and aggressive retention hooks.'
+  },
+  {
+    id: 'documentary',
+    label: 'Deep-Dive Documentary Explainer (Authoritative)',
+    description: 'Serious investigative tone, architectural deep-dives, authoritative presentation.'
+  },
+  {
+    id: 'brotherly',
+    label: 'Casual Senior Brotherly / Bhai Advice (Trustworthy)',
+    description: 'Warm, trustworthy elder brother mentor advice with practical cautionary tips.'
+  },
+  {
+    id: 'urgent_tech',
+    label: 'High-Stakes Urgent Breaking Tech (Fast hook alert)',
+    description: 'Urgent security and breakthrough tech warnings, rapid-fire pacing.'
+  },
+  {
+    id: 'workshop',
+    label: 'Step-by-Step Hands-On Workshop (Instructor pace)',
+    description: 'Calm, patient instructor cadence walking through complex interface workflows click by click.'
   }
 ];
 
+/**
+ * Screenshot 4: Flow Prompt Script Style Options
+ */
 export const DEFAULT_STYLE_PRESETS: StylePresetItem[] = [
   {
     id: 'cinematic_3d',
     label: 'Cinematic 3D Hologram + Anchor Split',
     description: 'Prepends visual cinematic directing (9:16 vertical, 8K, anamorphic lens, cyan/amber volumetric lighting, left anchor split with floating holographic UI).'
+  },
+  {
+    id: 'motion_graphics',
+    label: 'Minimalist Clean Motion Graphics & Code Screencast',
+    description: 'Clean high-contrast vector motion graphics, code editor screencasts, and crisp syntax highlighting.'
+  },
+  {
+    id: 'split_screen',
+    label: 'Live Split-Screen Hands-On Demo & Facecam Reaction',
+    description: 'Dual-camera split with presenter facecam reaction on left and real-time screen capture demonstration on right.'
+  },
+  {
+    id: 'kinetic',
+    label: 'Kinetic Typography & Dynamic Zoom Cutaways',
+    description: 'Fast-paced kinetic animated subtitles, dynamic whip-pans, and rhythmic snap zooms.'
   },
   {
     id: 'standard',
@@ -97,27 +165,57 @@ export const DEFAULT_STYLE_PRESETS: StylePresetItem[] = [
   },
   {
     id: 'minimal',
-    label: 'Minimal Clean Prompt',
+    label: 'Minimal Prompt',
     description: 'Compact prompt format focusing purely on dialogue and essential visual cues.'
   }
 ];
 
+/**
+ * Screenshot 5: Agent Script Rules & Prompt Instructions Presets
+ */
+export const SCRIPT_RULE_PRESETS = [
+  {
+    id: '10_scene_short',
+    title: '10-Scene Short',
+    subtitle: 'Hook, Problem, Agitate, Reveal, Step 1, Step 2, Proof...',
+    instructions: 'Strict 10-Scene Short format in Roman Urdu. Structure: Disruptive pattern-interrupt hook (0-10s), Problem breakdown, Agitate pain points, Instant secret reveal, Step-by-step practical execution, Proof and benchmarks, Curiosity loop, CTA outro with subscriber prompt.'
+  },
+  {
+    id: 'whatsapp_secrets',
+    title: 'WhatsApp & Tools Secrets',
+    subtitle: 'Hook, Instant Teaser, Secret Hack 1, Secret Hack 2, Secr...',
+    instructions: 'Category 7 Secrets & Daily Tools format in Roman Urdu. Structure: Teaser hook revealing hidden trick, Instant screen proof, Secret Shortcut 1, Secret Shortcut 2, Common mistake warning, Practical takeaway, High-engagement question in comment CTA.'
+  },
+  {
+    id: 'power_automate',
+    title: 'Power Automate & Long-f...',
+    subtitle: 'Episode Context & Recap, Workplace Problem,...',
+    instructions: 'Deep productivity and automation tutorial format. Structure: Episode context and recap, Workplace business problem, Architecture and trigger breakdown, Step-by-step logic nodes, Live testing and run execution, Speed boost proof, Next chapter teaser.'
+  },
+  {
+    id: 'bug_security',
+    title: 'Bug Alert & Security',
+    subtitle: 'Shocking Tech Alert, Risk Proof, Root Cause, 1-Click...',
+    instructions: 'High-stakes urgent tone in Roman Urdu. Structure: Shocking security/productivity warning or myth reveal, Live proof of why users are at risk, Root cause explanation, 1-Click fix & prevention step, Post-fix verification test, Interactive viewer question, Subscribe CTA.'
+  }
+];
+
 export const DEFAULT_SIMULATOR_CONFIG: SimulatorConfig = {
-  baselineTag: 'Active Baseline',
+  baselineTag: 'Active',
   defaultSceneCount: 10,
-  duplicateStrictness: 'strict',
-  dialectTone: 'lahori_conversational',
+  duplicateStrictness: 'deep',
+  dialectTone: 'workshop',
   lockPersonaAcrossScenes: true,
   autoQueueSync: true,
-  flowPromptFormat: 'cinematic_3d',
+  flowPromptFormat: 'split_screen',
   scenePresets: DEFAULT_SCENE_PRESETS,
   dialectPresets: DEFAULT_DIALECT_PRESETS,
   stylePresets: DEFAULT_STYLE_PRESETS,
   customInstructions:
-    'Strict Lahori Conversational Dialect. Single consistent anchor persona from Scene 1 to the end (No mid-story voice or narrator switching). Prepend Cinematic Directing instructions (9:16, 8K volumetric lighting, cyan/amber glowing holographic UI) on every scene script.'
+    'High-stakes urgent tone in Roman Urdu. Structure: Shocking security/productivity warning or myth reveal, Live proof of why users are at risk, Root cause explanation, 1-Click fix & prevention step, Post-fix verification test, Interactive viewer question, Subscribe CTA.'
 };
 
-const STORAGE_KEY = 'itcafeteria_simulator_config_v3';
+const STORAGE_KEY = 'itcafeteria_simulator_config_v4';
 
 export function loadSimulatorConfig(): SimulatorConfig {
   if (typeof window === 'undefined') return DEFAULT_SIMULATOR_CONFIG;
@@ -128,9 +226,9 @@ export function loadSimulatorConfig(): SimulatorConfig {
       return {
         ...DEFAULT_SIMULATOR_CONFIG,
         ...parsed,
-        scenePresets: Array.isArray(parsed.scenePresets) && parsed.scenePresets.length ? parsed.scenePresets : DEFAULT_SCENE_PRESETS,
-        dialectPresets: Array.isArray(parsed.dialectPresets) && parsed.dialectPresets.length ? parsed.dialectPresets : DEFAULT_DIALECT_PRESETS,
-        stylePresets: Array.isArray(parsed.stylePresets) && parsed.stylePresets.length ? parsed.stylePresets : DEFAULT_STYLE_PRESETS
+        scenePresets: DEFAULT_SCENE_PRESETS,
+        dialectPresets: DEFAULT_DIALECT_PRESETS,
+        stylePresets: DEFAULT_STYLE_PRESETS
       };
     }
   } catch {}
@@ -163,752 +261,283 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
 }) => {
   const [local, setLocal] = useState<SimulatorConfig>(config);
   const [savedToast, setSavedToast] = useState(false);
-
-  // Preset addition states
-  const [showAddScenePreset, setShowAddScenePreset] = useState(false);
-  const [newSceneCount, setNewSceneCount] = useState<number>(14);
-  const [newSceneLabel, setNewSceneLabel] = useState<string>('');
-
-  const [showAddDialectPreset, setShowAddDialectPreset] = useState(false);
-  const [newDialectName, setNewDialectName] = useState<string>('');
-  const [newDialectDesc, setNewDialectDesc] = useState<string>('');
-
-  const [showAddStylePreset, setShowAddStylePreset] = useState(false);
-  const [newStyleName, setNewStyleName] = useState<string>('');
-  const [newStyleDesc, setNewStyleDesc] = useState<string>('');
-
-  // Dynamic published count for duplicate defense label
-  const [liveCatalogCount, setLiveCatalogCount] = useState<number>(PUBLISHED_VIDEOS.length);
+  const [activeRulePattern, setActiveRulePattern] = useState<string>('bug_security');
 
   useEffect(() => {
-    try {
-      const queueRaw = localStorage.getItem('itcafeteria_autopilot_queue');
-      const queue = queueRaw ? JSON.parse(queueRaw) : [];
-      const completedCount = Array.isArray(queue) ? queue.filter((t: any) => t.status === 'completed').length : 0;
-      setLiveCatalogCount(PUBLISHED_VIDEOS.length + completedCount);
-    } catch {
-      setLiveCatalogCount(PUBLISHED_VIDEOS.length);
-    }
-  }, [isOpen]);
+    setLocal(config);
+  }, [config, isOpen]);
 
-  const markDirty = (updated: SimulatorConfig) => {
-    dirtyManager.setDirty({
-      id: 'simulator_config',
-      title: 'Agent Simulator Engine Configuration',
-      description: 'Story Engine ke parameters aur baseline rules ki tabdeeliyaan ghair mehfooz hain.',
-      onSave: () => handleSave(updated),
-      onDiscard: () => {
-        setLocal(config);
-        dirtyManager.clearDirty('simulator_config');
-      }
-    });
-  };
-
-  const updateField = <K extends keyof SimulatorConfig>(field: K, value: SimulatorConfig[K]) => {
-    setLocal((prev) => ({ ...prev, [field]: value }));
-    markDirty({ ...local, [field]: value });
-  };
-
+  // Lock scroll
   useEffect(() => {
     if (isOpen) {
-      setLocal({
-        ...config,
-        scenePresets: config.scenePresets || DEFAULT_SCENE_PRESETS,
-        dialectPresets: config.dialectPresets || DEFAULT_DIALECT_PRESETS,
-        stylePresets: config.stylePresets || DEFAULT_STYLE_PRESETS
-      });
       document.documentElement.classList.add('modal-open');
       document.body.classList.add('modal-open');
       return () => {
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
-        dirtyManager.clearDirty('simulator_config');
       };
     }
-  }, [config, isOpen]);
+  }, [isOpen]);
 
-  if (!isOpen) return null;
+  const updateField = <K extends keyof SimulatorConfig>(field: K, value: SimulatorConfig[K]) => {
+    const updated = { ...local, [field]: value };
+    setLocal(updated);
+  };
 
-  const handleSave = (overrideConfig?: SimulatorConfig) => {
-    const target = overrideConfig || local;
-    saveSimulatorConfig(target);
-    onSave(target);
-    dirtyManager.clearDirty('simulator_config');
+  const handleSave = () => {
+    onSave(local);
+    saveSimulatorConfig(local);
     setSavedToast(true);
     setTimeout(() => {
       setSavedToast(false);
       onClose();
-    }, 400);
+    }, 600);
   };
 
   const handleResetDefaults = () => {
-    if (window.confirm('Kya aap Simulator ki settings ko default par reset karna chahte hain?')) {
-      onReset();
-      setLocal(DEFAULT_SIMULATOR_CONFIG);
-      saveSimulatorConfig(DEFAULT_SIMULATOR_CONFIG);
-      onSave(DEFAULT_SIMULATOR_CONFIG);
-      dirtyManager.clearDirty('simulator_config');
-    }
+    setLocal(DEFAULT_SIMULATOR_CONFIG);
+    onReset();
+    saveSimulatorConfig(DEFAULT_SIMULATOR_CONFIG);
   };
 
-  // Add / Delete Scene Presets
-  const handleAddScenePreset = () => {
-    const count = Number(newSceneCount);
-    if (!count || count < 7 || count > 30) {
-      alert('Scene count 7 se 30 ke darmiyan hona chahiye.');
-      return;
-    }
-    const label = newSceneLabel.trim() || `${count} Scenes (${count * 10}s — Custom Format)`;
-    const newPreset: ScenePresetItem = {
-      id: `sc-custom-${Date.now()}`,
-      count,
-      label
-    };
-    const updatedPresets = [...(local.scenePresets || DEFAULT_SCENE_PRESETS), newPreset].sort((a, b) => a.count - b.count);
-    updateField('scenePresets', updatedPresets);
-    updateField('defaultSceneCount', count);
-    setNewSceneLabel('');
-    setShowAddScenePreset(false);
+  const selectRulePattern = (preset: typeof SCRIPT_RULE_PRESETS[0]) => {
+    setActiveRulePattern(preset.id);
+    updateField('customInstructions', preset.instructions);
   };
 
-  const handleDeleteScenePreset = (presetId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const currentList = local.scenePresets || DEFAULT_SCENE_PRESETS;
-    if (currentList.length <= 1) {
-      alert('Kam az kam aik scene preset lazmi rehna chahiye.');
-      return;
-    }
-    const updated = currentList.filter((p) => p.id !== presetId);
-    updateField('scenePresets', updated);
-    if (!updated.some((p) => p.count === local.defaultSceneCount)) {
-      updateField('defaultSceneCount', updated[0]?.count || 10);
-    }
-  };
+  if (!isOpen) return null;
 
-  // Add / Delete Dialect Presets
-  const handleAddDialectPreset = () => {
-    if (!newDialectName.trim()) return;
-    const newPreset: DialectPresetItem = {
-      id: `dialect-${Date.now()}`,
-      label: newDialectName.trim(),
-      description: newDialectDesc.trim() || 'Custom dialect tone & cadence.'
-    };
-    const updated = [...(local.dialectPresets || DEFAULT_DIALECT_PRESETS), newPreset];
-    updateField('dialectPresets', updated);
-    updateField('dialectTone', newPreset.id);
-    setNewDialectName('');
-    setNewDialectDesc('');
-    setShowAddDialectPreset(false);
-  };
+  const charCount = local.customInstructions.length;
+  const wordCount = local.customInstructions.trim() ? local.customInstructions.trim().split(/\s+/).length : 0;
 
-  const handleDeleteDialectPreset = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const current = local.dialectPresets || DEFAULT_DIALECT_PRESETS;
-    if (current.length <= 1) {
-      alert('Kam az kam aik dialect preset hona chahiye.');
-      return;
-    }
-    const updated = current.filter((p) => p.id !== id);
-    updateField('dialectPresets', updated);
-    if (local.dialectTone === id) {
-      updateField('dialectTone', updated[0]?.id || 'lahori_conversational');
-    }
-  };
-
-  // Add / Delete Style Presets
-  const handleAddStylePreset = () => {
-    if (!newStyleName.trim()) return;
-    const newPreset: StylePresetItem = {
-      id: `style-${Date.now()}`,
-      label: newStyleName.trim(),
-      description: newStyleDesc.trim() || 'Custom visual directing & flow prompt style.'
-    };
-    const updated = [...(local.stylePresets || DEFAULT_STYLE_PRESETS), newPreset];
-    updateField('stylePresets', updated);
-    updateField('flowPromptFormat', newPreset.id);
-    setNewStyleName('');
-    setNewStyleDesc('');
-    setShowAddStylePreset(false);
-  };
-
-  const handleDeleteStylePreset = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const current = local.stylePresets || DEFAULT_STYLE_PRESETS;
-    if (current.length <= 1) {
-      alert('Kam az kam aik style preset hona chahiye.');
-      return;
-    }
-    const updated = current.filter((p) => p.id !== id);
-    updateField('stylePresets', updated);
-    if (local.flowPromptFormat === id) {
-      updateField('flowPromptFormat', updated[0]?.id || 'cinematic_3d');
-    }
-  };
-
-  // Quick instruction templates
-  const injectDirective = (text: string) => {
-    const existing = local.customInstructions.trim();
-    const updated = existing ? `${existing}\n\n• ${text}` : `• ${text}`;
-    updateField('customInstructions', updated);
-  };
-
-  const scenePresets = local.scenePresets || DEFAULT_SCENE_PRESETS;
-  const dialectPresets = local.dialectPresets || DEFAULT_DIALECT_PRESETS;
-  const stylePresets = local.stylePresets || DEFAULT_STYLE_PRESETS;
+  const currentTolerance = DUPLICATE_TOLERANCE_OPTIONS.find(o => o.id === local.duplicateStrictness) || DUPLICATE_TOLERANCE_OPTIONS[0];
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-blue-500/40 rounded-2xl w-full max-w-3xl max-h-[88vh] h-full sm:h-auto flex flex-col shadow-2xl shadow-blue-950/80 overflow-hidden overscroll-contain text-slate-100">
-        {/* Header — Cleaned as requested: v3.42 label completely removed, Active Baseline kept intact */}
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl shadow-blue-950/80 overflow-hidden overscroll-contain text-slate-100">
+        
+        {/* Modal Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/20 text-blue-400 rounded-xl border border-blue-500/30">
+            <div className="p-2.5 bg-blue-500/20 text-blue-400 rounded-xl border border-blue-500/30">
               <Bot className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-white text-base">Agent Simulator Engine Configuration</h3>
-                <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-mono font-semibold">
-                  {local.baselineTag || 'Active Baseline'}
+                <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-bold">
+                  {local.baselineTag || 'Active'}
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                Story parameters, Lahori dialect, custom scene presets (7–30), aur cinematic directing rules customize karein.
+              <p className="text-xs text-slate-400 mt-0.5">
+                Multi-Agent Story Engine ke rules, baseline status, scene settings, dialect aur pattern structure customize karein.
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Band Karein"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Saved Feedback Toast */}
-        {savedToast && (
-          <div className="mx-5 mt-3 p-2.5 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs text-emerald-200 flex items-center gap-2 shadow-lg animate-in fade-in duration-150 shrink-0">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Engine Configuration kamyabi se save ho gayi! Tamam changes live sync ho chuke hain.</span>
-          </div>
-        )}
-
-        {/* Content Body — Fixed height with internal scrolling only, preventing full-page scroll */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll p-4 sm:p-5 space-y-4 text-xs">
-          
-          {/* Baseline Tag Status (Editable without any v3.42 label) */}
-          <div className="p-3.5 bg-slate-950/60 border border-slate-800 rounded-xl flex items-center justify-between gap-4 flex-wrap">
+        {/* Content Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
+          {/* Baseline Tag Status */}
+          <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="text-slate-300 font-semibold block text-xs">Engine Baseline Status</span>
-              <p className="text-[11px] text-slate-400">Current active model pipeline baseline tag</p>
+              <div className="font-bold text-white text-xs">Baseline Tag Status</div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Current active production baseline for the Multi-Channel Story Engine.
+              </p>
             </div>
             <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800/60 rounded-lg text-xs font-semibold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" /> Active
+              </span>
               <input
                 type="text"
                 value={local.baselineTag}
                 onChange={(e) => updateField('baselineTag', e.target.value)}
-                className="bg-slate-800 border border-emerald-500/40 rounded-lg px-3 py-1.5 text-emerald-300 font-mono text-xs focus:outline-none focus:border-emerald-400"
-                placeholder="Active Baseline"
+                placeholder="Active"
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-slate-200 text-xs font-mono focus:outline-none focus:border-cyan-400 w-28"
               />
             </div>
           </div>
 
-          {/* 1. SCENE COUNT PARAMETERS & CUSTOM PRESET BUILDER */}
-          <div className="space-y-3 p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
-            <div className="flex items-center justify-between flex-wrap gap-2">
+          {/* Story Generation Parameters */}
+          <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-4">
+            <div className="flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-cyan-400" />
+              <h4 className="font-bold text-white text-xs uppercase tracking-wider">
+                Story Generation Parameters
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Default Scene Count */}
               <div>
-                <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                  <Film className="w-3.5 h-3.5 text-cyan-400" />
-                  Configurable Scene Counts (7 to 30 Scenes)
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Direct scene count set karein ya apni marzi se naye presets add / delete karein.
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-slate-300 font-semibold block text-xs">
+                    Default Scene Count
+                  </label>
+                  <span className="text-[11px] text-cyan-400 font-mono">10s / scene</span>
+                </div>
+                <select
+                  value={local.defaultSceneCount}
+                  onChange={(e) => updateField('defaultSceneCount', Number(e.target.value))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                >
+                  {DEFAULT_SCENE_PRESETS.map((p) => (
+                    <option key={p.id} value={p.count}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Calculation: Har scene theek 10 second ka hai. 18 scenes = 3 min, 30 scenes = 5 min.
                 </p>
               </div>
 
-              {/* Direct Scene Count Stepper (7 to 30) */}
-              <div className="flex items-center gap-2 bg-slate-900 border border-cyan-500/40 px-2.5 py-1 rounded-xl">
-                <span className="text-[11px] text-slate-400 font-medium">Selected:</span>
-                <button
-                  type="button"
-                  onClick={() => updateField('defaultSceneCount', Math.max(7, local.defaultSceneCount - 1))}
-                  className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+              {/* Duplicate Check Tolerance */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-slate-300 font-semibold block text-xs">
+                    Duplicate Check Tolerance
+                  </label>
+                  <span className="text-[11px] text-emerald-400 font-mono">Sub-Point Verification</span>
+                </div>
+                <select
+                  value={local.duplicateStrictness}
+                  onChange={(e) => updateField('duplicateStrictness', e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
                 >
-                  -
-                </button>
-                <input
-                  type="number"
-                  min={7}
-                  max={30}
-                  value={local.defaultSceneCount}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val)) {
-                      updateField('defaultSceneCount', Math.max(7, Math.min(30, val)));
-                    }
-                  }}
-                  className="w-12 bg-transparent text-center font-bold font-mono text-cyan-300 focus:outline-none text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => updateField('defaultSceneCount', Math.min(30, local.defaultSceneCount + 1))}
-                  className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center cursor-pointer"
+                  {DUPLICATE_TOLERANCE_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                  {currentTolerance.desc}
+                </p>
+              </div>
+
+              {/* Dialect & Cadence */}
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1.5 text-xs">
+                  Dialect & Cadence
+                </label>
+                <select
+                  value={local.dialectTone}
+                  onChange={(e) => updateField('dialectTone', e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
                 >
-                  +
-                </button>
-                <span className="text-[10px] text-slate-400">Scenes</span>
+                  {DEFAULT_DIALECT_PRESETS.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Flow Prompt Script Style */}
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1.5 text-xs">
+                  Flow Prompt Script Style
+                </label>
+                <select
+                  value={local.flowPromptFormat}
+                  onChange={(e) => updateField('flowPromptFormat', e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                >
+                  {DEFAULT_STYLE_PRESETS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Presets Chips with Delete Buttons */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-slate-300 font-semibold block text-[11px]">
-                  Scene Presets (Click to Select, [x] to Delete):
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowAddScenePreset(!showAddScenePreset)}
-                  className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/30"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Naya Preset Banayein</span>
-                </button>
-              </div>
-
-              {/* Add New Scene Preset Mini-Form */}
-              {showAddScenePreset && (
-                <div className="p-3 mb-3 bg-slate-900 border border-cyan-500/40 rounded-xl space-y-2 animate-in fade-in duration-150">
-                  <div className="font-semibold text-cyan-300 text-[11px] flex items-center gap-1">
-                    <Plus className="w-3 h-3" /> Naya Scene Preset Darj Karein:
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-0.5">Scene Count (7-30)</label>
-                      <input
-                        type="number"
-                        min={7}
-                        max={30}
-                        value={newSceneCount}
-                        onChange={(e) => setNewSceneCount(parseInt(e.target.value) || 10)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-cyan-400"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="text-[10px] text-slate-400 block mb-0.5">Label (e.g. 14 Scenes — Deep Dive)</label>
-                      <input
-                        type="text"
-                        value={newSceneLabel}
-                        onChange={(e) => setNewSceneLabel(e.target.value)}
-                        placeholder="e.g. 14 Scenes (140s — Intermediate)"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-400"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowAddScenePreset(false)}
-                      className="px-2.5 py-1 text-slate-400 hover:text-white text-[11px]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAddScenePreset}
-                      className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
-                    >
-                      <Check className="w-3 h-3" /> Preset Save Karein
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Preset List Badges */}
-              <div className="flex flex-wrap gap-2">
-                {scenePresets.map((preset) => {
-                  const isSelected = local.defaultSceneCount === preset.count;
-                  return (
-                    <div
-                      key={preset.id}
-                      onClick={() => updateField('defaultSceneCount', preset.count)}
-                      className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-cyan-950/70 border-cyan-400 text-cyan-200 shadow-md shadow-cyan-950 ring-1 ring-cyan-500/40 font-semibold'
-                          : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      <span>{preset.label}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteScenePreset(preset.id, e)}
-                        className="opacity-40 group-hover:opacity-100 hover:text-rose-400 p-0.5 transition-opacity"
-                        title="Is preset ko delete karein"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Checkbox: Auto-save to Queue & Calendar */}
+            <div className="pt-2 border-t border-slate-800/80">
+              <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                <input
+                  type="checkbox"
+                  checked={local.autoQueueSync}
+                  onChange={(e) => updateField('autoQueueSync', e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-400 h-4 w-4"
+                />
+                <span className="text-xs">
+                  Generate hote hi kahani ko Target Queue aur Content Calendar mein auto-save karein
+                </span>
+              </label>
             </div>
           </div>
 
-          {/* 2. DUPLICATE CHECK TOLERANCE & RADAR */}
-          <div className="space-y-3 p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
-            <div className="flex items-center justify-between">
-              <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
-                Duplicate Defense & Tolerance Rules
-              </h4>
-              <span className="text-[10px] bg-rose-500/10 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded font-mono">
-                {liveCatalogCount} Catalog Videos Synced
+          {/* Agent Script Rules & Prompt Instructions */}
+          <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-cyan-400" />
+                <h4 className="font-bold text-white text-xs uppercase tracking-wider">
+                  Agent Script Rules & Prompt Instructions
+                </h4>
+              </div>
+              <span className="text-[10px] text-cyan-400 font-mono">
+                Click any pattern below to load, or type custom instructions:
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {[
-                {
-                  id: 'strict',
-                  title: 'Strict (0-Tolerance)',
-                  desc: `Zero duplication allowed against ${liveCatalogCount} published library videos.`
-                },
-                {
-                  id: 'balanced',
-                  title: 'Balanced Angle',
-                  desc: 'Allows fresh angle or distinct workflow on previously covered tools.'
-                },
-                {
-                  id: 'relaxed',
-                  title: 'Relaxed Experimental',
-                  desc: 'Soft semantic threshold for testing viral variations of top videos.'
-                }
-              ].map((opt) => (
-                <div
-                  key={opt.id}
-                  onClick={() => updateField('duplicateStrictness', opt.id)}
-                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                    local.duplicateStrictness === opt.id
-                      ? 'bg-rose-950/40 border-rose-500 text-rose-200 ring-1 ring-rose-500/40 shadow-lg'
-                      : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-400'
-                  }`}
-                >
-                  <div className="font-bold text-xs text-white mb-1 flex items-center justify-between">
-                    <span>{opt.title}</span>
-                    {local.duplicateStrictness === opt.id && <Check className="w-3.5 h-3.5 text-rose-400" />}
-                  </div>
-                  <p className="text-[10px] leading-relaxed">{opt.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 3. LAHORI DIALECT & STRICT PERSONA LOCK */}
-          <div className="space-y-3 p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                  Dialect, Cadence & Anchor Persona
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Lahori conversational tone select karein aur persona lock enforce karein.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowAddDialectPreset(!showAddDialectPreset)}
-                className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 cursor-pointer bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/30"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Naya Dialect Preset</span>
-              </button>
-            </div>
-
-            {/* Add Dialect Preset Form */}
-            {showAddDialectPreset && (
-              <div className="p-3 bg-slate-900 border border-emerald-500/40 rounded-xl space-y-2 animate-in fade-in duration-150">
-                <div className="font-semibold text-emerald-300 text-[11px]">Naya Dialect Tone Add Karein:</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    value={newDialectName}
-                    onChange={(e) => setNewDialectName(e.target.value)}
-                    placeholder="Dialect Title (e.g. Punjabi Punch Urdu)"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-400"
-                  />
-                  <input
-                    type="text"
-                    value={newDialectDesc}
-                    onChange={(e) => setNewDialectDesc(e.target.value)}
-                    placeholder="Description & tone rules..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-emerald-400"
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddDialectPreset(false)}
-                    className="px-2.5 py-1 text-slate-400 hover:text-white text-[11px]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAddDialectPreset}
-                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
-                  >
-                    <Check className="w-3 h-3" /> Save Preset
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Dialect Cards */}
-            <div className="space-y-2">
-              {dialectPresets.map((preset) => {
-                const isSelected = local.dialectTone === preset.id;
+            {/* 4 Clickable Pattern Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+              {SCRIPT_RULE_PRESETS.map((preset) => {
+                const isActive = activeRulePattern === preset.id;
                 return (
                   <div
                     key={preset.id}
-                    onClick={() => updateField('dialectTone', preset.id)}
-                    className={`group p-3 rounded-xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
-                      isSelected
-                        ? 'bg-emerald-950/40 border-emerald-500 text-emerald-200 ring-1 ring-emerald-500/40 shadow-lg'
-                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                    onClick={() => selectRulePattern(preset)}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer relative ${
+                      isActive
+                        ? 'bg-slate-900 border-cyan-400 ring-1 ring-cyan-400/50 shadow-md shadow-cyan-950'
+                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
                     }`}
                   >
-                    <div className="min-w-0">
-                      <div className="font-bold text-xs text-white flex items-center gap-2">
-                        <span>{preset.label}</span>
-                        {preset.id === 'lahori_conversational' && (
-                          <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-mono">
-                            Recommended
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{preset.description}</p>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isSelected && <Check className="w-4 h-4 text-emerald-400" />}
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteDialectPreset(preset.id, e)}
-                        className="opacity-40 group-hover:opacity-100 hover:text-rose-400 p-1 transition-opacity"
-                        title="Delete Preset"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    {isActive && (
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 absolute top-2.5 right-2.5 shadow-sm shadow-cyan-400" />
+                    )}
+                    <div className="font-bold text-white text-xs mb-1 line-clamp-1">{preset.title}</div>
+                    <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">{preset.subtitle}</p>
                   </div>
                 );
               })}
             </div>
 
-            {/* Strict Persona Lock Switch */}
-            <div className="p-3 bg-slate-900 border border-emerald-500/30 rounded-xl flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-emerald-400 shrink-0" />
-                <div>
-                  <div className="font-semibold text-white text-xs">
-                    Strict Persona Lock (No Mid-Story Persona Switching)
-                  </div>
-                  <p className="text-[10px] text-slate-400">
-                    Scene 1 se aakhri scene tak anchor character tag aur awaaz ka persona 100% aik jaisa rahega.
-                  </p>
-                </div>
+            {/* Active Instructions Textarea */}
+            <div>
+              <div className="flex justify-between items-center mb-1 text-[11px] text-slate-400 font-mono">
+                <span>Active Prompt Instructions for AI Story Engine:</span>
+                <span>{charCount} chars • {wordCount} words</span>
               </div>
-
-              <button
-                type="button"
-                role="switch"
-                aria-checked={local.lockPersonaAcrossScenes}
-                onClick={() => updateField('lockPersonaAcrossScenes', !local.lockPersonaAcrossScenes)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  local.lockPersonaAcrossScenes ? 'bg-emerald-500' : 'bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    local.lockPersonaAcrossScenes ? 'translate-x-4' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-
-          {/* 4. FLOW PROMPT SCRIPT STYLE & CINEMATIC DIRECTING */}
-          <div className="space-y-3 p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                  Flow Prompt Script Style (Google Flow)
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Cinematic 3D Hologram + Anchor Split with camera movements and lighting.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowAddStylePreset(!showAddStylePreset)}
-                className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/30"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Naya Style Preset</span>
-              </button>
-            </div>
-
-            {/* Add Style Preset Form */}
-            {showAddStylePreset && (
-              <div className="p-3 bg-slate-900 border border-cyan-500/40 rounded-xl space-y-2 animate-in fade-in duration-150">
-                <div className="font-semibold text-cyan-300 text-[11px]">Naya Flow Script Style Add Karein:</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    value={newStyleName}
-                    onChange={(e) => setNewStyleName(e.target.value)}
-                    placeholder="Style Name (e.g. Cyberpunk Holographic HUD)"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-400"
-                  />
-                  <input
-                    type="text"
-                    value={newStyleDesc}
-                    onChange={(e) => setNewStyleDesc(e.target.value)}
-                    placeholder="Visual directing instructions..."
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddStylePreset(false)}
-                    className="px-2.5 py-1 text-slate-400 hover:text-white text-[11px]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAddStylePreset}
-                    className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
-                  >
-                    <Check className="w-3 h-3" /> Save Preset
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Style Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {stylePresets.map((preset) => {
-                const isSelected = local.flowPromptFormat === preset.id;
-                return (
-                  <div
-                    key={preset.id}
-                    onClick={() => updateField('flowPromptFormat', preset.id)}
-                    className={`group p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                      isSelected
-                        ? 'bg-cyan-950/40 border-cyan-400 text-cyan-200 ring-1 ring-cyan-500/40 shadow-lg'
-                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                    }`}
-                  >
-                    <div>
-                      <div className="font-bold text-xs text-white mb-1 flex items-center justify-between">
-                        <span>{preset.label}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-cyan-400" />}
-                      </div>
-                      <p className="text-[10px] text-slate-400 leading-relaxed">{preset.description}</p>
-                    </div>
-
-                    <div className="flex justify-end pt-2">
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteStylePreset(preset.id, e)}
-                        className="opacity-30 group-hover:opacity-100 hover:text-rose-400 p-0.5 transition-opacity"
-                        title="Delete Preset"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Auto-Sync Toggle to Target Queue and Content Calendar */}
-            <label className="flex items-center gap-2.5 pt-1 text-slate-300 cursor-pointer select-none bg-slate-900/80 p-3 rounded-xl border border-slate-800">
-              <input
-                type="checkbox"
-                checked={local.autoQueueSync}
-                onChange={(e) => updateField('autoQueueSync', e.target.checked)}
-                className="w-4 h-4 rounded border-slate-700 text-blue-500 focus:ring-0 cursor-pointer"
+              <textarea
+                value={local.customInstructions}
+                onChange={(e) => updateField('customInstructions', e.target.value)}
+                rows={4}
+                className="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-cyan-400 resize-none shadow-inner"
               />
-              <div>
-                <span className="font-semibold text-white block text-xs">
-                  Target Queue aur Content Calendar Auto-Sync
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  Generate hote hi kahani ko Pending Queue (`pendingQueueStore`) aur Calendar mein auto-save karein.
-                </span>
-              </div>
-            </label>
-          </div>
-
-          {/* 5. AGENT SCRIPT RULES & PROMPT INSTRUCTIONS */}
-          <div className="space-y-2.5 p-4 bg-slate-950/60 border border-slate-800 rounded-xl">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                <Edit3 className="w-3.5 h-3.5 text-blue-400" />
-                Script Rules & Prompt Directives (Editable)
-              </h4>
-
-              {/* Quick Template Injections */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => injectDirective('Dialect: Lahori Conversational Urdu ("Bhai yeh check karein...").')}
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[10px] border border-slate-700"
-                >
-                  + Lahori Dialect
-                </button>
-                <button
-                  type="button"
-                  onClick={() => injectDirective('Cinematic Directing: Prepend visual direction with 8K volumetric lighting and floating 3D hologram.')}
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[10px] border border-slate-700"
-                >
-                  + Cinematic Directing
-                </button>
-                <button
-                  type="button"
-                  onClick={() => injectDirective('Persona Lock: Anchor identity remains completely unchanged across all scenes without mid-story voice change.')}
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 text-[10px] border border-slate-700"
-                >
-                  + Persona Lock
-                </button>
-              </div>
             </div>
-
-            <textarea
-              rows={4}
-              value={local.customInstructions}
-              onChange={(e) => updateField('customInstructions', e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white font-mono text-[11px] leading-relaxed focus:outline-none focus:border-blue-400"
-              placeholder="Custom instructions for AI story script generation..."
-            />
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between shrink-0">
+        {/* Modal Footer Controls */}
+        <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-between items-center">
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer text-xs"
+            className="px-3.5 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset Defaults</span>
@@ -918,16 +547,16 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
-              onClick={() => handleSave()}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-lg shadow-blue-950 cursor-pointer"
+              onClick={handleSave}
+              className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-cyan-500/25 transition-all cursor-pointer"
             >
-              <Check className="w-3.5 h-3.5" />
+              <Check className="w-4 h-4" />
               <span>Save Engine Settings</span>
             </button>
           </div>

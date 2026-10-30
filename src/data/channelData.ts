@@ -644,7 +644,8 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
       { value: "@WM25-2", label: "@WM25-2 (Blue Accent)" },
       { value: "@WM25-3", label: "@WM25-3 (Tech Setup)" },
       { value: "@WM25-4", label: "@WM25-4 (Lecture Series)" },
-      { value: "@WM25-5", label: "@WM25-5 (Smart Casual)" }
+      { value: "@WM25-5", label: "@WM25-5 (Smart Casual)" },
+      { value: "@WM25-6", label: "@WM25-6 (Signature Studio / Black Jacket)" }
     ],
     categories: CATEGORIES_IT_CAFETERIA.map(({ id, name, playlist }) => ({ id, name, playlist })),
     rotationCategoryIds: CATEGORIES_IT_CAFETERIA.filter((c) => c.id <= 8).map((c) => c.id),

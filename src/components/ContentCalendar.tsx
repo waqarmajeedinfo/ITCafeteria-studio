@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Calendar as CalendarIcon, 
@@ -30,13 +30,18 @@ import {
   Bot,
   FileText,
   Film,
-  BookOpen
+  BookOpen,
+  Grid,
+  List,
+  CheckSquare,
+  Edit2
 } from 'lucide-react';
-import { PUBLISHED_VIDEOS, CATEGORIES_IT_CAFETERIA } from '../data/channelData';
-import { updatePendingStoryStatus, loadPendingQueue } from '../lib/pendingQueueStore';
-import { publishStoryDirectly } from '../lib/publishedLibraryStore';
+import { PUBLISHED_VIDEOS, CATEGORIES_IT_CAFETERIA, type PublishedVideo } from '../data/channelData';
+import { updatePendingStoryStatus, loadPendingQueue, upsertPendingStoryRecord, type PendingStoryRecord } from '../lib/pendingQueueStore';
+import { publishStoryDirectly, getAllPublishedVideos, type DynamicPublishedStory } from '../lib/publishedLibraryStore';
+import type { GeneratedStory, StoryScene } from './StoryPackageView';
 
-interface ScheduledPost {
+export interface ScheduledPost {
   id: string;
   title: string;
   category: string;
@@ -46,15 +51,16 @@ interface ScheduledPost {
   status: 'published' | 'scheduled' | 'draft';
   platform: 'YouTube + TikTok' | 'YouTube Only';
   reason: string;
+  storyPackage?: GeneratedStory;
+  catalogVideoId?: number;
 }
 
-export interface StorySceneBrief {
-  num: number;
-  duration: string;
-  purpose: string;
-  visual: string;
-  dialogue: string;
-  script: string;
+export interface VerificationInfo {
+  status: 'already_published' | 'pending_queue' | 'draft_ready';
+  catalogVideo?: DynamicPublishedStory;
+  queueRecord?: PendingStoryRecord;
+  message: string;
+  isPublished: boolean;
 }
 
 interface PublishPackage {
@@ -68,7 +74,7 @@ interface PublishPackage {
   thumbnailPrompt: string;
   tiktokCaption: string;
   episodicBridge: string;
-  scenes?: StorySceneBrief[];
+  scenes?: StoryScene[];
 }
 
 interface AiChatDraft {
@@ -90,8 +96,228 @@ interface AiChatDraft {
   episodicBridge: string;
 }
 
+/**
+ * Robust verification helper to check if a scheduled post is:
+ * 1. Already published in the 58-video IT Cafeteria catalog or dynamically published library
+ * 2. In the active Pending Queue
+ * 3. Or a draft/upcoming story
+ */
+export function verifyPostStoryStatus(post: ScheduledPost): VerificationInfo {
+  const publishedCatalog = getAllPublishedVideos();
+  const cleanPostTitle = post.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const catalogMatch = publishedCatalog.find((v) => {
+    const cleanVTitle = v.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return cleanPostTitle.includes(cleanVTitle) || cleanVTitle.includes(cleanPostTitle);
+  });
+
+  if (catalogMatch || post.status === 'published') {
+    return {
+      status: 'already_published',
+      catalogVideo: catalogMatch,
+      isPublished: true,
+      message: catalogMatch
+        ? `✓ تصدیق شدہ: یہ ویڈیو پہلے ہی IT Cafeteria کیٹلاگ میں بطور Video #${catalogMatch.id} (${catalogMatch.published || 'Published'}) پبلش ہو چکی ہے!`
+        : `✓ تصدیق شدہ: یہ ویڈیو IT Cafeteria پبلشڈ لائبریری میں مارک ہو چکی ہے۔`
+    };
+  }
+
+  const queue = loadPendingQueue();
+  const queueMatch = queue.find(
+    (q) => q.id === post.id || q.title.toLowerCase().trim() === post.title.toLowerCase().trim()
+  );
+
+  if (queueMatch) {
+    const isPub = queueMatch.status === 'published';
+    return {
+      status: isPub ? 'already_published' : 'pending_queue',
+      queueRecord: queueMatch,
+      isPublished: isPub,
+      message: isPub
+        ? `✓ تصدیق شدہ: پینڈنگ کیو میں پبلش ہو چکی ہے اور لائبریری میں سنک ہے۔`
+        : `⏰ تصدیق شدہ: ایکٹو پینڈنگ کیو میں موجود ہے، ٹارگٹ ٹائم: ${queueMatch.scheduledTime} (${queueMatch.scheduledDate})`
+    };
+  }
+
+  return {
+    status: 'draft_ready',
+    isPublished: false,
+    message: `📝 تصدیق شدہ: ڈرافٹ / شیڈول پوسٹ۔ مکمل 10 سینز پر مشتمل اسکرپٹ تصدیق اور پبلشنگ کے لیے تیار ہے۔`
+  };
+}
+
+/**
+ * Synthesizes or retrieves a full 10-Scene Story Package for any scheduled post.
+ */
+export function createFull10SceneStoryPackage(
+  post: ScheduledPost,
+  verification?: VerificationInfo
+): GeneratedStory {
+  // If post already has a package, prefer it
+  if (post.storyPackage && post.storyPackage.scenes && post.storyPackage.scenes.length >= 6) {
+    return post.storyPackage;
+  }
+
+  // If matched in pending queue, use queue package
+  if (verification?.queueRecord?.storyPackage && verification.queueRecord.storyPackage.scenes?.length) {
+    return verification.queueRecord.storyPackage;
+  }
+
+  // If matched in catalog and has dynamic storyPackage, use it
+  if (verification?.catalogVideo?.storyPackage && verification.catalogVideo.storyPackage.scenes?.length) {
+    return verification.catalogVideo.storyPackage;
+  }
+
+  const presenter = 'Waqar Majeed';
+  const charTag = '@WM25-1';
+  const categoryName = post.category || 'AI Chatbots, Workflows & Tools';
+  const title = `${post.title} #shorts #itcafeteria #techtips`;
+  const hook = `Kya aap jante hain ke ${post.title} aapka ghanton ka waqt bacha sakta hai?`;
+
+  const scenes: StoryScene[] = [
+    {
+      num: 1,
+      duration: '0-10s',
+      purpose: 'Disruptive Hook',
+      isCTA: false,
+      words: 22,
+      visual: `Dramatic crash zoom-in onto ${presenter} wearing casual studio blazer at cyber workstation with floating glowing holographic headline.`,
+      dialogue: `Kya aap jante hain ke ${post.title} aapka ghanton ka waqt bacha sakta hai? Yeh secret trick har kisi ko pata honi chahiye!`,
+      script: `As a cinematic director, visualize this scene with a dynamic crash zoom-in, dramatic cyber-studio rim lighting, and a high-tech glowing holographic headline floating in 3D space.\n[PRESENTER & ACTION]: ${charTag} points forward with urgent authority.\nDuration: 0-10s.\nAudio Dialogue: "Kya aap jante hain ke ${post.title} aapka ghanton ka waqt bacha sakta hai? Yeh secret trick har kisi ko pata honi chahiye!"`
+    },
+    {
+      num: 2,
+      duration: '10-20s',
+      purpose: 'Problem Agitate',
+      isCTA: false,
+      words: 24,
+      visual: `Low-angle shot showing traditional slow, manual workflow on monitor screen with huge red error cross mark and spinning loading bar.`,
+      dialogue: `Aksar log is kaam ke liye ghanton manual mehnat karte hain aur third-party fake apps install kar ke apna system slow kar lete hain.`,
+      script: `As a cinematic director, visualize this scene with a low-angle dutch-tilt camera movement, subtle lens flare, and animated glitch alert diagnostics on transparent glass screens.\n[PRESENTER & ACTION]: ${charTag} shakes head showing frustration at the slow screen.\nDuration: 0-10s.\nAudio Dialogue: "Aksar log is kaam ke liye ghanton manual mehnat karte hain aur third-party fake apps install kar ke apna system slow kar lete hain."`
+    },
+    {
+      num: 3,
+      duration: '20-30s',
+      purpose: 'Secret Hack Reveal',
+      isCTA: false,
+      words: 23,
+      visual: `Over-the-shoulder shot panning across dual 4K monitors revealing the secret built-in settings toggle with vivid neon cyan border.`,
+      dialogue: `Lekin aaj mein aapko ek aisi hidden command aur built-in feature dikhaunga jo bina kisi software ke sirf ek click mein kaam karta hai!`,
+      script: `As a cinematic director, visualize this scene with an over-the-shoulder right-angle panning shot, crisp depth-of-field focusing on live tactile workstation controls and interactive floating UI widgets.\n[PRESENTER & ACTION]: ${charTag} snaps fingers and taps the command terminal.\nDuration: 0-10s.\nAudio Dialogue: "Lekin aaj mein aapko ek aisi hidden command aur built-in feature dikhaunga jo bina kisi software ke sirf ek click mein kaam karta hai!"`
+    },
+    {
+      num: 4,
+      duration: '30-40s',
+      purpose: 'Step 1 Live Demo',
+      isCTA: false,
+      words: 21,
+      visual: `Smooth dolly track-in focusing on keyboard shortcut execution with keyboard lighting reacting to keypress.`,
+      dialogue: `Pehla step: Apne system mein yeh key combination dabayein aur is feature ko enable karein jese screen par dikhaya ja raha hai.`,
+      script: `As a cinematic director, visualize this scene with a smooth dolly track-in, hyper-detailed volumetric neon lighting, and high-contrast dual-tone cyber accents.\n[PRESENTER & ACTION]: ${charTag} gestures toward the shortcut key combination.\nDuration: 0-10s.\nAudio Dialogue: "Pehla step: Apne system mein yeh key combination dabayein aur is feature ko enable karein jese screen par dikhaya ja raha hai."`
+    },
+    {
+      num: 5,
+      duration: '40-50s',
+      purpose: 'Step 2 Execution',
+      isCTA: false,
+      words: 25,
+      visual: `Wide establishing screen capture showing instant background task execution and automated workflow completing in 2 seconds flat.`,
+      dialogue: `Doosra step: Yeh specific parameter set karein aur Run dabayein. Dekhein background ke saare temporary files aur junk khud ba khud gayab ho gaye!`,
+      script: `As a cinematic director, visualize this scene with a wide establishing panoramic angle, fluid particle simulations, and vivid cyan-emerald data visualizations in motion.\n[PRESENTER & ACTION]: ${charTag} points to the 100% completion progress bar.\nDuration: 0-10s.\nAudio Dialogue: "Doosra step: Yeh specific parameter set karein aur Run dabayein. Dekhein background ke saare temporary files aur junk khud ba khud gayab ho gaye!"`
+    },
+    {
+      num: 6,
+      duration: '50-60s',
+      purpose: 'Instant Proof & Benchmark',
+      isCTA: false,
+      words: 22,
+      visual: `Medium-close split comparison displaying 'Before' vs 'After' performance metrics with green checkmarks and speed-up meters.`,
+      dialogue: `Yeh dekhein live proof! Jo kaam pehle 15 minute leta tha ab sirf 3 second mein khatam ho gaya. System ki speed 2x boost!`,
+      script: `As a cinematic director, visualize this scene with an intimate medium-close shot, shallow depth-of-field, and crisp focal transition revealing hidden workflow mechanics.\n[PRESENTER & ACTION]: ${charTag} shows thumbs up with genuine excitement.\nDuration: 0-10s.\nAudio Dialogue: "Yeh dekhein live proof! Jo kaam pehle 15 minute leta tha ab sirf 3 second mein khatam ho gaya. System ki speed 2x boost!"`
+    },
+    {
+      num: 7,
+      duration: '60-70s',
+      purpose: 'Advanced Secret / Pro Tip',
+      isCTA: false,
+      words: 24,
+      visual: `Orbital camera sweep around workstation, holographic callout showing automated scheduling recurring trigger.`,
+      dialogue: `Pro Tip: Agar aap rozana isko run nahi karna chahte toh iska automated schedule trigger on kar lein, yeh har shaam khud chalega.`,
+      script: `As a cinematic director, visualize this scene with an orbital camera sweep, 8K octane render clarity, and vibrant 3D holographic wireframes revolving around the anchor.\n[PRESENTER & ACTION]: ${charTag} points to the automatic schedule timer.\nDuration: 0-10s.\nAudio Dialogue: "Pro Tip: Agar aap rozana isko run nahi karna chahte toh iska automated schedule trigger on kar lein, yeh har shaam khud chalega."`
+    },
+    {
+      num: 8,
+      duration: '70-80s',
+      purpose: 'Common Mistake Warning',
+      isCTA: false,
+      words: 23,
+      visual: `Rapid rack focus from presenter to futuristic glass terminal screen displaying critical mistake prevention yellow warning icon.`,
+      dialogue: `Ek ghalati kabhi mat karna: Fake optimization cleaner apps bilkul install na karein, sirf yeh official certified method use karein!`,
+      script: `As a cinematic director, visualize this scene with a rapid rack focus from presenter to futuristic glass terminal screen, highlighting actionable step-by-step milestones.\n[PRESENTER & ACTION]: ${charTag} raises finger giving cautionary advice to audience.\nDuration: 0-10s.\nAudio Dialogue: "Ek ghalati kabhi mat karna: Fake optimization cleaner apps bilkul install na karein, sirf yeh official certified method use karein!"`
+    },
+    {
+      num: 9,
+      duration: '80-90s',
+      purpose: 'Viewer Question & Engagement',
+      isCTA: false,
+      words: 21,
+      visual: `Center-framed push-in with floating glowing comment bubble icon and interactive question prompt text.`,
+      dialogue: `Kya aapko yeh shortcut pehle pata tha? Aur aapke computer par isse kitna farq para? Mujhe comments mein zaroor batayein!`,
+      script: `As a cinematic director, visualize this scene with a confident center-framed steady-cam push-in, rich cinematic bokeh in the background, and glowing warning/takeaway callouts.\n[PRESENTER & ACTION]: ${charTag} looks directly into lens, engaging viewer conversationally.\nDuration: 0-10s.\nAudio Dialogue: "Kya aapko yeh shortcut pehle pata tha? Aur aapke computer par isse kitna farq para? Mujhe comments mein zaroor batayein!"`
+    },
+    {
+      num: 10,
+      duration: '90-100s',
+      purpose: 'CTA & Loop Outro',
+      isCTA: true,
+      words: 22,
+      visual: `Impactful slow push-in, cinematic warm bokeh, animated 3D subscriber bell ringing, and next episode episodic bridge banner.`,
+      dialogue: `Aisi mazeed powerful tech tricks ke liye IT Cafeteria ko abhi follow karein aur yeh video apne doston ke sath share karein!`,
+      script: `As a cinematic director, visualize this scene with an impactful center-frame slow push-in, cinematic warm bokeh, and an animated 3D subscriber bell & milestone badge with clear visual punch.\n[PRESENTER & ACTION]: ${charTag} smiles and taps the animated subscriber button.\nDuration: 0-10s.\nAudio Dialogue: "Aisi mazeed powerful tech tricks ke liye IT Cafeteria ko abhi follow karein aur yeh video apne doston ke sath share karein!"`
+    }
+  ];
+
+  return {
+    title,
+    hook,
+    channelName: 'IT Cafeteria',
+    presenter,
+    categoryName,
+    playlist: categoryName,
+    characterTag: charTag,
+    dateLabel: `${post.date} • ${post.scheduledTime}`,
+    sceneCount: 10,
+    scenes,
+    hashtags: ['#shorts', '#itcafeteria', '#pakistantech', '#waqarmajeed', '#techtips', '#productivity'],
+    description: `Dekhein ${post.title}.\nGhanton ka kaam ab seconds mein!\n\nPresenter: ${presenter} (${charTag})\nCategory: ${categoryName}\nScheduled: ${post.date} @ ${post.scheduledTime}\n\nHar roz aisi hi nayi tech updates aur secret workflows ke liye IT Cafeteria ko subscribe karein!\n#itcafeteria #shorts #pakistanitech #waqarmajeed #techtricks`,
+    tags: [
+      'itcafeteria', 'shorts', 'pakistan tech', 'waqar majeed', 'tech tricks',
+      'productivity hacks', 'urdu tech tutorials', post.category.toLowerCase()
+    ],
+    tiktokCaption: `Wait till you see this secret trick! 🔥 ${post.title} #itcafeteria #techtok #pakistan #shorts`,
+    thumbnailHeadline: post.title.slice(0, 18).toUpperCase(),
+    thumbnailSubBadge: '100% WORKING FIX',
+    thumbnailLine1: post.title.slice(0, 14).toUpperCase(),
+    thumbnailLine2: 'HIDDEN TRICK',
+    thumbnailHologram: 'VERIFIED WORKFLOW',
+    thumbnailPrompt: `Professional vertical 9:16 YouTube Shorts thumbnail cover, futuristic cyber dark navy theme (#070a13), 3D embossed yellow bold text "${post.title.slice(0, 18).toUpperCase()}", neon cyan glow edges, crisp 8k render, no blurry text, high CTR visual badge`,
+    seriesPlan: `Part 2 releasing tomorrow at 6:00 PM PKT! Next episode will cover automated batch processing.`,
+    memoryBlock: `Content Calendar: ${post.title} scheduled for ${post.date}.`,
+    idea: {
+      title: post.title,
+      hook,
+      angle: categoryName,
+      points: post.reason || 'High-retention practical tech workflow tutorial'
+    },
+    discussionNotes: `Verified from IT Cafeteria Master Content Calendar.`
+  };
+}
+
 export const ContentCalendar: React.FC = () => {
   const [selectedSlotTime, setSelectedSlotTime] = useState<string>('6:00 PM PKT');
+  const [calendarViewMode, setCalendarViewMode] = useState<'list' | 'grid'>('list');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'scheduled' | 'published' | 'draft'>('all');
+
   const DEFAULT_POSTS: ScheduledPost[] = [
     {
       id: 'sp-1',
@@ -102,7 +328,8 @@ export const ContentCalendar: React.FC = () => {
       date: '18 Oct 2026',
       status: 'published',
       platform: 'YouTube + TikTok',
-      reason: 'Published on peak weekend tech engagement slot'
+      reason: 'Published on peak weekend tech engagement slot (Catalog Video #6)',
+      catalogVideoId: 6
     },
     {
       id: 'sp-2',
@@ -113,7 +340,8 @@ export const ContentCalendar: React.FC = () => {
       date: '16 Oct 2026',
       status: 'published',
       platform: 'YouTube + TikTok',
-      reason: 'Captured 60 views in first 48 hours realtime'
+      reason: 'Captured 60 views in first 48 hours realtime (Catalog Video #1)',
+      catalogVideoId: 1
     },
     {
       id: 'sp-3',
@@ -167,6 +395,41 @@ export const ContentCalendar: React.FC = () => {
     } catch {}
   }, [scheduledPosts]);
 
+  // Sync scheduled posts with pendingQueueStore to ensure live synchronization
+  const syncWithPendingQueue = () => {
+    try {
+      const queue = loadPendingQueue();
+      const existingIds = new Set(scheduledPosts.map(p => p.id));
+      const newItems: ScheduledPost[] = [];
+
+      queue.forEach(item => {
+        if (!existingIds.has(item.id)) {
+          newItems.push({
+            id: item.id,
+            title: item.title,
+            category: item.category,
+            categoryNumber: item.categoryId || 4,
+            scheduledTime: item.scheduledTime || '6:00 PM PKT',
+            date: item.scheduledDate || '26 Oct 2026',
+            status: item.status === 'published' ? 'published' : item.status === 'draft' ? 'draft' : 'scheduled',
+            platform: 'YouTube + TikTok',
+            reason: item.targetSlotReason || 'Imported from Pending Queue',
+            storyPackage: item.storyPackage
+          });
+        }
+      });
+
+      if (newItems.length > 0) {
+        setScheduledPosts(prev => [...newItems, ...prev]);
+        showToast(`✓ Synced ${newItems.length} stories from Pending Queue into Calendar!`);
+      } else {
+        showToast(`✓ Calendar is already synced with live queue.`);
+      }
+    } catch (e) {
+      console.warn('Queue sync error:', e);
+    }
+  };
+
   // Optimal Slots Definition based on IT Cafeteria's real analytics
   const optimalSlots = [
     {
@@ -207,9 +470,16 @@ export const ContentCalendar: React.FC = () => {
   const [newPostTitle, setNewPostTitle] = useState('');
   const [newPostCategory, setNewPostCategory] = useState('PC & Windows Hacks');
   const [newPostTime, setNewPostTime] = useState('6:00 PM PKT');
-  const [newPostDate, setNewPostDate] = useState('25 Oct 2026');
+  const [newPostDate, setNewPostDate] = useState('26 Oct 2026');
 
-  // Quick Publish Automation Suite State
+  // Dedicated Open Story Verification Modal State
+  const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
+  const [activeStoryPost, setActiveStoryPost] = useState<ScheduledPost | null>(null);
+  const [activeStoryPackage, setActiveStoryPackage] = useState<GeneratedStory | null>(null);
+  const [activeStoryVerification, setActiveStoryVerification] = useState<VerificationInfo | null>(null);
+  const [storyModalTab, setStoryModalTab] = useState<'script' | 'youtube' | 'thumbnail' | 'tiktok'>('script');
+
+  // Quick Publish Automation Suite State (Secondary specs wizard)
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [activePublishPost, setActivePublishPost] = useState<ScheduledPost | null>(null);
   const [automationStep, setAutomationStep] = useState<number>(0);
@@ -223,11 +493,26 @@ export const ContentCalendar: React.FC = () => {
   const [autoFillFeedback, setAutoFillFeedback] = useState<string | null>(null);
   const [availableDrafts, setAvailableDrafts] = useState<AiChatDraft[]>([]);
 
-  // Load drafts from localStorage and pre-curated AI Script Chatbot sessions
+  const showToast = (msg: string) => {
+    setAutoFillFeedback(msg);
+    setTimeout(() => setAutoFillFeedback(null), 3500);
+  };
+
+  // Body scroll lock effect when story modal or publish modal is open
+  useEffect(() => {
+    if (isStoryModalOpen || isPublishModalOpen) {
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
+      return () => {
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+      };
+    }
+  }, [isStoryModalOpen, isPublishModalOpen]);
+
+  // Load drafts
   const loadDrafts = () => {
     const list: AiChatDraft[] = [];
-
-    // Check localStorage for live saved draft from AiChatbot component
     try {
       const stored = localStorage.getItem('itcafeteria_latest_ai_draft');
       if (stored) {
@@ -257,7 +542,6 @@ export const ContentCalendar: React.FC = () => {
       console.error('Error loading stored draft', e);
     }
 
-    // Curated AI Chatbot High-Yield Script Drafts (aligned with remaining Master List topics)
     list.push(
       {
         id: 'draft-sheets-smartfill',
@@ -294,24 +578,6 @@ export const ContentCalendar: React.FC = () => {
         thumbnailPrompt: 'High-contrast 9:16 vertical YouTube Shorts thumbnail, dark slate-950 cyber background, neon cyan and electric blue borders, 3D yellow extruded text "CLEAN TEMP FILES", glowing Windows logo, ultra-clean design',
         tiktokCaption: 'Make your PC lightning fast in 5 seconds! ⚡ #pc #windows11 #techtips',
         episodicBridge: 'Part 2 mein hum Windows startup apps ko 1-click disable karna seekhein ge!'
-      },
-      {
-        id: 'draft-chatgpt-voice',
-        title: 'ChatGPT Voice Mode Pakistani Accent Trick',
-        category: 'AI & Smart Technology',
-        sourceLabel: 'Chatbot Draft • 104.7% Retention Blueprint',
-        sourceSnippet: 'Scene 1: ChatGPT ab Pakistani Urdu accent ko 100% natural conversational flow mein reply karta hai! Kese enable karein bina kisi special prompt ke...',
-        model: 'gemini-3.8-flash',
-        optimizedTitle: 'ChatGPT Urdu Voice Mode Real Trick! #shorts #itcafeteria #chatgpt',
-        description: 'ChatGPT se Urdu mein real-time baat karein! Latest Voice Mode update ab Pakistani Urdu bolne walon ke accent ko bina kisi rukawat ke samajh raha hai.\n\nDekhein is video mein mukammal tareeqa.\n\n#itcafeteria #chatgpt #urduai #shorts #pakistanitech',
-        tags: ['chatgpt voice', 'urdu voice ai', 'chatgpt update', 'itcafeteria', 'ai in urdu', 'pakistan tech', 'openai'],
-        pinnedComment: 'Aapne ChatGPT Voice Mode test kiya? Kesa laga response? 👇',
-        thumbnailHeadline: 'CHATGPT VOICE URDU',
-        thumbnailSubBadge: '104% RETENTION LOOP',
-        thumbnailAccentColor: 'amber',
-        thumbnailPrompt: 'Vertical 9:16 YouTube Shorts thumbnail cover, futuristic cyber studio backdrop, glowing green sound waves, large bold yellow text "CHATGPT VOICE URDU", high contrast neon lighting, 8k render',
-        tiktokCaption: 'ChatGPT is now speaking fluent Urdu! 🎙️ #chatgpt #ai #pakistan #shorts',
-        episodicBridge: 'Agli episode mein hum dekhein ge ke Gemini Live aur ChatGPT Voice mein kaun behtar hai!'
       }
     );
 
@@ -320,42 +586,58 @@ export const ContentCalendar: React.FC = () => {
 
   useEffect(() => {
     loadDrafts();
-  }, [isPublishModalOpen]);
+  }, [isPublishModalOpen, isStoryModalOpen]);
 
-  // Apply selected draft directly into the Quick Publish modal package
-  const applyDraftToPackage = (draft: AiChatDraft) => {
-    setGeneratedPackage({
-      optimizedTitle: draft.optimizedTitle,
-      description: draft.description,
-      tags: draft.tags,
-      pinnedComment: draft.pinnedComment,
-      thumbnailHeadline: draft.thumbnailHeadline,
-      thumbnailSubBadge: draft.thumbnailSubBadge,
-      thumbnailAccentColor: draft.thumbnailAccentColor,
-      thumbnailPrompt: draft.thumbnailPrompt,
-      tiktokCaption: draft.tiktokCaption,
-      episodicBridge: draft.episodicBridge
-    });
+  /**
+   * Primary action requested by User:
+   * Clicking "Open Story" opens the full story verification modal for any post item.
+   */
+  const handleOpenStory = (post: ScheduledPost) => {
+    const verification = verifyPostStoryStatus(post);
+    const storyPkg = createFull10SceneStoryPackage(post, verification);
 
-    if (activePublishPost) {
-      setActivePublishPost({
-        ...activePublishPost,
-        title: draft.title,
-        category: draft.category
-      });
-    }
-
-    setAutoFillFeedback(`✓ Successfully auto-filled: "${draft.title}"`);
-    setShowDraftSelector(false);
-    setTimeout(() => setAutoFillFeedback(null), 3500);
+    setActiveStoryPost(post);
+    setActiveStoryVerification(verification);
+    setActiveStoryPackage(storyPkg);
+    setStoryModalTab('script');
+    setIsStoryModalOpen(true);
   };
 
-  // Quick auto-fill for the Schedule Next Short sidebar form
-  const handleAutoFillScheduler = (draft: AiChatDraft) => {
-    setNewPostTitle(draft.title);
-    setNewPostCategory(draft.category);
-    setAutoFillFeedback(`✓ Filled "${draft.title}" into scheduler!`);
-    setTimeout(() => setAutoFillFeedback(null), 3000);
+  /**
+   * Mark as published directly from Open Story Verification modal
+   */
+  const handlePublishFromStoryModal = () => {
+    if (!activeStoryPost || !activeStoryPackage) return;
+    const isCurrentlyPublished = activeStoryPost.status === 'published';
+    const newStatus: 'published' | 'scheduled' = isCurrentlyPublished ? 'scheduled' : 'published';
+
+    // 1. Update local post state
+    setScheduledPosts(prev => prev.map(p => 
+      p.id === activeStoryPost.id 
+        ? { ...p, status: newStatus, storyPackage: activeStoryPackage }
+        : p
+    ));
+
+    // 2. Sync to Pending Queue
+    updatePendingStoryStatus(activeStoryPost.id, newStatus === 'published' ? 'published' : 'pending');
+
+    // 3. Sync to Published Videos Library Store
+    if (newStatus === 'published') {
+      publishStoryDirectly(activeStoryPackage, activeStoryPost.id);
+      showToast(`✓ "${activeStoryPost.title.slice(0, 32)}..." Published Library mein verify aur live ho gayi!`);
+    } else {
+      showToast(`"${activeStoryPost.title.slice(0, 32)}..." wapas Scheduled Queue mein shift ho gayi.`);
+    }
+
+    // Refresh active modal state
+    setActiveStoryPost({ ...activeStoryPost, status: newStatus });
+    setActiveStoryVerification(verifyPostStoryStatus({ ...activeStoryPost, status: newStatus }));
+  };
+
+  const copyToClipboard = (text: string, fieldName: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2200);
   };
 
   const handleAddPost = (e: React.FormEvent) => {
@@ -376,250 +658,58 @@ export const ContentCalendar: React.FC = () => {
 
     setScheduledPosts([newPost, ...scheduledPosts]);
     setNewPostTitle('');
+    showToast(`✓ Post "${newPost.title.slice(0, 24)}..." scheduled successfully!`);
   };
 
-  // Body scroll lock effect when publish modal is open
-  useEffect(() => {
-    if (isPublishModalOpen) {
-      document.documentElement.classList.add('modal-open');
-      document.body.classList.add('modal-open');
-      return () => {
-        document.documentElement.classList.remove('modal-open');
-        document.body.classList.remove('modal-open');
-      };
-    }
-  }, [isPublishModalOpen]);
-
-  // Trigger Quick Publish Automation Script / Open Story
-  const triggerQuickPublish = async (
-    targetPost?: ScheduledPost,
-    defaultSubTab: 'story' | 'youtube' | 'thumbnail' | 'tiktok' = 'story'
-  ) => {
-    const postToProcess = targetPost || 
-      scheduledPosts.find(p => p.status === 'scheduled') || 
-      scheduledPosts.find(p => p.status === 'draft') || 
-      scheduledPosts[0];
+  // Secondary Quick Publish Automation Suite Trigger
+  const triggerQuickPublish = async (targetPost?: ScheduledPost) => {
+    const postToProcess = targetPost || scheduledPosts[0];
+    const verification = verifyPostStoryStatus(postToProcess);
+    const storyPkg = createFull10SceneStoryPackage(postToProcess, verification);
 
     setActivePublishPost(postToProcess);
-    setPublishSubTab(defaultSubTab);
+    setPublishSubTab('youtube');
     setIsPublishModalOpen(true);
-    setAutomationLoading(true);
-    setAutomationStep(1);
+    setAutomationLoading(false);
 
-    // 1. Check if this story already exists in Pending Queue or Published Store
-    try {
-      const pendingList = loadPendingQueue();
-      const existingMatch = pendingList.find(
-        (p) => p.id === postToProcess.id || p.title.toLowerCase().trim() === postToProcess.title.toLowerCase().trim()
-      );
-      if (existingMatch && existingMatch.storyPackage?.scenes?.length) {
-        const pkg = existingMatch.storyPackage;
-        setGeneratedPackage({
-          optimizedTitle: pkg.title || `${postToProcess.title} #shorts #itcafeteria`,
-          description: pkg.description || `Dekhein ${postToProcess.title}. IT Cafeteria by Waqar Majeed.`,
-          tags: pkg.tags || ['itcafeteria', 'shorts', 'pakistantech', 'waqarmajeed'],
-          pinnedComment: (pkg as any).pinnedComment || 'Aapko yeh shortcut kaisa laga? Comments mein batayein! 👇',
-          thumbnailHeadline: pkg.thumbnailHeadline || 'HIDDEN TRICK',
-          thumbnailSubBadge: pkg.thumbnailSubBadge || '100% WORKING',
-          thumbnailAccentColor: 'cyan',
-          thumbnailPrompt: pkg.thumbnailPrompt || '',
-          tiktokCaption: pkg.tiktokCaption || '',
-          episodicBridge: pkg.seriesPlan || 'Agle episode mein next pro trick dekhein!',
-          scenes: pkg.scenes.map((s) => ({
-            num: s.num,
-            duration: s.duration,
-            purpose: s.purpose,
-            visual: s.visual,
-            dialogue: s.dialogue,
-            script: s.script
-          }))
-        });
-        setAutomationLoading(false);
-        setAutomationStep(4);
-        return;
-      }
-    } catch (e) {
-      console.warn('Error reading existing story package from queue:', e);
-    }
+    setGeneratedPackage({
+      optimizedTitle: storyPkg.title,
+      description: storyPkg.description,
+      tags: storyPkg.tags,
+      pinnedComment: storyPkg.discussionNotes?.replace('Pinned Comment: ', '') || 'Aapko yeh shortcut kaisa laga? Comment karein! 👇',
+      thumbnailHeadline: storyPkg.thumbnailHeadline || postToProcess.title.slice(0, 18).toUpperCase(),
+      thumbnailSubBadge: storyPkg.thumbnailSubBadge || '100% WORKING',
+      thumbnailAccentColor: 'cyan',
+      thumbnailPrompt: storyPkg.thumbnailPrompt,
+      tiktokCaption: storyPkg.tiktokCaption,
+      episodicBridge: storyPkg.seriesPlan,
+      scenes: storyPkg.scenes
+    });
+  };
 
-    const defaultScenes: StorySceneBrief[] = [
-      {
-        num: 1,
-        duration: '0-10s',
-        purpose: 'Disruptive Hook',
-        visual: 'Dramatic close-up screen recording highlighting the hidden shortcut with warning neon glow.',
-        dialogue: `Kya aap jante hain ke ${postToProcess.title} aapka kitna qeemti waqt bacha sakta hai?`,
-        script: `Attention tech lovers: Kya aap jante hain ke ${postToProcess.title} aapka kitna qeemti waqt bacha sakta hai? Yeh trick har kisi ko pata honi chahiye.`
-      },
-      {
-        num: 2,
-        duration: '10-20s',
-        purpose: 'Problem Analysis',
-        visual: 'Screen demonstrating the slow traditional way with a big red X error mark.',
-        dialogue: 'Aksar log is kaam ke liye ghanton manual mehnat karte hain aur apna system slow kar lete hain.',
-        script: 'Aksar log is kaam ke liye ghanton manual mehnat karte hain aur apna system slow kar lete hain.'
-      },
-      {
-        num: 3,
-        duration: '20-30s',
-        purpose: 'Step 1 Direct Fix',
-        visual: 'Mouse clicks secret option with green highlighted border and zoom in.',
-        dialogue: 'Pehla step: Apne browser ya tool settings mein yeh hidden toggle on karein.',
-        script: 'Pehla step: Apne browser ya tool settings mein yeh hidden toggle on karein.'
-      },
-      {
-        num: 4,
-        duration: '30-40s',
-        purpose: 'Step 2 Execution',
-        visual: 'Fast speed-run demo showing the task getting automated in 3 seconds.',
-        dialogue: 'Doosra step: Yeh shortcut command chalayein aur dekhein sab kuch automatically clean ho gaya.',
-        script: 'Doosra step: Yeh shortcut command chalayein aur dekhein sab kuch automatically clean ho gaya.'
-      },
-      {
-        num: 5,
-        duration: '40-50s',
-        purpose: 'Proof & Results',
-        visual: 'Before vs After comparison screen proving 10x faster execution.',
-        dialogue: 'Yeh trick 100 fisad verified hai aur totally free hai bina kisi third-party tool ke.',
-        script: 'Yeh trick 100 fisad verified hai aur totally free hai bina kisi third-party tool ke.'
-      },
-      {
-        num: 6,
-        duration: '50-60s',
-        purpose: 'CTA & Loop',
-        visual: 'IT Cafeteria subscribe bell animation and Waqar Majeed studio outro.',
-        dialogue: 'Aisi daily tech tricks ke liye IT Cafeteria ko abhi follow karein aur video save kar lein!',
-        script: 'Aisi daily tech tricks ke liye IT Cafeteria ko abhi follow karein aur video save kar lein!'
-      }
-    ];
+  // Filter posts based on tab
+  const filteredPosts = useMemo(() => {
+    if (filterStatus === 'all') return scheduledPosts;
+    return scheduledPosts.filter(p => p.status === filterStatus);
+  }, [scheduledPosts, filterStatus]);
 
-    try {
-      // Step 1: Analyzing Search & Keywords
-      await new Promise(r => setTimeout(r, 300));
-      setAutomationStep(2);
-
-      // Step 2: Call Gemini Quick Publish API
-      const response = await fetch('/api/ai/quick-publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: postToProcess.title,
-          category: postToProcess.category,
-          scheduledTime: postToProcess.scheduledTime,
-          date: postToProcess.date,
-          platform: postToProcess.platform
-        })
+  // Calendar days generation for October 2026 grid view
+  const calendarDays = useMemo(() => {
+    const days: { day: number; dateStr: string; posts: ScheduledPost[] }[] = [];
+    for (let d = 1; d <= 31; d++) {
+      const dateStr = `${d} Oct 2026`;
+      const postsForDay = scheduledPosts.filter(p => {
+        const cleanDate = p.date.trim();
+        return cleanDate.startsWith(`${d} `) || cleanDate.startsWith(`0${d} `) || cleanDate === dateStr;
       });
-
-      setAutomationStep(3);
-      await new Promise(r => setTimeout(r, 300));
-
-      if (response.ok) {
-        const data = await response.json();
-        setGeneratedPackage({
-          optimizedTitle: data.optimizedTitle || `${postToProcess.title} #shorts #itcafeteria #techtips`,
-          description: data.description || `Dekhein ${postToProcess.title}. Har roz aisi hi nayi tech updates ke liye IT Cafeteria ko follow karein!\n\n#itcafeteria #shorts #pakistanitech`,
-          tags: Array.isArray(data.tags) ? data.tags : ['itcafeteria', 'shorts', 'pakistan tech', 'waqar majeed', 'techtips'],
-          pinnedComment: data.pinnedComment || 'Aapko yeh feature kesa laga? Comments mein zaroor batayein! 👇',
-          thumbnailHeadline: data.thumbnailHeadline || 'WINDOWS 11 TRICK',
-          thumbnailSubBadge: data.thumbnailSubBadge || 'INSTANT FIX',
-          thumbnailAccentColor: (data.thumbnailAccentColor as any) || 'cyan',
-          thumbnailPrompt: data.thumbnailPrompt || `Modern high-tech YouTube Shorts vertical 9:16 thumbnail cover, cyber dark navy background #070a13, neon blue accent glow, bold yellow 3D text "${postToProcess.title.slice(0, 20).toUpperCase()}", ultra-crisp digital interface graphics, clean layout, 8k resolution`,
-          tiktokCaption: data.tiktokCaption || `Mind blowing tech trick! 🔥 #itcafeteria #techtok #pakistan #shorts`,
-          episodicBridge: data.episodicBridge || `Agli episode mein hum is tool ki mazeed advanced settings samjhein ge!`,
-          scenes: defaultScenes
-        });
-      } else {
-        throw new Error('Fallback needed');
-      }
-    } catch {
-      // Instant robust fallback
-      setGeneratedPackage({
-        optimizedTitle: `${postToProcess.title} #shorts #itcafeteria #techtips`,
-        description: `Is video mein dekhein ${postToProcess.title}.\nGhanton ka kaam ab seconds mein!\nChannel ko subscribe karein taake agli episode miss na ho.\n\n#itcafeteria #shorts #pakistanitech #waqarmajeed`,
-        tags: ['itcafeteria', 'shorts', 'pakistan tech', 'waqar majeed', 'tech tricks', 'urdu tech', 'productivity hacks'],
-        pinnedComment: 'Kiya aapko yeh trick pehle maloom thi? Comment zaroor karein! 👇',
-        thumbnailHeadline: postToProcess.title.slice(0, 18).toUpperCase(),
-        thumbnailSubBadge: '5 SECONDS FIX',
-        thumbnailAccentColor: 'cyan',
-        thumbnailPrompt: `Professional vertical 9:16 YouTube Shorts thumbnail cover, futuristic cyber dark theme (#070a13), 3D embossed yellow typography "${postToProcess.title.slice(0, 18).toUpperCase()}", neon cyan glow edges, crisp 8k render, no blurry text`,
-        tiktokCaption: `Wait till you see this! 🔥 #itcafeteria #tech #learnontiktok`,
-        episodicBridge: `Subscribe for Part 2 releasing tomorrow at 6:00 PM PKT!`,
-        scenes: defaultScenes
-      });
-    } finally {
-      setAutomationLoading(false);
-      setAutomationStep(4);
+      days.push({ day: d, dateStr, posts: postsForDay });
     }
-  };
-
-  const copyToClipboard = (text: string, fieldName: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(fieldName);
-    setTimeout(() => setCopiedField(null), 2200);
-  };
-
-  const markAsPublished = () => {
-    if (!activePublishPost) return;
-    const isCurrentlyPublished = activePublishPost.status === 'published';
-    const newStatus: 'published' | 'scheduled' = isCurrentlyPublished ? 'scheduled' : 'published';
-
-    setScheduledPosts(prev => prev.map(p => 
-      p.id === activePublishPost.id 
-        ? { ...p, status: newStatus, reason: newStatus === 'published' ? 'Quick-Published with final metadata & thumbnail package' : 'Reverted to scheduled queue' }
-        : p
-    ));
-
-    // Sync with pendingQueueStore
-    updatePendingStoryStatus(activePublishPost.id, newStatus === 'published' ? 'published' : 'pending');
-
-    // Automatically sync to Published Videos Library
-    if (newStatus === 'published' && generatedPackage) {
-      publishStoryDirectly({
-        title: generatedPackage.optimizedTitle || activePublishPost.title,
-        hook: generatedPackage.description?.slice(0, 90) || activePublishPost.title,
-        channelName: 'IT Cafeteria',
-        presenter: 'Waqar Majeed',
-        categoryName: activePublishPost.category,
-        playlist: activePublishPost.category,
-        characterTag: '@WM25-1',
-        dateLabel: activePublishPost.date,
-        sceneCount: generatedPackage.scenes?.length || 6,
-        hashtags: generatedPackage.tags?.map(t => `#${t.replace(/\s+/g, '')}`) || ['#shorts', '#itcafeteria'],
-        description: generatedPackage.description,
-        tags: generatedPackage.tags,
-        discussionNotes: `Pinned Comment: ${generatedPackage.pinnedComment}`,
-        seriesPlan: generatedPackage.episodicBridge || 'Next episode continuing the tech mastery series.',
-        memoryBlock: `Calendar scheduled post: ${activePublishPost.title}`,
-        idea: {
-          title: activePublishPost.title,
-          hook: generatedPackage.description?.slice(0, 90) || activePublishPost.title,
-          angle: activePublishPost.category,
-          points: 'High retention practical tech workflow tutorial'
-        },
-        tiktokCaption: generatedPackage.tiktokCaption,
-        thumbnailHeadline: generatedPackage.thumbnailHeadline,
-        thumbnailSubBadge: generatedPackage.thumbnailSubBadge,
-        thumbnailPrompt: generatedPackage.thumbnailPrompt,
-        scenes: (generatedPackage.scenes || []).map(s => ({
-          num: s.num,
-          duration: s.duration,
-          purpose: s.purpose,
-          isCTA: s.num === (generatedPackage.scenes?.length || 6),
-          words: s.dialogue?.split(/\s+/).length || 20,
-          visual: s.visual,
-          dialogue: s.dialogue,
-          script: s.script
-        }))
-      }, activePublishPost.id);
-    }
-
-    setActivePublishPost({ ...activePublishPost, status: newStatus });
-  };
+    return days;
+  }, [scheduledPosts]);
 
   return (
     <div className="space-y-6">
-      {/* Top Banner with Quick Publish Action */}
+      {/* Top Banner with Upload Cadence Protocol */}
       <div className="bg-gradient-to-r from-blue-950/60 via-slate-900 to-cyan-950/60 border border-blue-500/30 rounded-2xl p-6 relative overflow-hidden shadow-xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5 relative z-10">
@@ -631,33 +721,45 @@ export const ContentCalendar: React.FC = () => {
               <span className="text-xs text-slate-400">Section 9 Master Schedule Protocol</span>
             </div>
             <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              IT Cafeteria Content Calendar & Optimal Upload Engine
+              IT Cafeteria Content Calendar & Verification Studio
             </h2>
             <p className="text-slate-300 text-sm mt-1 max-w-3xl leading-relaxed">
-              Publishing history track karein aur pichle engagement peaks (India 37.9% + Pakistan 7.0% concurrency, 68.9% mobile traffic, aur TikTok 0am surge) ke mutabiq agle upload ka behtareen waqt pick karein.
+              Tamam scheduled posts ki mukammal kahani (10 scenes, dialogues, Flow directing layer, thumbnail) review karein. Har post ke sath <strong>"Open Story"</strong> button mojood hai taake aap verify kar sakein ke content pehle upload ho chuka hai ya abhi publish karna hai.
             </p>
           </div>
 
-          <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 text-center shrink-0 w-full md:w-auto min-w-[240px] shadow-lg">
+          <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 text-center shrink-0 w-full md:w-auto min-w-[250px] shadow-lg">
             <div className="text-[11px] text-slate-400 font-mono">Next Recommended Upload</div>
             <div className="text-xl font-bold text-cyan-400 mt-0.5">Today • 6:00 PM PKT</div>
             <div className="text-[10px] text-emerald-400 mt-0.5 flex items-center justify-center gap-1 font-medium">
               <Sparkles className="w-3 h-3" /> Prime Viral Overlap Slot
             </div>
 
-            {/* Quick Publish Automation Button */}
-            <button
-              onClick={() => triggerQuickPublish()}
-              className="w-full mt-3 px-3 py-2 bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:opacity-95 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/25 transition-all cursor-pointer transform active:scale-95"
-            >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Quick Publish Next Short</span>
-            </button>
+            <div className="flex items-center gap-2 mt-3">
+              <button
+                onClick={() => {
+                  const target = scheduledPosts.find(p => p.status !== 'published') || scheduledPosts[0];
+                  if (target) handleOpenStory(target);
+                }}
+                className="flex-1 px-3 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/25 transition-all cursor-pointer transform active:scale-95"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Open Next Story</span>
+              </button>
+
+              <button
+                onClick={syncWithPendingQueue}
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs transition-colors cursor-pointer"
+                title="Sync Live Stories from Pending Queue & Catalog"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-cyan-400" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Global Toast for Auto-Fill */}
+      {/* Global Toast for Auto-Fill & Status changes */}
       {autoFillFeedback && (
         <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 flex items-center gap-2 shadow-lg animate-in fade-in slide-in-from-top-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -707,95 +809,243 @@ export const ContentCalendar: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Scheduled Posts Timeline Column */}
         <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-slate-800">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800">
             <div>
-              <h3 className="font-bold text-white text-base">Recent Publishing History & Pipeline</h3>
-              <p className="text-xs text-slate-400">Tracked against the 58-video library and Section 9 daily rotation</p>
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                <span>Recent Publishing History & Pipeline</span>
+                <span className="text-xs text-cyan-400 bg-cyan-950/60 border border-cyan-800/40 px-2 py-0.5 rounded-full font-mono">
+                  {filteredPosts.length} items
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400">Click "Open Story" on any post below to verify full 10 scenes before publishing</p>
             </div>
-            <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="px-2.5 py-1 bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 rounded-lg">
-                Published: {scheduledPosts.filter(p => p.status === 'published').length}
-              </span>
-              <span className="px-2.5 py-1 bg-cyan-950/60 text-cyan-400 border border-cyan-800/40 rounded-lg">
-                Scheduled: {scheduledPosts.filter(p => p.status === 'scheduled').length}
-              </span>
+
+            {/* View Switcher & Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Filter Tabs */}
+              <div className="flex items-center bg-slate-950 rounded-xl p-1 border border-slate-800 text-[11px]">
+                <button
+                  onClick={() => setFilterStatus('all')}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
+                    filterStatus === 'all' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  All ({scheduledPosts.length})
+                </button>
+                <button
+                  onClick={() => setFilterStatus('scheduled')}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
+                    filterStatus === 'scheduled' ? 'bg-cyan-500/20 text-cyan-300 font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  ⏰ Scheduled ({scheduledPosts.filter(p => p.status === 'scheduled').length})
+                </button>
+                <button
+                  onClick={() => setFilterStatus('published')}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
+                    filterStatus === 'published' ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  ✓ Published ({scheduledPosts.filter(p => p.status === 'published').length})
+                </button>
+                <button
+                  onClick={() => setFilterStatus('draft')}
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
+                    filterStatus === 'draft' ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📝 Drafts ({scheduledPosts.filter(p => p.status === 'draft').length})
+                </button>
+              </div>
+
+              {/* View Toggle: List vs Month Grid */}
+              <div className="flex items-center bg-slate-950 rounded-xl p-1 border border-slate-800">
+                <button
+                  onClick={() => setCalendarViewMode('list')}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    calendarViewMode === 'list' ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500 hover:text-white'
+                  }`}
+                  title="List View"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setCalendarViewMode('grid')}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    calendarViewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-500 hover:text-white'
+                  }`}
+                  title="Month Calendar Grid View"
+                >
+                  <Grid className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Posts List with Individual Quick Publish Triggers */}
-          <div className="space-y-3">
-            {scheduledPosts.map((post) => (
-              <div 
-                key={post.id}
-                className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl hover:border-slate-700 transition-colors flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
-              >
-                <div className="space-y-1 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded">
-                      {post.category}
-                    </span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                      post.status === 'published'
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                        : post.status === 'scheduled'
-                        ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                    }`}>
-                      {post.status === 'published' ? '✓ Published' : post.status === 'scheduled' ? '⏰ Scheduled' : '📝 Draft'}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {post.platform}
-                    </span>
+          {/* VIEW MODE 1: TIMELINE LIST VIEW */}
+          {calendarViewMode === 'list' ? (
+            <div className="space-y-3">
+              {filteredPosts.map((post) => {
+                const verification = verifyPostStoryStatus(post);
+
+                return (
+                  <div 
+                    key={post.id}
+                    className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl hover:border-slate-700 transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 group"
+                  >
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded">
+                          {post.category}
+                        </span>
+
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          post.status === 'published'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                            : post.status === 'scheduled'
+                            ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        }`}>
+                          {post.status === 'published' ? '✓ Published' : post.status === 'scheduled' ? '⏰ Scheduled' : '📝 Draft'}
+                        </span>
+
+                        {/* Real-time Verification Badge */}
+                        {verification.status === 'already_published' ? (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700/50 flex items-center gap-1 font-semibold">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                            {verification.catalogVideo ? `Library Video #${verification.catalogVideo.id}` : 'Live in Library'}
+                          </span>
+                        ) : verification.status === 'pending_queue' ? (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-700/50 flex items-center gap-1 font-semibold">
+                            <Clock className="w-3 h-3 text-cyan-400" /> Queue Ready
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-700/50 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-amber-400" /> Script Ready
+                          </span>
+                        )}
+
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {post.platform}
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-white text-xs sm:text-sm tracking-tight">{post.title}</h4>
+                      <p className="text-[11px] text-slate-400">{post.reason}</p>
+                    </div>
+
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800 shrink-0">
+                      <div className="text-right">
+                        <div className="text-xs font-bold text-white font-mono">{post.scheduledTime}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">{post.date}</div>
+                      </div>
+
+                      {/* Post Actions: Prominent Open Story Button + Quick Publish */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* THE REQUIRED OPEN STORY BUTTON */}
+                        <button
+                          onClick={() => handleOpenStory(post)}
+                          className="px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-gradient-to-r from-cyan-950 via-slate-900 to-blue-950 hover:from-cyan-900 hover:to-blue-900 border border-cyan-400/60 text-cyan-300 shadow-md shadow-cyan-950/50 hover:border-cyan-300 hover:text-white"
+                          title="Open full 10-scene story package, scripts & Flow prompts for verification"
+                        >
+                          <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Open Story</span>
+                        </button>
+
+                        {/* Quick Publish / Specs button */}
+                        <button
+                          onClick={() => triggerQuickPublish(post)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                            post.status !== 'published'
+                              ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                          }`}
+                        >
+                          {post.status !== 'published' ? (
+                            <>
+                              <Zap className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                              <span>Quick Publish</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Specs</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* VIEW MODE 2: MONTHLY CALENDAR GRID VIEW */
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs font-mono text-slate-400 pb-1">
+                <span className="font-bold text-white">October 2026 Production Calendar</span>
+                <span>Click "Open Story" on any scheduled day slot to inspect content</span>
+              </div>
 
-                  <h4 className="font-bold text-white text-xs sm:text-sm tracking-tight">{post.title}</h4>
-                  <p className="text-[11px] text-slate-400">{post.reason}</p>
-                </div>
-
-                <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800 shrink-0">
-                  <div className="text-right">
-                    <div className="text-xs font-bold text-white font-mono">{post.scheduledTime}</div>
-                    <div className="text-[11px] text-slate-400 font-mono">{post.date}</div>
-                  </div>
-
-                  {/* Post Actions: Open Story + Quick Publish */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {/* Open Story Button (User requested for all posts in calendar) */}
-                    <button
-                      onClick={() => triggerQuickPublish(post, 'story')}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 shadow-sm hover:border-cyan-300"
-                      title="Open full 10-scene story package, scripts & Flow prompts"
-                    >
-                      <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Open Story</span>
-                    </button>
-
-                    {/* Quick Publish / View button */}
-                    <button
-                      onClick={() => triggerQuickPublish(post, 'youtube')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        post.status !== 'published'
-                          ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[560px] overflow-y-auto pr-1">
+                {calendarDays.map((dayObj) => {
+                  const hasPosts = dayObj.posts.length > 0;
+                  return (
+                    <div
+                      key={dayObj.day}
+                      className={`p-3 rounded-xl border flex flex-col justify-between min-h-[120px] transition-all ${
+                        hasPosts
+                          ? 'bg-slate-950/80 border-cyan-500/40 shadow-sm'
+                          : 'bg-slate-950/30 border-slate-800/60 opacity-70'
                       }`}
                     >
-                      {post.status !== 'published' ? (
-                        <>
-                          <Zap className="w-3.5 h-3.5 text-amber-400 fill-current" />
-                          <span>Quick Publish</span>
-                        </>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded ${
+                          hasPosts ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'text-slate-400'
+                        }`}>
+                          Oct {dayObj.day}
+                        </span>
+                        {hasPosts && (
+                          <span className="text-[10px] text-amber-400 font-mono font-bold">
+                            {dayObj.posts.length} post{dayObj.posts.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+
+                      {hasPosts ? (
+                        <div className="space-y-2 my-auto">
+                          {dayObj.posts.map(p => (
+                            <div key={p.id} className="space-y-1.5 p-2 bg-slate-900 rounded-lg border border-slate-800">
+                              <div className="text-[11px] font-bold text-white line-clamp-1">{p.title}</div>
+                              <div className="flex items-center justify-between gap-1 text-[9px] font-mono text-slate-400">
+                                <span>{p.scheduledTime}</span>
+                                <span className={p.status === 'published' ? 'text-emerald-400' : 'text-cyan-400'}>
+                                  {p.status === 'published' ? '✓ Live' : '⏰ Queued'}
+                                </span>
+                              </div>
+
+                              {/* Open Story button on Calendar Day Slot card */}
+                              <button
+                                onClick={() => handleOpenStory(p)}
+                                className="w-full mt-1 px-2 py-1 bg-cyan-950/90 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 rounded text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-sm"
+                              >
+                                <BookOpen className="w-3 h-3 text-cyan-400" />
+                                <span>Open Story</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       ) : (
-                        <>
-                          <Eye className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Package Specs</span>
-                        </>
+                        <div className="text-[10px] text-slate-600 font-mono text-center my-auto">
+                          Slot Open
+                        </div>
                       )}
-                    </button>
-                  </div>
-                </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Schedule Next Short Form */}
@@ -810,7 +1060,12 @@ export const ContentCalendar: React.FC = () => {
                 {availableDrafts.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => handleAutoFillScheduler(availableDrafts[0])}
+                    onClick={() => {
+                      const d = availableDrafts[0];
+                      setNewPostTitle(d.title);
+                      setNewPostCategory(d.category);
+                      showToast(`✓ Auto-filled draft "${d.title}" into form!`);
+                    }}
                     className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-mono transition-colors cursor-pointer"
                     title="Fill from AI Chatbot Draft"
                   >
@@ -820,7 +1075,7 @@ export const ContentCalendar: React.FC = () => {
                 )}
               </div>
               <p className="text-[11px] text-slate-400">
-                Plan a story into your YouTube Studio scheduling pipeline
+                Plan a story into your YouTube Studio scheduling pipeline with full 10-scene verification
               </p>
             </div>
 
@@ -892,14 +1147,525 @@ export const ContentCalendar: React.FC = () => {
               <Youtube className="w-3.5 h-3.5 text-red-400" /> YouTube Studio Schedule Protocol:
             </span>
             <p className="text-slate-400 leading-relaxed">
-              Upload video as <strong>Schedule</strong> setting time to <strong>6:00 PM</strong>. YouTube backend gets 1-2 hours to process 1080p encoding, captions, and checks before public release.
+              Upload video as <strong>Schedule</strong> setting time to <strong>6:00 PM PKT</strong>. YouTube backend gets 1-2 hours to process 1080p encoding, captions, and copyright checks before public release.
             </p>
           </div>
         </div>
       </div>
 
-      {/* QUICK PUBLISH AUTOMATION MODAL */}
-      {isPublishModalOpen && activePublishPost && typeof document !== 'undefined' ? createPortal(
+      {/* =========================================================================
+          FULL STORY VERIFICATION & INSPECTION MODAL (REQUESTED BY USER)
+          ========================================================================= */}
+      {isStoryModalOpen && activeStoryPost && activeStoryPackage && typeof document !== 'undefined' ? createPortal(
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl shadow-cyan-500/10">
+            {/* Modal Header with Verification Badges */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950 flex justify-between items-start gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/40 rounded-xl shrink-0 mt-0.5">
+                  <BookOpen className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-bold text-white text-base sm:text-lg">
+                      Story Package Verification & Publishing Studio
+                    </h3>
+                    <span className="text-[10px] bg-cyan-950/80 text-cyan-300 border border-cyan-800/50 px-2 py-0.5 rounded-full font-mono font-bold">
+                      10 Scenes • Flow Ready
+                    </span>
+                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono">
+                      {activeStoryPost.scheduledTime} ({activeStoryPost.date})
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1">
+                    Topic: <strong className="text-cyan-300">{activeStoryPost.title}</strong> • Category: {activeStoryPost.category}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsStoryModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* VERIFICATION ALERT BANNER (Directly answers user's need to know if published or unworked) */}
+            <div className="p-3.5 border-b border-slate-800 bg-slate-950/90">
+              {activeStoryVerification?.status === 'already_published' ? (
+                <div className="p-3 bg-emerald-950/60 border border-emerald-500/50 rounded-xl flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <div>
+                      <div className="font-bold text-emerald-300">
+                        {activeStoryVerification.catalogVideo
+                          ? `✓ Already Published in IT Cafeteria Catalog (Video #${activeStoryVerification.catalogVideo.id})`
+                          : `✓ Published in IT Cafeteria Library`}
+                      </div>
+                      <p className="text-[11px] text-emerald-400/90 mt-0.5">
+                        {activeStoryVerification.message}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded bg-emerald-900/60 text-emerald-200 border border-emerald-700/60 text-[10px] font-mono font-bold shrink-0">
+                    LIVE ON YOUTUBE
+                  </span>
+                </div>
+              ) : activeStoryVerification?.status === 'pending_queue' ? (
+                <div className="p-3 bg-cyan-950/60 border border-cyan-500/50 rounded-xl flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <Clock className="w-5 h-5 text-cyan-400 shrink-0" />
+                    <div>
+                      <div className="font-bold text-cyan-300">
+                        ⏰ Active in Pending Upload Queue
+                      </div>
+                      <p className="text-[11px] text-cyan-400/90 mt-0.5">
+                        {activeStoryVerification.message}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded bg-cyan-900/60 text-cyan-200 border border-cyan-700/60 text-[10px] font-mono font-bold shrink-0">
+                    QUEUE VERIFIED
+                  </span>
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-950/60 border border-amber-500/50 rounded-xl flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+                    <div>
+                      <div className="font-bold text-amber-300">
+                        📝 Scheduled Draft — Full Story Generated for Verification
+                      </div>
+                      <p className="text-[11px] text-amber-400/90 mt-0.5">
+                        {activeStoryVerification?.message}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded bg-amber-900/60 text-amber-200 border border-amber-700/60 text-[10px] font-mono font-bold shrink-0">
+                    DRAFT STAGE
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex border-b border-slate-800 bg-slate-950/60 px-5 text-xs font-medium overflow-x-auto">
+              <button
+                onClick={() => setStoryModalTab('script')}
+                className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                  storyModalTab === 'script'
+                    ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10 font-bold'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Film className="w-4 h-4 text-cyan-400" />
+                <span>Story Script (تمام 10 سینز)</span>
+              </button>
+
+              <button
+                onClick={() => setStoryModalTab('youtube')}
+                className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                  storyModalTab === 'youtube'
+                    ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10 font-bold'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Youtube className="w-4 h-4 text-red-400" />
+                <span>YouTube 5-Item Specs</span>
+              </button>
+
+              <button
+                onClick={() => setStoryModalTab('thumbnail')}
+                className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                  storyModalTab === 'thumbnail'
+                    ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10 font-bold'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <ImageIcon className="w-4 h-4 text-amber-400" />
+                <span>9:16 Thumbnail Card & Prompt</span>
+              </button>
+
+              <button
+                onClick={() => setStoryModalTab('tiktok')}
+                className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                  storyModalTab === 'tiktok'
+                    ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10 font-bold'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Video className="w-4 h-4 text-purple-400" />
+                <span>TikTok & Series Bridge</span>
+              </button>
+            </div>
+
+            {/* Modal Body Contents */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* TAB 1: 10 SCENES STORY SCRIPT */}
+              {storyModalTab === 'script' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div>
+                      <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <Film className="w-4 h-4 text-cyan-400" />
+                        Complete Scene-by-Scene Script ({activeStoryPackage.scenes.length} Scenes • Strictly 10s Each)
+                      </span>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Presenter: <strong>{activeStoryPackage.presenter}</strong> ({activeStoryPackage.characterTag}) • Total Duration: {activeStoryPackage.scenes.length * 10}s
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const scenesText = activeStoryPackage.scenes.map(s => 
+                            `Scene ${s.num} — ${s.duration} [${s.purpose}]\nVisual: ${s.visual}\nDialogue: "${s.dialogue}"\nFlow Script:\n${s.script}`
+                          ).join('\n\n');
+                          copyToClipboard(scenesText, 'allScenes');
+                        }}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      >
+                        {copiedField === 'allScenes' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedField === 'allScenes' ? 'Copied All Scenes!' : 'Copy All 10 Scenes'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Scene Cards List */}
+                  <div className="space-y-3">
+                    {activeStoryPackage.scenes.map((scene) => (
+                      <div 
+                        key={scene.num}
+                        className="p-4 bg-slate-950/80 border border-slate-800 hover:border-slate-700 rounded-xl space-y-2.5 transition-all"
+                      >
+                        <div className="flex justify-between items-center text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-cyan-300 px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/40">
+                              Scene {scene.num}
+                            </span>
+                            <span className="font-semibold text-white">
+                              {scene.purpose}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded">
+                              {scene.duration}
+                            </span>
+                            {scene.isCTA && (
+                              <span className="text-[10px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/40 px-1.5 py-0.5 rounded">
+                                CTA Outro
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400">
+                            <span>{scene.words} words</span>
+                            <button
+                              onClick={() => copyToClipboard(`Scene ${scene.num} Flow Script:\n${scene.script}`, `sc-${scene.num}`)}
+                              className="px-2 py-0.5 bg-slate-900 hover:bg-slate-800 text-cyan-400 rounded border border-slate-800 flex items-center gap-1 cursor-pointer"
+                            >
+                              {copiedField === `sc-${scene.num}` ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                              <span>{copiedField === `sc-${scene.num}` ? 'Copied' : 'Copy'}</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Visual Camera Prompt */}
+                        <div className="text-[11px] text-slate-300 space-y-1">
+                          <span className="text-[10px] text-slate-500 uppercase font-mono font-semibold block">Visual & Camera Direction:</span>
+                          <p className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/60 text-slate-300 leading-relaxed">
+                            {scene.visual}
+                          </p>
+                        </div>
+
+                        {/* Spoken Roman Urdu Dialogue */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-cyan-500 uppercase font-mono font-semibold block">Roman Urdu Voiceover:</span>
+                          <div className="p-3 bg-gradient-to-r from-blue-950/30 to-slate-900 rounded-lg border border-cyan-900/40 text-xs text-white font-medium italic leading-relaxed">
+                            "{scene.dialogue}"
+                          </div>
+                        </div>
+
+                        {/* Google Flow Directing Prompt Snippet */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-slate-500 uppercase font-mono font-semibold block">Google Flow Directing Layer:</span>
+                          <div className="p-2.5 bg-slate-900/90 rounded-lg border border-slate-800 text-[11px] text-slate-300 font-mono leading-relaxed whitespace-pre-wrap">
+                            {scene.script}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: YOUTUBE SHORTS PACKAGE */}
+              {storyModalTab === 'youtube' && (
+                <div className="space-y-4">
+                  {/* Title */}
+                  <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-cyan-400 flex items-center gap-1.5 uppercase tracking-wider">
+                        <Tag className="w-3.5 h-3.5" /> 1. Video Title (Hook + Hashtags)
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(activeStoryPackage.title, 'modalTitle')}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono transition-colors cursor-pointer"
+                      >
+                        {copiedField === 'modalTitle' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedField === 'modalTitle' ? 'Copied!' : 'Copy Title'}</span>
+                      </button>
+                    </div>
+                    <div className="text-sm font-semibold text-white bg-slate-900/90 p-3 rounded-lg border border-slate-800">
+                      {activeStoryPackage.title}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-cyan-400 flex items-center gap-1.5 uppercase tracking-wider">
+                        <Layers className="w-3.5 h-3.5" /> 2. High-Retention Description
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(activeStoryPackage.description, 'modalDesc')}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono transition-colors cursor-pointer"
+                      >
+                        {copiedField === 'modalDesc' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedField === 'modalDesc' ? 'Copied!' : 'Copy Description'}</span>
+                      </button>
+                    </div>
+                    <pre className="text-xs text-slate-200 bg-slate-900/90 p-3 rounded-lg border border-slate-800 whitespace-pre-wrap font-sans leading-relaxed">
+                      {activeStoryPackage.description}
+                    </pre>
+                  </div>
+
+                  {/* Search Tags & Pinned Comment */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Tags */}
+                    <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold text-cyan-400 flex items-center gap-1.5 uppercase tracking-wider">
+                          <Tag className="w-3.5 h-3.5" /> 3. Search SEO Tags ({activeStoryPackage.tags.length})
+                        </label>
+                        <button
+                          onClick={() => copyToClipboard(activeStoryPackage.tags.join(', '), 'modalTags')}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] flex items-center gap-1 font-mono cursor-pointer"
+                        >
+                          {copiedField === 'modalTags' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedField === 'modalTags' ? 'Copied CSV' : 'Copy CSV'}</span>
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pt-1">
+                        {activeStoryPackage.tags.map((t, i) => (
+                          <span key={i} className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800/80 text-cyan-300 border border-slate-700">
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Pinned Comment */}
+                    <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-bold text-cyan-400 flex items-center gap-1.5 uppercase tracking-wider">
+                          <MessageSquare className="w-3.5 h-3.5" /> 4. Pinned Engagement Comment
+                        </label>
+                        <button
+                          onClick={() => copyToClipboard(activeStoryPackage.discussionNotes, 'modalPinned')}
+                          className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] flex items-center gap-1 font-mono cursor-pointer"
+                        >
+                          {copiedField === 'modalPinned' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedField === 'modalPinned' ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+                      <div className="text-xs text-slate-300 bg-slate-900/90 p-3 rounded-lg border border-slate-800 leading-relaxed">
+                        {activeStoryPackage.discussionNotes}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: 9:16 VERTICAL THUMBNAIL */}
+              {storyModalTab === 'thumbnail' && (
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+                  {/* Left: Visual 9:16 Card */}
+                  <div className="md:col-span-5 flex flex-col items-center">
+                    <div className="w-full max-w-[240px] aspect-[9/16] bg-slate-950 rounded-2xl border-2 border-cyan-400/50 p-4 flex flex-col justify-between relative overflow-hidden shadow-2xl shadow-cyan-500/20">
+                      <div className="absolute top-0 right-0 w-36 h-36 bg-cyan-500/20 rounded-full blur-2xl pointer-events-none" />
+                      <div className="absolute bottom-0 left-0 w-36 h-36 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
+                      <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-30 pointer-events-none" />
+
+                      <div className="relative z-10 flex justify-between items-center">
+                        <span className="text-[10px] font-black tracking-widest uppercase bg-red-600 text-white px-2 py-0.5 rounded shadow">
+                          SHORTS
+                        </span>
+                        <span className="text-[10px] font-mono text-cyan-400 bg-slate-900/90 border border-cyan-500/40 px-2 py-0.5 rounded font-bold">
+                          IT CAFETERIA
+                        </span>
+                      </div>
+
+                      <div className="relative z-10 text-center my-auto space-y-2">
+                        <div className="inline-block px-2.5 py-1 bg-amber-400 text-slate-950 font-black text-xs uppercase rounded-md tracking-wider shadow-lg transform -rotate-1">
+                          {activeStoryPackage.thumbnailSubBadge || '100% WORKING'}
+                        </div>
+                        <div className="text-xl font-black text-white leading-tight uppercase tracking-tight drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)] border-y border-cyan-500/40 py-2 bg-slate-950/70 backdrop-blur-sm">
+                          {activeStoryPackage.thumbnailHeadline || activeStoryPost.title.slice(0, 18).toUpperCase()}
+                        </div>
+                        <div className="text-[10px] font-mono text-cyan-300 tracking-wide font-bold">
+                          100% FREE • SECONDS MEIN!
+                        </div>
+                      </div>
+
+                      <div className="relative z-10 pt-2 border-t border-slate-800 flex justify-between items-center text-[9px] text-slate-400 font-mono">
+                        <span>WAQAR MAJEED ({activeStoryPackage.characterTag})</span>
+                        <span className="text-amber-400 font-bold">★ 6:00 PM PKT</span>
+                      </div>
+                    </div>
+
+                    <span className="text-[11px] text-slate-400 mt-2 font-mono">
+                      9:16 Aspect Ratio Visual Blueprint
+                    </span>
+                  </div>
+
+                  {/* Right: Nano Banana 2.1 Prompt Spec */}
+                  <div className="md:col-span-7 space-y-4">
+                    <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5" /> Nano Banana 2.1 Prompt (Section 19.1.2)
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(activeStoryPackage.thumbnailPrompt, 'modalThumbPrompt')}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono transition-colors cursor-pointer"
+                        >
+                          {copiedField === 'modalThumbPrompt' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedField === 'modalThumbPrompt' ? 'Copied Prompt' : 'Copy Prompt'}</span>
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-300 bg-slate-900/90 p-3 rounded-lg border border-slate-800 leading-relaxed font-mono whitespace-pre-wrap">
+                        {activeStoryPackage.thumbnailPrompt}
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-blue-950/40 border border-blue-500/30 rounded-xl text-xs text-slate-300 space-y-1">
+                      <div className="font-bold text-cyan-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> High-CTR Contrast Rule
+                      </div>
+                      <p className="text-slate-400 text-[11px] leading-relaxed">
+                        Yellow badge text par black font aur deep cyber navy background (<code className="text-cyan-300">#070a13</code>) mobile screen scroll karte waqt viewer ki attention catch karne ke liye verified hai.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: TIKTOK & REELS */}
+              {storyModalTab === 'tiktok' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-purple-400 flex items-center gap-1.5 uppercase tracking-wider">
+                        <Video className="w-3.5 h-3.5" /> TikTok & Instagram Reels Caption
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(activeStoryPackage.tiktokCaption, 'modalTikTok')}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono transition-colors cursor-pointer"
+                      >
+                        {copiedField === 'modalTikTok' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedField === 'modalTikTok' ? 'Copied!' : 'Copy'}</span>
+                      </button>
+                    </div>
+                    <div className="text-xs text-slate-200 bg-slate-900/90 p-3 rounded-lg border border-slate-800 font-mono leading-relaxed">
+                      {activeStoryPackage.tiktokCaption}
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
+                        <Sparkles className="w-3.5 h-3.5" /> Episodic Bridge (Subscriber Retention Solution)
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(activeStoryPackage.seriesPlan, 'modalBridge')}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono transition-colors cursor-pointer"
+                      >
+                        {copiedField === 'modalBridge' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedField === 'modalBridge' ? 'Copied!' : 'Copy'}</span>
+                      </button>
+                    </div>
+                    <div className="text-xs text-slate-200 bg-slate-900/90 p-3 rounded-lg border border-slate-800 font-sans leading-relaxed">
+                      {activeStoryPackage.seriesPlan}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div className="p-4 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => {
+                    const scenesBlock = activeStoryPackage.scenes.map(s => 
+                      `Scene ${s.num} [${s.purpose}] (${s.duration}):\nVisual: ${s.visual}\nDialogue: "${s.dialogue}"\nFlow Script:\n${s.script}`
+                    ).join('\n\n');
+                    const fullText = `=== IT CAFETERIA FULL STORY PACKAGE ===\nTitle: ${activeStoryPackage.title}\nCategory: ${activeStoryPackage.categoryName}\nPresenter: ${activeStoryPackage.presenter} (${activeStoryPackage.characterTag})\nDate: ${activeStoryPackage.dateLabel}\n\n=== 10 SCENES STORY SCRIPT ===\n\n${scenesBlock}\n\n=== 5-ITEM YOUTUBE UPLOAD PACKAGE ===\n1. TITLE:\n${activeStoryPackage.title}\n\n2. DESCRIPTION:\n${activeStoryPackage.description}\n\n3. TAGS:\n${activeStoryPackage.tags.join(', ')}\n\n4. TIKTOK CAPTION:\n${activeStoryPackage.tiktokCaption}\n\n5. THUMBNAIL PROMPT:\n${activeStoryPackage.thumbnailPrompt}\n\nPINNED COMMENT:\n${activeStoryPackage.discussionNotes}\n\nSERIES PLAN:\n${activeStoryPackage.seriesPlan}`;
+                    copyToClipboard(fullText, 'modalAllPackage');
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:opacity-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                >
+                  {copiedField === 'modalAllPackage' ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedField === 'modalAllPackage' ? 'Full Package Copied!' : 'Copy Full 10-Scene Story Package'}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const scenesBlock = activeStoryPackage.scenes.map(s => 
+                      `Scene ${s.num} [${s.purpose}] (${s.duration}):\nVisual: ${s.visual}\nDialogue: "${s.dialogue}"`
+                    ).join('\n\n');
+                    copyToClipboard(scenesBlock, 'modalScenesShort');
+                  }}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  {copiedField === 'modalScenesShort' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Film className="w-3.5 h-3.5" />}
+                  <span>{copiedField === 'modalScenesShort' ? 'Copied!' : 'Dialogues Only'}</span>
+                </button>
+              </div>
+
+              {/* Direct Publish / Toggle Status Button */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={handlePublishFromStoryModal}
+                  className={`w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
+                    activeStoryPost.status === 'published'
+                      ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-95 text-white shadow-emerald-500/20 ring-2 ring-emerald-400/40'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                  <span>
+                    {activeStoryPost.status === 'published'
+                      ? 'Wapas Scheduled Queue Mein Dalein'
+                      : 'Publish Story Now (پبلش کریں)'}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setIsStoryModalOpen(false)}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      ) : null}
+
+      {/* QUICK PUBLISH AUTOMATION MODAL (Secondary specs wizard) */}
+      {isPublishModalOpen && activePublishPost && generatedPackage && typeof document !== 'undefined' ? createPortal(
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5">
           <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl shadow-cyan-500/10">
             {/* Modal Header */}
@@ -939,418 +1705,141 @@ export const ContentCalendar: React.FC = () => {
               </div>
             </div>
 
-            {/* DRAFT AUTO-FILL SELECTOR DRAWER */}
-            {showDraftSelector && (
-              <div className="p-4 bg-slate-950 border-b border-cyan-500/30 space-y-3">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-cyan-400" />
-                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                      Auto-Fill from AI Script Chatbot Context ({availableDrafts.length} drafts ready)
-                    </h4>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono">Click any draft to auto-populate title, description, & tags</span>
-                </div>
+            {/* Sub Tab Navigation */}
+            <div className="flex border-b border-slate-800 bg-slate-950/60 px-5 text-xs font-medium overflow-x-auto">
+              <button
+                onClick={() => setPublishSubTab('youtube')}
+                className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                  publishSubTab === 'youtube'
+                    ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Youtube className="w-4 h-4 text-red-400" />
+                <span>YouTube Shorts Package</span>
+              </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-                  {availableDrafts.map((draft) => (
-                    <div 
-                      key={draft.id}
-                      className="p-3 bg-slate-900 border border-slate-800 hover:border-cyan-500/50 rounded-xl space-y-1.5 transition-all flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex justify-between items-start gap-1">
-                          <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-800/40">
-                            {draft.category}
-                          </span>
-                          <span className="text-[9px] text-slate-500 font-mono">{draft.model}</span>
-                        </div>
-                        <h5 className="font-bold text-white text-xs mt-1.5 line-clamp-1">{draft.title}</h5>
-                        <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">{draft.sourceSnippet}</p>
-                      </div>
+              <button
+                onClick={() => setPublishSubTab('thumbnail')}
+                className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                  publishSubTab === 'thumbnail'
+                    ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <ImageIcon className="w-4 h-4 text-amber-400" />
+                <span>9:16 Thumbnail & Prompt</span>
+              </button>
 
+              <button
+                onClick={() => setPublishSubTab('tiktok')}
+                className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                  publishSubTab === 'tiktok'
+                    ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Video className="w-4 h-4 text-purple-400" />
+                <span>Cross-Platform & Series Bridge</span>
+              </button>
+            </div>
+
+            {/* SubTab Contents */}
+            <div className="p-5 space-y-5 flex-1 overflow-y-auto">
+              {publishSubTab === 'youtube' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                        1. Video Title
+                      </label>
                       <button
-                        onClick={() => applyDraftToPackage(draft)}
-                        className="w-full mt-2 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        onClick={() => copyToClipboard(generatedPackage.optimizedTitle, 'qTitle')}
+                        className="px-2.5 py-1 bg-slate-800 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono cursor-pointer"
                       >
-                        <Zap className="w-3 h-3 fill-current" /> Auto-Fill Package
+                        {copiedField === 'qTitle' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>Copy</span>
                       </button>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Automation Progress Tracker */}
-            {automationLoading ? (
-              <div className="p-8 text-center space-y-4 my-auto">
-                <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin mx-auto" />
-                <div className="space-y-1">
-                  <div className="font-bold text-white text-sm">
-                    {automationStep === 1 && "Stage 1: Analyzing Category & High-Yield Search Keywords..."}
-                    {automationStep === 2 && "Stage 2: Synthesizing YouTube SEO Package & Series Bridge..."}
-                    {automationStep === 3 && "Stage 3: Rendering High-CTR 9:16 Vertical Thumbnail Card..."}
-                  </div>
-                  <p className="text-xs text-slate-400 font-mono">
-                    Leveraging Gemini 3.8 Flash • Optimizing for Pakistan & India Concurrency
-                  </p>
-                </div>
-              </div>
-            ) : generatedPackage ? (
-              <div className="flex-1 overflow-y-auto flex flex-col">
-                {/* Sub Tab Navigation */}
-                <div className="flex border-b border-slate-800 bg-slate-950/60 px-5 text-xs font-medium overflow-x-auto">
-                  <button
-                    onClick={() => setPublishSubTab('story')}
-                    className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
-                      publishSubTab === 'story'
-                        ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10'
-                        : 'border-transparent text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Film className="w-4 h-4 text-cyan-400" />
-                    <span>Story Script (تمام سینز)</span>
-                  </button>
-
-                  <button
-                    onClick={() => setPublishSubTab('youtube')}
-                    className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
-                      publishSubTab === 'youtube'
-                        ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10'
-                        : 'border-transparent text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Youtube className="w-4 h-4 text-red-400" />
-                    <span>YouTube Shorts Package</span>
-                  </button>
-
-                  <button
-                    onClick={() => setPublishSubTab('thumbnail')}
-                    className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
-                      publishSubTab === 'thumbnail'
-                        ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10'
-                        : 'border-transparent text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <ImageIcon className="w-4 h-4 text-amber-400" />
-                    <span>9:16 Thumbnail & Prompt</span>
-                  </button>
-
-                  <button
-                    onClick={() => setPublishSubTab('tiktok')}
-                    className={`py-3 px-4 border-b-2 flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
-                      publishSubTab === 'tiktok'
-                        ? 'border-cyan-400 text-cyan-400 bg-cyan-500/10'
-                        : 'border-transparent text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <ShareIcon className="w-4 h-4 text-purple-400" />
-                    <span>Cross-Platform & Series Bridge</span>
-                  </button>
-                </div>
-
-                {/* SubTab Contents */}
-                <div className="p-5 space-y-5 flex-1">
-                  {publishSubTab === 'story' && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                        <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                          <Film className="w-3.5 h-3.5 text-cyan-400" />
-                          Complete 6-Scene Story Script (Flow Ready)
-                        </span>
-                        <button
-                          onClick={() => {
-                            const text = (generatedPackage.scenes || []).map(s => `Scene ${s.num} [${s.purpose}] (${s.duration}):\nVisual: ${s.visual}\nDialogue: "${s.dialogue}"\nFlow Script: ${s.script}`).join('\n\n');
-                            copyToClipboard(text, 'scenesOnly');
-                          }}
-                          className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                        >
-                          {copiedField === 'scenesOnly' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{copiedField === 'scenesOnly' ? 'Copied!' : 'Copy Scenes Only'}</span>
-                        </button>
-                      </div>
-
-                      <div className="space-y-2.5 max-h-[50vh] overflow-y-auto pr-1">
-                        {(generatedPackage.scenes || []).map(s => (
-                          <div key={s.num} className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1.5">
-                            <div className="flex justify-between items-center text-xs">
-                              <span className="font-bold text-cyan-300">Scene {s.num} — {s.purpose} ({s.duration})</span>
-                              <span className="text-[10px] text-slate-400 font-mono">Roman Urdu Voiceover</span>
-                            </div>
-                            <p className="text-[11px] text-slate-400 font-sans"><span className="text-slate-500 font-mono">Visual:</span> {s.visual}</p>
-                            <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800/80 text-xs text-slate-200 font-mono leading-relaxed whitespace-pre-wrap">
-                              "{s.script}"
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="text-sm font-semibold text-white bg-slate-900/90 p-3 rounded-lg border border-slate-800">
+                      {generatedPackage.optimizedTitle}
                     </div>
-                  )}
-                  {publishSubTab === 'youtube' && (
-                    <div className="space-y-4">
-                      {/* Title */}
-                      <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
-                        <div className="flex justify-between items-center">
-                          <label className="text-xs font-bold text-cyan-400 flex items-center gap-1.5 uppercase tracking-wider">
-                            <Tag className="w-3.5 h-3.5" /> 1. Video Title (Hook + Hashtags)
-                          </label>
-                          <button
-                            onClick={() => copyToClipboard(generatedPackage.optimizedTitle, 'title')}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono transition-colors cursor-pointer"
-                          >
-                            {copiedField === 'title' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                            <span>{copiedField === 'title' ? 'Copied!' : 'Copy'}</span>
-                          </button>
-                        </div>
-                        <div className="text-sm font-semibold text-white bg-slate-900/90 p-3 rounded-lg border border-slate-800 font-sans">
-                          {generatedPackage.optimizedTitle}
-                        </div>
-                      </div>
-
-                      {/* Description with Series Bridge */}
-                      <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
-                        <div className="flex justify-between items-center">
-                          <label className="text-xs font-bold text-cyan-400 flex items-center gap-1.5 uppercase tracking-wider">
-                            <Layers className="w-3.5 h-3.5" /> 2. Description & Episodic Subscriber Hook
-                          </label>
-                          <button
-                            onClick={() => copyToClipboard(generatedPackage.description, 'description')}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono transition-colors cursor-pointer"
-                          >
-                            {copiedField === 'description' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                            <span>{copiedField === 'description' ? 'Copied!' : 'Copy'}</span>
-                          </button>
-                        </div>
-                        <pre className="text-xs text-slate-200 bg-slate-900/90 p-3 rounded-lg border border-slate-800 whitespace-pre-wrap font-sans leading-relaxed">
-                          {generatedPackage.description}
-                        </pre>
-                      </div>
-
-                      {/* Search Tags & Pinned Comment */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Tags */}
-                        <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
-                          <div className="flex justify-between items-center">
-                            <label className="text-xs font-bold text-cyan-400 flex items-center gap-1.5 uppercase tracking-wider">
-                              <Tag className="w-3.5 h-3.5" /> 3. Search SEO Tags ({generatedPackage.tags.length})
-                            </label>
-                            <button
-                              onClick={() => copyToClipboard(generatedPackage.tags.join(', '), 'tags')}
-                              className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] flex items-center gap-1 font-mono cursor-pointer"
-                            >
-                              {copiedField === 'tags' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                              <span>{copiedField === 'tags' ? 'Copied CSV' : 'Copy CSV'}</span>
-                            </button>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pt-1">
-                            {generatedPackage.tags.map((t, i) => (
-                              <span key={i} className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800/80 text-cyan-300 border border-slate-700">
-                                #{t}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Pinned Comment */}
-                        <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
-                          <div className="flex justify-between items-center">
-                            <label className="text-xs font-bold text-cyan-400 flex items-center gap-1.5 uppercase tracking-wider">
-                              <MessageSquare className="w-3.5 h-3.5" /> 4. Pinned Engagement Comment
-                            </label>
-                            <button
-                              onClick={() => copyToClipboard(generatedPackage.pinnedComment, 'pinned')}
-                              className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] flex items-center gap-1 font-mono cursor-pointer"
-                            >
-                              {copiedField === 'pinned' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                              <span>{copiedField === 'pinned' ? 'Copied' : 'Copy'}</span>
-                            </button>
-                          </div>
-                          <div className="text-xs text-slate-300 bg-slate-900/90 p-3 rounded-lg border border-slate-800 leading-relaxed">
-                            {generatedPackage.pinnedComment}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {publishSubTab === 'thumbnail' && (
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
-                      {/* Left: 9:16 Vertical Thumbnail Preview Card */}
-                      <div className="md:col-span-5 flex flex-col items-center">
-                        <div className="w-full max-w-[240px] aspect-[9/16] bg-slate-950 rounded-2xl border-2 border-cyan-400/50 p-4 flex flex-col justify-between relative overflow-hidden shadow-2xl shadow-cyan-500/20 group">
-                          {/* Ambient glow backgrounds */}
-                          <div className="absolute top-0 right-0 w-36 h-36 bg-cyan-500/20 rounded-full blur-2xl pointer-events-none" />
-                          <div className="absolute bottom-0 left-0 w-36 h-36 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
-                          <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-30 pointer-events-none" />
-
-                          {/* Top Badge */}
-                          <div className="relative z-10 flex justify-between items-center">
-                            <span className="text-[10px] font-black tracking-widest uppercase bg-red-600 text-white px-2 py-0.5 rounded shadow">
-                              SHORTS
-                            </span>
-                            <span className="text-[10px] font-mono text-cyan-400 bg-slate-900/90 border border-cyan-500/40 px-2 py-0.5 rounded font-bold">
-                              IT CAFETERIA
-                            </span>
-                          </div>
-
-                          {/* Center High-Impact Typography Badge */}
-                          <div className="relative z-10 text-center my-auto space-y-2">
-                            <div className="inline-block px-2.5 py-1 bg-amber-400 text-slate-950 font-black text-xs uppercase rounded-md tracking-wider shadow-lg transform -rotate-1">
-                              {generatedPackage.thumbnailSubBadge}
-                            </div>
-                            <div className="text-xl font-black text-white leading-tight uppercase tracking-tight drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)] border-y border-cyan-500/40 py-2 bg-slate-950/70 backdrop-blur-sm">
-                              {generatedPackage.thumbnailHeadline}
-                            </div>
-                            <div className="text-[10px] font-mono text-cyan-300 tracking-wide font-bold">
-                              100% FREE • SECONDS MEIN!
-                            </div>
-                          </div>
-
-                          {/* Bottom Tech Watermark */}
-                          <div className="relative z-10 pt-2 border-t border-slate-800 flex justify-between items-center text-[9px] text-slate-400 font-mono">
-                            <span>WAQAR MAJEED</span>
-                            <span className="text-amber-400 font-bold">★ 6:00 PM PKT</span>
-                          </div>
-                        </div>
-
-                        <span className="text-[11px] text-slate-400 mt-2 font-mono">
-                          9:16 Aspect Ratio Visual Blueprint
-                        </span>
-                      </div>
-
-                      {/* Right: Section 19.1.2 Nano Banana Prompt Spec */}
-                      <div className="md:col-span-7 space-y-4">
-                        <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5" /> Nano Banana 2.1 Prompt (Section 19.1.2)
-                            </span>
-                            <button
-                              onClick={() => copyToClipboard(generatedPackage.thumbnailPrompt, 'thumbPrompt')}
-                              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono transition-colors cursor-pointer"
-                            >
-                              {copiedField === 'thumbPrompt' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                              <span>{copiedField === 'thumbPrompt' ? 'Copied Prompt' : 'Copy Prompt'}</span>
-                            </button>
-                          </div>
-                          <p className="text-xs text-slate-300 bg-slate-900/90 p-3 rounded-lg border border-slate-800 leading-relaxed font-mono whitespace-pre-wrap">
-                            {generatedPackage.thumbnailPrompt}
-                          </p>
-                        </div>
-
-                        <div className="p-3.5 bg-blue-950/40 border border-blue-500/30 rounded-xl text-xs text-slate-300 space-y-1">
-                          <div className="font-bold text-cyan-400 flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> High-CTR Contrast Rule
-                          </div>
-                          <p className="text-slate-400 text-[11px] leading-relaxed">
-                            Yellow badge text par black font aur deep navy background (<code className="text-cyan-300">#070a13</code>) mobile screen scroll karte waqt viewer ki eye-catch karne ke liye algorithm-proven hai.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {publishSubTab === 'tiktok' && (
-                    <div className="space-y-4">
-                      {/* TikTok Cross-Posting Caption */}
-                      <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
-                        <div className="flex justify-between items-center">
-                          <label className="text-xs font-bold text-purple-400 flex items-center gap-1.5 uppercase tracking-wider">
-                            <Video className="w-3.5 h-3.5" /> TikTok & Instagram Reels Caption
-                          </label>
-                          <button
-                            onClick={() => copyToClipboard(generatedPackage.tiktokCaption, 'tiktok')}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono transition-colors cursor-pointer"
-                          >
-                            {copiedField === 'tiktok' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                            <span>{copiedField === 'tiktok' ? 'Copied!' : 'Copy'}</span>
-                          </button>
-                        </div>
-                        <div className="text-xs text-slate-200 bg-slate-900/90 p-3 rounded-lg border border-slate-800 font-mono leading-relaxed">
-                          {generatedPackage.tiktokCaption}
-                        </div>
-                      </div>
-
-                      {/* Episodic Bridge (Solving 0.2% Returning Viewer Leak) */}
-                      <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
-                        <div className="flex justify-between items-center">
-                          <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
-                            <Sparkles className="w-3.5 h-3.5" /> Episodic Bridge (Subscriber Retention Solution)
-                          </label>
-                          <button
-                            onClick={() => copyToClipboard(generatedPackage.episodicBridge, 'bridge')}
-                            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono transition-colors cursor-pointer"
-                          >
-                            {copiedField === 'bridge' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                            <span>{copiedField === 'bridge' ? 'Copied!' : 'Copy'}</span>
-                          </button>
-                        </div>
-                        <div className="text-xs text-slate-200 bg-slate-900/90 p-3 rounded-lg border border-slate-800 font-sans leading-relaxed">
-                          {generatedPackage.episodicBridge}
-                        </div>
-                        <p className="text-[11px] text-slate-400">
-                          Yeh line video ke aakhri 5 seconds aur description ke top par rakhne se returning viewers (0.2%) ki conversion 15-20% barh jati hai.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Modal Footer Controls */}
-                <div className="p-4 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-3">
-                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                    <button
-                      onClick={() => {
-                        const scenesBlock = (generatedPackage.scenes || []).map(s => `Scene ${s.num} [${s.purpose}] (${s.duration}):\nVisual: ${s.visual}\nDialogue: "${s.dialogue}"\nFlow Script: ${s.script}`).join('\n\n');
-                        const fullText = `=== STORY SCRIPT (${generatedPackage.scenes?.length || 6} SCENES) ===\n\n${scenesBlock}\n\n=== 5-ITEM YOUTUBE UPLOAD PACKAGE ===\n\n1. TITLE:\n${generatedPackage.optimizedTitle}\n\n2. DESCRIPTION:\n${generatedPackage.description}\n\n3. TAGS:\n${generatedPackage.tags.join(', ')}\n\n4. TIKTOK CAPTION:\n${generatedPackage.tiktokCaption}\n\n5. THUMBNAIL PROMPT:\n${generatedPackage.thumbnailPrompt}\n\nPINNED COMMENT:\n${generatedPackage.pinnedComment}\n\nEPISODIC BRIDGE:\n${generatedPackage.episodicBridge}`;
-                        copyToClipboard(fullText, 'allPackage');
-                      }}
-                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:opacity-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
-                      title="Copy all 6 scenes, visuals, dialogue, and complete YouTube upload package"
-                    >
-                      {copiedField === 'allPackage' ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedField === 'allPackage' ? 'Full Package Copied!' : 'Copy Full Story Package'}</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        const scenesBlock = (generatedPackage.scenes || []).map(s => `Scene ${s.num} [${s.purpose}] (${s.duration}):\nVisual: ${s.visual}\nDialogue: "${s.dialogue}"\nFlow Script: ${s.script}`).join('\n\n');
-                        copyToClipboard(scenesBlock, 'scenesOnly');
-                      }}
-                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Copy only scene flow scripts and dialogue"
-                    >
-                      {copiedField === 'scenesOnly' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Film className="w-3.5 h-3.5" />}
-                      <span>{copiedField === 'scenesOnly' ? 'Copied!' : 'Scenes Only'}</span>
-                    </button>
-
-                    <button
-                      onClick={() => triggerQuickPublish(activePublishPost)}
-                      className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                      title="Re-run AI Automation"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </button>
                   </div>
 
-                  <button
-                    onClick={markAsPublished}
-                    className={`w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
-                      activePublishPost?.status === 'published'
-                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                        : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:opacity-95 text-white shadow-emerald-500/20 ring-2 ring-emerald-400/40'
-                    }`}
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-white" />
-                    <span>
-                      {activePublishPost?.status === 'published'
-                        ? 'Wapas Pending / Scheduled Karein'
-                        : 'Mark as Published (پبلش ہو چکی ہے)'}
-                    </span>
-                  </button>
+                  <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                        2. Description
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(generatedPackage.description, 'qDesc')}
+                        className="px-2.5 py-1 bg-slate-800 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono cursor-pointer"
+                      >
+                        {copiedField === 'qDesc' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>Copy</span>
+                      </button>
+                    </div>
+                    <pre className="text-xs text-slate-200 bg-slate-900/90 p-3 rounded-lg border border-slate-800 whitespace-pre-wrap font-sans">
+                      {generatedPackage.description}
+                    </pre>
+                  </div>
                 </div>
-              </div>
-            ) : null}
+              )}
+
+              {publishSubTab === 'thumbnail' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                        Nano Banana 2.1 Prompt Spec
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(generatedPackage.thumbnailPrompt, 'qPrompt')}
+                        className="px-2.5 py-1 bg-slate-800 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono cursor-pointer"
+                      >
+                        {copiedField === 'qPrompt' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>Copy Prompt</span>
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-300 bg-slate-900/90 p-3 rounded-lg border border-slate-800 leading-relaxed font-mono whitespace-pre-wrap">
+                      {generatedPackage.thumbnailPrompt}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {publishSubTab === 'tiktok' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-purple-400 uppercase tracking-wider">
+                        TikTok Caption
+                      </label>
+                      <button
+                        onClick={() => copyToClipboard(generatedPackage.tiktokCaption, 'qTiktok')}
+                        className="px-2.5 py-1 bg-slate-800 text-slate-300 rounded text-[11px] flex items-center gap-1 font-mono cursor-pointer"
+                      >
+                        {copiedField === 'qTiktok' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>Copy</span>
+                      </button>
+                    </div>
+                    <div className="text-xs text-slate-200 bg-slate-900/90 p-3 rounded-lg border border-slate-800 font-mono">
+                      {generatedPackage.tiktokCaption}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-end gap-2">
+              <button
+                onClick={() => setIsPublishModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>,
         document.body
@@ -1358,24 +1847,3 @@ export const ContentCalendar: React.FC = () => {
     </div>
   );
 };
-
-// Internal icon helper
-const ShareIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg 
-    viewBox="0 0 24 24" 
-    width="16" 
-    height="16" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    fill="none" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <circle cx="18" cy="5" r="3"></circle>
-    <circle cx="6" cy="12" r="3"></circle>
-    <circle cx="18" cy="19" r="3"></circle>
-    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-  </svg>
-);

@@ -32,6 +32,17 @@ export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+        // Ensure itcafeteria has @WM25-6 in its tags if present in storage
+        if (parsed.itcafeteria && Array.isArray(parsed.itcafeteria.tags)) {
+          const hasWM6 = parsed.itcafeteria.tags.some((t: any) => t.value === '@WM25-6');
+          if (!hasWM6) {
+            parsed.itcafeteria.tags.push({
+              value: '@WM25-6',
+              label: '@WM25-6 (Signature Studio / Black Jacket)'
+            });
+            saveAllChannels(parsed);
+          }
+        }
         return parsed;
       }
     }
@@ -40,6 +51,35 @@ export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
   }
 
   return DEFAULT_CHANNELS;
+}
+
+export function addTagToChannel(channelId: string, newTag: { value: string; label: string; imagePath?: string }) {
+  const current = loadAllChannels();
+  const targetChannel = current[channelId] || DEFAULT_CHANNELS[channelId];
+  if (!targetChannel) return current;
+
+  const existingTags = targetChannel.tags || [];
+  const tagExists = existingTags.some(t => t.value.toLowerCase() === newTag.value.toLowerCase());
+  
+  const updatedTags = tagExists
+    ? existingTags.map(t => t.value.toLowerCase() === newTag.value.toLowerCase() ? newTag : t)
+    : [...existingTags, newTag];
+
+  const updatedChannel: ExtendedChannelProfile = {
+    ...targetChannel,
+    tags: updatedTags
+  };
+
+  const updatedAll = {
+    ...current,
+    [channelId]: updatedChannel
+  };
+
+  saveAllChannels(updatedAll);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('itcafeteria_channels_updated', { detail: updatedAll }));
+  }
+  return updatedAll;
 }
 
 function saveHistoryState(currentChannels: Record<string, ExtendedChannelProfile>) {
