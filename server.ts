@@ -1172,6 +1172,8 @@ STORY RULES (strict)
 6. The story must follow the creator's idea and discussion notes. Do not drift to an unrelated topic.
 7. Title must NOT be the raw topic sentence. Max 65 characters, curiosity + search keyword. Do not reuse excluded titles.
 8. Description: 2-3 Roman Urdu lines + a "PRACTICAL STEPS / COMMANDS:" block with 3-6 concrete steps when the topic is a tech tutorial + a Pinned Comment engagement prompt.
+   - If the video demonstrates or references an AI tool (ChatGPT, Claude, Gemini, Midjourney, Google Flow, etc.), you MUST provide "demoPrompt" containing the exact reusable prompt used in the demonstration so viewers can copy-paste it directly.
+   - If any tools or websites are discussed, list 1-3 direct URLs or tool names in "outsourcedLinks".
 9. THUMBNAIL AGENT v3.45 structured output (server master prompt khud banayega, is liye poora image prompt mat likho):
    - thumbnailLine1 + thumbnailLine2: total 3-5 UPPERCASE words, har line maximum 14 characters. Line 1 white aur line 2 neon-cyan render hogi. Raw topic sentence kabhi nahi.
    - thumbnailSubBanner: 2-4 word punchy yellow-banner hook, Roman Urdu + English mix allowed.
@@ -1189,6 +1191,8 @@ Return STRICT valid JSON only, no markdown fences:
   "thumbnailHologram": "story-specific floating 3D hologram description with energy trails",
   "hashtags": ["${primaryHashtag}", "#Shorts", "#..."],
   "description": "...",
+  "demoPrompt": "exact copy-paste prompt used in ChatGPT / AI tool demonstration (or empty string)",
+  "outsourcedLinks": ["https://... or tool resource links mentioned in tutorial"],
   "tags": ["keyword1", "keyword2", "... 10-14 tags"],
   "tiktokCaption": "...",
   "seriesPlan": "...",
@@ -1348,6 +1352,8 @@ DIALOGUE: "${dialogue}"`;
       tiktokCaption,
       thumbnailPrompt,
       seriesPlan: safeString(data.seriesPlan),
+      demoPrompt: safeString(data.demoPrompt),
+      outsourcedLinks: Array.isArray(data.outsourcedLinks) ? data.outsourcedLinks.map((item: any) => safeString(item)).filter(Boolean) : [],
       scenes,
       modelUsed,
     });

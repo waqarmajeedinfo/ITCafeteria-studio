@@ -563,6 +563,8 @@ export function savePendingQueue(queue: PendingStoryRecord[]): void {
   try {
     if (typeof window !== 'undefined') {
       localStorage.setItem(PENDING_QUEUE_STORAGE_KEY, JSON.stringify(queue));
+      window.dispatchEvent(new CustomEvent('itcafeteria_pending_queue_updated', { detail: queue }));
+      window.dispatchEvent(new CustomEvent('storage'));
     }
   } catch (e) {
     console.error('Error saving pending queue', e);

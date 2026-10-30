@@ -79,6 +79,9 @@ export interface GeneratedStory {
   cinematicDirectingActive?: boolean;
   customCinematicDirection?: string;
   lastRefreshedAt?: string;
+  practicalSteps?: string[];
+  outsourcedLinks?: string[];
+  demoPrompt?: string;
 }
 
 /**
@@ -176,7 +179,10 @@ export function sanitizeStoryPackage(raw: any): GeneratedStory {
     modelUsed: raw.modelUsed ? String(raw.modelUsed) : undefined,
     cinematicDirectingActive: Boolean(raw.cinematicDirectingActive),
     customCinematicDirection: raw.customCinematicDirection ? String(raw.customCinematicDirection) : undefined,
-    lastRefreshedAt: raw.lastRefreshedAt ? String(raw.lastRefreshedAt) : undefined
+    lastRefreshedAt: raw.lastRefreshedAt ? String(raw.lastRefreshedAt) : undefined,
+    practicalSteps: Array.isArray(raw.practicalSteps) ? raw.practicalSteps.map(String).filter(Boolean) : undefined,
+    outsourcedLinks: Array.isArray(raw.outsourcedLinks) ? raw.outsourcedLinks.map(String).filter(Boolean) : undefined,
+    demoPrompt: raw.demoPrompt ? String(raw.demoPrompt) : undefined
   };
 }
 
