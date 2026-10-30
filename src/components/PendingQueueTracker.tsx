@@ -33,7 +33,10 @@ import {
   Wand2,
   Sliders,
   X,
-  Loader2
+  Loader2,
+  Maximize2,
+  Minimize2,
+  ArrowLeft
 } from 'lucide-react';
 
 import {
@@ -44,7 +47,7 @@ import {
   type StoryPublishStatus
 } from '../lib/pendingQueueStore';
 import { StoryPackageView, buildStoryPackageText, type GeneratedStory } from './StoryPackageView';
-import { publishStoryDirectly } from '../lib/publishedLibraryStore';
+import { publishStoryDirectly, LIBRARY_UPDATED_EVENT } from '../lib/publishedLibraryStore';
 import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
 import { CATEGORIES_IT_CAFETERIA } from '../data/channelData';
 import {
@@ -64,10 +67,12 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     const next = getNextTargetStory(loadPendingQueue());
     return next ? next.id : '';
   });
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'overdue' | 'draft' | 'published'>('pending');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'overdue' | 'draft' | 'published'>('all');
+  const [viewMode, setViewMode] = useState<'split' | 'full'>('full');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const storySectionRef = React.useRef<HTMLDivElement>(null);
 
   // Refresh Story & Cinematic Directing Modal State
   const [refreshTargetStory, setRefreshTargetStory] = useState<PendingStoryRecord | null>(null);
@@ -81,6 +86,31 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
   const [newTime, setNewTime] = useState('6:00 PM PKT');
   const [newDate, setNewDate] = useState('Today');
   const [newTag, setNewTag] = useState('WM25-1');
+
+  // Automatic synchronization listener: whenever any story is published across the app, sync instantly!
+  useEffect(() => {
+    const handleSync = () => {
+      setQueue(loadPendingQueue());
+    };
+    window.addEventListener(LIBRARY_UPDATED_EVENT, handleSync);
+    window.addEventListener('itcafeteria_story_published', handleSync);
+    return () => {
+      window.removeEventListener(LIBRARY_UPDATED_EVENT, handleSync);
+      window.removeEventListener('itcafeteria_story_published', handleSync);
+    };
+  }, []);
+
+  // Body scroll lock effect when any modal is open
+  useEffect(() => {
+    if (showAddModal || refreshTargetStory) {
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
+      return () => {
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+      };
+    }
+  }, [showAddModal, refreshTargetStory]);
 
   useEffect(() => {
     savePendingQueue(queue);
@@ -417,42 +447,346 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
         </div>
       </div>
 
-      {/* Main Grid: Left Side Queue List | Right Side Full Story Showcase */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Sequence Queue List (5 Cols on LG) */}
-        <div className="lg:col-span-5 space-y-4">
-          {/* Filter Bar */}
-          <div className="flex items-center justify-between gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-xl flex-wrap">
-            <div className="flex items-center gap-1 overflow-x-auto">
-              {[
-                { id: 'all', label: `All (${queue.length})` },
-                { id: 'pending', label: `Pending (${pendingCount})` },
-                { id: 'overdue', label: `Overdue (${overdueCount})` },
-                { id: 'draft', label: `Drafts (${draftCount})` },
-                { id: 'published', label: `Published (${publishedCount})` },
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setFilterStatus(f.id as any)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    filterStatus === f.id
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
+      {/* Filter Bar & View Mode Toggle */}
+      <div className="flex items-center justify-between gap-2 p-2 bg-slate-900/90 border border-slate-800 rounded-2xl flex-wrap">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {[
+            { id: 'all', label: `All (${queue.length})` },
+            { id: 'pending', label: `Pending (${pendingCount})` },
+            { id: 'overdue', label: `Overdue (${overdueCount})` },
+            { id: 'draft', label: `Drafts (${draftCount})` },
+            { id: 'published', label: `Published (${publishedCount})` },
+          ].map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilterStatus(f.id as any)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                filterStatus === f.id
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1.5 ml-auto">
+          <button
+            onClick={() => setViewMode(viewMode === 'full' ? 'split' : 'full')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border ${
+              viewMode === 'full'
+                ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/50 shadow-md shadow-cyan-950/40'
+                : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
+            }`}
+            title={viewMode === 'full' ? 'Side-by-side split column view par switch karein' : 'Full-Width Story Editor par switch karein'}
+          >
+            {viewMode === 'full' ? (
+              <>
+                <Maximize2 className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Full-Width Story (Active)</span>
+              </>
+            ) : (
+              <>
+                <Minimize2 className="w-3.5 h-3.5 text-slate-400" />
+                <span>Split Columns</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* FULL WIDTH MODE (Default & User Requested: Story Package is Full Width) */}
+      {viewMode === 'full' ? (
+        <div className="space-y-6">
+          {/* Queue Items Row: Responsive Cards Grid */}
+          <div className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800/80 text-xs">
+              <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                Queue Stories List ({filteredQueue.length} items) — Kisi bhi story par click kar ke neeche full-width mein review karein:
+              </span>
+              <span className="text-[11px] text-slate-500 font-mono">
+                Active Selection: <strong className="text-cyan-400">{selectedRecord?.title.slice(0, 32)}...</strong>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-1 custom-modal-scroll">
+              {filteredQueue.map((item, index) => {
+                const isSelected = item.id === selectedStoryId;
+                const isPublished = item.status === 'published';
+                const isOverdue = item.status === 'overdue';
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      setSelectedStoryId(item.id);
+                      setTimeout(() => {
+                        storySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }, 50);
+                    }}
+                    className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between gap-2.5 ${
+                      isSelected
+                        ? 'bg-slate-900/95 border-cyan-400 shadow-lg shadow-cyan-950/40 ring-1 ring-cyan-400/60'
+                        : 'bg-slate-900/50 border-slate-800 hover:bg-slate-900/80 hover:border-slate-700'
+                    }`}
+                  >
+                    <div
+                      className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                        isPublished ? 'bg-emerald-500' : isOverdue ? 'bg-rose-500' : 'bg-cyan-400'
+                      }`}
+                    />
+
+                    <div className="pl-1 space-y-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-mono font-bold text-slate-400">#{index + 1}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                          {item.category}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-indigo-950/60 text-indigo-300 border border-indigo-800/40">
+                          {item.characterTag}
+                        </span>
+                        {isPublished ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 flex items-center gap-1">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> Published
+                          </span>
+                        ) : isOverdue ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-950/60 text-rose-400 border border-rose-800/40">
+                            Overdue
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950/60 text-amber-300 border border-amber-800/40">
+                            Pending
+                          </span>
+                        )}
+                      </div>
+
+                      <h4 className="font-bold text-white text-xs line-clamp-2 mt-1">
+                        {item.title}
+                      </h4>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        {item.scheduledDate} • {item.scheduledTime}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-1 pt-2 border-t border-slate-800/80 text-[11px]" onClick={(e) => e.stopPropagation()}>
+                      {/* Open Story Button (Always visible on each item) */}
+                      <button
+                        onClick={() => {
+                          setSelectedStoryId(item.id);
+                          setTimeout(() => {
+                            storySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }, 50);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-sm hover:border-cyan-300"
+                        title="Is story ko full width mein review aur edit karein"
+                      >
+                        <Eye className="w-3 h-3 text-cyan-400" />
+                        <span>Open Story</span>
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenRefreshModal(item)}
+                          className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                          title="Refresh Story & Directing Layer"
+                        >
+                          <RotateCcw className="w-3 h-3 text-cyan-400" />
+                        </button>
+                        <button
+                          onClick={() => togglePublishStatus(item.id)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer ${
+                            isPublished
+                              ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                          }`}
+                        >
+                          {isPublished ? '✓ Published' : 'Mark Pub'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Queue Items List */}
-          <div className="space-y-3">
+          {/* Full-Width Story Package Editor Container */}
+          <div ref={storySectionRef} className="space-y-4 w-full">
+            {selectedRecord ? (
+              <div className="space-y-4">
+                {/* Status Bar */}
+                <div
+                  className={`p-5 rounded-2xl border backdrop-blur-md relative overflow-hidden shadow-xl ${
+                    selectedRecord.status === 'published'
+                      ? 'bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border-emerald-500/40'
+                      : selectedRecord.status === 'overdue'
+                      ? 'bg-gradient-to-r from-rose-950/60 via-slate-900 to-slate-900 border-rose-500/40'
+                      : 'bg-gradient-to-r from-cyan-950/60 via-slate-900 to-slate-900 border-cyan-500/40'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                            selectedRecord.status === 'published'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                              : selectedRecord.status === 'overdue'
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          }`}
+                        >
+                          {selectedRecord.status === 'published' ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>PUBLISHED (پبلش ہو چکی ہے)</span>
+                            </>
+                          ) : selectedRecord.status === 'overdue' ? (
+                            <>
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              <span>OVERDUE / MISSED (اپلوڈ نہیں ہوئی)</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3.5 h-3.5" />
+                              <span>PENDING PUBLICATION (ابھی تک پبلش نہیں ہوئی)</span>
+                            </>
+                          )}
+                        </span>
+
+                        <span className="text-xs text-slate-400 font-medium font-mono">
+                          Slot: {selectedRecord.scheduledDate} • {selectedRecord.scheduledTime}
+                        </span>
+
+                        <span className="text-xs bg-cyan-950/60 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-800/40 font-mono">
+                          {selectedRecord.characterTag}
+                        </span>
+                      </div>
+
+                      <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-1">
+                        {selectedRecord.title}
+                      </h3>
+
+                      <p className="text-xs text-cyan-300/90 mt-1">
+                        Target Strategy: {selectedRecord.targetSlotReason}
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <button
+                        onClick={() => handleOpenRefreshModal(selectedRecord)}
+                        className="px-3.5 py-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/90 border border-cyan-500/50 text-cyan-300 font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer hover:border-cyan-400"
+                        title="Refresh Story & Apply Cinematic Directing Layer"
+                      >
+                        <Clapperboard className="w-4 h-4 text-cyan-400" />
+                        <span>Refresh Story</span>
+                      </button>
+
+                      <button
+                        onClick={() => togglePublishStatus(selectedRecord.id)}
+                        className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg transition-all cursor-pointer ${
+                          selectedRecord.status === 'published'
+                            ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                            : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/40'
+                        }`}
+                      >
+                        {selectedRecord.status === 'published' ? (
+                          <>
+                            <RotateCcw className="w-4 h-4 text-slate-400" />
+                            <span>Revert to Pending</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="w-4 h-4 text-white" />
+                            <span>Mark as Published</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          const packageText = buildStoryPackageText(selectedRecord.storyPackage);
+                          copyText(packageText, 'full-package');
+                        }}
+                        className="px-3.5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Copy Complete Flow Script & YouTube Package"
+                      >
+                        {copiedKey === 'full-package' ? (
+                          <>
+                            <Check className="w-4 h-4 text-emerald-400" />
+                            <span className="text-emerald-300">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4 text-cyan-400" />
+                            <span>Copy Full Package</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Full-Width StoryPackageView */}
+                <div className="w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-1 overflow-hidden">
+                  <StoryPackageView
+                    story={selectedRecord.storyPackage}
+                    storyId={selectedRecord.id}
+                    publishStatus={selectedRecord.status}
+                    onTogglePublish={() => togglePublishStatus(selectedRecord.id)}
+                    onDeleteStory={() => {
+                      setQueue((prevQueue) => {
+                        const updated = prevQueue.filter((item) => item.id !== selectedRecord.id);
+                        savePendingQueue(updated);
+                        if (selectedStoryId === selectedRecord.id) {
+                          setSelectedStoryId(updated[0]?.id || '');
+                        }
+                        return updated;
+                      });
+                      showToast('Story delete kar di gayi!');
+                    }}
+                    onUpdateStory={(updatedStory: GeneratedStory) => {
+                      setQueue((prevQueue) => {
+                        const updated = prevQueue.map((item) => {
+                          if (item.id === selectedRecord.id) {
+                            return {
+                              ...item,
+                              title: updatedStory.title,
+                              hook: updatedStory.hook,
+                              characterTag: updatedStory.characterTag,
+                              storyPackage: updatedStory,
+                            };
+                          }
+                          return item;
+                        });
+                        savePendingQueue(updated);
+                        return updated;
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center text-slate-400">
+                <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <h3 className="text-lg font-bold text-white">Koi Story Select Nahi Ki Gayi</h3>
+                <p className="text-xs text-slate-400 mt-1">Upar ki list mein kisi bhi story par "Open Story" click karein.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* SPLIT COLUMN VIEW (Side-by-side) */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column: Sequence Queue List (5 Cols on LG) */}
+          <div className="lg:col-span-5 space-y-3">
             {filteredQueue.map((item, index) => {
               const isSelected = item.id === selectedStoryId;
               const isPublished = item.status === 'published';
               const isOverdue = item.status === 'overdue';
-              const isPending = item.status === 'pending';
 
               return (
                 <div
@@ -464,52 +798,26 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                       : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-900 hover:border-slate-700'
                   }`}
                 >
-                  {/* Status Strip on left */}
                   <div
                     className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                      isPublished
-                        ? 'bg-emerald-500'
-                        : isOverdue
-                        ? 'bg-rose-500'
-                        : 'bg-cyan-400'
+                      isPublished ? 'bg-emerald-500' : isOverdue ? 'bg-rose-500' : 'bg-cyan-400'
                     }`}
                   />
 
                   <div className="flex items-start justify-between gap-3 pl-2">
                     <div className="min-w-0 flex-1">
-                      {/* Top Badges */}
                       <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                        <span className="text-[10px] font-mono font-bold text-slate-400">
-                          #{index + 1}
-                        </span>
-
+                        <span className="text-[10px] font-mono font-bold text-slate-400">#{index + 1}</span>
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                           {item.category}
                         </span>
-
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-indigo-950/60 text-indigo-300 border border-indigo-800/40">
                           {item.characterTag}
                         </span>
-
                         {isPublished ? (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Published & Synced
-                            </span>
-                            {onNavigateTab && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onNavigateTab('duplicate');
-                                }}
-                                className="text-[10px] text-cyan-400 hover:text-cyan-200 underline font-semibold cursor-pointer"
-                                title="Published Library mein check karein"
-                              >
-                                View in Library →
-                              </button>
-                            )}
-                          </div>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/40 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Published & Synced
+                          </span>
                         ) : isOverdue ? (
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-950/60 text-rose-400 border border-rose-800/40 flex items-center gap-1 animate-pulse">
                             <AlertTriangle className="w-3 h-3" /> Overdue
@@ -521,12 +829,10 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                         )}
                       </div>
 
-                      {/* Story Title */}
                       <h4 className="font-bold text-white text-sm line-clamp-2 group-hover:text-cyan-300 transition-colors">
                         {item.title}
                       </h4>
 
-                      {/* Scheduled Time info */}
                       <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-2">
                         <Clock className="w-3.5 h-3.5 text-cyan-400" />
                         <span className="text-slate-300 font-medium">
@@ -538,7 +844,18 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      {/* Refresh Story Option */}
+                      <button
+                        onClick={() => {
+                          setSelectedStoryId(item.id);
+                          setViewMode('full');
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold flex items-center gap-1 transition-all shadow-sm hover:border-cyan-300 cursor-pointer"
+                        title="Open Full Width"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Open Story</span>
+                      </button>
+
                       <button
                         onClick={() => handleOpenRefreshModal(item)}
                         className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 text-xs transition-colors cursor-pointer"
@@ -547,7 +864,6 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                         <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
                       </button>
 
-                      {/* Toggle Button: Mark Published / Revert */}
                       <button
                         onClick={() => togglePublishStatus(item.id)}
                         className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-md ${
@@ -555,328 +871,192 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                             ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/30'
                             : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
                         }`}
-                        title={isPublished ? 'Click karein wapas Pending karne ke liye' : 'Click karein Published mark karne ke liye'}
                       >
-                        {isPublished ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Published</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />
-                            <span>Mark Pub</span>
-                          </>
-                        )}
+                        {isPublished ? '✓ Pub' : 'Mark Pub'}
                       </button>
                     </div>
                   </div>
                 </div>
               );
             })}
-
-            {filteredQueue.length === 0 && (
-              <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 text-center text-slate-400">
-                <Clock className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm font-semibold">Is filter mein koi story nahi mili.</p>
-                <p className="text-xs text-slate-500 mt-1">"All" filter select karein ya nayi story draft karein.</p>
-              </div>
-            )}
           </div>
-        </div>
 
-        {/* Right Column: Full Story Package Inspection & Actions (7 Cols on LG) */}
-        <div className="lg:col-span-7 space-y-4">
-          {selectedRecord ? (
-            <div className="space-y-4">
-              {/* Target Story Top Status Header Bar */}
-              <div
-                className={`p-5 rounded-2xl border backdrop-blur-md relative overflow-hidden shadow-xl ${
-                  selectedRecord.status === 'published'
-                    ? 'bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border-emerald-500/40'
-                    : selectedRecord.status === 'overdue'
-                    ? 'bg-gradient-to-r from-rose-950/60 via-slate-900 to-slate-900 border-rose-500/40'
-                    : 'bg-gradient-to-r from-cyan-950/60 via-slate-900 to-slate-900 border-cyan-500/40'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          {/* Right Column: Story Package */}
+          <div className="lg:col-span-7 space-y-4">
+            {selectedRecord ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
                   <div>
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          selectedRecord.status === 'published'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                            : selectedRecord.status === 'overdue'
-                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                        }`}
-                      >
-                        {selectedRecord.status === 'published' ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>PUBLISHED (پبلش ہو چکی ہے)</span>
-                          </>
-                        ) : selectedRecord.status === 'overdue' ? (
-                          <>
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            <span>OVERDUE / MISSED (اپلوڈ نہیں ہوئی)</span>
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>PENDING PUBLICATION (ابھی تک پبلش نہیں ہوئی)</span>
-                          </>
-                        )}
-                      </span>
-
-                      <span className="text-xs text-slate-400 font-medium">
-                        Slot: {selectedRecord.scheduledDate} • {selectedRecord.scheduledTime}
-                      </span>
-                    </div>
-
-                    <h3 className="text-xl font-bold text-white tracking-tight mt-1">
-                      {selectedRecord.title}
-                    </h3>
-
-                    <p className="text-xs text-cyan-300/90 mt-1">
-                      Target Strategy: {selectedRecord.targetSlotReason}
-                    </p>
+                    <h3 className="font-bold text-white text-base truncate max-w-md">{selectedRecord.title}</h3>
+                    <p className="text-xs text-slate-400">{selectedRecord.category} • {selectedRecord.characterTag}</p>
                   </div>
-
-                  {/* Primary Publish Action Buttons */}
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    <button
-                      onClick={() => handleOpenRefreshModal(selectedRecord)}
-                      className="px-3.5 py-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/90 border border-cyan-500/50 text-cyan-300 font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer hover:border-cyan-400 group"
-                      title="Refresh Story & Apply Cinematic Directing Layer"
-                    >
-                      <Clapperboard className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
-                      <span>Refresh Story</span>
-                    </button>
-
-                    <button
-                      onClick={() => togglePublishStatus(selectedRecord.id)}
-                      className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg transition-all cursor-pointer ${
-                        selectedRecord.status === 'published'
-                          ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                          : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/40'
-                      }`}
-                    >
-                      {selectedRecord.status === 'published' ? (
-                        <>
-                          <RotateCcw className="w-4 h-4 text-slate-400" />
-                          <span>Revert to Pending</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-4 h-4 text-white" />
-                          <span>Mark as Published</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        const packageText = buildStoryPackageText(selectedRecord.storyPackage);
-                        copyText(packageText, 'full-package');
-                      }}
-                      className="px-3.5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Copy Complete Flow Script & YouTube Package"
-                    >
-                      {copiedKey === 'full-package' ? (
-                        <>
-                          <Check className="w-4 h-4 text-emerald-400" />
-                          <span className="text-emerald-300">Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4 text-cyan-400" />
-                          <span>Copy Full Package</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setViewMode('full')}
+                    className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer shadow-md"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" /> Full Width
+                  </button>
                 </div>
-
-                {/* Important Publication Policy Warning Notice */}
-                {selectedRecord.status !== 'published' && (
-                  <div className="mt-4 p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-200/90 text-xs flex items-start gap-2.5">
-                    <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-amber-200">
-                        Publication Policy Safeguard:
-                      </p>
-                      <p className="text-[11px] text-amber-300/80 mt-0.5">
-                        Yeh story abhi tak draft/pending haalat mein hai. Jab tak aap isko video bana kar YouTube par upload na kar dein aur yahan "Mark as Published" na karein, tab tak yeh channel ke published records mein count nahi hogi.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Renders the Complete 6-Scene Story Package */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-1 overflow-hidden">
-                <StoryPackageView
-                  story={selectedRecord.storyPackage}
-                  storyId={selectedRecord.id}
-                  publishStatus={selectedRecord.status}
-                  onTogglePublish={() => togglePublishStatus(selectedRecord.id)}
-                  onDeleteStory={() => {
-                    setQueue((prevQueue) => {
-                      const updated = prevQueue.filter((item) => item.id !== selectedRecord.id);
-                      savePendingQueue(updated);
-                      if (selectedStoryId === selectedRecord.id) {
-                        setSelectedStoryId(updated[0]?.id || '');
-                      }
-                      return updated;
-                    });
-                    showToast('Story delete kar di gayi!');
-                  }}
-                  onUpdateStory={(updatedStory: GeneratedStory) => {
-                    setQueue((prevQueue) => {
-                      const updated = prevQueue.map((item) => {
-                        if (item.id === selectedRecord.id) {
-                          return {
-                            ...item,
-                            title: updatedStory.title,
-                            hook: updatedStory.hook,
-                            characterTag: updatedStory.characterTag,
-                            storyPackage: updatedStory,
-                          };
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-1 overflow-hidden">
+                  <StoryPackageView
+                    story={selectedRecord.storyPackage}
+                    storyId={selectedRecord.id}
+                    publishStatus={selectedRecord.status}
+                    onTogglePublish={() => togglePublishStatus(selectedRecord.id)}
+                    onDeleteStory={() => {
+                      setQueue((prevQueue) => {
+                        const updated = prevQueue.filter((item) => item.id !== selectedRecord.id);
+                        savePendingQueue(updated);
+                        if (selectedStoryId === selectedRecord.id) {
+                          setSelectedStoryId(updated[0]?.id || '');
                         }
-                        return item;
+                        return updated;
                       });
-                      savePendingQueue(updated);
-                      return updated;
-                    });
-                  }}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center text-slate-400">
-              <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-white">Koi Story Select Nahi Ki Gayi</h3>
-              <p className="text-xs text-slate-400 mt-1">Left side par kisi bhi pending ya scheduled story par click karein.</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Add New Draft Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-xl w-full flex flex-col overflow-hidden shadow-2xl">
-            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950">
-              <div className="flex items-center gap-2">
-                <Plus className="w-5 h-5 text-cyan-400" />
-                <h3 className="font-bold text-white text-base">Nayi Pending Story Queue Mein Shamil Karein</h3>
-              </div>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-slate-400 hover:text-white p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateDraft} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                  Story Title / Topic:
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Google Sheets Smart Fill AI Shortcut"
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-cyan-400"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Category:</label>
-                  <select
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-cyan-400"
-                  >
-                    {CATEGORIES_IT_CAFETERIA.map((cat) => (
-                      <option key={cat.id} value={cat.name}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Character Tag:</label>
-                  <select
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-cyan-400"
-                  >
-                    <option value="WM25-1">WM25-1 (Desk & Mic Classic)</option>
-                    <option value="WM25-2">WM25-2 (Standing Studio Presentation)</option>
-                    <option value="WM25-3">WM25-3 (Deep Tech Cyber Glow)</option>
-                    <option value="WM25-4">WM25-4 (Podcast Mic Closeup)</option>
-                    <option value="WM25-5">WM25-5 (Neon Outline Holographic)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Scheduled Time:</label>
-                  <select
-                    value={newTime}
-                    onChange={(e) => setNewTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-cyan-400"
-                  >
-                    <option value="6:00 PM PKT">6:00 PM PKT (Prime Viral Peak)</option>
-                    <option value="5:00 PM PKT">5:00 PM PKT (Office / Desktop Slot)</option>
-                    <option value="7:00 PM PKT">7:00 PM PKT (Mobile Leisure Slot)</option>
-                    <option value="11:30 PM PKT">11:30 PM PKT (TikTok Midnight Surge)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">Target Date:</label>
-                  <input
-                    type="text"
-                    value={newDate}
-                    onChange={(e) => setNewDate(e.target.value)}
-                    placeholder="e.g. 29 Oct 2026"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-cyan-400"
+                      showToast('Story delete kar di gayi!');
+                    }}
+                    onUpdateStory={(updatedStory: GeneratedStory) => {
+                      setQueue((prevQueue) => {
+                        const updated = prevQueue.map((item) => {
+                          if (item.id === selectedRecord.id) {
+                            return {
+                              ...item,
+                              title: updatedStory.title,
+                              hook: updatedStory.hook,
+                              characterTag: updatedStory.characterTag,
+                              storyPackage: updatedStory,
+                            };
+                          }
+                          return item;
+                        });
+                        savePendingQueue(updated);
+                        return updated;
+                      });
+                    }}
                   />
                 </div>
               </div>
-
-              <div className="p-3 bg-cyan-950/30 border border-cyan-800/40 rounded-xl text-cyan-200/90 text-[11px]">
-                💡 Nayi story khud-ba-khud 6 Scenes, Roman Urdu dialogue, YouTube description, hashtags aur thumbnail prompt ke sath create ho kar Queue mein top par add ho jayegi.
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-lg shadow-cyan-600/30 cursor-pointer"
-                >
-                  Queue Mein Add Karein
-                </button>
-              </div>
-            </form>
+            ) : null}
           </div>
         </div>
       )}
+
+      {/* Add New Draft Modal (Portaled) */}
+      {showAddModal &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-xl w-full flex flex-col overflow-hidden shadow-2xl">
+              <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                <div className="flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-cyan-400" />
+                  <h3 className="font-bold text-white text-base">Nayi Pending Story Queue Mein Shamil Karein</h3>
+                </div>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="text-slate-400 hover:text-white p-1 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateDraft} className="p-5 space-y-4 text-xs">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                    Story Title / Topic:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Google Sheets Smart Fill AI Shortcut"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Category:</label>
+                    <select
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-cyan-400"
+                    >
+                      {CATEGORIES_IT_CAFETERIA.map((cat) => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Character Tag:</label>
+                    <select
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-cyan-400"
+                    >
+                      <option value="WM25-1">WM25-1 (Desk & Mic Classic)</option>
+                      <option value="WM25-2">WM25-2 (Standing Studio Presentation)</option>
+                      <option value="WM25-3">WM25-3 (Deep Tech Cyber Glow)</option>
+                      <option value="WM25-4">WM25-4 (Podcast Mic Closeup)</option>
+                      <option value="WM25-5">WM25-5 (Neon Outline Holographic)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Scheduled Time:</label>
+                    <select
+                      value={newTime}
+                      onChange={(e) => setNewTime(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-cyan-400"
+                    >
+                      <option value="6:00 PM PKT">6:00 PM PKT (Prime Viral Peak)</option>
+                      <option value="5:00 PM PKT">5:00 PM PKT (Office / Desktop Slot)</option>
+                      <option value="7:00 PM PKT">7:00 PM PKT (Mobile Leisure Slot)</option>
+                      <option value="11:30 PM PKT">11:30 PM PKT (TikTok Midnight Surge)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-300 block mb-1">Target Date:</label>
+                    <input
+                      type="text"
+                      value={newDate}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      placeholder="e.g. 29 Oct 2026"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-cyan-950/30 border border-cyan-800/40 rounded-xl text-cyan-200/90 text-[11px]">
+                  💡 Nayi story khud-ba-khud 6 Scenes, Roman Urdu dialogue, YouTube description, hashtags aur thumbnail prompt ke sath create ho kar Queue mein top par add ho jayegi.
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-lg shadow-cyan-600/30 cursor-pointer"
+                  >
+                    Queue Mein Add Karein
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* Refresh Story & Cinematic Directing Re-analysis Modal */}
       {refreshTargetStory &&

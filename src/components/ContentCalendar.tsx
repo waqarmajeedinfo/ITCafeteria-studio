@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -28,10 +29,12 @@ import {
   Layers,
   Bot,
   FileText,
-  Film
+  Film,
+  BookOpen
 } from 'lucide-react';
 import { PUBLISHED_VIDEOS, CATEGORIES_IT_CAFETERIA } from '../data/channelData';
-import { updatePendingStoryStatus } from '../lib/pendingQueueStore';
+import { updatePendingStoryStatus, loadPendingQueue } from '../lib/pendingQueueStore';
+import { publishStoryDirectly } from '../lib/publishedLibraryStore';
 
 interface ScheduledPost {
   id: string;
@@ -375,17 +378,69 @@ export const ContentCalendar: React.FC = () => {
     setNewPostTitle('');
   };
 
-  // Trigger Quick Publish Automation Script
-  const triggerQuickPublish = async (targetPost?: ScheduledPost) => {
+  // Body scroll lock effect when publish modal is open
+  useEffect(() => {
+    if (isPublishModalOpen) {
+      document.documentElement.classList.add('modal-open');
+      document.body.classList.add('modal-open');
+      return () => {
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+      };
+    }
+  }, [isPublishModalOpen]);
+
+  // Trigger Quick Publish Automation Script / Open Story
+  const triggerQuickPublish = async (
+    targetPost?: ScheduledPost,
+    defaultSubTab: 'story' | 'youtube' | 'thumbnail' | 'tiktok' = 'story'
+  ) => {
     const postToProcess = targetPost || 
       scheduledPosts.find(p => p.status === 'scheduled') || 
       scheduledPosts.find(p => p.status === 'draft') || 
       scheduledPosts[0];
 
     setActivePublishPost(postToProcess);
+    setPublishSubTab(defaultSubTab);
     setIsPublishModalOpen(true);
     setAutomationLoading(true);
     setAutomationStep(1);
+
+    // 1. Check if this story already exists in Pending Queue or Published Store
+    try {
+      const pendingList = loadPendingQueue();
+      const existingMatch = pendingList.find(
+        (p) => p.id === postToProcess.id || p.title.toLowerCase().trim() === postToProcess.title.toLowerCase().trim()
+      );
+      if (existingMatch && existingMatch.storyPackage?.scenes?.length) {
+        const pkg = existingMatch.storyPackage;
+        setGeneratedPackage({
+          optimizedTitle: pkg.title || `${postToProcess.title} #shorts #itcafeteria`,
+          description: pkg.description || `Dekhein ${postToProcess.title}. IT Cafeteria by Waqar Majeed.`,
+          tags: pkg.tags || ['itcafeteria', 'shorts', 'pakistantech', 'waqarmajeed'],
+          pinnedComment: (pkg as any).pinnedComment || 'Aapko yeh shortcut kaisa laga? Comments mein batayein! 👇',
+          thumbnailHeadline: pkg.thumbnailHeadline || 'HIDDEN TRICK',
+          thumbnailSubBadge: pkg.thumbnailSubBadge || '100% WORKING',
+          thumbnailAccentColor: 'cyan',
+          thumbnailPrompt: pkg.thumbnailPrompt || '',
+          tiktokCaption: pkg.tiktokCaption || '',
+          episodicBridge: pkg.seriesPlan || 'Agle episode mein next pro trick dekhein!',
+          scenes: pkg.scenes.map((s) => ({
+            num: s.num,
+            duration: s.duration,
+            purpose: s.purpose,
+            visual: s.visual,
+            dialogue: s.dialogue,
+            script: s.script
+          }))
+        });
+        setAutomationLoading(false);
+        setAutomationStep(4);
+        return;
+      }
+    } catch (e) {
+      console.warn('Error reading existing story package from queue:', e);
+    }
 
     const defaultScenes: StorySceneBrief[] = [
       {
@@ -440,7 +495,7 @@ export const ContentCalendar: React.FC = () => {
 
     try {
       // Step 1: Analyzing Search & Keywords
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 300));
       setAutomationStep(2);
 
       // Step 2: Call Gemini Quick Publish API
@@ -457,7 +512,7 @@ export const ContentCalendar: React.FC = () => {
       });
 
       setAutomationStep(3);
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 300));
 
       if (response.ok) {
         const data = await response.json();
@@ -517,6 +572,47 @@ export const ContentCalendar: React.FC = () => {
 
     // Sync with pendingQueueStore
     updatePendingStoryStatus(activePublishPost.id, newStatus === 'published' ? 'published' : 'pending');
+
+    // Automatically sync to Published Videos Library
+    if (newStatus === 'published' && generatedPackage) {
+      publishStoryDirectly({
+        title: generatedPackage.optimizedTitle || activePublishPost.title,
+        hook: generatedPackage.description?.slice(0, 90) || activePublishPost.title,
+        channelName: 'IT Cafeteria',
+        presenter: 'Waqar Majeed',
+        categoryName: activePublishPost.category,
+        playlist: activePublishPost.category,
+        characterTag: '@WM25-1',
+        dateLabel: activePublishPost.date,
+        sceneCount: generatedPackage.scenes?.length || 6,
+        hashtags: generatedPackage.tags?.map(t => `#${t.replace(/\s+/g, '')}`) || ['#shorts', '#itcafeteria'],
+        description: generatedPackage.description,
+        tags: generatedPackage.tags,
+        discussionNotes: `Pinned Comment: ${generatedPackage.pinnedComment}`,
+        seriesPlan: generatedPackage.episodicBridge || 'Next episode continuing the tech mastery series.',
+        memoryBlock: `Calendar scheduled post: ${activePublishPost.title}`,
+        idea: {
+          title: activePublishPost.title,
+          hook: generatedPackage.description?.slice(0, 90) || activePublishPost.title,
+          angle: activePublishPost.category,
+          points: 'High retention practical tech workflow tutorial'
+        },
+        tiktokCaption: generatedPackage.tiktokCaption,
+        thumbnailHeadline: generatedPackage.thumbnailHeadline,
+        thumbnailSubBadge: generatedPackage.thumbnailSubBadge,
+        thumbnailPrompt: generatedPackage.thumbnailPrompt,
+        scenes: (generatedPackage.scenes || []).map(s => ({
+          num: s.num,
+          duration: s.duration,
+          purpose: s.purpose,
+          isCTA: s.num === (generatedPackage.scenes?.length || 6),
+          words: s.dialogue?.split(/\s+/).length || 20,
+          visual: s.visual,
+          dialogue: s.dialogue,
+          script: s.script
+        }))
+      }, activePublishPost.id);
+    }
 
     setActivePublishPost({ ...activePublishPost, status: newStatus });
   };
@@ -662,27 +758,40 @@ export const ContentCalendar: React.FC = () => {
                     <div className="text-[11px] text-slate-400 font-mono">{post.date}</div>
                   </div>
 
-                  {/* Quick Publish / View button */}
-                  <button
-                    onClick={() => triggerQuickPublish(post)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                      post.status !== 'published'
-                        ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
-                    }`}
-                  >
-                    {post.status !== 'published' ? (
-                      <>
-                        <Zap className="w-3.5 h-3.5 text-amber-400 fill-current" />
-                        <span>Quick Publish</span>
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Package Specs</span>
-                      </>
-                    )}
-                  </button>
+                  {/* Post Actions: Open Story + Quick Publish */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Open Story Button (User requested for all posts in calendar) */}
+                    <button
+                      onClick={() => triggerQuickPublish(post, 'story')}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 shadow-sm hover:border-cyan-300"
+                      title="Open full 10-scene story package, scripts & Flow prompts"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Open Story</span>
+                    </button>
+
+                    {/* Quick Publish / View button */}
+                    <button
+                      onClick={() => triggerQuickPublish(post, 'youtube')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        post.status !== 'published'
+                          ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                      }`}
+                    >
+                      {post.status !== 'published' ? (
+                        <>
+                          <Zap className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                          <span>Quick Publish</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Package Specs</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -790,8 +899,8 @@ export const ContentCalendar: React.FC = () => {
       </div>
 
       {/* QUICK PUBLISH AUTOMATION MODAL */}
-      {isPublishModalOpen && activePublishPost && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+      {isPublishModalOpen && activePublishPost && typeof document !== 'undefined' ? createPortal(
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5">
           <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl shadow-cyan-500/10">
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-950 flex justify-between items-center">
@@ -1243,8 +1352,9 @@ export const ContentCalendar: React.FC = () => {
               </div>
             ) : null}
           </div>
-        </div>
-      )}
+        </div>,
+        document.body
+      ) : null}
     </div>
   );
 };

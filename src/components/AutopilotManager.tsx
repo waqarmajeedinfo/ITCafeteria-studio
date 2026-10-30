@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Cpu,
   Sparkles,
@@ -53,6 +54,7 @@ import {
 import { buildMasterThumbnailPrompt, splitHeadline } from '../lib/thumbnailMaster';
 import { StoryPackageView, buildStoryPackageText, type GeneratedStory, type StoryScene } from './StoryPackageView';
 import { updatePendingStoryStatus, upsertPendingStoryRecord } from '../lib/pendingQueueStore';
+import { getAllPublishedVideos } from '../lib/publishedLibraryStore';
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import { loadSimulatorConfig } from './SimulatorConfigModal';
 import {
@@ -270,10 +272,14 @@ export function createFullAutopilotStoryPackage(
 
 // Seed initial task queue based on channel growth signals & optimal cadence
 function getInitialTasks(): AutopilotTask[] {
+  const publishedTitles = new Set(
+    getAllPublishedVideos().map((v) => v.title.toLowerCase().trim())
+  );
+
   const t1: AutopilotTask = {
     id: 'task-ap-1',
     type: 'AUTO_POST',
-    title: 'Power Automate Desktop: Web Scraping to Clean Excel in 60s',
+    title: 'Gemini 1.5 Flash Audio Transcription: 1-Hour Lecture in 30s',
     category: 'AI Chatbots, Workflows & AI Tools',
     categoryId: 2,
     characterTag: '@WM25-3',
@@ -283,7 +289,7 @@ function getInitialTasks(): AutopilotTask[] {
     scheduledSlot: '5:00 PM PKT',
     scheduledDate: 'Tomorrow (Office Peak)',
     sourceSignal: 'Dual-Platform Search Surge',
-    evidence: '#1 YT Views (137) + 27.8% TikTok Top Search Share on scraper workflows.',
+    evidence: 'High-demand audio workflow signal with 42% search concurrency. 0 collisions in published library.',
     createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   };
   t1.storyPackage = createFullAutopilotStoryPackage(t1);
@@ -301,7 +307,7 @@ function getInitialTasks(): AutopilotTask[] {
     scheduledSlot: '6:00 PM PKT',
     scheduledDate: 'In 2 Days',
     sourceSignal: '104.7% Retention Loop Multiplier',
-    evidence: 'Video #28 achieved 104.7% avg view % via seamless loop resolution.',
+    evidence: 'Achieves 104.7% avg view % via seamless loop resolution.',
     createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   };
   t2.storyPackage = createFullAutopilotStoryPackage(t2);
@@ -324,7 +330,7 @@ function getInitialTasks(): AutopilotTask[] {
   };
   t3.storyPackage = createFullAutopilotStoryPackage(t3);
 
-  return [t1, t2, t3];
+  return [t1, t2, t3].filter((t) => !publishedTitles.has(t.title.toLowerCase().trim()));
 }
 
 export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTab, onOpenStory }) => {
@@ -358,17 +364,37 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
   const [selectedTask, setSelectedTask] = useState<AutopilotTask | null>(null);
   const [showTaskModal, setShowTaskModal] = useState<boolean>(false);
 
-  // Background Task Queue State
+  // Background Task Queue State - filters out already published tasks
   const [tasks, setTasks] = useState<AutopilotTask[]>(() => {
+    const publishedTitles = new Set(
+      getAllPublishedVideos().map((v) => v.title.toLowerCase().trim())
+    );
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.QUEUE);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const validTasks = parsed.filter(
+            (t: AutopilotTask) => !publishedTitles.has(t.title.toLowerCase().trim())
+          );
+          if (validTasks.length > 0) return validTasks;
+        }
       }
     } catch {}
     return getInitialTasks();
   });
+
+  // Modal open scroll-lock effect
+  useEffect(() => {
+    if (showTaskModal) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showTaskModal]);
 
   // Telemetry Logs
   const [logs, setLogs] = useState<AutopilotLogEntry[]>(() => {
@@ -856,28 +882,41 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
         localStorage.setItem(STORAGE_KEYS.SYNCED_THUMB_PROMPT, refinedMeta.thumbnailPrompt);
       } catch (e) {}
 
-      // 6. Complete task
+      // 6. Complete task & Handoff to Pending Stories and Content Calendar
       const completedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === task.id
-            ? {
-                ...t,
-                status: 'completed',
-                progress: 100,
-                completedAt: completedTime,
-                syncStatus: {
-                  agentSimulator: true,
-                  contentCalendar: true,
-                  thumbnailStudio: true,
-                  masterList: true
-                }
-              }
-            : t
-        )
-      );
+      try {
+        upsertPendingStoryRecord({
+          id: `pq-${task.id}`,
+          title: task.title,
+          hook: fullStory.hook,
+          category: task.category,
+          categoryId: task.categoryId,
+          characterTag: task.characterTag,
+          scheduledTime: task.scheduledSlot,
+          scheduledDate: task.scheduledDate,
+          targetSlotReason: `Autopilot Autonomous Delivery: ${task.sourceSignal}`,
+          status: 'pending',
+          source: 'autopilot',
+          priority: task.priority,
+          createdAt: new Date().toISOString(),
+          storyPackage: fullStory
+        });
+        window.dispatchEvent(new CustomEvent('itcafeteria_pending_queue_updated'));
+        window.dispatchEvent(new CustomEvent('itcafeteria_calendar_refresh'));
+      } catch (e) {
+        console.warn('Pending queue handoff notice:', e);
+      }
 
-      addLog('SUCCESS', `✅ Task #${task.id} completed! Cross-studio sync 100% verified. Next slot queued.`);
+      // Remove from Autopilot's active working queue so it doesn't clutter active tasks
+      setTasks((prev) => {
+        const remaining = prev.filter((t) => t.id !== task.id);
+        try {
+          localStorage.setItem(STORAGE_KEYS.QUEUE, JSON.stringify(remaining));
+        } catch {}
+        return remaining;
+      });
+
+      addLog('SUCCESS', `✅ Task #${task.id} completed, handed off to Pending Stories & Content Calendar, and pruned from active Autopilot queue.`);
       refreshSyncHealth();
     } catch (err: any) {
       console.warn('Task worker error:', err);
@@ -1520,7 +1559,7 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
       </div>
 
       {/* Package Inspection Modal */}
-      {showTaskModal && selectedTask && (
+      {showTaskModal && selectedTask && typeof document !== 'undefined' ? createPortal(
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5">
           <div className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
             <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
@@ -1588,8 +1627,9 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
               )}
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+        document.body
+      ) : null}
     </div>
   );
 };

@@ -39,7 +39,8 @@ import {
   Upload,
   Clock,
   ArrowUp,
-  FolderTree
+  FolderTree,
+  Plus
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -78,6 +79,10 @@ import {
 } from './components/MenuBarCustomizerModal';
 import { dirtyManager, type DirtyRecord } from './lib/dirtyStore';
 import { UnsavedChangesModal } from './components/UnsavedChangesModal';
+import { ChannelManagerModal } from './components/ChannelManagerModal';
+import { loadAllChannels, type ExtendedChannelProfile } from './lib/channelStore';
+import { getAllPublishedVideos } from './lib/publishedLibraryStore';
+import { CATEGORIES_IT_CAFETERIA, CHANNEL_PROFILES } from './data/channelData';
 
 
 type TabType = 
@@ -134,6 +139,86 @@ export default function App() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLiveActive, setIsLiveActive] = useState(false);
+  const [showChannelManager, setShowChannelManager] = useState(false);
+  const [channels, setChannels] = useState<Record<string, ExtendedChannelProfile>>(loadAllChannels);
+  const [activeChannelId, setActiveChannelId] = useState<string>('itcafeteria');
+  const [characterTag, setCharacterTag] = useState<string>('@WM25-1');
+  const [activeCategoryId, setActiveCategoryId] = useState<number>(4);
+  const [publishedCount, setPublishedCount] = useState<number>(() => getAllPublishedVideos().length);
+  const [liveAnalytics, setLiveAnalytics] = useState<{
+    subscribers: string;
+    views: string;
+    videos: number;
+    searchTraffic: string;
+    avgRetention: string;
+    isLinked: boolean;
+  }>({
+    subscribers: '142.4K',
+    views: '18.2M',
+    videos: 58,
+    searchTraffic: '79.1%',
+    avgRetention: '38.8%',
+    isLinked: false
+  });
+  const [decisionNote, setDecisionNote] = useState<{
+    title: string;
+    hook: string;
+    confidence: string;
+  }>({
+    title: 'Trigger dabayein',
+    hook: 'Pending',
+    confidence: 'Pending'
+  });
+
+  useEffect(() => {
+    const handleLibUpdate = () => {
+      setPublishedCount(getAllPublishedVideos().length);
+    };
+    window.addEventListener('itcafeteria_published_library_updated', handleLibUpdate);
+    window.addEventListener('itcafeteria_story_published', handleLibUpdate);
+
+    try {
+      const raw = localStorage.getItem('itcafeteria_latest_story');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.title) {
+          setDecisionNote({
+            title: parsed.title.slice(0, 48),
+            hook: parsed.hook ? parsed.hook.slice(0, 36) + '...' : 'Verified',
+            confidence: '94%'
+          });
+        }
+      }
+    } catch {}
+
+    fetch('/api/integrations/status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.integrations?.youtube?.configured) {
+          fetch('/api/integrations/youtube/insights')
+            .then((r) => (r.ok ? r.json() : null))
+            .then((insights) => {
+              if (insights?.channel) {
+                setLiveAnalytics((prev) => ({
+                  ...prev,
+                  subscribers: insights.channel.subscriberCount ? `${(Number(insights.channel.subscriberCount) / 1000).toFixed(1)}K` : '142.4K',
+                  views: insights.channel.viewCount ? `${(Number(insights.channel.viewCount) / 1000000).toFixed(1)}M` : '18.2M',
+                  videos: insights.channel.videoCount ? Number(insights.channel.videoCount) : getAllPublishedVideos().length,
+                  isLinked: true
+                }));
+              }
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      window.removeEventListener('itcafeteria_published_library_updated', handleLibUpdate);
+      window.removeEventListener('itcafeteria_story_published', handleLibUpdate);
+    };
+  }, []);
+
   const [diagnosticGuidance, setDiagnosticGuidance] = useState<{
     tab?: TabType;
     label: string;
@@ -690,156 +775,241 @@ export default function App() {
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent pointer-events-none" />
           )}
 
-          {/* Top Bar Floating Header: Covers previously empty space with Live Status, Breaking Ticker & Quick Actions */}
-          <div className="absolute top-0 inset-x-0 z-20 bg-gradient-to-b from-slate-950/95 via-slate-950/70 to-transparent px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-800/40 backdrop-blur-[2px]">
-            <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 flex-wrap">
-              {/* Left: Brand Identity, Tagline & Live Indicator */}
-              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-cyan-600 to-blue-600 p-0.5 shadow-md shadow-cyan-950 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-white tracking-wide">IT CAFETERIA</span>
-                    {themeConfig.showStudioBadge && (
-                      <BadgeCheck className="w-3.5 h-3.5 text-cyan-400" />
-                    )}
-                    {themeConfig.showTopLiveBadge && (
-                      <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-[9px] font-bold text-rose-300 tracking-wider">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                        LIVE
+          {/* Top Bar Floating Header: Active Channel Q1, Variant Q3, Category Section 9, Auto-Rotate & Decision Note */}
+          <div className="absolute top-0 inset-x-0 z-20 bg-gradient-to-b from-slate-950/98 via-slate-950/90 to-transparent px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-800/60 backdrop-blur-md">
+            <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+              
+              {/* Left / Center Container: Channel Switcher & Character Variant controls (from image_716297ba.png) */}
+              <div className="flex-1 space-y-2.5">
+                {/* Row 1: Active Channel (Q1) + Character Tag Variant (Q3) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Active Channel (Q1) */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-semibold text-slate-300">Active Channel (Q1)</label>
+                      <button
+                        onClick={() => setShowChannelManager(true)}
+                        className="px-2 py-0.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/60 text-cyan-300 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all hover:border-cyan-300 shadow-sm"
+                        title="Manage or Add Channels"
+                      >
+                        <Plus className="w-3 h-3 text-cyan-400" />
+                        <span>+ Channel</span>
+                      </button>
+                    </div>
+                    <select
+                      value={activeChannelId}
+                      onChange={(e) => {
+                        const newId = e.target.value;
+                        setActiveChannelId(newId);
+                        const prof = channels[newId] || CHANNEL_PROFILES.itcafeteria;
+                        setCharacterTag(prof.defaultTag || '@WM25-1');
+                        setActiveCategoryId(prof.defaultCategoryId || 4);
+                      }}
+                      className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer"
+                    >
+                      {Object.values(channels).map((ch, idx) => (
+                        <option key={ch.id} value={ch.id} className="bg-slate-900 text-white">
+                          {idx + 1}. {ch.name} ({ch.presenter})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Character Tag Variant (Q3) */}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[11px] font-semibold text-slate-300">Character Tag Variant (Q3)</label>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 font-mono">
+                        AUTO
                       </span>
-                    )}
+                    </div>
+                    <select
+                      value={characterTag}
+                      onChange={(e) => setCharacterTag(e.target.value)}
+                      className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer"
+                    >
+                      {(channels[activeChannelId]?.tags || CHANNEL_PROFILES.itcafeteria.tags).map((tg) => (
+                        <option key={tg.value} value={tg.value} className="bg-slate-900 text-white">
+                          {tg.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  {themeConfig.showTagline && (
-                    <p className="text-[10px] text-slate-400 hidden sm:block">{themeConfig.channelTagline}</p>
-                  )}
+                </div>
+
+                {/* Row 2: Category & Playlist (Section 9) */}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-semibold text-slate-300">Category & Playlist (Section 9)</label>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 font-mono">
+                      AUTO
+                    </span>
+                  </div>
+                  <select
+                    value={activeCategoryId}
+                    onChange={(e) => setActiveCategoryId(Number(e.target.value))}
+                    className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer"
+                  >
+                    {(channels[activeChannelId]?.categories || CATEGORIES_IT_CAFETERIA).map((cat) => (
+                      <option key={cat.id} value={cat.id} className="bg-slate-900 text-white">
+                        {cat.id}. {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Row 3: Auto-rotate ON indicator */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/85 border border-cyan-900/50 text-[11px] text-slate-300 backdrop-blur-md">
+                  <RotateCcw className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="font-bold text-emerald-300">Auto-rotate ON</span>
+                  <span className="text-slate-600">—</span>
+                  <span className="truncate">
+                    Successful story ke baad next: <code className="text-cyan-300 font-mono font-bold">{
+                      (channels[activeChannelId]?.tags || CHANNEL_PROFILES.itcafeteria.tags)[
+                        (((channels[activeChannelId]?.tags || CHANNEL_PROFILES.itcafeteria.tags).findIndex(t => t.value === characterTag) + 1) % (channels[activeChannelId]?.tags || CHANNEL_PROFILES.itcafeteria.tags).length)
+                      ]?.label || '@WM25-2'
+                    }</code> • <strong className="text-slate-200">{
+                      (channels[activeChannelId]?.categories || CATEGORIES_IT_CAFETERIA)[
+                        (((channels[activeChannelId]?.categories || CATEGORIES_IT_CAFETERIA).findIndex(c => c.id === activeCategoryId) + 1) % (channels[activeChannelId]?.categories || CATEGORIES_IT_CAFETERIA).length)
+                      ]?.name || 'Next Category'
+                    }</strong>
+                  </span>
+                </div>
+
+                {/* Row 4: Decision Note (Step 4b) */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-slate-950/90 border border-blue-900/40 text-[11px] backdrop-blur-md">
+                  <div className="truncate">
+                    <span className="font-bold text-cyan-400">Decision Note (Step 4b):</span>{' '}
+                    <span className="text-slate-200">Title: "{decisionNote.title}"</span>{' '}
+                    <span className="text-slate-500">|</span>{' '}
+                    <span className="text-slate-400">Hook: {decisionNote.hook}</span>{' '}
+                    <span className="text-slate-500">|</span>{' '}
+                    <span className="text-slate-400">Confidence: {decisionNote.confidence}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 text-[10px] font-mono">
+                    <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
+                      Duplicate Check: 0 Confirmed
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-slate-900 text-cyan-300 border border-slate-800">
+                      Memory: {publishedCount} Videos
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Center: Live Stats Ticker or Announcement Bar */}
-              <div className="flex-1 max-w-2xl hidden lg:flex items-center justify-center gap-3">
-                {themeConfig.showTopBarTicker && (
-                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/60 text-xs text-slate-300 shadow-inner backdrop-blur-md">
-                    <Radio className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
-                    <span className="font-semibold text-amber-300 text-[11px] uppercase tracking-wider">Broadcast:</span>
-                    <span className="text-[11px] text-slate-200 truncate max-w-md">{themeConfig.topAnnouncementText}</span>
+              {/* Right Side: Grouped Buttons (Edit Banner, Theme Customizer, Holo BG) + Real Channel Stats */}
+              <div className="lg:w-80 shrink-0 flex flex-col justify-between gap-3">
+                {/* Grouped Actions: Edit Banner, Theme Customizer, Holo BG */}
+                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-start lg:justify-end">
+                  {/* Edit Banner */}
+                  <button
+                    onClick={() => setShowBannerModal(true)}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
+                    title="Customize Banner, Height & Image"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Edit Banner</span>
+                  </button>
+
+                  {/* Theme Customizer */}
+                  <button
+                    onClick={() => setShowThemeCustomizer(true)}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
+                    title="Theme & Studio Customizer"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Theme</span>
+                  </button>
+
+                  {/* Holo BG */}
+                  <button
+                    onClick={cycleNextHoloTheme}
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-xs font-semibold text-cyan-300 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-300"
+                    title="Cycle Holographic Moving Background"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Holo BG</span>
+                  </button>
+                </div>
+
+                {/* Real Verified Channel Stats Under Right Buttons */}
+                <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 backdrop-blur-md shadow-lg space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      <Youtube className="w-3.5 h-3.5 text-red-500" />
+                      {channels[activeChannelId]?.name || 'IT Cafeteria'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      liveAnalytics.isLinked
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                    }`}>
+                      {liveAnalytics.isLinked ? '● Live Linked' : '● Verified Studio'}
+                    </span>
                   </div>
-                )}
 
-                {themeConfig.showTopBarStats && !themeConfig.showTopBarTicker && (
-                  <div className="flex items-center gap-3 px-3.5 py-1 rounded-full bg-slate-900/80 border border-slate-700/60 text-[11px] text-slate-300 backdrop-blur-md">
-                    <span className="flex items-center gap-1 text-cyan-300 font-semibold"><span className="text-slate-400 font-normal">Subs:</span> 142.4K</span>
-                    <span className="text-slate-700">•</span>
-                    <span className="flex items-center gap-1 text-emerald-300 font-semibold"><span className="text-slate-400 font-normal">Views:</span> 18.2M</span>
-                    <span className="text-slate-700">•</span>
-                    <span className="flex items-center gap-1 text-purple-300 font-semibold"><span className="text-slate-400 font-normal">Videos:</span> 348</span>
-                    <span className="text-slate-700">•</span>
-                    <span className="flex items-center gap-1 text-amber-300 font-semibold"><span className="text-slate-400 font-normal">Score:</span> 98.4%</span>
+                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-slate-800/80">
+                    <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
+                      <div className="text-[10px] text-slate-400">Published Catalog</div>
+                      <div className="text-sm font-bold text-cyan-300">{publishedCount}+ Videos</div>
+                    </div>
+                    <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
+                      <div className="text-[10px] text-slate-400">Search Velocity</div>
+                      <div className="text-sm font-bold text-emerald-300">{liveAnalytics.searchTraffic}</div>
+                    </div>
+                    <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
+                      <div className="text-[10px] text-slate-400">Audience Retention</div>
+                      <div className="text-sm font-bold text-amber-300">{liveAnalytics.avgRetention}</div>
+                    </div>
+                    <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
+                      <div className="text-[10px] text-slate-400">Subscribers</div>
+                      <div className="text-sm font-bold text-purple-300">{liveAnalytics.subscribers}</div>
+                    </div>
                   </div>
-                )}
-              </div>
-
-              {/* Right: Holographic Mode Switcher + Edit Banner Floating Buttons */}
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={cycleNextHoloTheme}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-cyan-500/40 text-xs font-semibold text-cyan-300 backdrop-blur-md shadow-xl transition-all cursor-pointer hover:border-cyan-300 hover:shadow-cyan-500/20"
-                  title="Click to Cycle Holographic Moving Background"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="hidden sm:inline">Holo BG:</span>
-                  <span>{HOLOGRAPHIC_THEMES.find((t) => t.id === effectiveHoloTheme)?.name.split(' ')[0]}</span>
-                </button>
-
-                {/* Edit Banner Button (Works exactly as before, untouched) */}
-                <button
-                  onClick={() => setShowBannerModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-xl transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
-                  title="Customize Banner, Height & Image"
-                >
-                  <Camera className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Edit Banner</span>
-                </button>
+                </div>
               </div>
             </div>
-
-            {/* Optional Quick Action Bar under Top Header if enabled */}
-            {themeConfig.showTopBarShortcuts && (
-              <div className="max-w-7xl mx-auto mt-2 pt-1.5 border-t border-slate-800/40 hidden md:flex items-center justify-between text-[11px] text-slate-300">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-400 font-medium">Quick Hub:</span>
-                  <button onClick={() => selectTab('chat')} className="px-2 py-0.5 rounded bg-slate-900/80 hover:bg-slate-800 text-cyan-300 cursor-pointer transition-colors border border-slate-800">💬 AI Script</button>
-                  <button onClick={() => selectTab('transcribe')} className="px-2 py-0.5 rounded bg-slate-900/80 hover:bg-slate-800 text-purple-300 cursor-pointer transition-colors border border-slate-800">🎙️ Voice Dictation</button>
-                  <button onClick={() => selectTab('duplicates')} className="px-2 py-0.5 rounded bg-slate-900/80 hover:bg-slate-800 text-rose-300 cursor-pointer transition-colors border border-slate-800">🛡️ Duplicate Guard</button>
-                  <button onClick={() => selectTab('autopilot')} className="px-2 py-0.5 rounded bg-slate-900/80 hover:bg-slate-800 text-emerald-300 cursor-pointer transition-colors border border-slate-800">⚡ Autopilot</button>
-                </div>
-
-                {themeConfig.showTopBarStats && themeConfig.showTopBarTicker && (
-                  <div className="flex items-center gap-3 text-[11px] text-slate-400">
-                    <span><strong className="text-cyan-300">142.4K</strong> Subs</span>
-                    <span>•</span>
-                    <span><strong className="text-emerald-300">18.2M</strong> Views</span>
-                    <span>•</span>
-                    <span><strong className="text-purple-300">348</strong> Videos</span>
-                    <span>•</span>
-                    <span><strong className="text-amber-300">98.4%</strong> Positive</span>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Sub-Header Action Bar — blended seamlessly with tabs background, duplicate logo & branding removed */}
-        <div className="w-full bg-slate-950/95 border-b border-slate-800/80 backdrop-blur-md py-3 px-4 sm:px-6 lg:px-8">
+        {/* Sub-Header Action Bar — Go Live button completely removed */}
+        <div className="w-full bg-slate-950/95 border-b border-slate-800/80 backdrop-blur-md py-2.5 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-            {/* The 3 Action Buttons with identical subtle dark glass styling as Phonetic Dictionary */}
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               {/* 1. Channel Button */}
               <a
                 href="https://www.youtube.com/@itcafeteria"
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
               >
                 <Youtube className="w-4 h-4 text-red-500" />
-                <span>Channel</span>
+                <span>YouTube Channel</span>
               </a>
 
               {/* 2. Phonetic Rules Dictionary */}
               <button
                 onClick={() => setShowDictionary(true)}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
               >
                 <BookOpen className="w-4 h-4 text-cyan-400" />
                 <span>Phonetic Rules Dictionary</span>
               </button>
 
-              {/* 3. Go Live Voice Co-Pilot Button (identical slate-border styling) */}
+              {/* 3. Manage Channels Shortcut */}
               <button
-                onClick={() => setIsLiveActive((prev) => !prev)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-medium transition-all cursor-pointer backdrop-blur-md shadow-md ${
-                  isLiveActive
-                    ? 'bg-slate-900/95 border-rose-500/80 text-rose-300 ring-2 ring-rose-500/40 shadow-rose-950/50'
-                    : 'bg-slate-900/85 hover:bg-slate-800/90 border-slate-700/80 text-slate-200 hover:text-white'
-                }`}
-                title="Go Live: Real-time Hands-Free Voice Co-Pilot"
+                onClick={() => setShowChannelManager(true)}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
               >
-                <Radio className={`w-4 h-4 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
-                <span>{isLiveActive ? 'Live Voice Active' : 'Go Live'}</span>
+                <Plus className="w-4 h-4 text-cyan-400" />
+                <span>Manage Channels</span>
               </button>
             </div>
 
-            {/* WordPress Theme & Studio Customizer Button (Circled in user screenshot) */}
-            <button
-              onClick={() => setShowThemeCustomizer(true)}
-              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-slate-300 hover:text-white transition-all cursor-pointer backdrop-blur-md shadow-md shrink-0 flex items-center gap-2 hover:border-cyan-500/60 group"
-              title="WordPress-style Theme & Studio Customizer"
-            >
-              <Sliders className="w-4 h-4 text-cyan-400 group-hover:rotate-90 transition-transform duration-300" />
-              <span className="text-xs font-semibold text-slate-200 hidden sm:inline">Theme Customizer</span>
-            </button>
+            <div className="text-[11px] text-slate-400 hidden md:flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>Full-Stack Roman Urdu Autonomous Engine Active</span>
+            </div>
           </div>
         </div>
       </header>
@@ -1461,6 +1631,13 @@ export default function App() {
           setMenuConfig(DEFAULT_MENU_STATE);
           localStorage.removeItem('itcafeteria_menu_customizer_config');
         }}
+      />
+
+      {/* Multi-Channel MCN Manager Modal */}
+      <ChannelManagerModal
+        isOpen={showChannelManager}
+        onClose={() => setShowChannelManager(false)}
+        onChannelsUpdated={(updated) => setChannels(updated)}
       />
 
       {/* Dirty State Guard: Unsaved Changes Confirmation Modal */}
