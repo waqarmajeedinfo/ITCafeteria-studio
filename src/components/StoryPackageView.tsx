@@ -92,7 +92,96 @@ export function formatCharacterTag(tag?: string): string {
   return clean.startsWith('@') ? clean : `@${clean}`;
 }
 
-export function buildStoryPackageText(story: GeneratedStory): string {
+export function sanitizeStoryPackage(raw: any): GeneratedStory {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      title: 'Google Flow AI Video Trick: Start & End Frames Control',
+      hook: 'Reveal',
+      channelName: 'IT Cafeteria',
+      presenter: 'Waqar Majeed',
+      categoryName: 'AI & Smart Technology',
+      playlist: 'AI & Smart Technology',
+      characterTag: '@WM25-1',
+      dateLabel: new Date().toLocaleDateString('en-GB'),
+      sceneCount: 10,
+      scenes: [],
+      hashtags: ['#ITCafeteria', '#Shorts'],
+      description: 'IT Cafeteria YouTube video script in Roman Urdu.',
+      tags: ['IT Cafeteria', 'Roman Urdu', 'Tech'],
+      tiktokCaption: 'Check this tech secret! #itcafeteria #shorts',
+      thumbnailHeadline: 'TECH SECRET',
+      thumbnailSubBadge: 'MUST TRY',
+      thumbnailPrompt: 'Tech studio YouTube thumbnail with presenter.',
+      seriesPlan: 'Series Next',
+      memoryBlock: '',
+      idea: { title: 'Untitled', hook: 'Reveal', angle: '', points: '' },
+      discussionNotes: ''
+    };
+  }
+
+  const safeScenes: StoryScene[] = (Array.isArray(raw.scenes) ? raw.scenes : [])
+    .filter((s: any) => s && typeof s === 'object')
+    .map((s: any, idx: number) => ({
+      num: Number(s.num) || idx + 1,
+      duration: String(s.duration || '10s'),
+      purpose: String(s.purpose || `Scene ${idx + 1}`),
+      isCTA: Boolean(s.isCTA),
+      words: Number(s.words) || (s.dialogue ? String(s.dialogue).split(/\s+/).filter(Boolean).length : 24),
+      visual: String(s.visual || ''),
+      dialogue: String(s.dialogue || ''),
+      script: String(s.script || `${s.visual || ''}\n"${s.dialogue || ''}"`)
+    }));
+
+  const safeHashtags: string[] = (Array.isArray(raw.hashtags) ? raw.hashtags : [])
+    .map((h: any) => String(h || '').trim())
+    .filter(Boolean);
+  if (!safeHashtags.length) safeHashtags.push('#ITCafeteria', '#Shorts');
+
+  const safeTags: string[] = (Array.isArray(raw.tags) ? raw.tags : [])
+    .map((t: any) => String(t || '').trim())
+    .filter(Boolean);
+  if (!safeTags.length) safeTags.push('IT Cafeteria', 'Roman Urdu', 'Tech');
+
+  return {
+    title: String(raw.title || 'Untitled Story'),
+    hook: String(raw.hook || 'Reveal'),
+    channelName: String(raw.channelName || 'IT Cafeteria'),
+    presenter: String(raw.presenter || 'Waqar Majeed'),
+    categoryName: String(raw.categoryName || 'AI & Smart Technology'),
+    playlist: String(raw.playlist || 'AI & Smart Technology'),
+    characterTag: String(raw.characterTag || '@WM25-1'),
+    dateLabel: String(raw.dateLabel || new Date().toLocaleDateString('en-GB')),
+    sceneCount: safeScenes.length || Number(raw.sceneCount) || 10,
+    scenes: safeScenes,
+    hashtags: safeHashtags,
+    description: String(raw.description || ''),
+    tags: safeTags,
+    tiktokCaption: String(raw.tiktokCaption || `${raw.title || ''} ${safeHashtags.join(' ')}`),
+    thumbnailHeadline: String(raw.thumbnailHeadline || String(raw.title || '').slice(0, 20).toUpperCase()),
+    thumbnailSubBadge: String(raw.thumbnailSubBadge || 'MUST TRY'),
+    thumbnailPrompt: String(raw.thumbnailPrompt || ''),
+    thumbnailLine1: raw.thumbnailLine1 ? String(raw.thumbnailLine1) : undefined,
+    thumbnailLine2: raw.thumbnailLine2 ? String(raw.thumbnailLine2) : undefined,
+    thumbnailHologram: raw.thumbnailHologram ? String(raw.thumbnailHologram) : undefined,
+    seriesPlan: String(raw.seriesPlan || ''),
+    memoryBlock: String(raw.memoryBlock || ''),
+    idea: raw.idea && typeof raw.idea === 'object' ? {
+      title: String(raw.idea.title || raw.title || ''),
+      hook: String(raw.idea.hook || raw.hook || 'Reveal'),
+      angle: String(raw.idea.angle || ''),
+      points: String(raw.idea.points || ''),
+      whyFresh: raw.idea.whyFresh ? String(raw.idea.whyFresh) : undefined
+    } : { title: String(raw.title || ''), hook: String(raw.hook || 'Reveal'), angle: '', points: '' },
+    discussionNotes: String(raw.discussionNotes || ''),
+    modelUsed: raw.modelUsed ? String(raw.modelUsed) : undefined,
+    cinematicDirectingActive: Boolean(raw.cinematicDirectingActive),
+    customCinematicDirection: raw.customCinematicDirection ? String(raw.customCinematicDirection) : undefined,
+    lastRefreshedAt: raw.lastRefreshedAt ? String(raw.lastRefreshedAt) : undefined
+  };
+}
+
+export function buildStoryPackageText(rawStory: GeneratedStory): string {
+  const story = sanitizeStoryPackage(rawStory);
   const normTag = formatCharacterTag(story.characterTag);
   const presenter = story.presenter || (normTag.startsWith('@MZ') ? 'Mehr Zadi' : 'Waqar Majeed');
 
@@ -109,10 +198,10 @@ export function buildStoryPackageText(story: GeneratedStory): string {
     characterTag: normTag,
   });
 
-  const scenesText = story.scenes.map((scene) => {
+  const scenesText = (story.scenes || []).map((scene) => {
     let directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
     // Enforce strictly 0-10s duration and @tag
-    directedScript = directedScript
+    directedScript = (directedScript || '')
       .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
 
@@ -148,13 +237,14 @@ ${story.description}
 ${thumbnail.prompt}`;
 }
 
-export function buildScenesOnlyText(story: GeneratedStory): string {
+export function buildScenesOnlyText(rawStory: GeneratedStory): string {
+  const story = sanitizeStoryPackage(rawStory);
   const normTag = formatCharacterTag(story.characterTag);
   const presenter = story.presenter || (normTag.startsWith('@MZ') ? 'Mehr Zadi' : 'Waqar Majeed');
 
-  const scenesText = story.scenes.map((scene) => {
+  const scenesText = (story.scenes || []).map((scene) => {
     let directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
-    directedScript = directedScript
+    directedScript = (directedScript || '')
       .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
 
@@ -174,7 +264,8 @@ Cinematic Directing Layer: Active
 ${scenesText}`;
 }
 
-export function buildYouTubePackageOnlyText(story: GeneratedStory): string {
+export function buildYouTubePackageOnlyText(rawStory: GeneratedStory): string {
+  const story = sanitizeStoryPackage(rawStory);
   const normTag = formatCharacterTag(story.characterTag);
   const presenter = story.presenter || (normTag.startsWith('@MZ') ? 'Mehr Zadi' : 'Waqar Majeed');
 
@@ -218,13 +309,14 @@ export interface StoryPackageViewProps {
 }
 
 export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
-  story,
+  story: rawStory,
   publishStatus,
   onTogglePublish,
   onUpdateStory,
   onDeleteStory,
   storyId
 }) => {
+  const story = sanitizeStoryPackage(rawStory);
   const [copiedScene, setCopiedScene] = useState<number | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copiedPackageItem, setCopiedPackageItem] = useState<string | null>(null);
@@ -255,6 +347,15 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
   const [editDescription, setEditDescription] = useState(story.description);
   const [editTags, setEditTags] = useState(story.tags.join(', '));
   const [editTiktok, setEditTiktok] = useState(story.tiktokCaption);
+
+  React.useEffect(() => {
+    const s = sanitizeStoryPackage(rawStory);
+    setEditTitle(s.title);
+    setEditHashtags(s.hashtags.join(' '));
+    setEditDescription(s.description);
+    setEditTags(s.tags.join(', '));
+    setEditTiktok(s.tiktokCaption);
+  }, [rawStory]);
 
   const normTag = formatCharacterTag(story.characterTag);
   const effectivePresenter = story.presenter || (normTag.startsWith('@MZ') ? 'Mehr Zadi' : 'Waqar Majeed');

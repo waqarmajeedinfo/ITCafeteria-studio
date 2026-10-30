@@ -1098,6 +1098,7 @@ app.post('/api/ai/generate-story', async (req, res) => {
 
     const dialectDescriptions: Record<string, string> = {
       conversational: 'Natural Lahori conversational Pakistani Urdu, friendly tech YouTuber cadence, approachable brotherly tone.',
+      lahori_conversational: 'Natural Lahori conversational Pakistani Urdu, friendly tech YouTuber cadence, approachable brotherly tone.',
       formal: 'Neutral semi-formal tech Urdu, clear articulate phrasing.',
       fast_paced: 'Fast-paced, high-energy viral TikTok style, punchy sentences, zero pause.',
       documentary: 'Deep-dive documentary explainer cadence, authoritative, serious investigative tone.',

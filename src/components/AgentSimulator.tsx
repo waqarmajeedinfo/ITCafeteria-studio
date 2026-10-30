@@ -19,7 +19,8 @@ import {
   type AgentTriggerOutcome,
   type AgentTriggerSelection
 } from './AgentFlowScreen';
-import { StoryPackageView, type GeneratedStory } from './StoryPackageView';
+import { StoryPackageView, sanitizeStoryPackage, type GeneratedStory } from './StoryPackageView';
+import { ErrorBoundary } from './ErrorBoundary';
 import { loadPendingQueue, savePendingQueue, getNextTargetStory, type PendingStoryRecord } from '../lib/pendingQueueStore';
 import {
   SimulatorConfigModal,
@@ -88,14 +89,16 @@ function loadLatestStory(): GeneratedStory | null {
     const raw = localStorage.getItem(LATEST_STORY_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.scenes) && parsed.title) return parsed as GeneratedStory;
+      if (parsed && Array.isArray(parsed.scenes) && parsed.title) {
+        return sanitizeStoryPackage(parsed);
+      }
     }
   } catch {}
 
   // Fallback to active Pending Queue target story so new logins NEVER see an empty screen!
   const nextTarget = getNextTargetStory();
   if (nextTarget && nextTarget.storyPackage && Array.isArray(nextTarget.storyPackage.scenes) && nextTarget.storyPackage.scenes.length > 0) {
-    return nextTarget.storyPackage;
+    return sanitizeStoryPackage(nextTarget.storyPackage);
   }
   return null;
 }
@@ -225,21 +228,25 @@ export const AgentSimulator: React.FC = () => {
   };
 
   const handleTrigger = () => {
-    setAppliedSelection({
-      channelId: draftChannel,
-      tag: draftTag,
-      categoryId: draftCategory,
-      sceneCount: draftSceneCount
-    });
-    setTriggerOutcome(null);
-    setFlowOpen(true);
+    try {
+      setAppliedSelection({
+        channelId: draftChannel,
+        tag: draftTag,
+        categoryId: draftCategory,
+        sceneCount: draftSceneCount
+      });
+      setTriggerOutcome(null);
+      setFlowOpen(true);
+    } catch (err) {
+      console.error('Trigger execution error:', err);
+    }
   };
 
   const handleFlowOutcome = (outcome: AgentTriggerOutcome) => {
     setTriggerOutcome(outcome);
     if (outcome.status !== 'generated' || !outcome.story) return;
 
-    const generatedStory = outcome.story;
+    const generatedStory = sanitizeStoryPackage(outcome.story);
     const outcomeProfile = (channels[outcome.selection.channelId] || profilesMap[outcome.selection.channelId] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile;
     setLatestStory(generatedStory);
 
@@ -598,11 +605,16 @@ export const AgentSimulator: React.FC = () => {
                 Saved locally • {latestStory.sceneCount} scenes
               </span>
             </div>
-            <StoryPackageView
-              story={latestStory}
-              onDeleteStory={() => setLatestStory(null)}
-              onUpdateStory={(updated: GeneratedStory) => setLatestStory(updated)}
-            />
+            <ErrorBoundary
+              fallbackTitle="Story Package Viewer Error Recovered"
+              onReset={() => setLatestStory(null)}
+            >
+              <StoryPackageView
+                story={latestStory}
+                onDeleteStory={() => setLatestStory(null)}
+                onUpdateStory={(updated: GeneratedStory) => setLatestStory(updated)}
+              />
+            </ErrorBoundary>
           </>
         ) : (
           <div className="py-12 px-4 text-center space-y-3">
@@ -621,14 +633,19 @@ export const AgentSimulator: React.FC = () => {
       </div>
 
       {flowOpen && appliedSelection && (
-        <AgentFlowScreen
-          profile={appliedProfile || CHANNEL_PROFILES.itcafeteria}
-          selection={appliedSelection}
-          memoryRecords={memoryRecords}
-          simulatorConfig={simulatorConfig}
-          onClose={() => setFlowOpen(false)}
-          onOutcome={handleFlowOutcome}
-        />
+        <ErrorBoundary
+          fallbackTitle="Agent Flow Trigger Screen Recovered"
+          onReset={() => setFlowOpen(false)}
+        >
+          <AgentFlowScreen
+            profile={appliedProfile || CHANNEL_PROFILES.itcafeteria}
+            selection={appliedSelection}
+            memoryRecords={memoryRecords}
+            simulatorConfig={simulatorConfig}
+            onClose={() => setFlowOpen(false)}
+            onOutcome={handleFlowOutcome}
+          />
+        </ErrorBoundary>
       )}
 
       {/* Engine & Baseline Configuration Modal */}

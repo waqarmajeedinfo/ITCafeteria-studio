@@ -46,6 +46,7 @@ import {
 import { ChannelAnalytics } from './components/ChannelAnalytics';
 import { LiveInsights, type OAuthNotice } from './components/LiveInsights';
 import { AgentSimulator } from './components/AgentSimulator';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { AutopilotManager } from './components/AutopilotManager';
 import { DuplicateChecker } from './components/DuplicateChecker';
 import { UpscalingRoadmap } from './components/UpscalingRoadmap';
@@ -1260,7 +1261,11 @@ export default function App() {
           {activeTab === 'calendar' && <ContentCalendar />}
           {activeTab === 'community' && <CommunityPollWidget />}
           {activeTab === 'benchmarking' && <CompetitorBenchmarking />}
-          {activeTab === 'simulator' && <AgentSimulator />}
+          {activeTab === 'simulator' && (
+            <ErrorBoundary fallbackTitle="Agent Simulator Error Recovered">
+              <AgentSimulator />
+            </ErrorBoundary>
+          )}
           {activeTab === 'chat' && <AiChatbot />}
           {activeTab === 'search' && <SearchGroundingStudio />}
           {activeTab === 'video' && <VideoStudio />}

@@ -36,7 +36,9 @@ const BUNDLED_REFERENCE_BASE = '/character-refs/';
 
 const getBundledReferencePath = (tag: string): string | null => {
   const match = /^@?(WM25-\d)$/.exec((tag || '').trim());
-  return match ? `${BUNDLED_REFERENCE_BASE}${match[1]}.jpg` : null;
+  if (!match) return null;
+  if (match[1] === 'WM25-6') return `${BUNDLED_REFERENCE_BASE}${match[1]}.png`;
+  return `${BUNDLED_REFERENCE_BASE}${match[1]}.jpg`;
 };
 
 const readStoredReference = (tag: string): StoredReference | null => {

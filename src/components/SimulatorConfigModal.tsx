@@ -215,17 +215,20 @@ export const DEFAULT_SIMULATOR_CONFIG: SimulatorConfig = {
     'High-stakes urgent tone in Roman Urdu. Structure: Shocking security/productivity warning or myth reveal, Live proof of why users are at risk, Root cause explanation, 1-Click fix & prevention step, Post-fix verification test, Interactive viewer question, Subscribe CTA.'
 };
 
-const STORAGE_KEY = 'itcafeteria_simulator_config_v4';
+const STORAGE_KEY = 'itcafeteria_simulator_config_v5';
+const LEGACY_STORAGE_KEY = 'itcafeteria_simulator_config_v4';
 
 export function loadSimulatorConfig(): SimulatorConfig {
   if (typeof window === 'undefined') return DEFAULT_SIMULATOR_CONFIG;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       return {
         ...DEFAULT_SIMULATOR_CONFIG,
         ...parsed,
+        dialectTone: parsed.dialectTone || 'workshop',
+        flowPromptFormat: parsed.flowPromptFormat || 'split_screen',
         scenePresets: DEFAULT_SCENE_PRESETS,
         dialectPresets: DEFAULT_DIALECT_PRESETS,
         stylePresets: DEFAULT_STYLE_PRESETS
