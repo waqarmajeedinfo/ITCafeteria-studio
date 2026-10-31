@@ -19,5 +19,5 @@ jobs:
 
       - name: Run command or script
         run: |
-          echo "Running your automated task..."
+          curl https://itcafeteria-studio.onrender.com/api/autopilot/trigger-daily
           # Yahan aap apni script ya command add kar sakte hain
