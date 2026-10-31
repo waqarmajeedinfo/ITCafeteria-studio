@@ -1,0 +1,23 @@
+name: Automated Workflow
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # Yeh rozana suba 6 baje run hoga (aap time change kar sakte hain)
+  workflow_dispatch: # Is se aap manually bhi run kar sakenge
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run command or script
+        run: |
+          echo "Running your automated task..."
+          # Yahan aap apni script ya command add kar sakte hain
