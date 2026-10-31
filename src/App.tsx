@@ -40,7 +40,9 @@ import {
   Clock,
   ArrowUp,
   FolderTree,
-  Plus
+  Plus,
+  Trash2,
+  Search
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -65,7 +67,14 @@ import { CommunityPollWidget } from './components/CommunityPollWidget';
 import { StudioAssistant } from './components/StudioAssistant';
 import { HolographicBackground, type HolographicTheme, HOLOGRAPHIC_THEMES } from './components/HolographicBackground';
 import { PendingQueueTracker } from './components/PendingQueueTracker';
-import { PHONETIC_DICTIONARY } from './data/channelData';
+import {
+  getPhoneticDictionary,
+  addPhoneticRule,
+  deletePhoneticRule,
+  resetPhoneticDictionaryToDefault,
+  PHONETIC_UPDATED_EVENT,
+  type PhoneticRule
+} from './lib/phoneticDictionaryStore';
 import { 
   ThemeCustomizerModal, 
   type StudioThemeConfig, 
@@ -216,11 +225,37 @@ export default function App() {
       })
       .catch(() => {});
 
+    const handlePhoneticUpdate = (e: any) => {
+      setPhoneticRules(e.detail || getPhoneticDictionary());
+    };
+    window.addEventListener(PHONETIC_UPDATED_EVENT, handlePhoneticUpdate);
+
+    const handleOpenTopic = (e: any) => {
+      setActiveTab('simulator');
+      if (e.detail?.tool || e.detail?.title) {
+        try {
+          localStorage.setItem('itcafeteria_prefill_topic', JSON.stringify(e.detail));
+        } catch {}
+      }
+    };
+    window.addEventListener('itcafeteria_open_simulator_for_topic', handleOpenTopic);
+
     return () => {
       window.removeEventListener('itcafeteria_published_library_updated', handleLibUpdate);
       window.removeEventListener('itcafeteria_story_published', handleLibUpdate);
+      window.removeEventListener(PHONETIC_UPDATED_EVENT, handlePhoneticUpdate);
+      window.removeEventListener('itcafeteria_open_simulator_for_topic', handleOpenTopic);
     };
   }, []);
+
+  // Phonetic Living List state
+  const [phoneticRules, setPhoneticRules] = useState<PhoneticRule[]>(getPhoneticDictionary);
+  const [newRuleWord, setNewRuleWord] = useState('');
+  const [newRuleFix, setNewRuleFix] = useState('');
+  const [newRuleReason, setNewRuleReason] = useState('');
+  const [ruleSearch, setRuleSearch] = useState('');
+  const [showAddRuleForm, setShowAddRuleForm] = useState(false);
+  const [ruleSaveMessage, setRuleSaveMessage] = useState<string | null>(null);
 
   const [diagnosticGuidance, setDiagnosticGuidance] = useState<{
     tab?: TabType;
@@ -660,12 +695,18 @@ export default function App() {
   };
 
   // Dynamically generated tabs and groups from Menu Customizer Configuration
-  const tabs = menuConfig.items.map((item) => ({
-    id: item.id,
-    label: item.label,
-    icon: TAB_ICONS[item.id] || <Sparkles className="w-4 h-4" />,
-    group: item.groupId
-  }));
+  const tabs = menuConfig.items.map((item) => {
+    let label = item.label;
+    if (item.id === 'duplicates') {
+      label = `Duplicate Checker (${publishedCount})`;
+    }
+    return {
+      id: item.id,
+      label,
+      icon: TAB_ICONS[item.id] || <Sparkles className="w-4 h-4" />,
+      group: item.groupId
+    };
+  });
 
   const groups = menuConfig.groups.map((g) => {
     const count = tabs.filter((t) => t.group === g.id).length;
@@ -783,209 +824,80 @@ export default function App() {
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent pointer-events-none" />
           )}
 
-          {/* Top Bar Floating Header: Active Channel Q1, Variant Q3, Category Section 9, Auto-Rotate & Decision Note */}
-          <div className="absolute top-0 inset-x-0 z-20 bg-gradient-to-b from-slate-950/98 via-slate-950/90 to-transparent px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-800/60 backdrop-blur-md">
-            <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+          {/* Top Bar Floating Header: Clean Horizontal Aligned Analytics Bar (Eliminated duplicate Agent bar) */}
+          <div className="absolute top-0 inset-x-0 z-20 bg-gradient-to-b from-slate-950/98 via-slate-950/90 to-transparent px-3 sm:px-6 py-2.5 sm:py-3 border-b border-slate-800/60 backdrop-blur-md">
+            <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-3">
               
-              {/* Left / Center Container: Channel Switcher & Character Variant controls (from image_716297ba.png) */}
-              <div className="flex-1 space-y-2.5">
-                {/* Row 1: Active Channel (Q1) + Character Tag Variant (Q3) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Active Channel (Q1) */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-semibold text-slate-300">Active Channel (Q1)</label>
-                      <button
-                        onClick={() => setShowChannelManager(true)}
-                        className="px-2 py-0.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/60 text-cyan-300 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all hover:border-cyan-300 shadow-sm"
-                        title="Manage or Add Channels"
-                      >
-                        <Plus className="w-3 h-3 text-cyan-400" />
-                        <span>+ Channel</span>
-                      </button>
-                    </div>
-                    <select
-                      value={activeChannelId}
-                      onChange={(e) => {
-                        const newId = e.target.value;
-                        setActiveChannelId(newId);
-                        const prof = channels[newId] || CHANNEL_PROFILES.itcafeteria;
-                        setCharacterTag(prof.defaultTag || '@WM25-1');
-                        setActiveCategoryId(prof.defaultCategoryId || 4);
-                      }}
-                      className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer"
-                    >
-                      {Object.values(channels).map((ch, idx) => (
-                        <option key={ch.id} value={ch.id} className="bg-slate-900 text-white">
-                          {idx + 1}. {ch.name} ({ch.presenter})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Character Tag Variant (Q3) */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <label className="text-[11px] font-semibold text-slate-300">Character Tag Variant (Q3)</label>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 font-mono">
-                          AUTO
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowTagManager(true)}
-                        className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold hover:underline cursor-pointer bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-500/30"
-                        title="Add or upload custom character tag"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>+ Tag</span>
-                      </button>
-                    </div>
-                    <select
-                      value={characterTag}
-                      onChange={(e) => setCharacterTag(e.target.value)}
-                      className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer"
-                    >
-                      {(channels[activeChannelId]?.tags || CHANNEL_PROFILES.itcafeteria.tags).map((tg) => (
-                        <option key={tg.value} value={tg.value} className="bg-slate-900 text-white">
-                          {tg.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Row 2: Category & Playlist (Section 9) */}
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <label className="text-[11px] font-semibold text-slate-300">Category & Playlist (Section 9)</label>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/40 font-mono">
-                      AUTO
-                    </span>
-                  </div>
-                  <select
-                    value={activeCategoryId}
-                    onChange={(e) => setActiveCategoryId(Number(e.target.value))}
-                    className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer"
-                  >
-                    {(channels[activeChannelId]?.categories || CATEGORIES_IT_CAFETERIA).map((cat) => (
-                      <option key={cat.id} value={cat.id} className="bg-slate-900 text-white">
-                        {cat.id}. {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Row 3: Auto-rotate ON indicator */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/85 border border-cyan-900/50 text-[11px] text-slate-300 backdrop-blur-md">
-                  <RotateCcw className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span className="font-bold text-emerald-300">Auto-rotate ON</span>
-                  <span className="text-slate-600">—</span>
-                  <span className="truncate">
-                    Successful story ke baad next: <code className="text-cyan-300 font-mono font-bold">{
-                      (channels[activeChannelId]?.tags || CHANNEL_PROFILES.itcafeteria.tags)[
-                        (((channels[activeChannelId]?.tags || CHANNEL_PROFILES.itcafeteria.tags).findIndex(t => t.value === characterTag) + 1) % (channels[activeChannelId]?.tags || CHANNEL_PROFILES.itcafeteria.tags).length)
-                      ]?.label || '@WM25-2'
-                    }</code> • <strong className="text-slate-200">{
-                      (channels[activeChannelId]?.categories || CATEGORIES_IT_CAFETERIA)[
-                        (((channels[activeChannelId]?.categories || CATEGORIES_IT_CAFETERIA).findIndex(c => c.id === activeCategoryId) + 1) % (channels[activeChannelId]?.categories || CATEGORIES_IT_CAFETERIA).length)
-                      ]?.name || 'Next Category'
-                    }</strong>
+              {/* Left / Center: Channel Identity & Live Dynamic Analytic Metrics in One Horizontal Sequence */}
+              <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto">
+                {/* Channel & Verified Badge */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-sm shrink-0">
+                  <Youtube className="w-3.5 h-3.5 text-red-500" />
+                  <span className="font-bold text-white text-xs">{channels[activeChannelId]?.name || 'IT Cafeteria'}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    liveAnalytics.isLinked
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                  }`}>
+                    {liveAnalytics.isLinked ? '● Live Linked' : '● Verified Studio'}
                   </span>
                 </div>
 
-                {/* Row 4: Decision Note (Step 4b) */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-slate-950/90 border border-blue-900/40 text-[11px] backdrop-blur-md">
-                  <div className="truncate">
-                    <span className="font-bold text-cyan-400">Decision Note (Step 4b):</span>{' '}
-                    <span className="text-slate-200">Title: "{decisionNote.title}"</span>{' '}
-                    <span className="text-slate-500">|</span>{' '}
-                    <span className="text-slate-400">Hook: {decisionNote.hook}</span>{' '}
-                    <span className="text-slate-500">|</span>{' '}
-                    <span className="text-slate-400">Confidence: {decisionNote.confidence}</span>
+                {/* Horizontal Live Metric Chips (Aligned, Dynamic, Single-Line) */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-900/85 border border-slate-800/80 shadow-sm flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">Published:</span>
+                    <span className="text-xs font-bold text-cyan-300 font-mono">{publishedCount}+ Videos</span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 text-[10px] font-mono">
-                    <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
-                      Duplicate Check: 0 Confirmed
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-slate-900 text-cyan-300 border border-slate-800">
-                      Memory: {publishedCount} Videos
-                    </span>
+
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-900/85 border border-slate-800/80 shadow-sm flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">Search:</span>
+                    <span className="text-xs font-bold text-emerald-300 font-mono">{liveAnalytics.searchTraffic}</span>
+                  </div>
+
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-900/85 border border-slate-800/80 shadow-sm flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">Retention:</span>
+                    <span className="text-xs font-bold text-amber-300 font-mono">{liveAnalytics.avgRetention}</span>
+                  </div>
+
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-900/85 border border-slate-800/80 shadow-sm flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">Subs:</span>
+                    <span className="text-xs font-bold text-purple-300 font-mono">{liveAnalytics.subscribers}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Right Side: Grouped Buttons (Edit Banner, Theme Customizer, Holo BG) + Real Channel Stats */}
-              <div className="lg:w-80 shrink-0 flex flex-col justify-between gap-3">
-                {/* Grouped Actions: Edit Banner, Theme Customizer, Holo BG */}
-                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-start lg:justify-end">
-                  {/* Edit Banner */}
-                  <button
-                    onClick={() => setShowBannerModal(true)}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
-                    title="Customize Banner, Height & Image"
-                  >
-                    <Camera className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Edit Banner</span>
-                  </button>
+              {/* Right Side: Grouped Action Buttons in Same Horizontal Sequence */}
+              <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
+                {/* Edit Banner */}
+                <button
+                  onClick={() => setShowBannerModal(true)}
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
+                  title="Customize Banner, Height & Image"
+                >
+                  <Camera className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Edit Banner</span>
+                </button>
 
-                  {/* Theme Customizer */}
-                  <button
-                    onClick={() => setShowThemeCustomizer(true)}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
-                    title="Theme & Studio Customizer"
-                  >
-                    <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Theme</span>
-                  </button>
+                {/* Theme Customizer */}
+                <button
+                  onClick={() => setShowThemeCustomizer(true)}
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
+                  title="Theme & Studio Customizer"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Theme</span>
+                </button>
 
-                  {/* Holo BG */}
-                  <button
-                    onClick={cycleNextHoloTheme}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-xs font-semibold text-cyan-300 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-300"
-                    title="Cycle Holographic Moving Background"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Holo BG</span>
-                  </button>
-                </div>
-
-                {/* Real Verified Channel Stats Under Right Buttons */}
-                <div className="p-3 rounded-2xl bg-slate-950/90 border border-slate-800 backdrop-blur-md shadow-lg space-y-2">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      <Youtube className="w-3.5 h-3.5 text-red-500" />
-                      {channels[activeChannelId]?.name || 'IT Cafeteria'}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      liveAnalytics.isLinked
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                    }`}>
-                      {liveAnalytics.isLinked ? '● Live Linked' : '● Verified Studio'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-slate-800/80">
-                    <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
-                      <div className="text-[10px] text-slate-400">Published Catalog</div>
-                      <div className="text-sm font-bold text-cyan-300">{publishedCount}+ Videos</div>
-                    </div>
-                    <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
-                      <div className="text-[10px] text-slate-400">Search Velocity</div>
-                      <div className="text-sm font-bold text-emerald-300">{liveAnalytics.searchTraffic}</div>
-                    </div>
-                    <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
-                      <div className="text-[10px] text-slate-400">Audience Retention</div>
-                      <div className="text-sm font-bold text-amber-300">{liveAnalytics.avgRetention}</div>
-                    </div>
-                    <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800/60">
-                      <div className="text-[10px] text-slate-400">Subscribers</div>
-                      <div className="text-sm font-bold text-purple-300">{liveAnalytics.subscribers}</div>
-                    </div>
-                  </div>
-                </div>
+                {/* Holo BG */}
+                <button
+                  onClick={cycleNextHoloTheme}
+                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-xs font-semibold text-cyan-300 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-300"
+                  title="Cycle Holographic Moving Background"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Holo BG</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1279,44 +1191,229 @@ export default function App() {
         </motion.div>
       </main>
 
-      {/* Phonetic Dictionary Modal */}
+      {/* Phonetic Dictionary Modal (Interactive Living List with Add/Delete & Flow Engine Sync) */}
       {showDictionary && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[85vh] h-full sm:h-auto flex flex-col overflow-hidden overscroll-contain shadow-2xl">
+            {/* Modal Header */}
             <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950 shrink-0">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-cyan-400" />
-                <h3 className="font-bold text-white text-sm">Roman Urdu Phonetic Living List (Section 7)</h3>
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Roman Urdu Phonetic Living List (Section 7)</h3>
+                  <p className="text-[11px] text-slate-400">Flow voice engine ke mispronunciations ko rokne ke liye test-verified living rules</p>
+                </div>
               </div>
               <button 
                 onClick={() => setShowDictionary(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Band karein"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll space-y-3 text-xs divide-y divide-slate-800/60">
-              <p className="text-slate-400 text-xs pb-2">
-                Flow voice engine ke mispronunciations ko rokne ke liye test-verified spellings:
-              </p>
-              {PHONETIC_DICTIONARY.map((item, idx) => (
-                <div key={idx} className="pt-2.5 first:pt-0 flex flex-col gap-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-slate-300 font-semibold">{item.word}</span>
-                    <span className="font-mono text-cyan-300 font-bold bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">
-                      Write: {item.fix}
-                    </span>
-                  </div>
-                  <span className="text-slate-400 text-[11px]">{item.reason}</span>
-                </div>
-              ))}
+            {/* Action Toolbar: Search + Add Rule Toggle + Reset */}
+            <div className="p-3 bg-slate-950/70 border-b border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 shrink-0">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Lafz ya rule talash karein..."
+                  value={ruleSearch}
+                  onChange={(e) => setRuleSearch(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddRuleForm(!showAddRuleForm)}
+                  className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{showAddRuleForm ? 'Cancel' : '+ Add Word Rule'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const reset = resetPhoneticDictionaryToDefault();
+                    setPhoneticRules(reset);
+                    setRuleSaveMessage('Defaults restore ho gaye.');
+                    setTimeout(() => setRuleSaveMessage(null), 2500);
+                  }}
+                  className="p-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition-colors cursor-pointer"
+                  title="Reset to default verified rules"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
-            <div className="p-3 bg-slate-950 border-t border-slate-800 text-right shrink-0">
+            {/* Feedback Message */}
+            {ruleSaveMessage && (
+              <div className="px-4 py-2 bg-emerald-950/80 border-b border-emerald-500/40 text-[11px] text-emerald-300 flex items-center gap-2 shrink-0 animate-in fade-in">
+                <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{ruleSaveMessage}</span>
+              </div>
+            )}
+
+            {/* Inline Add Word Rule Form */}
+            {showAddRuleForm && (
+              <div className="p-4 bg-slate-950 border-b border-cyan-500/40 space-y-3 shrink-0 animate-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between text-xs font-bold text-cyan-300">
+                  <span>Naya Phonetic Word Rule Shamil Karein</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Google Flow AI Voice ke liye</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                      Target Word / Slur Pattern
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. bary ya kharaabi"
+                      value={newRuleWord}
+                      onChange={(e) => setNewRuleWord(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                      Flow Phonetic Fix (Write As)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. barray ya khraabi"
+                      value={newRuleFix}
+                      onChange={(e) => setNewRuleFix(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-cyan-200 font-mono text-xs focus:outline-none focus:border-cyan-400"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
+                    Pronunciation Reason / Audio Logic
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Flow voice slurs single r into berry, double rr creates sharp Urdu retroflex flap"
+                    value={newRuleReason}
+                    onChange={(e) => setNewRuleReason(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200 text-xs focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRuleForm(false)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newRuleWord.trim() || !newRuleFix.trim()) {
+                        setRuleSaveMessage('Word aur Fix dono fields lazmi hain.');
+                        return;
+                      }
+                      const updated = addPhoneticRule({
+                        word: newRuleWord.trim(),
+                        fix: newRuleFix.trim(),
+                        reason: newRuleReason.trim()
+                      });
+                      setPhoneticRules(updated);
+                      setNewRuleWord('');
+                      setNewRuleFix('');
+                      setNewRuleReason('');
+                      setShowAddRuleForm(false);
+                      setRuleSaveMessage(`Rule "${newRuleWord.trim()}" kamyabi se save ho gaya!`);
+                      setTimeout(() => setRuleSaveMessage(null), 3000);
+                    }}
+                    className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1 shadow-md cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save Word Rule</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Rules List */}
+            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll space-y-2.5 text-xs divide-y divide-slate-800/60">
+              {(() => {
+                const filtered = phoneticRules.filter((r) => {
+                  const q = ruleSearch.toLowerCase().trim();
+                  if (!q) return true;
+                  return (
+                    r.word.toLowerCase().includes(q) ||
+                    r.fix.toLowerCase().includes(q) ||
+                    r.reason.toLowerCase().includes(q)
+                  );
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-slate-500">
+                      Koi phonetic rule nahi mila. "+ Add Word Rule" daba kar naya rule banayein.
+                    </div>
+                  );
+                }
+
+                return filtered.map((item, idx) => (
+                  <div key={idx} className="pt-2.5 first:pt-0 flex flex-col gap-1.5 group">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-white font-semibold text-xs">{item.word}</span>
+                        {item.isCustom ? (
+                          <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[9px] font-bold uppercase">
+                            Custom
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[9px] font-bold uppercase">
+                            Verified Standard
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-cyan-300 font-bold bg-cyan-950/70 px-2 py-0.5 rounded border border-cyan-800/40 text-xs">
+                          Write: {item.fix}
+                        </span>
+                        {item.isCustom && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = deletePhoneticRule(item.word);
+                              setPhoneticRules(updated);
+                              setRuleSaveMessage(`Rule "${item.word}" delete ho gaya.`);
+                              setTimeout(() => setRuleSaveMessage(null), 2500);
+                            }}
+                            className="p-1 rounded hover:bg-rose-950/60 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                            title="Rule delete karein"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-slate-400 text-[11px] leading-relaxed">{item.reason}</span>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            <div className="p-3 bg-slate-950 border-t border-slate-800 flex justify-between items-center text-right shrink-0">
+              <span className="text-[11px] text-slate-500 font-mono">
+                Total: {phoneticRules.length} Verified Rules
+              </span>
               <button
                 onClick={() => setShowDictionary(false)}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-medium cursor-pointer"
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors shadow-sm"
               >
                 Theek Hai (Close)
               </button>

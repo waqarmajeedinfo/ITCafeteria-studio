@@ -61,7 +61,7 @@ export const DEFAULT_MENU_STATE: MenuCustomizerState = {
     // Management & Queue (5)
     { id: 'pending', label: 'Pending Stories & Target Queue', groupId: 'management', isLocked: true },
     { id: 'calendar', label: 'Content Calendar', groupId: 'management', isLocked: true },
-    { id: 'duplicates', label: 'Duplicate Checker (58)', groupId: 'management', isLocked: true },
+    { id: 'duplicates', label: 'Duplicate Checker', groupId: 'management', isLocked: true },
     { id: 'masterlist', label: 'Master List', groupId: 'management', isLocked: true },
     { id: 'roadmap', label: 'Upscaling (v3.42+)', groupId: 'management', isLocked: true },
 
@@ -85,7 +85,14 @@ export function loadMenuConfig(): MenuCustomizerState {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed.groups) && Array.isArray(parsed.items)) {
-        return parsed;
+        // Sanitize any stale hardcoded "(58)" from duplicates label
+        const sanitizedItems = parsed.items.map((it: MenuItemConfig) => {
+          if (it.id === 'duplicates' && it.label && (it.label.includes('(58)') || it.label.includes('(63)'))) {
+            return { ...it, label: 'Duplicate Checker' };
+          }
+          return it;
+        });
+        return { ...parsed, items: sanitizedItems };
       }
     }
   } catch (e) {

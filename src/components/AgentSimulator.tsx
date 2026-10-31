@@ -218,6 +218,36 @@ export const AgentSimulator: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const handleTopicEvent = (e: any) => {
+      const topicData = e.detail;
+      if (topicData) {
+        // Map topic to appropriate category
+        const toolLower = (topicData.tool || '').toLowerCase();
+        const titleLower = (topicData.title || '').toLowerCase();
+        let targetCat = 4; // default PC & Windows Hacks
+        if (toolLower.includes('whatsapp') || titleLower.includes('whatsapp')) targetCat = 3;
+        else if (toolLower.includes('power automate') || titleLower.includes('power automate')) targetCat = 2;
+        else if (toolLower.includes('ai') || toolLower.includes('flow') || toolLower.includes('bot') || titleLower.includes('ai')) targetCat = 1;
+        else if (toolLower.includes('secret') || titleLower.includes('secret')) targetCat = 5;
+
+        setDraftCategory(targetCat);
+        setAppliedSelection({
+          channelId: draftChannel,
+          tag: draftTag,
+          categoryId: targetCat,
+          sceneCount: draftSceneCount
+        });
+        setTriggerOutcome(null);
+        setFlowOpen(true);
+      }
+    };
+    window.addEventListener('itcafeteria_open_simulator_for_topic', handleTopicEvent);
+    return () => {
+      window.removeEventListener('itcafeteria_open_simulator_for_topic', handleTopicEvent);
+    };
+  }, [draftChannel, draftTag, draftSceneCount]);
+
   const handleDraftChannelChange = (channelId: string) => {
     const nextProfile = (channels[channelId] || profilesMap[channelId] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile;
     const saved = loadRotationState()[channelId as ChannelProfile['id']];

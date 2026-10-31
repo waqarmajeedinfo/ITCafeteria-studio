@@ -18,7 +18,9 @@ import {
   X,
   BookmarkCheck,
   CheckCircle2,
-  RotateCcw
+  RotateCcw,
+  ExternalLink,
+  Terminal
 } from 'lucide-react';
 import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
 import { StoryThumbnailPanel } from './StoryThumbnailPanel';
@@ -327,6 +329,8 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copiedPackageItem, setCopiedPackageItem] = useState<string | null>(null);
   const [statusToast, setStatusToast] = useState<string | null>(null);
+  const [savedFeedback, setSavedFeedback] = useState<boolean>(false);
+  const [copiedPrompt, setCopiedPrompt] = useState<boolean>(false);
 
   // Status tracking (local sync with prop or internal direct publish)
   const [currentStatus, setCurrentStatus] = useState<string>(
@@ -512,7 +516,9 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
     };
 
     upsertPendingStoryRecord(newRecord);
-    showToast('Story Pending Queue mein kamyabi se save ho gayi!');
+    setSavedFeedback(true);
+    setTimeout(() => setSavedFeedback(false), 3000);
+    showToast('✓ Story Pending Queue mein kamyabi se save ho gayi!');
   };
 
   // Current Status Controls: Delete Story
@@ -1034,11 +1040,11 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
           </div>
         </div>
 
-        {/* Item 2: Description + Practical Steps */}
-        <div className="bg-blue-950/20 border border-blue-500/30 p-4 rounded-xl space-y-2 text-xs">
+        {/* Item 2: Description + Practical Steps + AI Demo Prompt + Outsourced Links */}
+        <div className="bg-blue-950/20 border border-blue-500/30 p-4 rounded-xl space-y-3 text-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-blue-300 uppercase flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5" /> Item 2: Description + Practical Steps
+              <FileText className="w-3.5 h-3.5" /> Item 2: YouTube Description & Practical Details
             </span>
             <div className="flex items-center gap-1.5">
               <button
@@ -1091,6 +1097,89 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
           ) : (
             <p className="text-slate-200 text-[13px] whitespace-pre-wrap leading-relaxed">{story.description}</p>
           )}
+
+          {/* Reusable AI Demo Prompt (کاپی پیسٹ پرامپٹ) */}
+          {(() => {
+            const promptText = story.demoPrompt || `Create a detailed step-by-step tutorial script and prompt template for: "${story.title}". Focus on practical execution, key commands, and zero fluff.`;
+            return (
+              <div className="mt-3 p-3.5 rounded-xl bg-slate-900/95 border border-cyan-500/40 space-y-2 shadow-inner">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-cyan-300 font-bold text-xs">
+                    <Terminal className="w-4 h-4 text-cyan-400" />
+                    <span>Reusable AI Demo Prompt (کاپی پیسٹ پرامپٹ)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(promptText);
+                      setCopiedPrompt(true);
+                      setTimeout(() => setCopiedPrompt(false), 2000);
+                      showToast('AI Demo Prompt copy ho gaya!');
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-400/50 text-cyan-200 hover:text-white text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer shadow-sm"
+                    title="Yeh prompt direct AI tool mein paste karne ke liye copy karein"
+                  >
+                    {copiedPrompt ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-300">Prompt Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Copy Prompt</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800 text-slate-200 font-mono text-[11px] leading-relaxed select-all">
+                  {promptText}
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Yeh prompt viewers aur practical testers ke liye description mein provide kiya gaya hai taake wo direct copy-paste kar ke test kar sakein.
+                </p>
+              </div>
+            );
+          })()}
+
+          {/* Outsourced Links & Tools (ضروری لنکس اور ٹولز) */}
+          <div className="mt-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Outsourced Links & Tools (ضروری لنکس اور ٹولز)</span>
+              </span>
+              <span className="text-[10px] text-slate-500 font-mono">Verified Resources</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {(story.outsourcedLinks && story.outsourcedLinks.length > 0
+                ? story.outsourcedLinks
+                : [
+                    'Google AI Studio: https://aistudio.google.com',
+                    'Official Reference & Downloads: https://itcafeteria.com/resources'
+                  ]
+              ).map((link, idx) => (
+                <div
+                  key={idx}
+                  className="p-2 rounded-lg bg-slate-950/80 border border-slate-800/80 flex items-center justify-between gap-2"
+                >
+                  <span className="text-slate-300 font-mono text-[11px] truncate">{link}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cleanUrl = link.includes('http') ? link.split('http')[1] ? `http${link.split('http')[1]}` : link : link;
+                      navigator.clipboard.writeText(cleanUrl.trim());
+                      showToast('Link copy ho gaya!');
+                    }}
+                    className="p-1 rounded hover:bg-slate-800 text-cyan-400 shrink-0 cursor-pointer"
+                    title="Copy Link"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {story.seriesPlan && (
@@ -1131,11 +1220,24 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
             <button
               type="button"
               onClick={handleSaveToPendingQueue}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer hover:border-cyan-400"
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer ${
+                savedFeedback
+                  ? 'bg-emerald-950 border border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/50'
+                  : 'bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 hover:border-cyan-400'
+              }`}
               title="Story ko Pending Queue aur state mein save karein"
             >
-              <BookmarkCheck className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Save (Pending me bhejein)</span>
+              {savedFeedback ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-emerald-300 font-bold">✓ Saved in Pending! (محفوظ ہو گیا)</span>
+                </>
+              ) : (
+                <>
+                  <BookmarkCheck className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Save (Pending me bhejein)</span>
+                </>
+              )}
             </button>
 
             {/* Control 2: Direct Publish Button — ALWAYS SHOWN TOGETHER WITH SAVE */}

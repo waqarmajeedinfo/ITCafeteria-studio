@@ -733,6 +733,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                 {/* Full-Width StoryPackageView */}
                 <div className="w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-1 overflow-hidden">
                   <StoryPackageView
+                    key={selectedRecord.id}
                     story={selectedRecord.storyPackage}
                     storyId={selectedRecord.id}
                     publishStatus={selectedRecord.status}

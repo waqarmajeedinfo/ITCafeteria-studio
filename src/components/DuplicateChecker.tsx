@@ -281,7 +281,7 @@ export const DuplicateChecker: React.FC = () => {
                 <th className="pb-3 font-medium">Key Points Covered</th>
                 <th className="pb-3 font-medium">Series / Part</th>
                 <th className="pb-3 font-medium w-16">Length</th>
-                <th className="pb-3 font-medium text-right pr-2 w-28">Action</th>
+                <th className="pb-3 font-medium text-right pr-2 w-56">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 text-slate-300">
@@ -312,19 +312,37 @@ export const DuplicateChecker: React.FC = () => {
                     </td>
                     <td className="py-2.5 font-mono text-cyan-400">{v.length}</td>
                     <td className="py-2.5 text-right pr-2">
-                      <button
-                        type="button"
-                        onClick={() => setReviewStory(v)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
-                          isDynamic
-                            ? 'bg-emerald-950/80 hover:bg-emerald-900 border-emerald-500/50 text-emerald-300 shadow-sm'
-                            : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white'
-                        }`}
-                        title="Is video ki mukammal story open karein"
-                      >
-                        <Eye className="w-3 h-3 text-cyan-400" />
-                        <span>Open Story</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.dispatchEvent(
+                              new CustomEvent('itcafeteria_open_simulator_for_topic', {
+                                detail: { tool: v.tool, title: v.title, series: v.series, isSequel: true }
+                              })
+                            );
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold border bg-cyan-950/80 hover:bg-cyan-900 border-cyan-500/50 text-cyan-300 hover:text-white transition-all cursor-pointer shadow-sm"
+                          title="Is topic ka agla part / sequel Agent Simulator mein trigger karein"
+                        >
+                          <Sparkles className="w-3 h-3 text-cyan-400" />
+                          <span>Sequel (اگلا پارٹ)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setReviewStory(v)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                            isDynamic
+                              ? 'bg-emerald-950/80 hover:bg-emerald-900 border-emerald-500/50 text-emerald-300 shadow-sm'
+                              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white'
+                          }`}
+                          title="Is video ki mukammal story open karein"
+                        >
+                          <Eye className="w-3 h-3 text-cyan-400" />
+                          <span>Open Story</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -373,11 +391,37 @@ export const DuplicateChecker: React.FC = () => {
             {/* Modal Content */}
             <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
               {reviewStory.storyPackage ? (
-                <StoryPackageView
-                  story={reviewStory.storyPackage}
-                  publishStatus="published"
-                  storyId={reviewStory.sourceRecordId}
-                />
+                <div className="space-y-4">
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/60 to-blue-950/40 border border-cyan-500/40 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <div>
+                        <span className="font-bold text-xs text-cyan-200">Is video ka agla episode (Part 2 / Sequel) banana chahte hain?</span>
+                        <span className="block text-[10px] text-cyan-300/70">Agent Simulator mein is topic ka naya part generate karein.</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReviewStory(null);
+                        window.dispatchEvent(
+                          new CustomEvent('itcafeteria_open_simulator_for_topic', {
+                            detail: { tool: reviewStory.tool, title: reviewStory.title, series: reviewStory.series, isSequel: true }
+                          })
+                        );
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-lg cursor-pointer transition-colors"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Create Sequel (اگلا پارٹ بنائیں)</span>
+                    </button>
+                  </div>
+                  <StoryPackageView
+                    story={reviewStory.storyPackage}
+                    publishStatus="published"
+                    storyId={reviewStory.sourceRecordId}
+                  />
+                </div>
               ) : (
                 /* Catalog Review Card */
                 <div className="space-y-4">
