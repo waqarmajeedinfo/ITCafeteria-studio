@@ -40,6 +40,7 @@ import { PUBLISHED_VIDEOS, CATEGORIES_IT_CAFETERIA, type PublishedVideo } from '
 import { updatePendingStoryStatus, loadPendingQueue, upsertPendingStoryRecord, type PendingStoryRecord } from '../lib/pendingQueueStore';
 import { publishStoryDirectly, getAllPublishedVideos, type DynamicPublishedStory } from '../lib/publishedLibraryStore';
 import type { GeneratedStory, StoryScene } from './StoryPackageView';
+import { generateTopicAccurateStoryPackage, isStoryPackageMismatched } from '../lib/storyTopicGenerator';
 
 export interface ScheduledPost {
   id: string;
@@ -153,164 +154,37 @@ export function createFull10SceneStoryPackage(
   post: ScheduledPost,
   verification?: VerificationInfo
 ): GeneratedStory {
-  // If post already has a package, prefer it
+  // If post already has a package and it matches the title, prefer it
   if (post.storyPackage && post.storyPackage.scenes && post.storyPackage.scenes.length >= 6) {
-    return post.storyPackage;
+    if (!isStoryPackageMismatched(post.title, post.storyPackage)) {
+      return post.storyPackage;
+    }
   }
 
-  // If matched in pending queue, use queue package
+  // If matched in pending queue and matches the title, use queue package
   if (verification?.queueRecord?.storyPackage && verification.queueRecord.storyPackage.scenes?.length) {
-    return verification.queueRecord.storyPackage;
+    if (!isStoryPackageMismatched(post.title, verification.queueRecord.storyPackage)) {
+      return verification.queueRecord.storyPackage;
+    }
   }
 
   // If matched in catalog and has dynamic storyPackage, use it
   if (verification?.catalogVideo?.storyPackage && verification.catalogVideo.storyPackage.scenes?.length) {
-    return verification.catalogVideo.storyPackage;
+    if (!isStoryPackageMismatched(post.title, verification.catalogVideo.storyPackage)) {
+      return verification.catalogVideo.storyPackage;
+    }
   }
 
-  const presenter = 'Waqar Majeed';
-  const charTag = '@WM25-1';
-  const categoryName = post.category || 'AI Chatbots, Workflows & Tools';
-  const title = `${post.title} #shorts #itcafeteria #techtips`;
-  const hook = `Kya aap jante hain ke ${post.title} aapka ghanton ka waqt bacha sakta hai?`;
-
-  const scenes: StoryScene[] = [
-    {
-      num: 1,
-      duration: '0-10s',
-      purpose: 'Disruptive Hook',
-      isCTA: false,
-      words: 22,
-      visual: `Dramatic crash zoom-in onto ${presenter} wearing casual studio blazer at cyber workstation with floating glowing holographic headline.`,
-      dialogue: `Kya aap jante hain ke ${post.title} aapka ghanton ka waqt bacha sakta hai? Yeh secret trick har kisi ko pata honi chahiye!`,
-      script: `As a cinematic director, visualize this scene with a dynamic crash zoom-in, dramatic cyber-studio rim lighting, and a high-tech glowing holographic headline floating in 3D space.\n[PRESENTER & ACTION]: ${charTag} points forward with urgent authority.\nDuration: 0-10s.\nAudio Dialogue: "Kya aap jante hain ke ${post.title} aapka ghanton ka waqt bacha sakta hai? Yeh secret trick har kisi ko pata honi chahiye!"`
-    },
-    {
-      num: 2,
-      duration: '10-20s',
-      purpose: 'Problem Agitate',
-      isCTA: false,
-      words: 24,
-      visual: `Low-angle shot showing traditional slow, manual workflow on monitor screen with huge red error cross mark and spinning loading bar.`,
-      dialogue: `Aksar log is kaam ke liye ghanton manual mehnat karte hain aur third-party fake apps install kar ke apna system slow kar lete hain.`,
-      script: `As a cinematic director, visualize this scene with a low-angle dutch-tilt camera movement, subtle lens flare, and animated glitch alert diagnostics on transparent glass screens.\n[PRESENTER & ACTION]: ${charTag} shakes head showing frustration at the slow screen.\nDuration: 0-10s.\nAudio Dialogue: "Aksar log is kaam ke liye ghanton manual mehnat karte hain aur third-party fake apps install kar ke apna system slow kar lete hain."`
-    },
-    {
-      num: 3,
-      duration: '20-30s',
-      purpose: 'Secret Hack Reveal',
-      isCTA: false,
-      words: 23,
-      visual: `Over-the-shoulder shot panning across dual 4K monitors revealing the secret built-in settings toggle with vivid neon cyan border.`,
-      dialogue: `Lekin aaj mein aapko ek aisi hidden command aur built-in feature dikhaunga jo bina kisi software ke sirf ek click mein kaam karta hai!`,
-      script: `As a cinematic director, visualize this scene with an over-the-shoulder right-angle panning shot, crisp depth-of-field focusing on live tactile workstation controls and interactive floating UI widgets.\n[PRESENTER & ACTION]: ${charTag} snaps fingers and taps the command terminal.\nDuration: 0-10s.\nAudio Dialogue: "Lekin aaj mein aapko ek aisi hidden command aur built-in feature dikhaunga jo bina kisi software ke sirf ek click mein kaam karta hai!"`
-    },
-    {
-      num: 4,
-      duration: '30-40s',
-      purpose: 'Step 1 Live Demo',
-      isCTA: false,
-      words: 21,
-      visual: `Smooth dolly track-in focusing on keyboard shortcut execution with keyboard lighting reacting to keypress.`,
-      dialogue: `Pehla step: Apne system mein yeh key combination dabayein aur is feature ko enable karein jese screen par dikhaya ja raha hai.`,
-      script: `As a cinematic director, visualize this scene with a smooth dolly track-in, hyper-detailed volumetric neon lighting, and high-contrast dual-tone cyber accents.\n[PRESENTER & ACTION]: ${charTag} gestures toward the shortcut key combination.\nDuration: 0-10s.\nAudio Dialogue: "Pehla step: Apne system mein yeh key combination dabayein aur is feature ko enable karein jese screen par dikhaya ja raha hai."`
-    },
-    {
-      num: 5,
-      duration: '40-50s',
-      purpose: 'Step 2 Execution',
-      isCTA: false,
-      words: 25,
-      visual: `Wide establishing screen capture showing instant background task execution and automated workflow completing in 2 seconds flat.`,
-      dialogue: `Doosra step: Yeh specific parameter set karein aur Run dabayein. Dekhein background ke saare temporary files aur junk khud ba khud gayab ho gaye!`,
-      script: `As a cinematic director, visualize this scene with a wide establishing panoramic angle, fluid particle simulations, and vivid cyan-emerald data visualizations in motion.\n[PRESENTER & ACTION]: ${charTag} points to the 100% completion progress bar.\nDuration: 0-10s.\nAudio Dialogue: "Doosra step: Yeh specific parameter set karein aur Run dabayein. Dekhein background ke saare temporary files aur junk khud ba khud gayab ho gaye!"`
-    },
-    {
-      num: 6,
-      duration: '50-60s',
-      purpose: 'Instant Proof & Benchmark',
-      isCTA: false,
-      words: 22,
-      visual: `Medium-close split comparison displaying 'Before' vs 'After' performance metrics with green checkmarks and speed-up meters.`,
-      dialogue: `Yeh dekhein live proof! Jo kaam pehle 15 minute leta tha ab sirf 3 second mein khatam ho gaya. System ki speed 2x boost!`,
-      script: `As a cinematic director, visualize this scene with an intimate medium-close shot, shallow depth-of-field, and crisp focal transition revealing hidden workflow mechanics.\n[PRESENTER & ACTION]: ${charTag} shows thumbs up with genuine excitement.\nDuration: 0-10s.\nAudio Dialogue: "Yeh dekhein live proof! Jo kaam pehle 15 minute leta tha ab sirf 3 second mein khatam ho gaya. System ki speed 2x boost!"`
-    },
-    {
-      num: 7,
-      duration: '60-70s',
-      purpose: 'Advanced Secret / Pro Tip',
-      isCTA: false,
-      words: 24,
-      visual: `Orbital camera sweep around workstation, holographic callout showing automated scheduling recurring trigger.`,
-      dialogue: `Pro Tip: Agar aap rozana isko run nahi karna chahte toh iska automated schedule trigger on kar lein, yeh har shaam khud chalega.`,
-      script: `As a cinematic director, visualize this scene with an orbital camera sweep, 8K octane render clarity, and vibrant 3D holographic wireframes revolving around the anchor.\n[PRESENTER & ACTION]: ${charTag} points to the automatic schedule timer.\nDuration: 0-10s.\nAudio Dialogue: "Pro Tip: Agar aap rozana isko run nahi karna chahte toh iska automated schedule trigger on kar lein, yeh har shaam khud chalega."`
-    },
-    {
-      num: 8,
-      duration: '70-80s',
-      purpose: 'Common Mistake Warning',
-      isCTA: false,
-      words: 23,
-      visual: `Rapid rack focus from presenter to futuristic glass terminal screen displaying critical mistake prevention yellow warning icon.`,
-      dialogue: `Ek ghalati kabhi mat karna: Fake optimization cleaner apps bilkul install na karein, sirf yeh official certified method use karein!`,
-      script: `As a cinematic director, visualize this scene with a rapid rack focus from presenter to futuristic glass terminal screen, highlighting actionable step-by-step milestones.\n[PRESENTER & ACTION]: ${charTag} raises finger giving cautionary advice to audience.\nDuration: 0-10s.\nAudio Dialogue: "Ek ghalati kabhi mat karna: Fake optimization cleaner apps bilkul install na karein, sirf yeh official certified method use karein!"`
-    },
-    {
-      num: 9,
-      duration: '80-90s',
-      purpose: 'Viewer Question & Engagement',
-      isCTA: false,
-      words: 21,
-      visual: `Center-framed push-in with floating glowing comment bubble icon and interactive question prompt text.`,
-      dialogue: `Kya aapko yeh shortcut pehle pata tha? Aur aapke computer par isse kitna farq para? Mujhe comments mein zaroor batayein!`,
-      script: `As a cinematic director, visualize this scene with a confident center-framed steady-cam push-in, rich cinematic bokeh in the background, and glowing warning/takeaway callouts.\n[PRESENTER & ACTION]: ${charTag} looks directly into lens, engaging viewer conversationally.\nDuration: 0-10s.\nAudio Dialogue: "Kya aapko yeh shortcut pehle pata tha? Aur aapke computer par isse kitna farq para? Mujhe comments mein zaroor batayein!"`
-    },
-    {
-      num: 10,
-      duration: '90-100s',
-      purpose: 'CTA & Loop Outro',
-      isCTA: true,
-      words: 22,
-      visual: `Impactful slow push-in, cinematic warm bokeh, animated 3D subscriber bell ringing, and next episode episodic bridge banner.`,
-      dialogue: `Aisi mazeed powerful tech tricks ke liye IT Cafeteria ko abhi follow karein aur yeh video apne doston ke sath share karein!`,
-      script: `As a cinematic director, visualize this scene with an impactful center-frame slow push-in, cinematic warm bokeh, and an animated 3D subscriber bell & milestone badge with clear visual punch.\n[PRESENTER & ACTION]: ${charTag} smiles and taps the animated subscriber button.\nDuration: 0-10s.\nAudio Dialogue: "Aisi mazeed powerful tech tricks ke liye IT Cafeteria ko abhi follow karein aur yeh video apne doston ke sath share karein!"`
-    }
-  ];
-
-  return {
-    title,
-    hook,
-    channelName: 'IT Cafeteria',
-    presenter,
-    categoryName,
-    playlist: categoryName,
-    characterTag: charTag,
-    dateLabel: `${post.date} • ${post.scheduledTime}`,
-    sceneCount: 10,
-    scenes,
-    hashtags: ['#shorts', '#itcafeteria', '#pakistantech', '#waqarmajeed', '#techtips', '#productivity'],
-    description: `Dekhein ${post.title}.\nGhanton ka kaam ab seconds mein!\n\nPresenter: ${presenter} (${charTag})\nCategory: ${categoryName}\nScheduled: ${post.date} @ ${post.scheduledTime}\n\nHar roz aisi hi nayi tech updates aur secret workflows ke liye IT Cafeteria ko subscribe karein!\n#itcafeteria #shorts #pakistanitech #waqarmajeed #techtricks`,
-    tags: [
-      'itcafeteria', 'shorts', 'pakistan tech', 'waqar majeed', 'tech tricks',
-      'productivity hacks', 'urdu tech tutorials', post.category.toLowerCase()
-    ],
-    tiktokCaption: `Wait till you see this secret trick! 🔥 ${post.title} #itcafeteria #techtok #pakistan #shorts`,
-    thumbnailHeadline: post.title.slice(0, 18).toUpperCase(),
-    thumbnailSubBadge: '100% WORKING FIX',
-    thumbnailLine1: post.title.slice(0, 14).toUpperCase(),
-    thumbnailLine2: 'HIDDEN TRICK',
-    thumbnailHologram: 'VERIFIED WORKFLOW',
-    thumbnailPrompt: `Professional vertical 9:16 YouTube Shorts thumbnail cover, futuristic cyber dark navy theme (#070a13), 3D embossed yellow bold text "${post.title.slice(0, 18).toUpperCase()}", neon cyan glow edges, crisp 8k render, no blurry text, high CTR visual badge`,
-    seriesPlan: `Part 2 releasing tomorrow at 6:00 PM PKT! Next episode will cover automated batch processing.`,
-    memoryBlock: `Content Calendar: ${post.title} scheduled for ${post.date}.`,
-    idea: {
-      title: post.title,
-      hook,
-      angle: categoryName,
-      points: post.reason || 'High-retention practical tech workflow tutorial'
-    },
-    discussionNotes: `Verified from IT Cafeteria Master Content Calendar.`
-  };
+  return generateTopicAccurateStoryPackage({
+    id: post.id,
+    title: post.title,
+    category: post.category,
+    characterTag: '@WM25-1',
+    scheduledTime: post.scheduledTime,
+    scheduledDate: post.date,
+    presenter: 'Waqar Majeed',
+    channelName: 'IT Cafeteria'
+  });
 }
 
 export const ContentCalendar: React.FC = () => {

@@ -7,6 +7,7 @@
 
 import type { GeneratedStory } from '../components/StoryPackageView';
 import { upgradeStoryScenesToCinematic } from './flowPromptBuilder';
+import { generateTopicAccurateStoryPackage, isStoryPackageMismatched } from './storyTopicGenerator';
 
 export type StoryPublishStatus = 'pending' | 'published' | 'draft' | 'overdue';
 
@@ -540,15 +541,37 @@ export function loadPendingQueue(): PendingStoryRecord[] {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed.map((item: PendingStoryRecord) => {
-        if (item && item.storyPackage) {
+      let didHeal = false;
+      const healedList = parsed.map((item: PendingStoryRecord) => {
+        if (!item) return item;
+        const needsHeal = isStoryPackageMismatched(item.title, item.storyPackage);
+        if (needsHeal) {
+          didHeal = true;
+          const freshPkg = generateTopicAccurateStoryPackage({
+            id: item.id,
+            title: item.title,
+            category: item.category,
+            categoryId: item.categoryId,
+            characterTag: item.characterTag,
+            scheduledTime: item.scheduledTime,
+            scheduledDate: item.scheduledDate
+          });
           return {
             ...item,
-            storyPackage: upgradeStoryScenesToCinematic(item.storyPackage)
+            hook: freshPkg.hook,
+            storyPackage: upgradeStoryScenesToCinematic(freshPkg)
           };
         }
-        return item;
+        return {
+          ...item,
+          storyPackage: upgradeStoryScenesToCinematic(item.storyPackage)
+        };
       });
+
+      if (didHeal && typeof window !== 'undefined') {
+        localStorage.setItem(PENDING_QUEUE_STORAGE_KEY, JSON.stringify(healedList));
+      }
+      return healedList;
     }
   } catch (e) {
     console.error('Error loading pending queue', e);
@@ -598,14 +621,32 @@ export function updatePendingStoryStatus(id: string, newStatus: StoryPublishStat
 }
 
 export function upsertPendingStoryRecord(record: PendingStoryRecord): PendingStoryRecord[] {
+  let validatedRecord = record;
+  if (isStoryPackageMismatched(record.title, record.storyPackage)) {
+    const freshPkg = generateTopicAccurateStoryPackage({
+      id: record.id,
+      title: record.title,
+      category: record.category,
+      categoryId: record.categoryId,
+      characterTag: record.characterTag,
+      scheduledTime: record.scheduledTime,
+      scheduledDate: record.scheduledDate
+    });
+    validatedRecord = {
+      ...record,
+      hook: freshPkg.hook,
+      storyPackage: upgradeStoryScenesToCinematic(freshPkg)
+    };
+  }
+
   const current = loadPendingQueue();
-  const existingIndex = current.findIndex((item) => item.id === record.id || item.title === record.title);
+  const existingIndex = current.findIndex((item) => item.id === validatedRecord.id || item.title === validatedRecord.title);
   let updated: PendingStoryRecord[];
   if (existingIndex >= 0) {
     updated = [...current];
-    updated[existingIndex] = { ...updated[existingIndex], ...record };
+    updated[existingIndex] = { ...updated[existingIndex], ...validatedRecord };
   } else {
-    updated = [record, ...current];
+    updated = [validatedRecord, ...current];
   }
   savePendingQueue(updated);
   return updated;

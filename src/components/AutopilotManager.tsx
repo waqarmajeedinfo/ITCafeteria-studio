@@ -57,6 +57,7 @@ import { updatePendingStoryStatus, upsertPendingStoryRecord } from '../lib/pendi
 import { getAllPublishedVideos } from '../lib/publishedLibraryStore';
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import { loadSimulatorConfig } from './SimulatorConfigModal';
+import { generateTopicAccurateStoryPackage } from '../lib/storyTopicGenerator';
 import {
   loadAutopilotConfig,
   updateAutopilotConfig,
@@ -684,142 +685,36 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
       );
       await new Promise((r) => setTimeout(r, 400));
 
-      // 4. Generate 10-Scene Story & Google Flow Prompts
-      addLog('STORY', `Constructing 10-scene Roman Urdu script with strict 22-25 words per scene...`);
+      // 4. Generate 10-Scene Story & Google Flow Prompts (Strictly Topic-Accurate)
+      addLog('STORY', `Constructing 10-scene Roman Urdu script strictly matching topic: "${task.title}"...`);
 
-      const templateScenes: StoryScene[] = [
-        {
-          num: 1,
-          duration: '10s',
-          purpose: 'Hook (Pattern Interrupt)',
-          isCTA: false,
-          words: 24,
-          visual: `${task.characterTag} stands in dark studio, points toward camera with intense expression`,
-          dialogue: 'Aapka system slow ho raha hai? Sirf yeh ek secret trick chalayein aur 5 seconds mein PC 2X fast karein!',
-          script: `${task.characterTag} — standing anchor pose. He speaks in his natural warm conversational Pakistani Urdu voice: "Aapka system slow ho raha hai? Sirf yeh ek secret trick chalayein aur 5 seconds mein PC 2X fast karein!"`
-        },
-        {
-          num: 2,
-          duration: '10s',
-          purpose: 'The Problem Revealed',
-          isCTA: false,
-          words: 23,
-          visual: 'Camera zooms in as red warning box flashes on computer screen',
-          dialogue: 'Aksar log is kaam ke liye ghanton manual mehnat karte hain ya fazool software download kar ke apna laptop slow kar dete hain.',
-          script: `The camera cuts to screen demonstration. ${task.characterTag} voiceover says: "Aksar log is kaam ke liye ghanton manual mehnat karte hain ya fazool software download kar ke apna laptop slow kar dete hain."`
-        },
-        {
-          num: 3,
-          duration: '10s',
-          purpose: 'Visual Interrupt (Retention Cliff Fix)',
-          isCTA: false,
-          words: 24,
-          visual: 'High-contrast neon yellow text badge flashes. Visual pattern interrupt.',
-          dialogue: 'Lekin aaj mein aapko ek aesi hidden run command bataunga jo bina kisi third-party app ke yeh masla seconds mein theek kar degi.',
-          script: `${task.characterTag} appears in half-screen split. Voice: "Lekin aaj mein aapko ek aesi hidden run command bataunga jo bina kisi third-party app ke yeh masla seconds mein theek kar degi."`
-        },
-        {
-          num: 4,
-          duration: '10s',
-          purpose: 'Step 1 Execution',
-          isCTA: false,
-          words: 24,
-          visual: 'Screen capture showing key shortcut highlighted in cyan glow',
-          dialogue: 'Keyboard par sirf Windows aur R dabayein, aur samne aane wali Run window ke andar yeh chota sa command type karein.',
-          script: `Full-screen software demo with smooth cursor movement. Voiceover: "Keyboard par sirf Windows aur R dabayein, aur samne aane wali Run window ke andar yeh chota sa command type karein."`
-        },
-        {
-          num: 5,
-          duration: '10s',
-          purpose: 'Step 2 Live Demonstration',
-          isCTA: false,
-          words: 23,
-          visual: 'Quick terminal / UI execution confirming instant result',
-          dialogue: 'Enter dabate hi aap dekhenge ke system ne tamam un-necessary temporary files aur cache ko clean kar diya hai bina kisi error ke.',
-          script: `Real-time execution showcase. Voiceover: "Enter dabate hi aap dekhenge ke system ne tamam un-necessary temporary files aur cache ko clean kar diya hai bina kisi error ke."`
-        },
-        {
-          num: 6,
-          duration: '10s',
-          purpose: 'Immediate Proof',
-          isCTA: false,
-          words: 23,
-          visual: 'Performance benchmark chart showing instant speedup',
-          dialogue: 'Is trick se aapki RAM space foran free hoti hai aur multitasking mein jo laptop atak raha tha woh bilkul smooth ho jata hai.',
-          script: `${task.characterTag} smiling in studio with live performance overlay. Voice: "Is trick se aapki RAM space foran free hoti hai aur multitasking mein jo laptop atak raha tha woh bilkul smooth ho jata hai."`
-        },
-        {
-          num: 7,
-          duration: '10s',
-          purpose: 'Pro Tip / Best Practice',
-          isCTA: false,
-          words: 24,
-          visual: 'Quick tip badge: "Haftay mein ek bar chalayein"',
-          dialogue: 'Behtareen performance ke liye yeh trick haftay mein sirf ek martaba repeat karein taake system cache fresh aur optimized rahe.',
-          script: `Split view showing tip box. Voice: "Behtareen performance ke liye yeh trick haftay mein sirf ek martaba repeat karein taake system cache fresh aur optimized rahe."`
-        },
-        {
-          num: 8,
-          duration: '10s',
-          purpose: 'Common Mistake Warning',
-          isCTA: false,
-          words: 23,
-          visual: 'Red alert cross icon showing what NOT to delete',
-          dialogue: 'Kabhi bhi kisi unknown cleaner app par bharosa mat karein jo aapki private registry files ko delete kar ke Windows corrupt kar sakti hai.',
-          script: `Warning graphics with safety badge. Voice: "Kabhi bhi kisi unknown cleaner app par bharosa mat karein jo aapki private registry files ko delete kar ke Windows corrupt kar sakti hai."`
-        },
-        {
-          num: 9,
-          duration: '10s',
-          purpose: 'Summary & Value Recap',
-          isCTA: false,
-          words: 23,
-          visual: `${task.characterTag} back on full camera with friendly studio lighting`,
-          dialogue: 'Yeh ek chota sa shortcut aapke ghanton ka waq-t bachata hai aur office ya study PC ko hamesha tez rakhta hai.',
-          script: `${task.characterTag} anchor pose. Warm voice: "Yeh ek chota sa shortcut aapke ghanton ka waq-t bachata hai aur office ya study PC ko hamesha tez rakhta hai."`
-        },
-        {
-          num: 10,
-          duration: '10s',
-          purpose: 'Episodic Bridge & Save CTA',
-          isCTA: true,
-          words: 24,
-          visual: 'Next episode teaser box + Subscribe button pulse',
-          dialogue: 'Kal theek shaam 6:00 PM par iska agla automation part aayega, video ko abhi save karein aur channel subscribe karein!',
-          script: `${task.characterTag} holding phone with subscribe button graphic. Voice: "Kal theek shaam 6:00 PM par iska agla automation part aayega, video ko abhi save karein aur channel subscribe karein!"`
-        }
-      ];
+      const topicPackage = generateTopicAccurateStoryPackage({
+        id: task.id,
+        title: task.title,
+        category: task.category,
+        categoryId: task.categoryId,
+        characterTag: task.characterTag,
+        scheduledTime: task.scheduledSlot,
+        scheduledDate: task.scheduledDate,
+        channelName: 'IT Cafeteria',
+        presenter: 'Waqar Majeed'
+      });
 
       const fullStory: GeneratedStory = {
+        ...topicPackage,
         title: task.title,
-        hook: templateScenes[0].dialogue,
-        channelName: 'IT Cafeteria',
-        presenter: 'Waqar Majeed',
-        categoryName: task.category,
-        playlist: task.category,
-        characterTag: task.characterTag,
-        dateLabel: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-        sceneCount: 10,
-        scenes: templateScenes,
-        hashtags: ['#ITCafeteria', '#Shorts', '#PakistanTech', '#TechTips'],
-        description: refinedMeta.description,
-        tags: refinedMeta.tags,
-        tiktokCaption: refinedMeta.tiktokCaption,
-        thumbnailHeadline: refinedMeta.thumbnailHeadline,
-        thumbnailSubBadge: refinedMeta.thumbnailSubBadge,
-        thumbnailPrompt: refinedMeta.thumbnailPrompt,
-        thumbnailLine1: line1 || 'SECRET',
-        thumbnailLine2: line2 || 'TRICK',
+        description: refinedMeta.description || topicPackage.description,
+        tags: refinedMeta.tags.length ? refinedMeta.tags : topicPackage.tags,
+        tiktokCaption: refinedMeta.tiktokCaption || topicPackage.tiktokCaption,
+        thumbnailHeadline: refinedMeta.thumbnailHeadline || topicPackage.thumbnailHeadline,
+        thumbnailSubBadge: refinedMeta.thumbnailSubBadge || topicPackage.thumbnailSubBadge,
+        thumbnailPrompt: refinedMeta.thumbnailPrompt || topicPackage.thumbnailPrompt,
+        thumbnailLine1: line1 || topicPackage.thumbnailLine1 || 'SECRET',
+        thumbnailLine2: line2 || topicPackage.thumbnailLine2 || 'TRICK',
         thumbnailHologram: `a glowing cyan 3D hologram visualizing "${task.title}" with floating UI panels and animated data stream nodes`,
         seriesPlan: 'Kal theek shaam 6:00 PM par agla episode aayega!',
         memoryBlock: `AP-${Date.now()}`,
-        discussionNotes: `Autopilot autonomous sequence executed from signal: ${task.sourceSignal}`,
-        idea: {
-          title: task.title,
-          hook: templateScenes[0].dialogue,
-          angle: 'Autopilot High-Retention Pipeline',
-          points: task.evidence
-        }
+        discussionNotes: `Autopilot autonomous sequence executed from signal: ${task.sourceSignal}. Topic-verified: ${task.title}`
       };
 
       setTasks((prev) =>

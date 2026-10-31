@@ -1496,7 +1496,7 @@ app.post('/api/autopilot/trigger-daily', async (req, res) => {
     console.log("Autopilot triggered via webhook");
     res.json({ success: true, message: "Autopilot triggered successfully" });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 

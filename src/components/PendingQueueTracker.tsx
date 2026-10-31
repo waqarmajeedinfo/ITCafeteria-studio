@@ -56,6 +56,7 @@ import {
   CINEMATIC_PRESETS,
   CINEMATIC_STAGE_DIRECTIONS
 } from '../lib/cinematicDirector';
+import { generateTopicAccurateStoryPackage, isStoryPackageMismatched } from '../lib/storyTopicGenerator';
 
 interface PendingQueueTrackerProps {
   onNavigateTab?: (tab: string) => void;
@@ -121,7 +122,54 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const selectedRecord = queue.find((item) => item.id === selectedStoryId) || queue[0];
+  const rawSelected = queue.find((item) => item.id === selectedStoryId) || queue[0];
+  const selectedRecord = React.useMemo(() => {
+    if (!rawSelected) return rawSelected;
+    if (isStoryPackageMismatched(rawSelected.title, rawSelected.storyPackage)) {
+      const freshPkg = generateTopicAccurateStoryPackage({
+        id: rawSelected.id,
+        title: rawSelected.title,
+        category: rawSelected.category,
+        categoryId: rawSelected.categoryId,
+        characterTag: rawSelected.characterTag,
+        scheduledTime: rawSelected.scheduledTime,
+        scheduledDate: rawSelected.scheduledDate
+      });
+      return {
+        ...rawSelected,
+        hook: freshPkg.hook,
+        storyPackage: freshPkg
+      };
+    }
+    return rawSelected;
+  }, [rawSelected]);
+
+  const handleRegenerateStory = (record: PendingStoryRecord) => {
+    const freshPkg = generateTopicAccurateStoryPackage({
+      id: record.id,
+      title: record.title,
+      category: record.category,
+      categoryId: record.categoryId,
+      characterTag: record.characterTag,
+      scheduledTime: record.scheduledTime,
+      scheduledDate: record.scheduledDate
+    });
+    setQueue((prev) => {
+      const updated = prev.map((item) =>
+        item.id === record.id
+          ? {
+              ...item,
+              hook: freshPkg.hook,
+              storyPackage: freshPkg
+            }
+          : item
+      );
+      savePendingQueue(updated);
+      return updated;
+    });
+    showToast(`"${record.title.slice(0, 30)}..." ke liye topic-matched scenes & YouTube package regenerate ho gaye!`);
+  };
+
   const nextTarget = getNextTargetStory(queue);
 
   // Toggle Publish Status & Forward to Published Library
@@ -677,6 +725,15 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                     {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
                       <button
+                        onClick={() => handleRegenerateStory(selectedRecord)}
+                        className="px-3.5 py-2.5 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500/50 text-indigo-300 font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer hover:border-indigo-400"
+                        title="Is topic ke mutabiq 10 mukammal scenes aur YouTube package regenerate karein"
+                      >
+                        <Sparkles className="w-4 h-4 text-indigo-400" />
+                        <span>Regenerate Topic Script</span>
+                      </button>
+
+                      <button
                         onClick={() => handleOpenRefreshModal(selectedRecord)}
                         className="px-3.5 py-2.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900/90 border border-cyan-500/50 text-cyan-300 font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer hover:border-cyan-400"
                         title="Refresh Story & Apply Cinematic Directing Layer"
@@ -733,7 +790,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                 {/* Full-Width StoryPackageView */}
                 <div className="w-full bg-slate-900/60 border border-slate-800 rounded-2xl p-1 overflow-hidden">
                   <StoryPackageView
-                    key={selectedRecord.id}
+                    key={`${selectedRecord.id}-${selectedRecord.title}-${selectedRecord.storyPackage?.scenes?.[0]?.dialogue?.slice(0, 20) || ''}`}
                     story={selectedRecord.storyPackage}
                     storyId={selectedRecord.id}
                     publishStatus={selectedRecord.status}
