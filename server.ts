@@ -1490,6 +1490,16 @@ DIALOGUE: "${dialogue}"`;
   }
 });
 
+app.post('/api/autopilot/trigger-daily', async (req, res) => {
+  try {
+    // Yahan hum autopilot script ya function ko call karenge
+    console.log("Autopilot triggered via webhook");
+    res.json({ success: true, message: "Autopilot triggered successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 registerIntegrationRoutes(app);
 
 // Setup Vite middleware in dev or static files in prod
