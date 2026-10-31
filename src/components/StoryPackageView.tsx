@@ -32,6 +32,7 @@ import {
   type PendingStoryRecord
 } from '../lib/pendingQueueStore';
 import { publishStoryDirectly } from '../lib/publishedLibraryStore';
+import { recordDialogueEdit, addPhoneticRule } from '../lib/phoneticDictionaryStore';
 
 export interface StoryIdea {
   title: string;
@@ -447,8 +448,20 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
     setSceneEditScript(s);
   };
 
-  // Save Scene Edits
+  // Save Scene Edits & Auto-Learn Modified Words into Phonetic Dictionary
   const handleSaveScene = (num: number) => {
+    let learnedNote: string | null = null;
+    const targetScene = story.scenes.find((sc) => sc.num === num);
+    if (targetScene && targetScene.dialogue.trim() !== sceneEditDialogue.trim()) {
+      const learned = recordDialogueEdit(targetScene.dialogue, sceneEditDialogue, {
+        sceneNum: num,
+        storyTitle: story.title
+      });
+      if (learned?.addedRule) {
+        learnedNote = `Phonetic Rule ("${learned.addedRule.word}" ➔ "${learned.addedRule.fix}") Phonetic Dictionary mein save ho gaya!`;
+      }
+    }
+
     const updatedScenes = story.scenes.map((sc) => {
       if (sc.num === num) {
         return {
@@ -471,7 +484,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
 
     onUpdateStory?.(updatedStory);
     setEditingSceneNum(null);
-    showToast(`Scene ${num} update ho gaya!`);
+    showToast(learnedNote ? `Scene ${num} update ho gaya! ${learnedNote}` : `Scene ${num} update ho gaya!`);
   };
 
   // Save Upload Package Item Edits

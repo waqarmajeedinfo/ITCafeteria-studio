@@ -8,6 +8,7 @@
 
 import type { GeneratedStory, StoryScene } from '../components/StoryPackageView';
 import { applyCinematicDirecting } from './cinematicDirector';
+import { applyPhoneticFixes } from './phoneticDictionaryStore';
 
 export interface GenerateStoryParams {
   id?: string;
@@ -391,12 +392,13 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     ];
   }
 
-  // Construct scenes with cinematic directing
+  // Construct scenes with cinematic directing & living phonetic dictionary rules
   const scenes: StoryScene[] = rawBeats.map((beat, idx) => {
     const sceneNum = idx + 1;
     const isCTA = sceneNum === rawBeats.length;
-    const words = beat.dialogue.split(/\s+/).filter(Boolean).length;
-    const rawScript = `${charTag} — anchor studio presentation.\nDialogue (Roman Urdu): "${beat.dialogue}"\nVisual details: ${beat.visual}`;
+    const phoneticDialogue = applyPhoneticFixes(beat.dialogue);
+    const words = phoneticDialogue.split(/\s+/).filter(Boolean).length;
+    const rawScript = `${charTag} — anchor studio presentation.\nDialogue (Roman Urdu): "${phoneticDialogue}"\nVisual details: ${beat.visual}`;
     const directedScript = applyCinematicDirecting(sceneNum, rawScript, undefined, beat.purpose);
 
     return {
@@ -406,14 +408,14 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
       isCTA,
       words,
       visual: beat.visual,
-      dialogue: beat.dialogue,
+      dialogue: phoneticDialogue,
       script: directedScript
     };
   });
 
   return {
     title: rawTitle,
-    hook,
+    hook: applyPhoneticFixes(hook),
     channelName,
     presenter,
     categoryName: category,

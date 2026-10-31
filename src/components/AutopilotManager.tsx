@@ -53,11 +53,12 @@ import {
 } from '../data/channelData';
 import { buildMasterThumbnailPrompt, splitHeadline } from '../lib/thumbnailMaster';
 import { StoryPackageView, buildStoryPackageText, type GeneratedStory, type StoryScene } from './StoryPackageView';
-import { updatePendingStoryStatus, upsertPendingStoryRecord } from '../lib/pendingQueueStore';
+import { updatePendingStoryStatus, upsertPendingStoryRecord, loadPendingQueue } from '../lib/pendingQueueStore';
 import { getAllPublishedVideos } from '../lib/publishedLibraryStore';
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import { loadSimulatorConfig } from './SimulatorConfigModal';
 import { generateTopicAccurateStoryPackage } from '../lib/storyTopicGenerator';
+import { PHONETIC_UPDATED_EVENT } from '../lib/phoneticDictionaryStore';
 import {
   loadAutopilotConfig,
   updateAutopilotConfig,
