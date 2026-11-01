@@ -20,7 +20,7 @@ export const ImageThumbnailStudio: React.FC = () => {
   );
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9' | '1:1'>('9:16');
   const [imageSize, setImageSize] = useState<'1K' | '2K'>('1K');
-  const [model, setModel] = useState<'gemini-nano-banana-2.1' | 'gemini-3.1-flash-lite-image'>('gemini-nano-banana-2.1');
+  const [model, setModel] = useState<'xiaomi-mimo-v2.6-pro-free' | 'gemini-3.1-flash-lite-image'>('xiaomi-mimo-v2.6-pro-free');
   const [base64InputImage, setBase64InputImage] = useState<string | null>(null);
   const [inputImageName, setInputImageName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
