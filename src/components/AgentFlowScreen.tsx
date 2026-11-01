@@ -26,6 +26,8 @@ import {
   Wand2
 } from 'lucide-react';
 import { PUBLISHED_VIDEOS, type ChannelProfile } from '../data/channelData';
+import { getAllPublishedVideos, type DynamicPublishedStory } from '../lib/publishedLibraryStore';
+import { loadPendingQueue } from '../lib/pendingQueueStore';
 import { StoryPackageView, type GeneratedStory, type StoryIdea, type StoryScene } from './StoryPackageView';
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import type { SimulatorConfig } from './SimulatorConfigModal';
@@ -73,6 +75,7 @@ interface AgentFlowScreenProps {
   selection: AgentTriggerSelection;
   memoryRecords: AgentMemoryRecord[];
   simulatorConfig?: SimulatorConfig;
+  initialTopic?: { title: string; tool?: string; isSequel?: boolean } | null;
   onClose: () => void;
   onOutcome: (outcome: AgentTriggerOutcome) => void;
 }
@@ -119,16 +122,98 @@ function tokenizeForMatch(text: string) {
   ));
 }
 
-function findDuplicateMatches(
+export interface TopicConcept {
+  id: string;
+  name: string;
+  aliases: string[];
+}
+
+export const CORE_TOPIC_CONCEPTS: TopicConcept[] = [
+  {
+    id: 'storage_sense',
+    name: 'Storage Sense & C-Drive Red Space',
+    aliases: [
+      'storage sense', 'c drive', 'c: drive', 'c-drive', 'red bar', 'drive red', 'disk space',
+      'free up space', 'cleanmgr', 'storage space', 'drive full', 'low disk', 'c drive red',
+      'c drive full', 'c drive space', 'free gb', 'junk files', 'temp files'
+    ]
+  },
+  {
+    id: 'clipboard_history',
+    name: 'Windows Clipboard History (Win+V)',
+    aliases: ['clipboard', 'win+v', 'win v', 'clipboard history', 'copy paste multiple', 'pin clipboard']
+  },
+  {
+    id: 'god_mode',
+    name: 'Windows God Mode Control Folder',
+    aliases: ['god mode', 'godmode', 'all tasks folder', 'master control panel', 'ed7ba470']
+  },
+  {
+    id: 'ultimate_performance',
+    name: 'Ultimate Performance Power Plan (powercfg)',
+    aliases: ['ultimate performance', 'powercfg', 'power plan', 'unhide power plan', 'power options']
+  },
+  {
+    id: 'run_commands',
+    name: 'Windows Win+R Secret Run Commands',
+    aliases: ['win+r', 'win r', 'run commands', 'secret run', 'msconfig', 'mrt', 'cleanmgr', 'perfmon']
+  },
+  {
+    id: 'excel_center_across',
+    name: 'Excel Center Across Selection',
+    aliases: ['center across selection', 'merge cells', 'merge and center', 'merge cells alternative', 'center across']
+  },
+  {
+    id: 'google_sheets_smart_fill',
+    name: 'Google Sheets AI Smart Fill',
+    aliases: ['smart fill', 'sheets ai', 'google sheets ai', 'flash fill sheets', 'sheets autofill']
+  },
+  {
+    id: 'voice_clone',
+    name: 'AI Voice Cloning & Voice Selling',
+    aliases: ['ai voice', 'voice clone', 'voice cloning', 'elevenlabs', 'sell ai voice', 'clone voice']
+  },
+  {
+    id: 'chatgpt_prompts',
+    name: 'ChatGPT & AI Prompt Hacks Masterclass',
+    aliases: ['prompt hacks', 'chatgpt secret', 'prompt engineering', 'chatgpt prompts', 'ai prompt masterclass']
+  },
+  {
+    id: 'chatbot_workflows',
+    name: 'AI Chatbot Workflows & Automation',
+    aliases: ['chatbot workflow', 'chatbots workflows', 'flow agent', 'bot workflow']
+  },
+  {
+    id: 'whatsapp_pin_chats',
+    name: 'WhatsApp Pin Chats & Secrets',
+    aliases: ['whatsapp pin', 'pin chat', 'pin chats', 'whatsapp secret']
+  },
+  {
+    id: 'power_automate_desktop',
+    name: 'Power Automate Desktop Daily Reports',
+    aliases: ['power automate', 'daily report automation', 'automate desktop']
+  }
+];
+
+export function findDuplicateMatches(
   title: string,
   points: string,
   channelId: ChannelProfile['id'],
-  memoryRecords: AgentMemoryRecord[]
-) {
-  const candidateTokens = tokenizeForMatch(`${title} ${points}`);
-  if (!candidateTokens.length) return [] as DuplicateMatch[];
+  memoryRecords: AgentMemoryRecord[] = []
+): DuplicateMatch[] {
+  const combinedCandidate = `${title} ${points}`.toLowerCase();
+  const candidateTokens = tokenizeForMatch(combinedCandidate);
+  if (!candidateTokens.length && !combinedCandidate.trim()) return [];
 
-  const catalogRecords: DuplicateMatch[] = (channelId === 'itcafeteria' ? PUBLISHED_VIDEOS : []).map((video) => ({
+  // Check if candidate is explicitly a Sequel / Part 2 / Episode 2.
+  // Approved sequels to previously published videos should NOT be blocked as duplicates.
+  const isCandidateSequel = /\b(part\s*[2-9]|sequel|episode\s*[2-9]|advanced|pro|phase\s*2|اگلا پارٹ)\b/i.test(combinedCandidate);
+
+  // 1. Gather all existing records: static catalog (58) + live published stories + pending queue + session memory
+  const allPublished = getAllPublishedVideos();
+  const pendingQueue = loadPendingQueue();
+
+  const libraryRecords: DuplicateMatch[] = (channelId === 'itcafeteria' ? allPublished : []).map((video) => ({
     source: 'Catalog',
     id: `#${video.id}`,
     title: video.title,
@@ -137,7 +222,16 @@ function findDuplicateMatches(
     matchedKeywords: []
   }));
 
-  const memoryMatches: DuplicateMatch[] = memoryRecords
+  const pendingRecords: DuplicateMatch[] = (channelId === 'itcafeteria' ? pendingQueue : []).map((p) => ({
+    source: 'Session Memory',
+    id: `Pending #${p.id.slice(0, 8)}`,
+    title: p.title,
+    tool: p.storyPackage?.idea?.title || p.category || 'Pending Queue',
+    points: p.storyPackage?.idea?.points || p.hook || '',
+    matchedKeywords: []
+  }));
+
+  const sessionRecords: DuplicateMatch[] = memoryRecords
     .filter((record) => record.channelId === channelId)
     .map((record) => ({
       source: 'Session Memory',
@@ -148,19 +242,62 @@ function findDuplicateMatches(
       matchedKeywords: []
     }));
 
+  const allRecords = [...libraryRecords, ...pendingRecords, ...sessionRecords];
   const results: DuplicateMatch[] = [];
-  for (const record of [...catalogRecords, ...memoryMatches]) {
-    const recordTokens = new Set(tokenizeForMatch(`${record.title} ${record.tool} ${record.points}`));
-    const matchedKeywords = candidateTokens.filter((token) => recordTokens.has(token));
-    const normalizedCandidate = normalizeDuplicateText(title);
-    const exactPhrase = normalizedCandidate.length >= 10 &&
-      normalizeDuplicateText(`${record.title} ${record.tool} ${record.points}`).includes(normalizedCandidate);
-    // Shared generic words (e.g. excel, report) alone should not block a fresh angle;
-    // require either 3+ overlapping keywords or 2 with strong keyword density.
-    const density = matchedKeywords.length / candidateTokens.length;
+  const seenIds = new Set<string>();
 
-    if (exactPhrase || matchedKeywords.length >= 3 || (matchedKeywords.length === 2 && density >= 0.34)) {
-      results.push({ ...record, matchedKeywords });
+  // 2. Deep Concept Analysis: Check if candidate matches any CORE_TOPIC_CONCEPTS
+  const matchedConcepts = CORE_TOPIC_CONCEPTS.filter((concept) =>
+    concept.aliases.some((alias) => combinedCandidate.includes(alias))
+  );
+
+  for (const record of allRecords) {
+    if (seenIds.has(record.id)) continue;
+    const recordCombined = `${record.title} ${record.tool} ${record.points}`.toLowerCase();
+
+    // If candidate is an approved sequel of this record, don't flag as duplicate
+    if (isCandidateSequel) {
+      const isRecordSequel = /\b(part\s*[2-9]|sequel|episode\s*[2-9])\b/i.test(recordCombined);
+      // Only flag if the record is ALREADY a sequel of the same number!
+      if (!isRecordSequel) {
+        continue;
+      }
+    }
+
+    let isMatch = false;
+    let matchedKeywords: string[] = [];
+
+    // Check concept match
+    for (const concept of matchedConcepts) {
+      const recordMatchesConcept = concept.aliases.some((alias) => recordCombined.includes(alias));
+      if (recordMatchesConcept) {
+        isMatch = true;
+        matchedKeywords.push(`Concept: ${concept.name}`);
+        break;
+      }
+    }
+
+    // Token and phrase match
+    const recordTokens = new Set(tokenizeForMatch(recordCombined));
+    const tokenOverlap = candidateTokens.filter((token) => recordTokens.has(token));
+    const normalizedCandidate = normalizeDuplicateText(title);
+    const exactPhrase =
+      normalizedCandidate.length >= 10 &&
+      normalizeDuplicateText(recordCombined).includes(normalizedCandidate);
+
+    const density = candidateTokens.length > 0 ? tokenOverlap.length / candidateTokens.length : 0;
+
+    if (exactPhrase || tokenOverlap.length >= 3 || (tokenOverlap.length === 2 && density >= 0.34)) {
+      isMatch = true;
+      matchedKeywords.push(...tokenOverlap);
+    }
+
+    if (isMatch) {
+      seenIds.add(record.id);
+      results.push({
+        ...record,
+        matchedKeywords: Array.from(new Set(matchedKeywords))
+      });
     }
   }
 
@@ -308,6 +445,7 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
   selection,
   memoryRecords,
   simulatorConfig,
+  initialTopic,
   onClose,
   onOutcome
 }) => {
@@ -357,6 +495,20 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
   const catalogCount = profile.id === 'itcafeteria' ? PUBLISHED_VIDEOS.length : 0;
 
   function initialIdea(): StoryIdea {
+    if (initialTopic?.title) {
+      const isSeq = Boolean(initialTopic.isSequel);
+      return {
+        title: initialTopic.title,
+        hook: isSeq
+          ? 'Part 1 ke baad yeh secret advanced step aapke system ko 10x level par le jayega!'
+          : initialNote.hook,
+        angle: isSeq
+          ? 'Part 2 Advanced Sequel continuation with next-level pro tools'
+          : `${category.id}. ${category.name} topic`,
+        points: initialTopic.tool ? `Tool: ${initialTopic.tool}` : '',
+        whyFresh: isSeq ? 'Official Sequel continuation' : ''
+      };
+    }
     return {
       title: initialNote.title,
       hook: initialNote.hook,
@@ -831,6 +983,21 @@ Rules:
     void generateStory(selectedIdea, discussionNotes.trim(), chatMessages);
   };
 
+  const handleCreateSequelFromDuplicate = (match?: DuplicateMatch | StoryIdea) => {
+    const rawTitle = (match as any)?.title || selectedIdea?.title || initialNote.title;
+    const cleanBase = rawTitle.replace(/\s*[-—–]\s*Part\s*\d+/i, '').replace(/\s*\(Part\s*\d+\)/i, '').trim();
+    const sequelTitle = `${cleanBase} — Part 2 (Advanced Hacks)`;
+    const sequelIdea: StoryIdea = {
+      title: sequelTitle,
+      hook: 'Part 1 ke baad yeh agla step 10x zyada powerful hai — secret advanced pro method!',
+      angle: 'Part 2 Advanced Sequel Continuation',
+      points: 'Part 2 Sequel: Advanced configuration, deeper tool mastery, and pro execution steps',
+      whyFresh: 'Approved Part 2 Continuation / Official Sequel'
+    };
+    setSelectedIdea(sequelIdea);
+    void generateStory(sequelIdea, `Official Part 2 Sequel continuation for ${cleanBase}`);
+  };
+
   const handleSynthesizeInstantStory = () => {
     const targetIdea = selectedIdea || initialIdea();
     const offlineStory = createInstantFallbackStory(
@@ -1079,6 +1246,29 @@ Rules:
                     )}
                   </div>
                 ))}
+              </div>
+
+              {/* Instant Part 2 / Sequel Option */}
+              <div className="rounded-xl border border-cyan-500/40 bg-gradient-to-r from-blue-950/60 to-cyan-950/40 p-3.5 space-y-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h5 className="text-xs font-bold text-cyan-200 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-cyan-400" />
+                      Is Topic Ka Agla Part (Part 2 / Sequel) Banana Chahte Hain?
+                    </h5>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      Part 1 pehle publish ho chuka hai. Agent Simulator is topic ka Advanced Sequel (Part 2) foran generate karega jisme pro tools aur advanced steps honge.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCreateSequelFromDuplicate(duplicates[0] || selectedIdea || initialIdea())}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-cyan-500/25 flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Film className="w-3.5 h-3.5" />
+                    <span>🎬 Part 2 Sequel Generate Karein (اگلا پارٹ بنائیں)</span>
+                  </button>
+                </div>
               </div>
 
               <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/15 p-3.5 space-y-3">

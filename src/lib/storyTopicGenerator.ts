@@ -67,11 +67,16 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
   const lowerTitle = titleClean.toLowerCase();
   const lowerCat = category.toLowerCase();
 
-  // Topic classification
-  const isGoogleSheets = lowerTitle.includes('sheet') || lowerTitle.includes('excel') || lowerTitle.includes('smart fill') || lowerTitle.includes('data');
-  const isPromptHacks = lowerTitle.includes('prompt') || lowerTitle.includes('chatgpt') || lowerTitle.includes('shortcuts') && (lowerTitle.includes('ai') || lowerCat.includes('prompt'));
+  // Topic classification - granular checks so specific topics don't collapse into Storage Sense
+  const isExcelCenter = lowerTitle.includes('center across') || lowerTitle.includes('merge cells') || lowerTitle.includes('merging');
+  const isGoogleSheets = !isExcelCenter && (lowerTitle.includes('sheet') || lowerTitle.includes('smart fill') || (lowerTitle.includes('excel') && !isExcelCenter));
+  const isPromptHacks = lowerTitle.includes('prompt') || lowerTitle.includes('chatgpt') || (lowerTitle.includes('shortcuts') && (lowerTitle.includes('ai') || lowerCat.includes('prompt')));
   const isChatbotWorkflow = lowerTitle.includes('chatbot') || lowerTitle.includes('workflow') || lowerTitle.includes('multi-agent') || lowerTitle.includes('power automate') || lowerCat.includes('chatbot');
-  const isPCWindows = lowerTitle.includes('windows') || lowerTitle.includes('pc') || lowerTitle.includes('laptop') || lowerTitle.includes('ram') || lowerTitle.includes('c-drive') || lowerCat.includes('pc');
+  const isStorageSense = lowerTitle.includes('storage sense') || lowerTitle.includes('c-drive') || lowerTitle.includes('c drive') || lowerTitle.includes('cdrive') || lowerTitle.includes('free space') || lowerTitle.includes('clean c');
+  const isGodMode = lowerTitle.includes('god mode') || lowerTitle.includes('control panel') || lowerTitle.includes('guid') || lowerTitle.includes('200+ hidden');
+  const isClipboard = lowerTitle.includes('clipboard') || lowerTitle.includes('win + v') || lowerTitle.includes('win+v') || lowerTitle.includes('paste old');
+  const isRunCommands = lowerTitle.includes('run command') || lowerTitle.includes('win + r') || lowerTitle.includes('win+r');
+  const isPowerPlan = lowerTitle.includes('power plan') || lowerTitle.includes('ultimate performance');
   const isWhatsApp = lowerTitle.includes('whatsapp') || lowerTitle.includes('mobile');
   const isYouTubeCourse = lowerTitle.includes('youtube') || lowerTitle.includes('yt automation') || lowerTitle.includes('chapter');
 
@@ -267,65 +272,254 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
         dialogue: 'Poora workflow blueprint description mein bilkul free hai. Aisi advanced tech ke liye IT Cafeteria ko follow karein!'
       }
     ];
-  } else if (isPCWindows) {
-    hook = 'Windows PC slow ho raha hai? Sirf yeh ek hidden setting on karein aur system 2X fast karein!';
-    description = `Windows 11 aur PC speedup secrets! Bina kisi third party tool ke RAM aur storage optimize karein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
-    tags = ['windows 11', 'pc speedup', 'c drive clean', 'storage sense', 'it cafeteria', 'waqar majeed', 'pc hacks urdu'];
-    hashtags = ['#Shorts', '#Windows11', '#PCHacks', '#ITCafeteria', '#TechShorts', '#SpeedUpPC'];
-    tiktokCaption = 'Windows PC ki speed 2X boost karne ka secret Windows built-in tareeqa! 💻⚡ #itcafeteria #windows11 #pchacks';
-    thumbnailHeadline = 'WINDOWS 11 SECRET';
-    thumbnailSubBadge = 'AUTO CLEAN & SPEEDUP';
+  } else if (isStorageSense) {
+    const isSequel = lowerTitle.includes('part 2') || lowerTitle.includes('sequel') || lowerTitle.includes('episode 2') || lowerTitle.includes('advanced') || lowerTitle.includes('pro');
+
+    if (isSequel) {
+      // Part 2 / Sequel: Advanced Space Recovery (DISM & CompactOS)
+      hook = 'Storage Sense ke baad bhi C-Drive red hai? Yeh advanced command line trick 25GB free karegi!';
+      description = `C-Drive Red Alert (Part 2: Advanced Pro Space Recovery)! DISM cleanup aur CompactOS se 25GB extra space bachaayein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
+      tags = ['c drive full', 'c drive red', 'part 2 space recovery', 'compact os', 'dism cleanup', 'windows 11 pro', 'it cafeteria', 'waqar majeed'];
+      hashtags = ['#Shorts', '#CDriveFull', '#Part2', '#Windows11Pro', '#ITCafeteria', '#SpaceRecovery'];
+      tiktokCaption = 'C-Drive red masla hal karne ka Advanced Part 2 tarika! 💾⚡ #itcafeteria #windows11 #cdrivefull';
+      thumbnailHeadline = 'C-DRIVE RED (PART 2)';
+      thumbnailSubBadge = 'ADVANCED 25GB RECOVERY';
+
+      rawBeats = [
+        {
+          purpose: 'Disruptive Hook (Part 2 Bridge)',
+          visual: `${charTag} holds red glowing internal SSD drive up to camera with intense focus.`,
+          dialogue: 'Agar Storage Sense chalane ke baad bhi aapki C-Drive red hai, to yeh Part 2 advance trick note karein!'
+        },
+        {
+          purpose: 'Hidden Space Thieves Exposed',
+          visual: 'Disk space analyzer visualizer mapping 25GB locked inside System Volume Information and dormant update cache.',
+          dialogue: 'Asal masla surface files nahi, balkay purane Windows updates ke superseded packages aur dormant hibernation files hain.'
+        },
+        {
+          purpose: 'Step 1: Terminal as Administrator',
+          visual: 'Keyboard pressing Win + X, selecting Terminal (Admin) with glowing cyan command prompt opening.',
+          dialogue: 'Pehla step: Keyboard se Windows plus X dabayein aur Terminal ko Run as Administrator open karein.'
+        },
+        {
+          purpose: 'Step 2: Compact OS Compression',
+          visual: 'Typing "compact.exe /compactos:always" into command line with instant compression progress bar.',
+          dialogue: 'Doosra step: Yeh command enter karein: compact.exe slash compactos always. Yeh Windows OS ko compress karke 8 GB foran free karta hai.'
+        },
+        {
+          purpose: 'Step 3: DISM Deep Component Cleanup',
+          visual: 'Typing "dism.exe /online /cleanup-image /startcomponentcleanup /resetbase" into terminal.',
+          dialogue: 'Teesra step: DISM component cleanup command chalayein jo tamam expire ho chuki update files ko permanently delete karti hai.'
+        },
+        {
+          purpose: 'Step 4: Disable Unused Hibernation',
+          visual: 'Desktop PC screen showing "powercfg -h off", instantly wiping the 16GB hiberfil.sys ghost file.',
+          dialogue: 'Chautha step: Agar desktop use kar rahe hain to powercfg minus h off dabayein. 16 GB ki hidden hiberfil file usi waqt khatam!'
+        },
+        {
+          purpose: 'Visual Transformation (Red to Cyan)',
+          visual: 'File Explorer refreshing: C-Drive storage bar transforms from solid warning red to healthy glowing cyan with 35GB free.',
+          dialogue: 'Check karein! C-Drive ka red bar khatam ho kar healthy blue ho chuka hai aur 30 GB se zyada clean space ready hai.'
+        },
+        {
+          purpose: 'Common Mistake Alert',
+          visual: 'Red prohibition symbol over manually deleting System32 or Windows folder files.',
+          dialogue: 'Khabardaar! Kabhi bhi Windows ya System32 folder se manual files delete mat karein warna OS crash ho sakta hai.'
+        },
+        {
+          purpose: 'Speed Benchmark',
+          visual: 'System diagnostics showing fast 4.2 GHz CPU boost and zero lag across active apps.',
+          dialogue: 'System par zero load hai aur read write speed pehle se 2 guna fast respond kar rahi hai.'
+        },
+        {
+          purpose: 'Episodic Outro & CTA',
+          visual: 'IT Cafeteria Part 2 complete badge with subscribe button pulsating on screen.',
+          dialogue: 'Yeh Part 2 apne doston ke sath share karein aur IT Cafeteria ko follow karke notification on karein!'
+        }
+      ];
+    } else {
+      // Standard Part 1 Storage Sense
+      hook = 'Windows PC slow ho raha hai? Sirf yeh ek hidden setting on karein aur system 2X fast karein!';
+      description = `Windows 11 aur PC speedup secrets! Bina kisi third party tool ke RAM aur storage optimize karein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
+      tags = ['windows 11', 'pc speedup', 'c drive clean', 'storage sense', 'it cafeteria', 'waqar majeed', 'pc hacks urdu'];
+      hashtags = ['#Shorts', '#Windows11', '#PCHacks', '#ITCafeteria', '#TechShorts', '#SpeedUpPC'];
+      tiktokCaption = 'Windows PC ki speed 2X boost karne ka secret Windows built-in tareeqa! 💻⚡ #itcafeteria #windows11 #pchacks';
+      thumbnailHeadline = 'WINDOWS 11 SECRET';
+      thumbnailSubBadge = 'AUTO CLEAN & SPEEDUP';
+
+      rawBeats = [
+        {
+          purpose: 'Disruptive Hook (Pattern Interrupt)',
+          visual: `${charTag} gestures toward a computer monitor showing heavy lag and spinning mouse cursor.`,
+          dialogue: 'Aapka computer ya laptop achanak hang ho raha hai? Kisi third party cleaner app ko bilkul mat install karein!'
+        },
+        {
+          purpose: 'Root Cause Breakdown',
+          visual: 'Task manager opening with 100% disk usage and red warning bar across background services.',
+          dialogue: 'Asal masla background update cache aur temporary log files hain jo silently hard drive par jam hoti rehti hain.'
+        },
+        {
+          purpose: 'Windows Built-in Setting Reveal',
+          visual: 'Keyboard pressing Windows + I, navigating straight to System > Storage settings.',
+          dialogue: 'Windows key plus I dabayein aur System mein Storage par click karein. Yahan Windows ka built-in cleaner maujood hai.'
+        },
+        {
+          purpose: 'Storage Sense Activation',
+          visual: 'Toggling Storage Sense switch to ON and configuring automatic cleanup intervals.',
+          dialogue: 'Storage Sense ko on karein aur cleanup frequency ko Every Week par set karein taake junk auto delete hota rahe.'
+        },
+        {
+          purpose: 'Run Cleaner Now',
+          visual: 'Clicking Run Storage Sense Now button, releasing 18GB of temporary cache in 3 seconds.',
+          dialogue: 'Ab Run Storage Sense dabayein. Chand seconds ke andar 15 se 20 GB tak hidden junk baghair kisi error ke saaf!'
+        },
+        {
+          purpose: 'Performance Proof',
+          visual: 'Task Manager disk and CPU drop from 95% down to 3%, green checkmark appears.',
+          dialogue: 'Nateeja dekhein! System load foran normal ho gaya aur applications bina kisi delay ke instant open ho rahi hain.'
+        },
+        {
+          purpose: 'Startup Apps Audit',
+          visual: 'Task Manager startup tab: Disabling Spotify and Steam auto-start on boot.',
+          dialogue: 'Task Manager mein Startup Apps par ja kar faltu software disable karein taake PC boot time aadha reh jaye.'
+        },
+        {
+          purpose: 'Safety Alert',
+          visual: 'Warning graphic showing corrupted registry error caused by unsafe cleaners.',
+          dialogue: 'Kabhi bhi unsafe registry cleaner mat use karein jo Windows files delete kar ke blue screen of death le aaye.'
+        },
+        {
+          purpose: 'Summary & Value',
+          visual: `${charTag} in sleek cyber workstation with smooth running monitors and clean desktop.`,
+          dialogue: 'Yeh do minute ki setting aapke laptop ki life aur speed ko salon tak fresh aur tez rakhegi.'
+        },
+        {
+          purpose: 'Closing & Subscribe',
+          visual: 'IT Cafeteria subscribe button and YouTube channel bell animation.',
+          dialogue: 'Daily Windows aur laptop shortcuts seekhne ke liye IT Cafeteria ko foran subscribe karein!'
+        }
+      ];
+    }
+  } else if (isGodMode) {
+    hook = 'Windows 11 ka Secret God Mode: Aik single folder se 200+ hidden control panel settings unlock karein!';
+    description = `Windows 11 God Mode Secret Trick! 200 se zyada hidden system settings aik jagah.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
+    tags = ['windows god mode', 'god mode trick', 'hidden settings windows 11', 'it cafeteria', 'waqar majeed', 'pc shortcuts urdu'];
+    hashtags = ['#Shorts', '#GodMode', '#Windows11', '#ITCafeteria', '#PCSecrets'];
+    tiktokCaption = 'Windows 11 ka Secret God Mode kaise activate karein! 🔥⚡ #itcafeteria #godmode #pchacks';
+    thumbnailHeadline = 'WINDOWS GOD MODE';
+    thumbnailSubBadge = '200+ HIDDEN SETTINGS';
 
     rawBeats = [
       {
         purpose: 'Disruptive Hook (Pattern Interrupt)',
-        visual: `${charTag} gestures toward a computer monitor showing heavy lag and spinning mouse cursor.`,
-        dialogue: 'Aapka computer ya laptop achanak hang ho raha hai? Kisi third party cleaner app ko bilkul mat install karein!'
+        visual: `${charTag} stands before multiple holographic control panels expanding in 360 degrees.`,
+        dialogue: 'Windows ki settings dhoondne ke liye kya aap abhi bhi 10 alag alag menus mein bhatak rahe hain?'
       },
       {
-        purpose: 'Root Cause Breakdown',
-        visual: 'Task manager opening with 100% disk usage and red warning bar across background services.',
-        dialogue: 'Asal masla background update cache aur temporary log files hain jo silently hard drive par jam hoti rehti hain.'
+        purpose: 'God Mode Reveal',
+        visual: 'Desktop screen creating new folder and renaming with secret GUID code.',
+        dialogue: 'Desktop par right-click karke new folder banayein aur yeh secret GUID code paste karein.'
       },
       {
-        purpose: 'Windows Built-in Setting Reveal',
-        visual: 'Keyboard pressing Windows + I, navigating straight to System > Storage settings.',
-        dialogue: 'Windows key plus I dabayein aur System mein Storage par click karein. Yahan Windows ka built-in cleaner maujood hai.'
+        purpose: 'Step 1: GUID Code Rename',
+        visual: 'Pasting "GodMode.{ED7BA470-8E54-465E-825C-99712043E01C}" into folder name.',
+        dialogue: 'Folder name mein likhein: GodMode dot aur curly braces mein secret GUID code.'
       },
       {
-        purpose: 'Storage Sense Activation',
-        visual: 'Toggling Storage Sense switch to ON and configuring automatic cleanup intervals.',
-        dialogue: 'Storage Sense ko on karein aur cleanup frequency ko Every Week par set karein taake junk auto delete hota rahe.'
+        purpose: 'Instant Icon Transformation',
+        visual: 'Ordinary yellow folder instantly morphs into official blue Control Panel icon.',
+        dialogue: 'Enter dabate hi aam folder official Control Panel icon mein transform ho jayega.'
       },
       {
-        purpose: 'Run Cleaner Now',
-        visual: 'Clicking Run Storage Sense Now button, releasing 18GB of temporary cache in 3 seconds.',
-        dialogue: 'Ab Run Storage Sense dabayein. Chand seconds ke andar 15 se 20 GB tak hidden junk baghair kisi error ke saaf!'
+        purpose: 'Explore 200+ Settings',
+        visual: 'Folder opens revealing categorized list of 206 master settings in one window.',
+        dialogue: 'Isay open karein! Yahan Power, Display, Security aur User Accounts ki 200 se zyada hidden settings aik click par dastyab hain.'
       },
       {
-        purpose: 'Performance Proof',
-        visual: 'Task Manager disk and CPU drop from 95% down to 3%, green checkmark appears.',
-        dialogue: 'Nateeja dekhein! System load foran normal ho gaya aur applications bina kisi delay ke instant open ho rahi hain.'
+        purpose: 'Pro Tip: Search Shortcut',
+        visual: 'Typing "power" into search bar, instant 1-click access to advanced power plan.',
+        dialogue: 'Pro tip: Search bar mein sirf keyword type karein aur ghanton ka kaam seconds mein karein.'
       },
       {
-        purpose: 'Startup Apps Audit',
-        visual: 'Task Manager startup tab: Disabling Spotify and Steam auto-start on boot.',
-        dialogue: 'Task Manager mein Startup Apps par ja kar faltu software disable karein taake PC boot time aadha reh jaye.'
+        purpose: 'Desktop Pinning',
+        visual: 'Dragging shortcut to taskbar with cyan neon outline.',
+        dialogue: 'Is folder ka shortcut taskbar par pin karein taake hamesha ready rahe.'
       },
       {
-        purpose: 'Safety Alert',
-        visual: 'Warning graphic showing corrupted registry error caused by unsafe cleaners.',
-        dialogue: 'Kabhi bhi unsafe registry cleaner mat use karein jo Windows files delete kar ke blue screen of death le aaye.'
+        purpose: 'Zero Registry Risk',
+        visual: 'Green shield security badge confirming 100% native safe Windows feature.',
+        dialogue: 'Yeh 100 fisad safe Windows official feature hai, koi registry edit nahi hoti.'
       },
       {
         purpose: 'Summary & Value',
-        visual: `${charTag} in sleek cyber workstation with smooth running monitors and clean desktop.`,
-        dialogue: 'Yeh do minute ki setting aapke laptop ki life aur speed ko salon tak fresh aur tez rakhegi.'
+        visual: `${charTag} pointing to organized workstation with clean control panel.`,
+        dialogue: 'Har computer user ke paas yeh God Mode folder lazmi hona chahiye.'
       },
       {
         purpose: 'Closing & Subscribe',
-        visual: 'IT Cafeteria subscribe button and YouTube channel bell animation.',
-        dialogue: 'Daily Windows aur laptop shortcuts seekhne ke liye IT Cafeteria ko foran subscribe karein!'
+        visual: 'IT Cafeteria subscribe button and community card.',
+        dialogue: 'Aisi mazeed hidden Windows tricks ke liye IT Cafeteria ko follow karein!'
+      }
+    ];
+  } else if (isExcelCenter) {
+    hook = 'Excel mein cells merge karna band karein! Yeh Center Across Selection trick formulas ko tootne se bachayegi.';
+    description = `Excel Center Across Selection trick! Merge Cells ki wajah se formulas break hona hamesha ke liye band.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
+    tags = ['excel center across selection', 'stop merge cells', 'excel formulas', 'it cafeteria', 'waqar majeed', 'excel hacks urdu'];
+    hashtags = ['#Shorts', '#ExcelHacks', '#CenterAcrossSelection', '#ITCafeteria', '#DataTips'];
+    tiktokCaption = 'Excel mein cells merge karne ki ghalti hamesha ke liye band karein! 📊⚡ #itcafeteria #excel #techtips';
+    thumbnailHeadline = 'STOP MERGING CELLS';
+    thumbnailSubBadge = 'CENTER ACROSS SELECTION';
+
+    rawBeats = [
+      {
+        purpose: 'Disruptive Hook (Pattern Interrupt)',
+        visual: `${charTag} points to Excel sheet where #VALUE! error pops up after merging cells.`,
+        dialogue: 'Agar aap bhi Excel mein heading center karne ke liye Merge Cells use karte hain, to foran ruk jayein!'
+      },
+      {
+        purpose: 'The Merge Cells Catastrophe',
+        visual: 'Employee trying to sort column or drag formula, getting annoying "Merged cells must be identical size" popup.',
+        dialogue: 'Merge cells karne se formulas toot jate hain aur column sorting mukammal block ho jati hai.'
+      },
+      {
+        purpose: 'The Professional Alternative',
+        visual: 'Selecting cells A1 to E1 without merging.',
+        dialogue: 'Cells ko select karein jahan heading center karni hai, lekin Merge button par click na karein.'
+      },
+      {
+        purpose: 'Step 1: Format Cells Shortcut',
+        visual: 'Pressing Ctrl + 1 on keyboard, Format Cells dialogue box opens instantly.',
+        dialogue: 'Keyboard se Ctrl plus 1 dabayein taake Format Cells window open ho.'
+      },
+      {
+        purpose: 'Step 2: Center Across Selection',
+        visual: 'Navigating to Alignment tab > Horizontal dropdown > Selecting "Center Across Selection".',
+        dialogue: 'Alignment tab mein Horizontal dropdown se Center Across Selection select karein aur OK dabayein.'
+      },
+      {
+        purpose: 'Proof & Visual Result',
+        visual: 'Text centers perfectly across 5 columns while cells A1, B1, C1 remain completely independent.',
+        dialogue: 'Jadu dekhein! Heading bilkul center mein aa gayi lekin cells alag alag hain aur koi formula nahi toota.'
+      },
+      {
+        purpose: 'Sorting & Filter Test',
+        visual: 'Dragging formulas and sorting columns smoothly with green verification checks.',
+        dialogue: 'Ab aap columns ko bina kisi rukawat ke filter aur sort kar sakte hain.'
+      },
+      {
+        purpose: 'Pro Tip: Macro Shortcut',
+        visual: 'Demonstration of 1-click personal ribbon button for Center Across Selection.',
+        dialogue: 'Pro tip: Quick Access Toolbar mein iska button add karein taake 1-click se apply ho sake.'
+      },
+      {
+        purpose: 'Summary & Value',
+        visual: `${charTag} smiling at clean structured Excel financial dashboard.`,
+        dialogue: 'Yeh choti si trick corporate data analysts ki sab se favourite setting hai.'
+      },
+      {
+        purpose: 'Closing & Subscribe',
+        visual: 'IT Cafeteria subscribe card and YouTube notification bell.',
+        dialogue: 'Daily Excel aur office hacks ke liye IT Cafeteria ko foran subscribe karein!'
       }
     ];
   } else {

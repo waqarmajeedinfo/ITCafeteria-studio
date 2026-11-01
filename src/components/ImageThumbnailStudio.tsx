@@ -12,6 +12,12 @@ import {
   Wand2
 } from 'lucide-react';
 
+export type ThumbnailModelId =
+  | 'xiaomi-mimo-v2.6-pro-free'
+  | 'mimo-v2.6-pro'
+  | 'gemini-nano-banana-2.1'
+  | 'gemini-3.1-flash-lite-image';
+
 export const ImageThumbnailStudio: React.FC = () => {
   const [headline, setHeadline] = useState('STORAGE SENSE');
   const [subBanner, setSubBanner] = useState('Auto Clean PC');
@@ -20,13 +26,31 @@ export const ImageThumbnailStudio: React.FC = () => {
   );
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9' | '1:1'>('9:16');
   const [imageSize, setImageSize] = useState<'1K' | '2K'>('1K');
-  const [model, setModel] = useState<'xiaomi-mimo-v2.6-pro-free' | 'gemini-3.1-flash-lite-image'>('xiaomi-mimo-v2.6-pro-free');
+  const [model, setModel] = useState<ThumbnailModelId>('xiaomi-mimo-v2.6-pro-free');
   const [base64InputImage, setBase64InputImage] = useState<string | null>(null);
   const [inputImageName, setInputImageName] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [usedModel, setUsedModel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Xiaomi / AIHubMix API Key State
+  const [xiaomiKeyInput, setXiaomiKeyInput] = useState<string>(() => {
+    try {
+      return localStorage.getItem('itc_xiaomi_api_key') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [serverStatus, setServerStatus] = useState<{ configured: boolean; keySource: string | null } | null>(null);
+
+  React.useEffect(() => {
+    fetch('/api/ai/xiaomi-status')
+      .then((r) => r.json())
+      .then((data) => setServerStatus(data))
+      .catch(() => {});
+  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -44,47 +68,37 @@ export const ImageThumbnailStudio: React.FC = () => {
     setIsLoading(true);
     setError(null);
 
-    const modelsToTry = model === 'xiaomi-mimo-v2.6-pro-free'
-      ? ['xiaomi-mimo-v2.6-pro-free', 'gemini-3.1-flash-lite-image'] as const
-      : ['gemini-3.1-flash-lite-image', 'xiaomi-mimo-v2.6-pro-free'] as const;
-
-    let lastError: Error | null = null;
+    const isXiaomi = model.includes('xiaomi') || model.includes('mimo');
 
     try {
-      for (const modelId of modelsToTry) {
-        try {
-          const res = await fetch('/api/ai/generate-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt: prompt.trim(),
-              aspectRatio,
-              imageSize,
-              model: modelId,
-              base64InputImage: base64InputImage || undefined,
-            }),
-          });
+      const res = await fetch('/api/ai/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(xiaomiKeyInput.trim() ? { 'x-xiaomi-api-key': xiaomiKeyInput.trim() } : {})
+        },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          aspectRatio,
+          imageSize,
+          model,
+          base64InputImage: base64InputImage || undefined,
+          xiaomiApiKey: xiaomiKeyInput.trim() || undefined
+        }),
+      });
 
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || `Image generation failed with status ${res.status}`);
-          }
-
-          const data = await res.json();
-          if (!data.imageUrl) {
-            throw new Error('No image URL returned from model.');
-          }
-
-          setGeneratedImageUrl(data.imageUrl);
-          setUsedModel(modelId);
-          lastError = null;
-          break;
-        } catch (err: any) {
-          lastError = err;
-        }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Image generation failed with status ${res.status}`);
       }
 
-      if (lastError) throw lastError;
+      const data = await res.json();
+      if (!data.imageUrl) {
+        throw new Error('No image URL returned from model.');
+      }
+
+      setGeneratedImageUrl(data.imageUrl);
+      setUsedModel(model);
     } catch (err: any) {
       console.error('Image gen error:', err);
       setError(err.message || 'Image generation failed.');
@@ -117,16 +131,74 @@ export const ImageThumbnailStudio: React.FC = () => {
               </h2>
             </div>
             <p className="text-xs text-slate-400 max-w-3xl">
-              Model: <strong className="text-cyan-400 font-mono">xiaomi-mimo-v2.6-pro-free</strong> (supports 1K, 2K & high-fidelity visual polish). Generate or edit IT Cafeteria thumbnails matching Section 19.1.2 Universal Anatomical Template.
+              Model: <strong className="text-cyan-400 font-mono">xiaomi-mimo-v2.6-pro-free</strong> (supports 1K, 2K & high-fidelity visual polish). Generate or edit IT Cafeteria thumbnails match 19.1.2 Universal Anatomical Template.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="px-3 py-1.5 bg-cyan-950/60 text-cyan-300 border border-cyan-800/40 rounded-xl">
-              xiaomi-mimo-v2.6-pro-free
+          <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+            <span className="px-3 py-1.5 bg-cyan-950/60 text-cyan-300 border border-cyan-800/40 rounded-xl flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              Xiaomi Mimo 2.6 Pro
             </span>
+            <button
+              type="button"
+              onClick={() => setShowKeyInput(!showKeyInput)}
+              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-[11px] font-sans flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Xiaomi / AIHubMix API Key Config"
+            >
+              <Sliders className="w-3 h-3 text-cyan-400" />
+              <span>{serverStatus?.configured ? 'API Key: Active (Render)' : xiaomiKeyInput ? 'Custom Key: Set' : 'Add API Key'}</span>
+            </button>
           </div>
         </div>
+
+        {/* Optional Collapsible Key Input */}
+        {showKeyInput && (
+          <div className="mt-4 pt-4 border-t border-slate-800/80 bg-slate-950/60 -mx-5 -mb-5 p-5 rounded-b-2xl space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-white flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-cyan-400" />
+                Xiaomi MiMo / AIHubMix API Key Settings
+              </span>
+              {serverStatus?.configured && (
+                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono">
+                  ✓ Server Environment Connected ({serverStatus.keySource})
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Render.com یا GitHub Environment Variables mein <code>XIAOMI_API_KEY</code> save hai to automatically use hogi. Agar aap yahan local key lagana chahte hain to paste karein:
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={xiaomiKeyInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setXiaomiKeyInput(val);
+                  try {
+                    if (val.trim()) localStorage.setItem('itc_xiaomi_api_key', val.trim());
+                    else localStorage.removeItem('itc_xiaomi_api_key');
+                  } catch {}
+                }}
+                placeholder="sk-gateway-... ya sk-... (Xiaomi MiMo / AIHubMix Key)"
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono"
+              />
+              {xiaomiKeyInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setXiaomiKeyInput('');
+                    try { localStorage.removeItem('itc_xiaomi_api_key'); } catch {}
+                  }}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-rose-300 rounded-xl text-xs cursor-pointer"
+                >
+                  Clear Key
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Workspace */}
@@ -256,8 +328,9 @@ export const ImageThumbnailStudio: React.FC = () => {
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-white focus:outline-none focus:border-cyan-400"
                 disabled={isLoading}
               >
-                
-                <option value="xiaomi-mimo-v2.6-pro-free">Xiami Mimo 2.6 Pro (HQ)</option>
+                <option value="xiaomi-mimo-v2.6-pro-free">Xiaomi Mimo 2.6 Pro (HQ)</option>
+                <option value="mimo-v2.6-pro">Xiaomi Mimo 2.6 Pro (Flagship)</option>
+                <option value="gemini-nano-banana-2.1">Nano Banana 2.1 (Google)</option>
                 <option value="gemini-3.1-flash-lite-image">Flash Lite Image (Fast)</option>
               </select>
             </div>

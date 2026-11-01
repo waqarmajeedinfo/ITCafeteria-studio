@@ -23,6 +23,7 @@ import {
   type DynamicPublishedStory 
 } from '../lib/publishedLibraryStore';
 import { StoryPackageView, buildStoryPackageText } from './StoryPackageView';
+import { findDuplicateMatches, CORE_TOPIC_CONCEPTS } from './AgentFlowScreen';
 
 export const DuplicateChecker: React.FC = () => {
   const [videos, setVideos] = useState<DynamicPublishedStory[]>(getAllPublishedVideos);
@@ -32,6 +33,25 @@ export const DuplicateChecker: React.FC = () => {
   const [seriesFilter, setSeriesFilter] = useState('all');
   const [copiedMemory, setCopiedMemory] = useState(false);
   const [reviewStory, setReviewStory] = useState<DynamicPublishedStory | null>(null);
+
+  // Centralized Sequel Launcher: Guarantees localStorage persistence + immediate custom event dispatch
+  const handleLaunchSequel = (target: { tool: string; title: string; series?: string }) => {
+    const topicData = {
+      tool: target.tool,
+      title: target.title,
+      series: target.series,
+      isSequel: true
+    };
+    try {
+      localStorage.setItem('itcafeteria_prefill_topic', JSON.stringify(topicData));
+    } catch {}
+    window.dispatchEvent(
+      new CustomEvent('itcafeteria_open_simulator_for_topic', {
+        detail: topicData
+      })
+    );
+    setReviewStory(null);
+  };
 
   // Sync with dynamic library events
   useEffect(() => {
@@ -61,9 +81,19 @@ export const DuplicateChecker: React.FC = () => {
     return matchesSearch && matchesSeries;
   });
 
-  // Duplicate Analysis Logic across ALL videos (static 58 + live published)
+  // Deep Duplicate Analysis Logic across ALL videos (static 58 + live published + core concepts)
   const getDuplicateStatus = () => {
     if (!toolInput.trim() && !featureInput.trim()) return null;
+
+    const candidateText = `${toolInput.trim()} ${featureInput.trim()}`.toLowerCase();
+    
+    // 1. Deep Concept Match
+    const matchedConcept = CORE_TOPIC_CONCEPTS.find(c => 
+      c.aliases.some(alias => candidateText.includes(alias))
+    );
+
+    // 2. Comprehensive deep matching
+    const deepMatches = findDuplicateMatches(toolInput.trim(), featureInput.trim(), 'itcafeteria');
 
     const matchedVideos = videos.filter(v => {
       const matchTool = toolInput.trim() && v.tool.toLowerCase().includes(toolInput.toLowerCase().trim());
@@ -71,14 +101,35 @@ export const DuplicateChecker: React.FC = () => {
         v.points.toLowerCase().includes(featureInput.toLowerCase().trim()) ||
         v.title.toLowerCase().includes(featureInput.toLowerCase().trim())
       );
-      return matchTool && matchFeature;
+      const matchConcept = matchedConcept && (
+        matchedConcept.aliases.some(alias => `${v.title} ${v.tool} ${v.points}`.toLowerCase().includes(alias))
+      );
+      return (matchTool && matchFeature) || matchConcept;
     });
 
-    if (matchedVideos.length > 0) {
+    if (matchedVideos.length > 0 || deepMatches.length > 0) {
+      const combined = [...matchedVideos];
+      deepMatches.forEach(dm => {
+        const numId = parseInt(dm.id.replace('#', ''), 10);
+        if (!combined.some(v => v.title === dm.title || v.id === numId)) {
+          combined.push({
+            id: isNaN(numId) ? 999 : numId,
+            title: dm.title,
+            tool: dm.tool,
+            points: dm.points,
+            series: 'Published',
+            length: '60s',
+            published: 'Platform Record'
+          });
+        }
+      });
+
       return {
         isDuplicate: true,
-        matches: matchedVideos,
-        message: `Pehle cover ho chuka hai! (Found in ${matchedVideos.length} published video/part)`
+        matches: combined,
+        message: matchedConcept 
+          ? `Deep Concept Duplicate: "${matchedConcept.name}" pehle cover ho chuka hai! (${combined.length} matches)`
+          : `Pehle cover ho chuka hai! (Found in ${combined.length} published video/part)`
       };
     }
 
@@ -99,7 +150,7 @@ export const DuplicateChecker: React.FC = () => {
     return {
       isDuplicate: false,
       matches: [],
-      message: "Naya Topic! (Poori published library mein koi duplicate nahi mila)"
+      message: "Naya Topic! (Poori published library aur deep concept checks mein koi duplicate nahi mila)"
     };
   };
 
@@ -315,13 +366,7 @@ export const DuplicateChecker: React.FC = () => {
                       <div className="flex items-center justify-end gap-1.5 flex-wrap">
                         <button
                           type="button"
-                          onClick={() => {
-                            window.dispatchEvent(
-                              new CustomEvent('itcafeteria_open_simulator_for_topic', {
-                                detail: { tool: v.tool, title: v.title, series: v.series, isSequel: true }
-                              })
-                            );
-                          }}
+                          onClick={() => handleLaunchSequel(v)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold border bg-cyan-950/80 hover:bg-cyan-900 border-cyan-500/50 text-cyan-300 hover:text-white transition-all cursor-pointer shadow-sm"
                           title="Is topic ka agla part / sequel Agent Simulator mein trigger karein"
                         >
@@ -402,14 +447,7 @@ export const DuplicateChecker: React.FC = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        setReviewStory(null);
-                        window.dispatchEvent(
-                          new CustomEvent('itcafeteria_open_simulator_for_topic', {
-                            detail: { tool: reviewStory.tool, title: reviewStory.title, series: reviewStory.series, isSequel: true }
-                          })
-                        );
-                      }}
+                      onClick={() => handleLaunchSequel(reviewStory)}
                       className="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-lg cursor-pointer transition-colors"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
@@ -461,18 +499,11 @@ export const DuplicateChecker: React.FC = () => {
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        setReviewStory(null);
-                        window.dispatchEvent(
-                          new CustomEvent('itcafeteria_open_simulator_for_topic', {
-                            detail: { tool: reviewStory.tool, title: reviewStory.title }
-                          })
-                        );
-                      }}
+                      onClick={() => handleLaunchSequel(reviewStory)}
                       className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-lg cursor-pointer"
                     >
-                      <span>Create Sequel</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Create Sequel (اگلا پارٹ بنائیں)</span>
                     </button>
                   </div>
                 </div>

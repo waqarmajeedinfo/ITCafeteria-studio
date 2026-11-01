@@ -140,6 +140,7 @@ export const AgentSimulator: React.FC = () => {
   const [memoryRecords, setMemoryRecords] = useState<AgentMemoryRecord[]>(loadMemoryRecords);
   const [latestStory, setLatestStory] = useState<GeneratedStory | null>(loadLatestStory);
   const [flowOpen, setFlowOpen] = useState(false);
+  const [flowInitialTopic, setFlowInitialTopic] = useState<{ title: string; tool?: string; isSequel?: boolean } | null>(null);
 
   const profilesMap = CHANNEL_PROFILES as unknown as Record<string, ChannelProfile>;
   const draftProfile = (channels[draftChannel] || profilesMap[draftChannel] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile;
@@ -167,6 +168,53 @@ export const AgentSimulator: React.FC = () => {
   const outcomeStatus = triggerOutcome?.status;
   const decisionTitle = triggerOutcome?.story?.title || triggerOutcome?.idea?.title || triggerOutcome?.title || appliedNote?.title || 'Trigger dabayein';
   const decisionHook = triggerOutcome?.story?.hook || triggerOutcome?.idea?.hook || triggerOutcome?.hook || appliedNote?.hook || 'Pending';
+
+  const applyTopicData = (topicData: any) => {
+    if (!topicData) return;
+    const toolLower = (topicData.tool || '').toLowerCase();
+    const titleLower = (topicData.title || '').toLowerCase();
+    let targetCat = 4; // default PC & Windows Hacks
+    if (toolLower.includes('whatsapp') || titleLower.includes('whatsapp')) targetCat = 3;
+    else if (toolLower.includes('power automate') || titleLower.includes('power automate')) targetCat = 2;
+    else if (toolLower.includes('ai') || toolLower.includes('flow') || toolLower.includes('bot') || titleLower.includes('sheets') || titleLower.includes('gemini') || titleLower.includes('ai')) targetCat = 1;
+    else if (toolLower.includes('secret') || titleLower.includes('secret')) targetCat = 5;
+
+    const rawTitle = String(topicData.title || '').trim();
+    let finalTitle = rawTitle;
+    if (topicData.isSequel) {
+      if (!/part\s*\d+|sequel|episode\s*\d+/i.test(rawTitle)) {
+        finalTitle = `${rawTitle} — Part 2 (Advanced Hacks)`;
+      }
+    }
+
+    setDraftCategory(targetCat);
+    setAppliedSelection({
+      channelId: draftChannel,
+      tag: draftTag,
+      categoryId: targetCat,
+      sceneCount: draftSceneCount
+    });
+    setFlowInitialTopic({
+      title: finalTitle,
+      tool: topicData.tool,
+      isSequel: topicData.isSequel
+    });
+    setTriggerOutcome(null);
+    setFlowOpen(true);
+  };
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('itcafeteria_prefill_topic');
+      if (stored) {
+        localStorage.removeItem('itcafeteria_prefill_topic');
+        const parsed = JSON.parse(stored);
+        if (parsed?.title || parsed?.tool) {
+          applyTopicData(parsed);
+        }
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     try {
@@ -222,24 +270,7 @@ export const AgentSimulator: React.FC = () => {
     const handleTopicEvent = (e: any) => {
       const topicData = e.detail;
       if (topicData) {
-        // Map topic to appropriate category
-        const toolLower = (topicData.tool || '').toLowerCase();
-        const titleLower = (topicData.title || '').toLowerCase();
-        let targetCat = 4; // default PC & Windows Hacks
-        if (toolLower.includes('whatsapp') || titleLower.includes('whatsapp')) targetCat = 3;
-        else if (toolLower.includes('power automate') || titleLower.includes('power automate')) targetCat = 2;
-        else if (toolLower.includes('ai') || toolLower.includes('flow') || toolLower.includes('bot') || titleLower.includes('ai')) targetCat = 1;
-        else if (toolLower.includes('secret') || titleLower.includes('secret')) targetCat = 5;
-
-        setDraftCategory(targetCat);
-        setAppliedSelection({
-          channelId: draftChannel,
-          tag: draftTag,
-          categoryId: targetCat,
-          sceneCount: draftSceneCount
-        });
-        setTriggerOutcome(null);
-        setFlowOpen(true);
+        applyTopicData(topicData);
       }
     };
     window.addEventListener('itcafeteria_open_simulator_for_topic', handleTopicEvent);
@@ -672,7 +703,11 @@ export const AgentSimulator: React.FC = () => {
             selection={appliedSelection}
             memoryRecords={memoryRecords}
             simulatorConfig={simulatorConfig}
-            onClose={() => setFlowOpen(false)}
+            initialTopic={flowInitialTopic}
+            onClose={() => {
+              setFlowOpen(false);
+              setFlowInitialTopic(null);
+            }}
             onOutcome={handleFlowOutcome}
           />
         </ErrorBoundary>

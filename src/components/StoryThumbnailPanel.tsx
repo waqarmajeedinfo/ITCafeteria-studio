@@ -18,7 +18,8 @@ import type { GeneratedStory } from './StoryPackageView';
 import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
 
 const IMAGE_MODELS = [
-  { id: 'gemini-nano-banana-2.1', label: 'Nano Banana 2.1 (best)' },
+  { id: 'xiaomi-mimo-v2.6-pro-free', label: 'Xiaomi Mimo 2.6 Pro (Free / HQ)' },
+  { id: 'gemini-nano-banana-2.1', label: 'Nano Banana 2.1 (Google)' },
   { id: 'gemini-3.1-flash-lite-image', label: 'Gemini 3.1 Flash Lite Image (fallback)' }
 ] as const;
 
@@ -100,7 +101,7 @@ export const StoryThumbnailPanel: React.FC<{
   onUpdateStory?: (updated: GeneratedStory) => void;
 }> = ({ story, onUpdateStory }) => {
   const [copied, setCopied] = useState(false);
-  const [model, setModel] = useState<ImageModel>('gemini-nano-banana-2.1');
+  const [model, setModel] = useState<ImageModel>('xiaomi-mimo-v2.6-pro-free');
   const [loading, setLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [usedModel, setUsedModel] = useState('');
@@ -264,14 +265,23 @@ export const StoryThumbnailPanel: React.FC<{
   };
 
   const requestImage = async (modelId: ImageModel) => {
+    let storedXiaomiKey = '';
+    try {
+      storedXiaomiKey = localStorage.getItem('itc_xiaomi_api_key') || '';
+    } catch {}
+
     const res = await fetch('/api/ai/generate-image', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(storedXiaomiKey ? { 'x-xiaomi-api-key': storedXiaomiKey.trim() } : {})
+      },
       body: JSON.stringify({
         prompt: spec.prompt,
         aspectRatio: '9:16',
         imageSize: '1K',
         model: modelId,
+        ...(storedXiaomiKey ? { xiaomiApiKey: storedXiaomiKey.trim() } : {}),
         ...(referenceImage ? { base64InputImage: referenceImage } : {})
       })
     });
@@ -294,7 +304,9 @@ export const StoryThumbnailPanel: React.FC<{
     setUsedModel('');
 
     const order: ImageModel[] =
-      model === 'gemini-nano-banana-2.1'
+      model === 'xiaomi-mimo-v2.6-pro-free'
+        ? ['xiaomi-mimo-v2.6-pro-free']
+        : model === 'gemini-nano-banana-2.1'
         ? ['gemini-nano-banana-2.1', 'gemini-3.1-flash-lite-image']
         : ['gemini-3.1-flash-lite-image', 'gemini-nano-banana-2.1'];
 
