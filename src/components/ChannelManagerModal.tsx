@@ -53,13 +53,20 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
   const [sceneCount, setSceneCount] = useState(10);
   const [categoriesText, setCategoriesText] = useState('');
 
-  // Lock background scroll when open
+  // AI Suggestion states
+  const [suggestingMeta, setSuggestingMeta] = useState(false);
+  const [suggestedNiches, setSuggestedNiches] = useState<string[]>([]);
+  const [suggestedCategories, setSuggestedCategories] = useState<string[]>([]);
+
+  // Lock background scroll when open & reset fields on open
   useEffect(() => {
     if (isOpen) {
       document.documentElement.classList.add('modal-open');
       document.body.classList.add('modal-open');
       const loaded = loadAllChannels();
       setChannels(loaded);
+      // Explicitly reset form state on modal open to prevent data bleed
+      resetFormFields();
       return () => {
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
@@ -67,6 +74,15 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
       };
     }
   }, [isOpen]);
+
+  // Automatically fetch AI niche suggestions when channel name is typed (with debounce)
+  useEffect(() => {
+    if (!showForm || editingChannelId || !name.trim() || name.trim().length < 3) return;
+    const timer = setTimeout(() => {
+      void handleFetchAiSuggestions();
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [name]);
 
 
   if (!isOpen) return null;
@@ -85,21 +101,49 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     setPlatform('Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
     setSceneCount(10);
     setCategoriesText('');
+    setSuggestedNiches([]);
+    setSuggestedCategories([]);
     setEditingChannelId(null);
     setShowForm(false);
   };
 
   const handleOpenAddForm = () => {
     setName('');
-    setPresenter('Waqar Majeed');
-    setNiche('AI & Tech Workflows');
+    setPresenter('');
+    setNiche('');
     setHasCharacterTag(false);
-    setTag('@WM25-Live');
+    setTag('');
     setPlatform('Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
     setSceneCount(10);
-    setCategoriesText('AI Tools & Agents, Windows & Cloud Hacks, Remote Income Skills, Tutorials');
+    setCategoriesText('');
+    setSuggestedNiches([]);
+    setSuggestedCategories([]);
     setEditingChannelId(null);
     setShowForm(true);
+  };
+
+  const handleFetchAiSuggestions = async () => {
+    if (!name.trim()) {
+      showStatus('Pehle channel ka naam likhein taake AI us se mutaliq niche aur categories suggest kar sake.');
+      return;
+    }
+    setSuggestingMeta(true);
+    try {
+      const res = await fetch('/api/ai/suggest-channel-meta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelName: name.trim() })
+      });
+      const data = await res.json();
+      if (data) {
+        setSuggestedNiches(data.niches || []);
+        setSuggestedCategories(data.categories || []);
+        showStatus('AI ne is channel name ke liye smart Niche aur Categories suggest kar di hain!');
+      }
+    } catch {
+      showStatus('AI suggestions load nahi ho sake.');
+    }
+    setSuggestingMeta(false);
   };
 
   const handleStartEdit = (channel: ExtendedChannelProfile) => {
@@ -428,6 +472,67 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
                     />
                   </div>
                 </div>
+
+                {/* AI Meta Suggestion Trigger & Pills */}
+                <div className="flex items-center justify-between pt-1 pb-1">
+                  <span className="text-[11px] font-semibold text-slate-400">Channel Niche & Categories AI Generator:</span>
+                  <button
+                    type="button"
+                    onClick={handleFetchAiSuggestions}
+                    disabled={suggestingMeta || !name.trim()}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold text-[11px] hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    {suggestingMeta ? <Sparkles className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-cyan-200" />}
+                    <span>✨ AI se Niche aur Categories Suggest Karwayein</span>
+                  </button>
+                </div>
+
+                {/* Suggested Niche & Categories Pills */}
+                {(suggestedNiches.length > 0 || suggestedCategories.length > 0) && (
+                  <div className="p-3 bg-slate-950/80 border border-cyan-500/30 rounded-xl space-y-2.5">
+                    {suggestedNiches.length > 0 && (
+                      <div>
+                        <span className="text-[10px] uppercase font-mono text-cyan-400 block mb-1">Suggested Niches (Click to select):</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {suggestedNiches.map((sNiche, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setNiche(sNiche)}
+                              className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-[11px] transition-colors cursor-pointer"
+                            >
+                              + {sNiche}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {suggestedCategories.length > 0 && (
+                      <div>
+                        <span className="text-[10px] uppercase font-mono text-cyan-400 block mb-1">Suggested Categories (Click to add):</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {suggestedCategories.map((sCat, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => {
+                                const current = categoriesText ? categoriesText.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                if (!current.includes(sCat)) {
+                                  current.push(sCat);
+                                  setCategoriesText(current.join(', '));
+                                }
+                              }}
+                              className="px-2 py-1 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-200 text-[11px] transition-colors cursor-pointer"
+                            >
+                              + {sCat}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>

@@ -599,6 +599,76 @@ Return strict raw JSON (no markdown fences):
   }
 });
 
+// AI Channel Meta Suggestions (5 Niches & 5-10 Categories based on Channel Name)
+app.post('/api/ai/suggest-channel-meta', async (req, res) => {
+  try {
+    const { channelName } = req.body;
+    const ai = getAiClient();
+    const prompt = `Based on the channel name "${channelName || 'New Channel'}", generate smart professional content suggestions in JSON format.
+Return an object with:
+1. "niches": an array of exactly 5 unique niche descriptions tailored to this channel name.
+2. "categories": an array of 8 distinct category names/playlists tailored to this channel name.
+Return ONLY valid JSON.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: { responseMimeType: 'application/json' }
+    });
+
+    let data;
+    try {
+      data = JSON.parse(response.text || '{}');
+    } catch {
+      data = {};
+    }
+
+    const defaultNiches = [
+      'Core Fundamentals & Basics',
+      'Advanced Professional Masterclass',
+      'Secret Tips & Quick Hacks',
+      'Automation & Efficiency Tools',
+      'Case Studies & Live Proof'
+    ];
+
+    const defaultCategories = [
+      'Introduction & Setup',
+      'Step-by-Step Tutorials',
+      'Pro Tips & Tricks',
+      'Troubleshooting Guide',
+      'Live Demonstration',
+      'Case Studies',
+      'Tools & Resources',
+      'Q&A & Masterclass'
+    ];
+
+    res.json({
+      niches: Array.isArray(data.niches) && data.niches.length > 0 ? data.niches.slice(0, 5) : defaultNiches,
+      categories: Array.isArray(data.categories) && data.categories.length > 0 ? data.categories.slice(0, 10) : defaultCategories
+    });
+  } catch (err) {
+    res.json({
+      niches: [
+        'Core Fundamentals & Basics',
+        'Advanced Professional Masterclass',
+        'Secret Tips & Quick Hacks',
+        'Automation & Efficiency Tools',
+        'Case Studies & Live Proof'
+      ],
+      categories: [
+        'Introduction & Setup',
+        'Step-by-Step Tutorials',
+        'Pro Tips & Tricks',
+        'Troubleshooting Guide',
+        'Live Demonstration',
+        'Case Studies',
+        'Tools & Resources',
+        'Q&A & Masterclass'
+      ]
+    });
+  }
+});
+
 // Xiaomi / MiMo Open Platform & AIHubMix Image Generator Helper
 async function generateXiaomiImage(params: {
   prompt: string;
