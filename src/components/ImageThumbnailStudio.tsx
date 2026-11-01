@@ -117,13 +117,13 @@ export const ImageThumbnailStudio: React.FC = () => {
               </h2>
             </div>
             <p className="text-xs text-slate-400 max-w-3xl">
-              Model: <strong className="text-cyan-400 font-mono">gemini-nano-banana-2.1</strong> (supports 1K, 2K & high-fidelity visual polish). Generate or edit IT Cafeteria thumbnails matching Section 19.1.2 Universal Anatomical Template.
+              Model: <strong className="text-cyan-400 font-mono">xiaomi-mimo-v2.6-pro-free</strong> (supports 1K, 2K & high-fidelity visual polish). Generate or edit IT Cafeteria thumbnails matching Section 19.1.2 Universal Anatomical Template.
             </p>
           </div>
 
           <div className="flex items-center gap-2 text-xs font-mono">
             <span className="px-3 py-1.5 bg-cyan-950/60 text-cyan-300 border border-cyan-800/40 rounded-xl">
-              Nano Banana 2.1
+              xiaomi-mimo-v2.6-pro-free
             </span>
           </div>
         </div>
