@@ -156,6 +156,9 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     setPlatform(channel.platform || 'Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
     setSceneCount(channel.defaultSceneCount || 10);
     setCategoriesText(channel.categories.map((c) => c.name).join(', '));
+    // Clear previous AI suggestions & encapsulate per channel context
+    setSuggestedNiches([]);
+    setSuggestedCategories([]);
     setShowForm(true);
   };
 
