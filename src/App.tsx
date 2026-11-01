@@ -1370,7 +1370,11 @@ export default function App() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-white font-semibold text-xs">{item.word}</span>
-                        {item.isCustom ? (
+                        {item.source === 'story_edit' ? (
+                          <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold uppercase flex items-center gap-1">
+                            ⚡ Auto-Learned (Story Edit)
+                          </span>
+                        ) : item.isCustom ? (
                           <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[9px] font-bold uppercase">
                             Custom
                           </span>
@@ -1384,7 +1388,7 @@ export default function App() {
                         <span className="font-mono text-cyan-300 font-bold bg-cyan-950/70 px-2 py-0.5 rounded border border-cyan-800/40 text-xs">
                           Write: {item.fix}
                         </span>
-                        {item.isCustom && (
+                        {(item.isCustom || item.source === 'story_edit') && (
                           <button
                             type="button"
                             onClick={() => {

@@ -152,6 +152,58 @@ const STORAGE_KEYS = {
   AI_DRAFT: 'itcafeteria_latest_ai_draft',
 };
 
+// Dynamic Categorized Topic Bank for Systematic Channel Rotations
+export const CATEGORY_TOPIC_BANK: Record<number, string[]> = {
+  1: [
+    'Google Sheets AI Smart Fill: Ghanton Ka Data Seconds Mein',
+    'Google Gemini AI Vision: Image Se Data Table Extraction',
+    'OpenAI Canvas & Claude Artifacts: Secret Productivity Hacks',
+    'AI Web Scraper: Bina Coding Kisi Bhi Website Ka Data Download Karein'
+  ],
+  2: [
+    'Gemini 1.5 Flash Audio Transcription: 1-Hour Lecture in 30s',
+    'ChatGPT Agent Workflows: Autonomous Tasks Setup',
+    'Claude 3.5 Sonnet Artifacts: Interactive Dashboards in 1-Click',
+    'n8n AI Workflow Automation: Free Self-Hosted Alternatives'
+  ],
+  3: [
+    'AI Prompt Hacks & Shortcuts Masterclass',
+    'DeepSeek vs ChatGPT: 3 Prompts Jo Sab Badal Denge',
+    'Zero-Shot Reasoning Prompts: Complex Math & Logic Solutions',
+    'Role-Play Persona Prompts for Instant Professional Code'
+  ],
+  4: [
+    'Excel Center Across Selection: Stop Merging Cells Forever',
+    'Windows 11 Secret God Mode & Master Control Panel',
+    'Power Automate Desktop: Free Daily Repetitive Task Bot',
+    'Win + R Secret Run Commands Jo 99% Log Nahi Jaante'
+  ],
+  5: [
+    'WhatsApp Multi-Device Hidden Features & HD Photo Lock',
+    'Android Developer Options: 3 Toggles Jo Phone Ko 2X Fast Bana Dein',
+    'WhatsApp Business Automated Catalogs & Payment Integration',
+    'Mobile Screen Mirroring to PC with Zero Lag and High FPS'
+  ],
+  6: [
+    'Outlook Quick Steps & Rules: Inbox Zero in 5 Minutes Daily',
+    'Notion AI Formulas & Database Automation Setup',
+    'Google Workspace Add-ons: Auto-Reply & Contract Generator',
+    'Zapier Free Alternatives: Open-Source Workflow Automation'
+  ],
+  7: [
+    'Urgent Windows Security Alert: Fake Browser Updates Scam',
+    'Google Chrome Zero-Day Patch: Instant Update Guide',
+    'Two-Factor Authentication Hardware Keys vs Authenticator Apps',
+    'Phishing Email Detection: 5 Instant Red Flags'
+  ],
+  9: [
+    'New AI Tools This Week: Top 5 Free Game Changers',
+    'Cursor AI vs GitHub Copilot: The Ultimate Coding Showdown',
+    'Local LLMs on Low-End PC: Ollama Complete Guide',
+    'Perplexity Pro Search: Replace Google Search Forever'
+  ]
+};
+
 export function createFullAutopilotStoryPackage(
   task: {
     id: string;
@@ -161,6 +213,7 @@ export function createFullAutopilotStoryPackage(
     scheduledSlot: string;
     scheduledDate: string;
     priority: string;
+    categoryId?: number;
   },
   sceneCountOverride?: number
 ): GeneratedStory {
@@ -169,87 +222,24 @@ export function createFullAutopilotStoryPackage(
   const cfg = loadSimulatorConfig();
   const targetSceneCount = Math.max(7, Math.min(30, sceneCountOverride || cfg.defaultSceneCount || 10));
 
-  // Beat descriptions and purposes for up to 30 scenes
-  const BEAT_PURPOSES: { purpose: string; hook: string; action: string }[] = [
-    { purpose: 'Disruptive Hook', hook: 'Bhai, kya aapka kaam ghanton tak phansa rehta hai?', action: 'points directly at camera with intense urgency' },
-    { purpose: 'The Bottleneck Exposed', hook: 'Aksar dost purana manual tareeqa use karke apna bohot waqt zaya karte hain.', action: 'indicates red slow-progress error popup on transparent terminal' },
-    { purpose: 'Pattern Interrupt & Reveal', hook: 'Lekin IT Cafeteria par aaj mein aapko ek aesa secret tool dikha raha hoon jo 100% free hai.', action: 'activates floating 3D neon holographic workflow panel' },
-    { purpose: 'Step 1: Rapid Initialization', hook: 'Pehla step note karein: Apne browser ya tool mein yeh hidden switch turn on karein.', action: 'clicks glowing emerald trigger setting on workspace screen' },
-    { purpose: 'Step 2: Core Automation Execution', hook: 'Doosra step: Sirf yeh one-line shortcut enter karein aur automatic run dabayein.', action: 'triggers script execution with cyan circuit ripple effect' },
-    { purpose: 'Visual Transformation & Verification', hook: 'Check karein! Sara raw data bina kisi ghalti ke instantly structured ho chuka hai.', action: 'presents high-contrast before vs after visual comparison' },
-    { purpose: 'Pro Tip: Daily Scheduler', hook: 'Pro tip: Is process ko background timer par set karein taake rozana khud chale.', action: 'leans in with confident smile, highlighting auto-scheduler' },
-    { purpose: 'Cross-Platform Verification', hook: 'Yeh trick Windows, Mac aur Cloud teeno par barabar fast execute hoti hai.', action: 'displays dual-device synchronized terminal outputs side-by-side' },
-    { purpose: 'Optimization & Mistake Warning', hook: 'Dhyan rahe, purani extension delete karna na bhoolein warna conflict aa sakta hai.', action: 'highlights warning border around legacy conflicting software' },
-    { purpose: 'Deep Dive: AI Prompt Injection', hook: 'Iske sath custom AI parameter jorhein taake summary aur categorization bhi auto ho.', action: 'drags neural logic node into active timeline' },
-    { purpose: 'Real-Time Benchmark Test', hook: 'Ab speed test karein: 10,000 rows ka data sirf 4 seconds mein clean!', action: 'launches countdown benchmarking stopwatch with glowing numbers' },
-    { purpose: 'Security & Privacy Check', hook: 'Local privacy safe hai — aapka koi data external server par leak nahi hoga.', action: 'activates green shield security badge over data storage card' },
-    { purpose: 'Multi-Format Export', hook: 'Aik click se Excel, CSV aur JSON teeno formats mein instant export karein.', action: 'taps floating export menu with animated particle confirmation' },
-    { purpose: 'Cloud Sync & Backup', hook: 'Direct Google Drive ya OneDrive folder ke sath automatic link banayein.', action: 'connects cloud pipeline wireframe with smooth camera dolly' },
-    { purpose: 'Workflow Integration Shortcut', hook: 'Desktop par custom shortcut banayein taake double-click se sab chale.', action: 'creates tactile desktop hotkey widget with neon cyan rim' },
-    { purpose: 'Batch Processing Demo', hook: 'Aik file nahi, poora folder drag karein aur multi-batch automation dekhein.', action: 'drags multiple files into ingestion hopper simultaneously' },
-    { purpose: 'Edge Case Error Handling', hook: 'Agar kabhi formula break ho to yeh backup formula automatically restore karega.', action: 'demonstrates fail-safe recovery switch on monitor' },
-    { purpose: 'Mobile Remote Trigger', hook: 'Office ke bahar hon to apne smartphone se bhi yeh script run kar sakte hain.', action: 'holds futuristic glass smartphone showing remote command success' },
-    { purpose: 'Team Sharing & Collaboration', hook: 'Poori team ko invite karein aur shared dashboard par real-time results dekhein.', action: 'expands collaborative network nodes in 3D holographic space' },
-    { purpose: 'Performance Audit', hook: 'Memory usage sirf 5% hai, CPU par koi heavy load nahi parta.', action: 'points to low-consumption diagnostic gauge on screen' },
-    { purpose: 'Custom Styling & Polish', hook: 'Report ka visual layout branded colors mein auto-format ho jata hai.', action: 'swipes hand across table transforming raw numbers to sleek charts' },
-    { purpose: 'Notification Hook', hook: 'Task complete hote hi WhatsApp ya Telegram par instant notification milega.', action: 'receives simulated green push notification ping on wrist device' },
-    { purpose: 'Archival & Version Control', hook: 'Har din ka version auto-save rehta hai, koi purana data lose nahi hoga.', action: 'scrolls through chronological version tree with ease' },
-    { purpose: 'Speed Acceleration Hack', hook: 'Cache flush command lagayein aur execution speed 2x aur tez karein.', action: 'executes turbo-boost toggle with glowing amber pulse' },
-    { purpose: 'User Questions Resolved', hook: 'Comment mein sab se zyada pooche jane wale maslay ka yeh exact hal hai.', action: 'addresses floating audience question bubble with direct answer' },
-    { purpose: 'Executive Summary', hook: 'To summary yeh hai: Ghanton ka manual kaam ab sirf seconds mein done.', action: 'stands center-stage framing the 3 golden rules on screen' },
-    { purpose: 'Episodic Bridge / Part 2 Teaser', hook: 'Agli video mein hum iska full autonomous agent banayein ge jo khud faislay karega.', action: 'points to teaser holographic thumbnail for next episode' },
-    { purpose: 'Subscriber Milestone Callout', hook: 'IT Cafeteria family ke 142K tech creators ka hissa banne ke liye shukriya!', action: 'celebrates with 3D glowing YouTube silver badge in background' },
-    { purpose: 'Pre-CTA Retention Hook', hook: 'Yeh script aur template description mein di gayi link se download karein.', action: 'gestures toward video description pin with glowing pointer' },
-    { purpose: 'Seamless Loop CTA', hook: 'Aisi daily Urdu tech hacks ke liye IT Cafeteria ko follow karein aur doston se share karein!', action: 'outro gesture with magnetic loop cue blending directly into opening' }
-  ];
-
-  const generatedScenes: StoryScene[] = [];
-
-  for (let i = 1; i <= targetSceneCount; i++) {
-    const isLastScene = i === targetSceneCount;
-    const beatIndex = isLastScene ? BEAT_PURPOSES.length - 1 : Math.min(i - 1, BEAT_PURPOSES.length - 2);
-    const beat = BEAT_PURPOSES[beatIndex] || BEAT_PURPOSES[0];
-
-    // Single consistent anchor persona maintained across EVERY scene!
-    const visual = `${tag} stands in cyber studio workstation, ${beat.action}. Floating 3D holographic interface elements on right.`;
-    const dialogue = isLastScene
-      ? `Aisi daily viral tech shortcuts ke liye IT Cafeteria ko subscribe karein aur abhi check karein!`
-      : `${beat.hook} Seedhi baat yeh hai ke is trick se aapka daily production 10x tezi se run hoga.`;
-
-    const rawScript = `${tag} — standing anchor presentation.\nDialogue (Lahori Conversational Urdu): "${dialogue}"\nVisual details: ${visual}`;
-    const directedScript = applyCinematicDirecting(i, rawScript, undefined, beat.purpose);
-
-    generatedScenes.push({
-      num: i,
-      duration: '10s',
-      purpose: beat.purpose,
-      isCTA: isLastScene,
-      words: dialogue.split(/\s+/).filter(Boolean).length,
-      visual,
-      dialogue,
-      script: directedScript
-    });
-  }
+  const topicPackage = generateTopicAccurateStoryPackage({
+    id: task.id,
+    title: task.title,
+    category: task.category,
+    categoryId: task.categoryId,
+    characterTag: task.characterTag,
+    scheduledTime: task.scheduledSlot,
+    scheduledDate: task.scheduledDate,
+    channelName: 'IT Cafeteria',
+    presenter: 'Waqar Majeed'
+  });
 
   return {
-    title: `${task.title} #shorts #itcafeteria`,
-    hook: `Kya aap jante hain ke ${task.title} aapka kitna qeemti waqt bacha sakta hai?`,
-    channelName: 'IT Cafeteria',
-    presenter: 'Waqar Majeed',
-    categoryName: task.category,
-    playlist: 'Autopilot Co-Pilot Series',
-    characterTag: tag,
-    dateLabel: `${task.scheduledDate} • ${task.scheduledSlot}`,
+    ...topicPackage,
     sceneCount: targetSceneCount,
-    hashtags: ['#shorts', '#itcafeteria', '#techurdu', '#pakistantech', '#automation'],
-    description: `${task.title} — IT Cafeteria production guide by Waqar Majeed.\n\nKey Steps:\n1. Open target tool settings\n2. Run automated shortcut\n3. Save clean output instantly\n\nSubscribe for daily Urdu tech shortcuts!\n#itcafeteria #pakistantech #shorts`,
-    tags: ['it cafeteria', 'waqar majeed', 'tech tips', 'urdu tech', 'automation', 'productivity', 'shorts'],
-    tiktokCaption: `${task.title} 🔥⚡ #itcafeteria #pakistantech #shorts`,
     thumbnailHeadline: `${line1 || 'SECRET'} ${line2 || 'TRICK'}`,
-    thumbnailSubBadge: '5 SEC FIX',
-    thumbnailLine1: line1 || 'SECRET',
-    thumbnailLine2: line2 || 'TRICK',
-    thumbnailHologram: 'CONFIRMED 100% WORKING',
+    thumbnailLine1: line1 || topicPackage.thumbnailLine1 || 'SECRET',
+    thumbnailLine2: line2 || topicPackage.thumbnailLine2 || 'TRICK',
     thumbnailPrompt: buildMasterThumbnailPrompt({
       channelName: 'IT Cafeteria',
       presenter: 'Waqar Majeed',
@@ -261,14 +251,6 @@ export function createFullAutopilotStoryPackage(
     }),
     seriesPlan: 'Episode in Autopilot Co-Pilot Series',
     memoryBlock: `Autopilot Task #${task.id} — Priority ${task.priority}. ${targetSceneCount}-Scene Structure. Zero-duplicate verified.`,
-    idea: {
-      title: task.title,
-      hook: 'Pattern interrupt opening hook',
-      angle: 'High-utility viral tech productivity',
-      points: `${targetSceneCount} scenes structured for 104% retention loop with strict persona lock`
-    },
-    discussionNotes: `Generated via Autonomous Multi-Agent Pipeline with ${targetSceneCount}-scene pacing and Lahori conversational dialect.`,
-    scenes: generatedScenes
   };
 }
 
@@ -365,6 +347,26 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<AutopilotTask | null>(null);
   const [showTaskModal, setShowTaskModal] = useState<boolean>(false);
+
+  // Sync All & PKT Scheduler States
+  const [isSyncingAll, setIsSyncingAll] = useState<boolean>(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+  const [pktTime, setPktTime] = useState<string>('');
+  const [pendingStoriesCount, setPendingStoriesCount] = useState<number>(() => {
+    return loadPendingQueue().filter((i) => i.status === 'pending').length;
+  });
+  const [lastDailyCheckResult, setLastDailyCheckResult] = useState<{
+    time: string;
+    status: 'STANDBY' | 'TRIGGERED';
+    pendingCount: number;
+    actionTaken: string;
+  } | null>(() => {
+    try {
+      const stored = localStorage.getItem('itcafeteria_autopilot_last_daily_check');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return null;
+  });
 
   // Background Task Queue State - filters out already published tasks
   const [tasks, setTasks] = useState<AutopilotTask[]>(() => {
@@ -879,6 +881,53 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
     return () => clearInterval(timer);
   }, [isDaemonActive, isWorkerBusy, automationMode, cadenceSeconds, tasks, addLog]);
 
+  // Live PKT (UTC+5) Clock & Pending Queue Listeners
+  useEffect(() => {
+    const updatePkt = () => {
+      const now = new Date();
+      const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+      const pkt = new Date(utc + 5 * 3600000);
+      setPktTime(
+        pkt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+      );
+    };
+    updatePkt();
+    const ticker = setInterval(updatePkt, 1000);
+
+    const handlePendingUpdate = () => {
+      setPendingStoriesCount(loadPendingQueue().filter((i) => i.status === 'pending').length);
+    };
+    window.addEventListener('itcafeteria_pending_queue_updated', handlePendingUpdate);
+
+    return () => {
+      clearInterval(ticker);
+      window.removeEventListener('itcafeteria_pending_queue_updated', handlePendingUpdate);
+    };
+  }, []);
+
+  // Daily 6:00 AM PKT Autonomous Replenishment Watcher
+  useEffect(() => {
+    const checkSchedule = () => {
+      const now = new Date();
+      const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+      const pkt = new Date(utc + 5 * 3600000);
+      const hour = pkt.getHours();
+      const minute = pkt.getMinutes();
+      const todayPktKey = `${pkt.getFullYear()}-${pkt.getMonth() + 1}-${pkt.getDate()}`;
+      const lastTriggeredDate = localStorage.getItem('itcafeteria_autopilot_last_daily_trigger_pkt');
+
+      // Trigger daily at 6:00 AM PKT window (06:00 - 06:04) once per day
+      if (hour === 6 && minute < 5 && lastTriggeredDate !== todayPktKey) {
+        localStorage.setItem('itcafeteria_autopilot_last_daily_trigger_pkt', todayPktKey);
+        addLog('RADAR', '⏰ 6:00 AM PKT Daily Replenishment window reached. Executing check...');
+        void runDailyReplenishmentCheck(false);
+      }
+    };
+
+    const interval = setInterval(checkSchedule, 20000);
+    return () => clearInterval(interval);
+  }, [tasks]);
+
   // Actions
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -886,26 +935,81 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
     setTimeout(() => setCopiedKey(null), 2500);
   };
 
-  const forceSyncAll = () => {
-    addLog('SYNC', 'User triggered manual cross-studio synchronization.');
+  const forceSyncAll = async () => {
+    setIsSyncingAll(true);
+    addLog('SYNC', '🔄 Manual cross-studio synchronization triggered by user.');
+    try {
+      await fetch('/api/autopilot/sync-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      }).catch((e) => console.warn('Sync all backend warning:', e));
+    } catch {}
+
+    // Dispatch global sync events across all tabs and stores
+    window.dispatchEvent(new CustomEvent('itcafeteria_pending_queue_updated'));
+    window.dispatchEvent(new CustomEvent('itcafeteria_calendar_refresh'));
+    window.dispatchEvent(new CustomEvent('itcafeteria_library_updated'));
+    window.dispatchEvent(new CustomEvent(PHONETIC_UPDATED_EVENT));
+    window.dispatchEvent(new Event('storage'));
+
     refreshSyncHealth();
-    addLog('SUCCESS', 'All studio states resynchronized.');
+    setPendingStoriesCount(loadPendingQueue().filter((i) => i.status === 'pending').length);
+    addLog('SUCCESS', '✅ All studio states, pending queue & phonetic dictionary resynchronized.');
+
+    setSyncToast('✅ تمام اسٹوڈیوز، پینڈنگ کیو اور فونیٹک ڈکشنری سنک (Synced) ہو گئے!');
+    setTimeout(() => {
+      setSyncToast(null);
+      setIsSyncingAll(false);
+    }, 2500);
   };
 
-  const enqueueNewSprint = (count: 3 | 7) => {
-    addLog('QUEUE', `Adding ${count}-Day sprint tasks to autonomous queue...`);
+  const enqueueNewSprint = (count: number) => {
+    addLog('QUEUE', `Adding ${count} autonomous tasks to queue...`);
     const newSprintTasks: AutopilotTask[] = [];
     const profile = CHANNEL_PROFILES.itcafeteria;
 
-    for (let i = 0; i < count; i++) {
-      const catId = profile.rotationCategoryIds[i % profile.rotationCategoryIds.length];
-      const cat = profile.categories.find((c) => c.id === catId) || profile.categories[0];
-      const tag = profile.tags[i % profile.tags.length]?.value || '@WM25-1';
+    // Read current rotation anchor
+    let currentTag = '@WM25-1';
+    let currentCatId = 4;
+    try {
+      const rot = JSON.parse(localStorage.getItem(STORAGE_KEYS.ROTATION_STATE) || '{}');
+      if (rot.itcafeteria) {
+        currentTag = rot.itcafeteria.tag || currentTag;
+        currentCatId = rot.itcafeteria.categoryId || currentCatId;
+      }
+    } catch {}
 
-      newSprintTasks.push({
+    const rotCatIds = profile.rotationCategoryIds && profile.rotationCategoryIds.length > 0
+      ? profile.rotationCategoryIds
+      : [4, 2, 1, 5, 3, 6, 7, 9];
+
+    let startCatIdx = rotCatIds.indexOf(currentCatId);
+    if (startCatIdx === -1) startCatIdx = 0;
+
+    let startTagIdx = profile.tags.findIndex((t) => t.value === currentTag);
+    if (startTagIdx === -1) startTagIdx = 0;
+
+    const publishedTitles = new Set(
+      getAllPublishedVideos().map((v) => v.title.toLowerCase().trim())
+    );
+
+    for (let i = 0; i < count; i++) {
+      const catIdx = (startCatIdx + i) % rotCatIds.length;
+      const catId = rotCatIds[catIdx];
+      const cat = profile.categories.find((c) => c.id === catId) || profile.categories[0];
+      const tag = profile.tags[(startTagIdx + i) % profile.tags.length]?.value || '@WM25-1';
+
+      // Pick authentic title from CATEGORY_TOPIC_BANK
+      const bank = CATEGORY_TOPIC_BANK[catId] || [];
+      let chosenTitle = bank[i % bank.length] || `${cat.name} Masterclass (Episode ${i + 1})`;
+      if (publishedTitles.has(chosenTitle.toLowerCase().trim())) {
+        chosenTitle = `${chosenTitle} (Part 2: Advanced Pro Trick)`;
+      }
+
+      const newTask: AutopilotTask = {
         id: `sprint-${Date.now()}-${i + 1}`,
         type: 'AUTO_POST',
-        title: `${cat.name} Masterclass (Episode ${i + 1})`,
+        title: chosenTitle,
         category: cat.name,
         categoryId: cat.id,
         characterTag: tag,
@@ -915,13 +1019,100 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
         scheduledSlot: i % 2 === 0 ? '6:00 PM PKT' : '5:00 PM PKT',
         scheduledDate: `Day ${i + 1}`,
         sourceSignal: 'Multi-Day Content Sprint Generator',
-        evidence: `Coordinated cross-category rotation to maintain peak engagement.`,
+        evidence: `Coordinated rotation (${tag} • ${cat.name}) to maintain peak engagement.`,
         createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      });
+      };
+      newTask.storyPackage = createFullAutopilotStoryPackage(newTask);
+      newSprintTasks.push(newTask);
     }
 
-    setTasks((prev) => [...prev, ...newSprintTasks]);
+    setTasks((prev) => {
+      const updated = [...prev, ...newSprintTasks];
+      try {
+        localStorage.setItem(STORAGE_KEYS.QUEUE, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
     addLog('SUCCESS', `${count} Tasks added to background queue.`);
+
+    // If worker is idle, start executing the first task
+    setTimeout(() => {
+      if (!isWorkerBusy && newSprintTasks.length > 0) {
+        void executeTaskWorker(newSprintTasks[0]);
+      }
+    }, 400);
+  };
+
+  const runDailyReplenishmentCheck = async (manual: boolean = false) => {
+    try {
+      const allPending = loadPendingQueue();
+      const pendingStories = allPending.filter((i) => i.status === 'pending');
+      const count = pendingStories.length;
+      setPendingStoriesCount(count);
+
+      const now = new Date();
+      const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+      const pkt = new Date(utc + 5 * 3600000);
+      const timeStr = pkt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+      // Record to backend
+      fetch('/api/autopilot/trigger-daily', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPendingCount: count, manual })
+      }).catch(() => {});
+
+      if (count >= 3) {
+        addLog('DECISION', `[6:00 AM PKT Trigger] Pending stories count = ${count} (>= 3 threshold). Standby mode active. Zero generation required.`);
+        const checkResult = {
+          time: timeStr,
+          status: 'STANDBY' as const,
+          pendingCount: count,
+          actionTaken: `Pending Queue mein ${count} stories mojood hain (>= 3 threshold). Standby mode active.`
+        };
+        setLastDailyCheckResult(checkResult);
+        try {
+          localStorage.setItem('itcafeteria_autopilot_last_daily_check', JSON.stringify(checkResult));
+        } catch {}
+        if (manual) {
+          setSyncToast(`ℹ️ پینڈنگ کیو میں پہلے ہی ${count} کہانیاں موجود ہیں (3 یا زیادہ)، اس لیے نیا ٹاسک جنریٹ کرنے کی ضرورت نہیں!`);
+          setTimeout(() => setSyncToast(null), 4000);
+        }
+        return;
+      }
+
+      // count < 3: Needs replenishment!
+      addLog('RADAR', `[6:00 AM PKT Trigger] Pending count = ${count} (< 3 threshold). Auto-trigger activated!`);
+
+      const sprintCount = count === 2 ? 1 : 3;
+      enqueueNewSprint(sprintCount);
+
+      const actionText = sprintCount === 3
+        ? `Queue critical (${count} pending <= 1). 3-Day Autonomous Sprint triggered.`
+        : `Queue replenishment (${count} pending === 2). 1 new rotated story queued.`;
+
+      const checkResult = {
+        time: timeStr,
+        status: 'TRIGGERED' as const,
+        pendingCount: count,
+        actionTaken: actionText
+      };
+      setLastDailyCheckResult(checkResult);
+      try {
+        localStorage.setItem('itcafeteria_autopilot_last_daily_check', JSON.stringify(checkResult));
+      } catch {}
+
+      setSyncToast(
+        sprintCount === 3
+          ? `⚡ پینڈنگ لسٹ میں صرف ${count} کہانیاں تھیں! 3 روزہ آٹونومس اسپرنٹ خودکار طور پر کیو میں شامل کر دیا گیا۔`
+          : `⚡ پینڈنگ لسٹ میں 2 کہانیاں تھیں! 1 نئی کہانی شامل کی گئی تاکہ 3 کا ٹارگٹ پورا ہو۔`
+      );
+      setTimeout(() => setSyncToast(null), 5000);
+    } catch (e: any) {
+      console.error('Daily replenishment check failed:', e);
+      addLog('ERROR', `Daily check failed: ${e?.message || 'Unknown error'}`);
+    }
   };
 
   const completedCount = tasks.filter((t) => t.status === 'completed').length;
@@ -1013,10 +1204,12 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
 
                 <button
                   onClick={forceSyncAll}
-                  className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-lg text-xs flex items-center gap-1 cursor-pointer"
+                  disabled={isSyncingAll}
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/50 text-slate-200 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all font-semibold"
                   title="Force Sync Cross-Studios"
                 >
-                  <RefreshCw className="w-3 h-3 text-cyan-400" /> Sync All
+                  <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isSyncingAll ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingAll ? 'Syncing...' : 'Sync All'}</span>
                 </button>
               </div>
             </div>
@@ -1042,6 +1235,76 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sync Toast Notification */}
+      {syncToast && (
+        <div className="p-3 bg-gradient-to-r from-cyan-950 to-indigo-950 border border-cyan-500/50 rounded-xl text-cyan-100 text-xs font-semibold flex items-center justify-between shadow-xl animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span>{syncToast}</span>
+          </div>
+          <button onClick={() => setSyncToast(null)} className="text-cyan-400 hover:text-white cursor-pointer p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 6:00 AM PKT Autonomous Replenishment Trigger Card */}
+      <div className="bg-slate-900/90 border border-indigo-500/40 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-indigo-400" /> Daily 6:00 AM PKT Trigger
+              </span>
+              <span className="font-mono text-xs text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-full border border-cyan-800/50 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping inline-block" />
+                PKT Time (UTC+5): <strong className="text-white">{pktTime || '06:00 AM PKT'}</strong>
+              </span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase border ${
+                pendingStoriesCount >= 3
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
+              }`}>
+                {pendingStoriesCount >= 3
+                  ? `Standby Mode (${pendingStoriesCount} Pending Stories >= 3)`
+                  : `Trigger Active (${pendingStoriesCount} Pending Stories < 3)`}
+              </span>
+            </div>
+
+            <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <span>صبح 6:00 بجے کا خودکار ریپلینشمنٹ ٹرگر (Daily 6:00 AM PKT Autonomous Trigger)</span>
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed max-w-4xl">
+              یہ ٹرگر روزانہ صبح 6:00 بجے پاکستانی وقت کے مطابق چلتا ہے۔ یہ مینجمنٹ میں پینڈنگ کہانیاں چیک کرتا ہے:
+              اگر پینڈنگ کہانیاں <strong>3 کے برابر یا اس سے زیادہ</strong> ہوں تو یہ کوئی کام نہیں کرتا (اسٹینڈ بائی رہتا ہے)۔
+              اگر <strong>3 سے کم</strong> ہوں تو خودکار نئی کہانیاں تلاش کر کے کیو میں لگاتا ہے اور تیار شدہ پیکج پینڈنگ کیو میں منتقل کر دیتا ہے۔
+            </p>
+
+            {lastDailyCheckResult && (
+              <div className="text-[11px] text-slate-400 font-mono mt-1 flex items-center gap-2 flex-wrap">
+                <span className="text-indigo-300">Last Check ({lastDailyCheckResult.time} PKT):</span>
+                <span className={lastDailyCheckResult.status === 'STANDBY' ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
+                  [{lastDailyCheckResult.status}] {lastDailyCheckResult.actionTaken}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => runDailyReplenishmentCheck(true)}
+              disabled={isWorkerBusy}
+              className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/40 cursor-pointer disabled:opacity-40 transition-all border border-indigo-400/30"
+              title="Test the 6:00 AM PKT Check condition right now"
+            >
+              <Zap className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
+              <span>⚡ Run 6:00 AM PKT Check Now</span>
+            </button>
           </div>
         </div>
       </div>
