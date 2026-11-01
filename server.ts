@@ -669,6 +669,59 @@ Return ONLY valid JSON.`;
   }
 });
 
+// AI Category Suggestions for Specific Niche Lookup
+app.post('/api/ai/suggest-categories-for-niche', async (req, res) => {
+  try {
+    const { niche } = req.body;
+    const ai = getAiClient();
+    const prompt = `Based on the channel niche/topic "${niche || 'General Content'}", generate 8-10 contextually relevant category names or playlists in JSON format.
+Return an object with:
+1. "categories": an array of 8 to 10 distinct professional category names tailored to this niche.
+Return ONLY valid JSON.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: { responseMimeType: 'application/json' }
+    });
+
+    let data;
+    try {
+      data = JSON.parse(response.text || '{}');
+    } catch {
+      data = {};
+    }
+
+    const defaultCategories = [
+      'Introduction & Setup',
+      'Step-by-Step Tutorials',
+      'Pro Tips & Tricks',
+      'Troubleshooting Guide',
+      'Live Demonstration',
+      'Case Studies',
+      'Tools & Resources',
+      'Q&A & Masterclass'
+    ];
+
+    res.json({
+      categories: Array.isArray(data.categories) && data.categories.length > 0 ? data.categories.slice(0, 10) : defaultCategories
+    });
+  } catch (err) {
+    res.json({
+      categories: [
+        'Introduction & Setup',
+        'Step-by-Step Tutorials',
+        'Pro Tips & Tricks',
+        'Troubleshooting Guide',
+        'Live Demonstration',
+        'Case Studies',
+        'Tools & Resources',
+        'Q&A & Masterclass'
+      ]
+    });
+  }
+});
+
 // Xiaomi / MiMo Open Platform & AIHubMix Image Generator Helper
 async function generateXiaomiImage(params: {
   prompt: string;

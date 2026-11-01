@@ -7,6 +7,7 @@ export interface ExtendedChannelProfile extends ChannelProfile {
   isCustom?: boolean;
   platform?: string;
   hasCharacterTag?: boolean;
+  aspectRatio?: '9:16' | '16:9';
 }
 
 export const DEFAULT_CHANNELS: Record<string, ExtendedChannelProfile> = {

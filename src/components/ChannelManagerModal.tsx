@@ -52,38 +52,43 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
   const [platform, setPlatform] = useState('Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
   const [sceneCount, setSceneCount] = useState(10);
   const [categoriesText, setCategoriesText] = useState('');
+  const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16');
 
   // AI Suggestion states
   const [suggestingMeta, setSuggestingMeta] = useState(false);
   const [suggestedNiches, setSuggestedNiches] = useState<string[]>([]);
   const [suggestedCategories, setSuggestedCategories] = useState<string[]>([]);
 
-  // Lock background scroll when open & reset fields on open
+  // Centralized useEffect hook monitoring editingChannelId / active channel context to clear local niche, category, and tag state arrays upon change, preventing cross-channel data pollution.
   useEffect(() => {
-    if (isOpen) {
-      document.documentElement.classList.add('modal-open');
-      document.body.classList.add('modal-open');
-      const loaded = loadAllChannels();
-      setChannels(loaded);
-      // Explicitly reset form state on modal open to prevent data bleed
-      resetFormFields();
-      return () => {
-        document.documentElement.classList.remove('modal-open');
-        document.body.classList.remove('modal-open');
-        dirtyManager.clearDirty('channel_manager');
-      };
+    setSuggestedNiches([]);
+    setSuggestedCategories([]);
+    if (!editingChannelId) {
+      setNiche('');
+      setTag('');
+      setCategoriesText('');
+      setAspectRatio('9:16');
     }
-  }, [isOpen]);
+  }, [editingChannelId]);
 
-  // Automatically fetch AI niche suggestions when channel name is typed (with debounce)
+  // Automatically trigger AI niche suggestion engine when channel name meets minimum length requirement (>= 3 chars) or on blur
   useEffect(() => {
-    if (!showForm || editingChannelId || !name.trim() || name.trim().length < 3) return;
+    if (!showForm || !name.trim() || name.trim().length < 3) return;
     const timer = setTimeout(() => {
       void handleFetchAiSuggestions();
-    }, 700);
+    }, 600);
     return () => clearTimeout(timer);
   }, [name]);
 
+  // Automatically trigger AI category lookup when niche is selected or changed, and reset category selection for consistency
+  useEffect(() => {
+    if (!showForm || !niche.trim() || niche.trim().length < 3) return;
+    setCategoriesText(''); // Reset category selection when niche changes
+    const timer = setTimeout(() => {
+      void handleFetchCategoriesForNiche(niche.trim());
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [niche]);
 
   if (!isOpen) return null;
 
@@ -103,45 +108,58 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     setCategoriesText('');
     setSuggestedNiches([]);
     setSuggestedCategories([]);
+    setAspectRatio('9:16');
     setEditingChannelId(null);
     setShowForm(false);
   };
 
   const handleOpenAddForm = () => {
-    setName('');
-    setPresenter('');
-    setNiche('');
-    setHasCharacterTag(false);
-    setTag('');
-    setPlatform('Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
-    setSceneCount(10);
-    setCategoriesText('');
-    setSuggestedNiches([]);
-    setSuggestedCategories([]);
-    setEditingChannelId(null);
+    resetFormFields();
     setShowForm(true);
   };
 
   const handleFetchAiSuggestions = async () => {
-    if (!name.trim()) {
-      showStatus('Pehle channel ka naam likhein taake AI us se mutaliq niche aur categories suggest kar sake.');
+    const currentName = name.trim();
+    if (!currentName || currentName.length < 2) {
       return;
     }
     setSuggestingMeta(true);
+    setSuggestedNiches([]);
+    setSuggestedCategories([]);
     try {
       const res = await fetch('/api/ai/suggest-channel-meta', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channelName: name.trim() })
+        body: JSON.stringify({ channelName: currentName })
       });
       const data = await res.json();
-      if (data) {
+      if (data && data.niches) {
         setSuggestedNiches(data.niches || []);
         setSuggestedCategories(data.categories || []);
-        showStatus('AI ne is channel name ke liye smart Niche aur Categories suggest kar di hain!');
+        showStatus(`AI ne "${currentName}" ke liye smart Niche aur Categories suggest kar di hain!`);
       }
     } catch {
       showStatus('AI suggestions load nahi ho sake.');
+    }
+    setSuggestingMeta(false);
+  };
+
+  const handleFetchCategoriesForNiche = async (targetNiche: string) => {
+    setSuggestingMeta(true);
+    setSuggestedCategories([]);
+    try {
+      const res = await fetch('/api/ai/suggest-categories-for-niche', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ niche: targetNiche })
+      });
+      const data = await res.json();
+      if (data && data.categories) {
+        setSuggestedCategories(data.categories || []);
+        showStatus(`AI ne "${targetNiche}" ke liye 5-10 contextually relevant categories suggest kar di hain!`);
+      }
+    } catch {
+      showStatus('Category suggestions load nahi ho sake.');
     }
     setSuggestingMeta(false);
   };
@@ -156,7 +174,7 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     setPlatform(channel.platform || 'Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
     setSceneCount(channel.defaultSceneCount || 10);
     setCategoriesText(channel.categories.map((c) => c.name).join(', '));
-    // Clear previous AI suggestions & encapsulate per channel context
+    setAspectRatio(channel.aspectRatio || '9:16');
     setSuggestedNiches([]);
     setSuggestedCategories([]);
     setShowForm(true);
@@ -187,6 +205,7 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
       niche: niche.trim() || 'Content & Tech',
       platform,
       hasCharacterTag,
+      aspectRatio,
       tags: hasCharacterTag
         ? [{ value: cleanTag, label: `${cleanTag} (Character Tag)` }]
         : [{ value: 'No-Character', label: 'Faceless / AI Storyboard (No Character)' }],
@@ -457,6 +476,11 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      onBlur={() => {
+                        if (name.trim().length >= 3) {
+                          void handleFetchAiSuggestions();
+                        }
+                      }}
                       placeholder="e.g. IT Cafeteria Shorts ya Waqar Tech AI"
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                     />
@@ -476,9 +500,36 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
                   </div>
                 </div>
 
-                {/* AI Meta Suggestion Trigger & Pills */}
-                <div className="flex items-center justify-between pt-1 pb-1">
-                  <span className="text-[11px] font-semibold text-slate-400">Channel Niche & Categories AI Generator:</span>
+                {/* AI Meta Suggestion Trigger, Ratio Buttons & Pills */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 pb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-slate-400">Aspect Ratio (Auto-Saved):</span>
+                    <button
+                      type="button"
+                      onClick={() => setAspectRatio('9:16')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-colors cursor-pointer ${
+                        aspectRatio === '9:16'
+                          ? 'bg-cyan-600 text-white border-cyan-400 shadow-md'
+                          : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+                      }`}
+                      title="9:16 Vertical Ratio (Shorts / Reels / TikTok)"
+                    >
+                      9:16
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAspectRatio('16:9')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-colors cursor-pointer ${
+                        aspectRatio === '16:9'
+                          ? 'bg-cyan-600 text-white border-cyan-400 shadow-md'
+                          : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'
+                      }`}
+                      title="16:9 Landscape Ratio (YouTube Longform)"
+                    >
+                      16:9
+                    </button>
+                  </div>
+
                   <button
                     type="button"
                     onClick={handleFetchAiSuggestions}
