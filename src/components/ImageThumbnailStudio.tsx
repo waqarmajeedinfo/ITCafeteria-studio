@@ -256,7 +256,8 @@ export const ImageThumbnailStudio: React.FC = () => {
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-2 text-white focus:outline-none focus:border-cyan-400"
                 disabled={isLoading}
               >
-                <option value="gemini-nano-banana-2.1">Nano Banana 2.1 (HQ)</option>
+                
+                <option value="xiaomi-mimo-v2.6-pro-free">Xiami Mimo 2.6 Pro (HQ)</option>
                 <option value="gemini-3.1-flash-lite-image">Flash Lite Image (Fast)</option>
               </select>
             </div>
