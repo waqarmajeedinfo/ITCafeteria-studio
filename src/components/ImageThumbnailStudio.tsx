@@ -44,9 +44,9 @@ export const ImageThumbnailStudio: React.FC = () => {
     setIsLoading(true);
     setError(null);
 
-    const modelsToTry = model === 'gemini-nano-banana-2.1'
-      ? ['gemini-nano-banana-2.1', 'gemini-3.1-flash-lite-image'] as const
-      : ['gemini-3.1-flash-lite-image', 'gemini-nano-banana-2.1'] as const;
+    const modelsToTry = model === 'xiaomi-mimo-v2.6-pro-free'
+      ? ['xiaomi-mimo-v2.6-pro-free', 'gemini-3.1-flash-lite-image'] as const
+      : ['gemini-3.1-flash-lite-image', 'xiaomi-mimo-v2.6-pro-free'] as const;
 
     let lastError: Error | null = null;
 
