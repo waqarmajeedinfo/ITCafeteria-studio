@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Sliders,
@@ -207,7 +208,7 @@ export const AutopilotConfigModal: React.FC<AutopilotConfigModalProps> = ({
     showStatus(`Naya Search Rule "${newRule.name}" add ho gaya!`);
   };
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl shadow-indigo-950/80 overflow-hidden overscroll-contain text-slate-100">
         {/* Header */}
@@ -1016,4 +1017,6 @@ export const AutopilotConfigModal: React.FC<AutopilotConfigModalProps> = ({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };

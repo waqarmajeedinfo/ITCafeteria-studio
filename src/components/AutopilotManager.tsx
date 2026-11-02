@@ -69,7 +69,10 @@ import {
   getAutopilotHistoryStacks,
   DEFAULT_AUTOPILOT_CONFIG,
   DEFAULT_AGENT_JDS,
-  type AutopilotConfiguration
+  DEFAULT_SEARCH_RULES,
+  type AutopilotConfiguration,
+  type AutopilotAgentJD,
+  type AutopilotSearchRule
 } from '../lib/autopilotConfigStore';
 import {
   loadAllChannels,
@@ -377,6 +380,66 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
   const [selectedTask, setSelectedTask] = useState<AutopilotTask | null>(null);
   const [showTaskModal, setShowTaskModal] = useState<boolean>(false);
   const [showAutopilotConfigModal, setShowAutopilotConfigModal] = useState<boolean>(false);
+  const [settingsSubTab, setSettingsSubTab] = useState<'jds' | 'search' | 'triggers' | 'channels' | 'sources'>('jds');
+
+  // New inline JD form state
+  const [showAddJdInline, setShowAddJdInline] = useState(false);
+  const [newJdRoleInline, setNewJdRoleInline] = useState('');
+  const [newJdTitleInline, setNewJdTitleInline] = useState('');
+  const [newJdDescriptionInline, setNewJdDescriptionInline] = useState('');
+  const [newJdTriggerInline, setNewJdTriggerInline] = useState('Runs on cadence timer (30s) or low queue (<3).');
+  const [newJdIntervalInline, setNewJdIntervalInline] = useState('Every 30 seconds');
+  const [newJdQueryInline, setNewJdQueryInline] = useState('{niche} latest trending shortcuts 2026');
+  const [newJdPriorityInline, setNewJdPriorityInline] = useState(8);
+
+  // New inline Search Rule form state
+  const [showAddSearchRuleInline, setShowAddSearchRuleInline] = useState(false);
+  const [newSrNameInline, setNewSrNameInline] = useState('');
+  const [newSrCategoryInline, setNewSrCategoryInline] = useState('');
+  const [newSrQueryInline, setNewSrQueryInline] = useState('');
+  const [newSrEngineInline, setNewSrEngineInline] = useState<'google_grounding' | 'fast_internal' | 'custom_web'>('google_grounding');
+  const [newSrFrequencyInline, setNewSrFrequencyInline] = useState<'continuous' | 'hourly' | 'daily_scheduled' | 'queue_depleted'>('continuous');
+  const [newSrDomainsInline, setNewSrDomainsInline] = useState('blog.google, microsoft.com');
+
+  const handleUpdateAutopilotConfig = (updates: Partial<AutopilotConfiguration>, message?: string) => {
+    const next = { ...autopilotConfig, ...updates };
+    setAutopilotConfig(next);
+    if (next.cadenceSeconds) setCadenceSeconds(next.cadenceSeconds);
+    const saved = updateAutopilotConfig(next, message || 'Dashboard Update');
+    setAutopilotConfig(saved);
+    setSyncToast(`⚡ Autopilot Settings updated: ${message || 'Saved'}`);
+    setTimeout(() => setSyncToast(null), 4000);
+  };
+
+  const handleResetAutopilotDefaults = () => {
+    if (window.confirm('Kya aap Autopilot ki tamam settings, JDs aur search rules ko default par reset karna chahte hain?')) {
+      const restored = restoreDefaultAutopilotConfig();
+      setAutopilotConfig(restored);
+      if (restored.cadenceSeconds) setCadenceSeconds(restored.cadenceSeconds);
+      setSyncToast('⚡ Autopilot Settings default par restore ho gayi hain!');
+      setTimeout(() => setSyncToast(null), 4000);
+    }
+  };
+
+  const handleUndoAutopilot = () => {
+    const res = undoAutopilotConfig();
+    if (res.success && res.config) {
+      setAutopilotConfig(res.config);
+      if (res.config.cadenceSeconds) setCadenceSeconds(res.config.cadenceSeconds);
+      setSyncToast('↩️ Pichli Autopilot configuration wapis aa gayi!');
+      setTimeout(() => setSyncToast(null), 3000);
+    }
+  };
+
+  const handleRedoAutopilot = () => {
+    const res = redoAutopilotConfig();
+    if (res.success && res.config) {
+      setAutopilotConfig(res.config);
+      if (res.config.cadenceSeconds) setCadenceSeconds(res.config.cadenceSeconds);
+      setSyncToast('↪️ Agli Autopilot configuration redo ho gayi!');
+      setTimeout(() => setSyncToast(null), 3000);
+    }
+  };
 
   // Sync All & PKT Scheduler States
   const [isSyncingAll, setIsSyncingAll] = useState<boolean>(false);
@@ -1211,15 +1274,32 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
               <span>⚡ Open Floating Overlay</span>
             </button>
 
-            {/* Autopilot Config Manager Button */}
+            {/* Autopilot Settings Dashboard (Inline) Button */}
+            <button
+              onClick={() => {
+                setActiveTab('engine');
+                setTimeout(() => {
+                  const el = document.getElementById('autopilot-settings-dashboard');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+              }}
+              data-guide-target="autopilot-settings-inline-btn"
+              className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-indigo-950 cursor-pointer transition-all border border-cyan-400/40"
+              title="Autopilot Settings Dashboard (JDs, Priorities & Search Rules) inline kholein"
+            >
+              <Sliders className="w-3.5 h-3.5 text-cyan-200" />
+              <span>⚙️ Autopilot Settings</span>
+            </button>
+
+            {/* Autopilot Config Popup Modal Button */}
             <button
               onClick={() => setShowAutopilotConfigModal(true)}
               data-guide-target="autopilot-config-manager-btn"
-              className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/20 cursor-pointer transition-all border border-indigo-400/40"
-              title="Autopilot Priorities, JDs, Search Rules aur Triggers customize karein"
+              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-slate-700 hover:border-indigo-400/50"
+              title="Popup Modal Dialog mein Autopilot settings kholein"
             >
-              <Sliders className="w-3.5 h-3.5 text-cyan-200" />
-              <span>⚙️ Autopilot Manager</span>
+              <Tv className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">Popup View</span>
             </button>
 
             <div className="h-10 w-px bg-slate-800 hidden sm:block" />
@@ -1555,158 +1635,934 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
             }`}
           >
             <Sliders className="w-4 h-4 text-cyan-400" />
-            <span>Focus Links & Engine JDs</span>
+            <span>⚙️ Autopilot Settings &amp; JDs Dashboard</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-mono">
+              {(autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).filter(j => j.isActive).length} JDs
+            </span>
           </button>
         </div>
 
-        {/* Tab 4: Focus Links & Autonomous Engine JDs */}
+        {/* Tab 4: Autopilot Settings & Engine JDs Dashboard */}
         {activeTab === 'engine' && (
-          <div className="p-4 sm:p-6 space-y-6 text-xs">
-            {/* Search Strategy Modification Interface */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-white text-sm flex items-center gap-2">
-                  <Sliders className="w-4 h-4 text-cyan-400" /> Search Strategy Modification & Resource Handling
-                </h4>
-                <span className="text-[10px] font-mono bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800/60">
-                  Mode: {searchStrategy.toUpperCase()}
-                </span>
+          <div id="autopilot-settings-dashboard" className="p-4 sm:p-6 space-y-6 text-xs animate-in fade-in duration-200">
+            {/* Dashboard Header Bar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-indigo-500/30">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="p-1 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/40">
+                    <Sliders className="w-4 h-4" />
+                  </span>
+                  <h3 className="font-bold text-white text-base">
+                    Autopilot Settings &amp; Execution Dashboard
+                  </h3>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    Mode: {autopilotConfig.searchStrategy?.toUpperCase() || 'DEEP_GROUNDING'}
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                    Cadence: {cadenceSeconds}s
+                  </span>
+                </div>
+                <p className="text-slate-400 text-xs">
+                  Agent team responsibilities (JDs), autonomous execution priorities, search radar rules aur automated function triggering customize karein.
+                </p>
               </div>
-              <p className="text-slate-400 text-xs">
-                Modify how Autopilot and the search agent handle web crawling, grounding sources, and resource filtering.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { id: 'deep', label: 'Deep Grounding + Web Scan', desc: 'Prioritizes live web search & YouTube transcripts' },
-                  { id: 'fast', label: 'Fast In-Memory Engine', desc: 'Instant generation without deep crawl' },
-                  { id: 'strict', label: 'Strict Duplicate Defense', desc: 'Zero tolerance against catalog' },
-                  { id: 'custom_links', label: 'Priority External Links', desc: 'Focuses strictly on user-added priority URLs' }
-                ].map((st) => (
+
+              {/* Quick Actions */}
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                <button
+                  type="button"
+                  onClick={handleUndoAutopilot}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Undo previous change"
+                >
+                  <Undo2 className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="hidden sm:inline">Undo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRedoAutopilot}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Redo previous change"
+                >
+                  <Redo2 className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="hidden sm:inline">Redo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetAutopilotDefaults}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 border border-slate-700 text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Restore default autopilot configuration"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">Defaults</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAutopilotConfigModal(true)}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-500/40 text-indigo-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                  title="Open in Popup Modal"
+                >
+                  <Tv className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Popup Dialog</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Dashboard Subtabs Navigation */}
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setSettingsSubTab('jds')}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  settingsSubTab === 'jds'
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Bot className="w-3.5 h-3.5 text-cyan-400" />
+                <span>🤖 Agent Roles &amp; JDs ({(autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSettingsSubTab('search')}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  settingsSubTab === 'search'
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Search className="w-3.5 h-3.5 text-cyan-400" />
+                <span>🔍 Search Strategies &amp; Rules ({(autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSettingsSubTab('triggers')}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  settingsSubTab === 'triggers'
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>⚡ Automated Triggers &amp; Cadence</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSettingsSubTab('channels')}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  settingsSubTab === 'channels'
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Tv className="w-3.5 h-3.5 text-emerald-400" />
+                <span>📺 Channel Engine Scope</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSettingsSubTab('sources')}
+                className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  settingsSubTab === 'sources'
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Target className="w-3.5 h-3.5 text-rose-400" />
+                <span>🎯 Priority URLs ({priorityResources.length})</span>
+              </button>
+            </div>
+
+            {/* SUBTAB 1: Agent Roles & JDs */}
+            {settingsSubTab === 'jds' && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-950/30 border border-indigo-500/20 rounded-xl">
+                  <div>
+                    <h4 className="font-bold text-white text-xs flex items-center gap-1.5">
+                      <Bot className="w-4 h-4 text-cyan-400" />
+                      Agent Team Job Descriptions (JDs) &amp; Autonomous Trigger Priorities
+                    </h4>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      Har agent ka role, responsibility, kab wo trigger hota hai aur uska execution interval set karein.
+                    </p>
+                  </div>
+                  {!showAddJdInline && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddJdInline(true)}
+                      className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-md shadow-cyan-950"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Add Agent JD</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Add Agent JD Form */}
+                {showAddJdInline && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (!newJdRoleInline.trim()) return;
+                      const newJD: AutopilotAgentJD = {
+                        id: `agent-jd-${Date.now()}`,
+                        roleName: newJdRoleInline.trim(),
+                        agentTitle: newJdTitleInline.trim() || newJdRoleInline.trim(),
+                        description: newJdDescriptionInline.trim(),
+                        triggerCondition: newJdTriggerInline.trim() || 'On demand',
+                        executionInterval: newJdIntervalInline.trim() || 'Every 30s cycle',
+                        searchQueryTemplate: newJdQueryInline.trim(),
+                        priorityWeight: newJdPriorityInline,
+                        isActive: true
+                      };
+                      const nextJds = [...(autopilotConfig.agentJDs || DEFAULT_AGENT_JDS), newJD];
+                      handleUpdateAutopilotConfig({ agentJDs: nextJds }, `Added JD: ${newJD.roleName}`);
+                      setNewJdRoleInline('');
+                      setNewJdTitleInline('');
+                      setNewJdDescriptionInline('');
+                      setShowAddJdInline(false);
+                    }}
+                    className="p-4 bg-slate-950 border border-cyan-500/40 rounded-xl space-y-3 animate-in fade-in"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <h5 className="font-bold text-cyan-300 text-xs flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                        Naya Agent Role / Custom JD Define Karein
+                      </h5>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddJdInline(false)}
+                        className="text-slate-400 hover:text-white"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-slate-300 font-semibold block mb-1">Role Name</label>
+                        <input
+                          type="text"
+                          value={newJdRoleInline}
+                          onChange={(e) => setNewJdRoleInline(e.target.value)}
+                          placeholder="e.g. Trend Predictor Agent"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-slate-300 font-semibold block mb-1">Agent Title / Badge</label>
+                        <input
+                          type="text"
+                          value={newJdTitleInline}
+                          onChange={(e) => setNewJdTitleInline(e.target.value)}
+                          placeholder="e.g. Viral Prediction Engine"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">Job Description &amp; Responsibilities</label>
+                      <textarea
+                        value={newJdDescriptionInline}
+                        onChange={(e) => setNewJdDescriptionInline(e.target.value)}
+                        placeholder="Explain what this agent does, what data it examines, and what output it produces..."
+                        rows={2}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-slate-300 font-semibold block mb-1">Trigger Condition</label>
+                        <input
+                          type="text"
+                          value={newJdTriggerInline}
+                          onChange={(e) => setNewJdTriggerInline(e.target.value)}
+                          placeholder="When pending queue < 2"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-slate-300 font-semibold block mb-1">Execution Interval</label>
+                        <input
+                          type="text"
+                          value={newJdIntervalInline}
+                          onChange={(e) => setNewJdIntervalInline(e.target.value)}
+                          placeholder="Every 30s cycle"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-slate-300 font-semibold block mb-1">Priority Weight (1-10)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={newJdPriorityInline}
+                          onChange={(e) => setNewJdPriorityInline(Number(e.target.value))}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">Search Query / Prompt Template</label>
+                      <input
+                        type="text"
+                        value={newJdQueryInline}
+                        onChange={(e) => setNewJdQueryInline(e.target.value)}
+                        placeholder="{niche} viral hacks and tools 2026"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400 font-mono text-[11px]"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddJdInline(false)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold flex items-center gap-1 shadow-md"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Save Agent JD</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Agent JDs Cards List */}
+                <div className="space-y-3">
+                  {(autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).map((jd) => (
+                    <div
+                      key={jd.id}
+                      className={`p-4 rounded-xl border transition-all ${
+                        jd.isActive
+                          ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                          : 'bg-slate-950/60 border-slate-900 opacity-60'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextJds = (autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).map((j) =>
+                                j.id === jd.id ? { ...j, isActive: !j.isActive } : j
+                              );
+                              handleUpdateAutopilotConfig({ agentJDs: nextJds }, `${jd.roleName} ${!jd.isActive ? 'Activated' : 'Paused'}`);
+                            }}
+                            className={`p-2 rounded-xl border mt-0.5 transition-colors cursor-pointer ${
+                              jd.isActive
+                                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                                : 'bg-slate-800 text-slate-500 border-slate-700'
+                            }`}
+                            title={jd.isActive ? 'Click to Pause Agent' : 'Click to Activate Agent'}
+                          >
+                            <Bot className="w-4 h-4" />
+                          </button>
+
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h5 className="font-bold text-white text-sm">{jd.roleName}</h5>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                                {jd.agentTitle}
+                              </span>
+                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                                jd.isActive
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : 'bg-slate-800 text-slate-400'
+                              }`}>
+                                {jd.isActive ? 'ACTIVE' : 'PAUSED'}
+                              </span>
+                            </div>
+                            <p className="text-slate-300 text-xs mt-1 leading-relaxed">
+                              {jd.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Controls: Priority & Actions */}
+                        <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
+                          <div className="flex flex-col items-end">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold">Priority (1-10)</span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <input
+                                type="number"
+                                min={1}
+                                max={10}
+                                value={jd.priorityWeight}
+                                onChange={(e) => {
+                                  const val = Math.max(1, Math.min(10, Number(e.target.value) || 1));
+                                  const nextJds = (autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).map((j) =>
+                                    j.id === jd.id ? { ...j, priorityWeight: val } : j
+                                  );
+                                  handleUpdateAutopilotConfig({ agentJDs: nextJds });
+                                }}
+                                className="w-14 bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-center text-cyan-300 font-mono font-bold text-xs"
+                              />
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Kya aap "${jd.roleName}" JD ko delete karna chahte hain?`)) {
+                                const nextJds = (autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).filter((j) => j.id !== jd.id);
+                                handleUpdateAutopilotConfig({ agentJDs: nextJds }, `Deleted ${jd.roleName}`);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors"
+                            title="Delete JD"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Details Strip */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-slate-800/80 text-[11px]">
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span className="truncate"><strong>Trigger:</strong> {jd.triggerCondition}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          <span className="truncate"><strong>Interval:</strong> {jd.executionInterval}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <Search className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span className="truncate font-mono text-[10px]"><strong>Query:</strong> {jd.searchQueryTemplate || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SUBTAB 2: Search Strategies & Rules */}
+            {settingsSubTab === 'search' && (
+              <div className="space-y-5">
+                {/* Search Strategy Selection */}
+                <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                        <Sliders className="w-4 h-4 text-cyan-400" /> Search Strategy Mode &amp; Crawling Engine
+                      </h4>
+                      <p className="text-slate-400 text-xs mt-0.5">
+                        Select how Autopilot and Radar agents collect fresh topics and ground information.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800/60">
+                      Active: {autopilotConfig.searchStrategy?.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {[
+                      { id: 'deep', label: 'Deep Grounding + Web Scan', desc: 'Google Search Grounding + Live Web verification' },
+                      { id: 'fast', label: 'Fast In-Memory Engine', desc: 'Instant pattern matching without network delay' },
+                      { id: 'strict', label: 'Strict Duplicate Defense', desc: 'Zero tolerance against all 58 catalog stories' },
+                      { id: 'custom_links', label: 'Priority External Links', desc: 'Prioritizes specific user-added URLs and feeds' }
+                    ].map((st) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => {
+                          setSearchStrategy(st.id);
+                          handleUpdateAutopilotConfig({ searchStrategy: st.id as any }, `Search Strategy: ${st.label}`);
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                          (autopilotConfig.searchStrategy || searchStrategy) === st.id
+                            ? 'bg-cyan-950/60 border-cyan-400 ring-1 ring-cyan-400/40 text-cyan-100 shadow-md'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="font-bold text-white text-xs mb-1 flex items-center justify-between">
+                          <span>{st.label}</span>
+                          {(autopilotConfig.searchStrategy || searchStrategy) === st.id && (
+                            <Check className="w-3.5 h-3.5 text-cyan-400" />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-snug">{st.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Search Radar Rules List */}
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-950/30 border border-indigo-500/20 rounded-xl">
+                    <div>
+                      <h4 className="font-bold text-white text-xs flex items-center gap-1.5">
+                        <Search className="w-4 h-4 text-cyan-400" />
+                        Radar Rules &amp; Continuous Topic Crawlers
+                      </h4>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        These specific rules execute on every cadence cycle to keep the queue replenished.
+                      </p>
+                    </div>
+
+                    {!showAddSearchRuleInline && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddSearchRuleInline(true)}
+                        className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-md shadow-cyan-950"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Add Radar Rule</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Add Radar Rule Form */}
+                  {showAddSearchRuleInline && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!newSrNameInline.trim() || !newSrQueryInline.trim()) return;
+                        const newRule: AutopilotSearchRule = {
+                          id: `search-rule-${Date.now()}`,
+                          name: newSrNameInline.trim(),
+                          targetNicheOrCategory: newSrCategoryInline.trim() || 'General AI',
+                          queryTemplate: newSrQueryInline.trim(),
+                          searchEngine: newSrEngineInline,
+                          frequency: newSrFrequencyInline,
+                          domainsPriority: newSrDomainsInline.split(',').map(s => s.trim()).filter(Boolean),
+                          isActive: true
+                        };
+                        const nextRules = [...(autopilotConfig.searchRules || DEFAULT_SEARCH_RULES), newRule];
+                        handleUpdateAutopilotConfig({ searchRules: nextRules }, `Added Radar Rule: ${newRule.name}`);
+                        setNewSrNameInline('');
+                        setNewSrCategoryInline('');
+                        setNewSrQueryInline('');
+                        setShowAddSearchRuleInline(false);
+                      }}
+                      className="p-4 bg-slate-950 border border-cyan-500/40 rounded-xl space-y-3 animate-in fade-in"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <h5 className="font-bold text-cyan-300 text-xs">Naya Search Radar Rule Add Karein</h5>
+                        <button type="button" onClick={() => setShowAddSearchRuleInline(false)} className="text-slate-400 hover:text-white">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-slate-300 font-semibold block mb-1">Rule Name</label>
+                          <input
+                            type="text"
+                            value={newSrNameInline}
+                            onChange={(e) => setNewSrNameInline(e.target.value)}
+                            placeholder="e.g. Daily AI Agents Scanner"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-300 font-semibold block mb-1">Category Target</label>
+                          <input
+                            type="text"
+                            value={newSrCategoryInline}
+                            onChange={(e) => setNewSrCategoryInline(e.target.value)}
+                            placeholder="e.g. AI Tools & Agents"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-slate-300 font-semibold block mb-1">Search Query Pattern</label>
+                        <input
+                          type="text"
+                          value={newSrQueryInline}
+                          onChange={(e) => setNewSrQueryInline(e.target.value)}
+                          placeholder="trending AI productivity agents new release 2026"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400 font-mono text-xs"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-slate-300 font-semibold block mb-1">Search Engine</label>
+                          <select
+                            value={newSrEngineInline}
+                            onChange={(e) => setNewSrEngineInline(e.target.value as any)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400"
+                          >
+                            <option value="google_grounding">Google Search Grounding (Live Web)</option>
+                            <option value="fast_internal">Fast Internal Catalog Scan</option>
+                            <option value="custom_web">Custom Priority URLs Scan</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-slate-300 font-semibold block mb-1">Execution Cadence</label>
+                          <select
+                            value={newSrFrequencyInline}
+                            onChange={(e) => setNewSrFrequencyInline(e.target.value as any)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-cyan-400"
+                          >
+                            <option value="continuous">Continuous (Every Cadence Cycle)</option>
+                            <option value="hourly">Hourly Rotation</option>
+                            <option value="daily_scheduled">Daily Scheduled (6:00 AM PKT)</option>
+                            <option value="queue_depleted">Only When Queue Depleted (&lt; 3)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button type="button" onClick={() => setShowAddSearchRuleInline(false)} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300">
+                          Cancel
+                        </button>
+                        <button type="submit" className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Add Rule</span>
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Rules Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {(autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).map((rule) => (
+                      <div
+                        key={rule.id}
+                        className={`p-3.5 rounded-xl border transition-all ${
+                          rule.isActive
+                            ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                            : 'bg-slate-950/60 border-slate-900 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h5 className="font-bold text-white text-xs truncate">{rule.name}</h5>
+                              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                                {rule.targetNicheOrCategory}
+                              </span>
+                            </div>
+                            <div className="font-mono text-cyan-300 text-[11px] truncate mt-1">
+                              {rule.queryTemplate}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextRules = (autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).map(r =>
+                                  r.id === rule.id ? { ...r, isActive: !r.isActive } : r
+                                );
+                                handleUpdateAutopilotConfig({ searchRules: nextRules });
+                              }}
+                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors ${
+                                rule.isActive
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700'
+                              }`}
+                            >
+                              {rule.isActive ? 'ACTIVE' : 'OFF'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextRules = (autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).filter(r => r.id !== rule.id);
+                                handleUpdateAutopilotConfig({ searchRules: nextRules });
+                              }}
+                              className="p-1 rounded hover:bg-rose-950/60 text-slate-500 hover:text-rose-400 transition-colors"
+                              title="Delete Rule"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-[10px] text-slate-400 pt-2 border-t border-slate-800">
+                          <span>Engine: <strong className="text-slate-300">{rule.searchEngine}</strong></span>
+                          <span>•</span>
+                          <span>Frequency: <strong className="text-slate-300">{rule.frequency}</strong></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SUBTAB 3: Automated Triggers & Cadence */}
+            {settingsSubTab === 'triggers' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Cadence Cycle Tuning */}
+                  <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-cyan-400" />
+                        <h4 className="font-bold text-white text-xs">Autonomous Cycle Interval (Cadence)</h4>
+                      </div>
+                      <span className="font-mono text-cyan-300 text-xs font-bold bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">
+                        {cadenceSeconds} seconds
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-xs leading-relaxed">
+                      Autopilot background daemon har kitne second baad queue aur replenish check karega.
+                    </p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[15, 30, 60, 120].map((sec) => (
+                        <button
+                          key={sec}
+                          type="button"
+                          onClick={() => {
+                            setCadenceSeconds(sec);
+                            handleUpdateAutopilotConfig({ cadenceSeconds: sec }, `Cadence: ${sec}s`);
+                          }}
+                          className={`py-2 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
+                            cadenceSeconds === sec
+                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-sm'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {sec}s
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Replenishment Thresholds */}
+                  <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-400" />
+                      <h4 className="font-bold text-white text-xs">Autonomous Trigger Thresholds</h4>
+                    </div>
+                    <p className="text-slate-400 text-xs">
+                      Jab pending queue is threshold se kam hogi to Autopilot khud ba khud naye topics generate karega.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-300 block mb-1">Low Inventory Alert</label>
+                        <select
+                          value={autopilotConfig.lowInventoryThreshold || 3}
+                          onChange={(e) => handleUpdateAutopilotConfig({ lowInventoryThreshold: Number(e.target.value) })}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono text-xs"
+                        >
+                          <option value={2}>&lt; 2 Stories</option>
+                          <option value={3}>&lt; 3 Stories (Default Rec)</option>
+                          <option value={5}>&lt; 5 Stories</option>
+                          <option value={7}>&lt; 7 Stories</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] text-slate-300 block mb-1">Critical Sprint Trigger</label>
+                        <select
+                          value={autopilotConfig.criticalSprintThreshold ?? 1}
+                          onChange={(e) => handleUpdateAutopilotConfig({ criticalSprintThreshold: Number(e.target.value) })}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white font-mono text-xs"
+                        >
+                          <option value={0}>0 (Queue Empty Only)</option>
+                          <option value={1}>&le; 1 Story (Recommended)</option>
+                          <option value={2}>&le; 2 Stories</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Automation Toggles */}
+                <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+                  <h4 className="font-bold text-white text-xs flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    Function Trigger Automation Gates
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* 6:00 AM PKT Trigger Toggle */}
+                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-white text-xs">6:00 AM PKT Check</div>
+                        <div className="text-[10px] text-slate-400">Daily autonomous sprint check</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateAutopilotConfig({ enableDaily6AmCheck: !autopilotConfig.enableDaily6AmCheck })}
+                        className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border transition-colors ${
+                          autopilotConfig.enableDaily6AmCheck
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-slate-800 text-slate-500 border-slate-700'
+                        }`}
+                      >
+                        {autopilotConfig.enableDaily6AmCheck ? 'ON' : 'OFF'}
+                      </button>
+                    </div>
+
+                    {/* Auto-Publish Toggle */}
+                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-white text-xs">Auto-Publish Completed</div>
+                        <div className="text-[10px] text-slate-400">Directly sync to library &amp; catalog</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateAutopilotConfig({ autoPublishCompleted: !autopilotConfig.autoPublishCompleted })}
+                        className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border transition-colors ${
+                          autopilotConfig.autoPublishCompleted
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-slate-800 text-slate-500 border-slate-700'
+                        }`}
+                      >
+                        {autopilotConfig.autoPublishCompleted ? 'ON' : 'OFF'}
+                      </button>
+                    </div>
+
+                    {/* Zero-Duplicate Tolerance */}
+                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold text-white text-xs">Duplicate Tolerance</div>
+                        <div className="text-[10px] text-slate-400">Catalog match sensitivity</div>
+                      </div>
+                      <select
+                        value={autopilotConfig.duplicateCheckStrictness || 'deep'}
+                        onChange={(e) => handleUpdateAutopilotConfig({ duplicateCheckStrictness: e.target.value as any })}
+                        className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-cyan-300 text-xs font-mono"
+                      >
+                        <option value="deep">Deep (0.92)</option>
+                        <option value="balanced">Balanced (0.85)</option>
+                        <option value="strict">Strict (0.95)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SUBTAB 4: Channel Engine Scope */}
+            {settingsSubTab === 'channels' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-slate-950/80 border border-indigo-500/30 rounded-xl flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h4 className="font-bold text-white text-xs flex items-center gap-2">
+                      <Tv className="w-4 h-4 text-emerald-400" />
+                      Multi-Channel Engine Profiles &amp; Isolation
+                    </h4>
+                    <p className="text-slate-400 text-xs mt-0.5">
+                      Har channel ka apna engine configuration, voice/dialect, aur target platform alag save hota hai.
+                    </p>
+                  </div>
+
                   <button
-                    key={st.id}
+                    type="button"
                     onClick={() => {
-                      setSearchStrategy(st.id);
+                      window.dispatchEvent(new CustomEvent('itcafeteria_open_channel_manager'));
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Open Channel Manager</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {Object.values(loadAllChannels()).map((ch) => (
+                    <div
+                      key={ch.id}
+                      className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 hover:border-slate-700 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h5 className="font-bold text-white text-xs truncate">{ch.name}</h5>
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                          {ch.engineConfig?.autonomousPriority || 'PRIORITY'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        Presenter: <strong className="text-slate-300">{ch.presenter}</strong> • Niche: <strong className="text-slate-300">{ch.niche}</strong>
+                      </p>
+                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Dialect: <strong className="text-indigo-300">{ch.engineConfig?.dialectTone || 'Lahori Tech'}</strong></span>
+                        <span>Scenes: <strong className="text-cyan-300">{ch.defaultSceneCount || 10}</strong></span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SUBTAB 5: Priority External Links */}
+            {settingsSubTab === 'sources' && (
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                    <Target className="w-4 h-4 text-cyan-400" /> Prioritized Focus Links &amp; Search Sources
+                  </h4>
+                  <span className="text-[10px] font-mono bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800/60">
+                    {priorityResources.length} Active Sources
+                  </span>
+                </div>
+                <p className="text-slate-400 text-xs">
+                  Enter specific external links, RSS feeds, or focus points that Autopilot must prioritize during autonomous web crawling.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="https://example.com/feed or focus keyword"
+                    value={newResourceInput}
+                    onChange={(e) => setNewResourceInput(e.target.value)}
+                    className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newResourceInput.trim()) return;
+                      const updated = [...priorityResources, newResourceInput.trim()];
+                      setPriorityResources(updated);
+                      setNewResourceInput('');
                       try {
-                        localStorage.setItem('itcafeteria_search_strategy', st.id);
+                        localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
                       } catch {}
                     }}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                      searchStrategy === st.id
-                        ? 'bg-cyan-950/50 border-cyan-500 ring-1 ring-cyan-500/40 text-cyan-100'
-                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
-                    }`}
+                    className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold cursor-pointer"
                   >
-                    <div className="font-bold text-white text-xs mb-1">{st.label}</div>
-                    <p className="text-[10px] text-slate-400">{st.desc}</p>
+                    Add Link
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Prioritized Focus Links Management */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-white text-sm flex items-center gap-2">
-                  <Target className="w-4 h-4 text-cyan-400" /> Prioritized Focus Links & Search Sources
-                </h4>
-                <span className="text-[10px] font-mono bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800/60">
-                  {priorityResources.length} Active Sources
-                </span>
-              </div>
-              <p className="text-slate-400 text-xs">
-                Enter specific external links, RSS feeds, or focus points that Autopilot must prioritize during autonomous web crawling and story search.
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="https://example.com/feed or focus keyword"
-                  value={newResourceInput}
-                  onChange={(e) => setNewResourceInput(e.target.value)}
-                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!newResourceInput.trim()) return;
-                    const updated = [...priorityResources, newResourceInput.trim()];
-                    setPriorityResources(updated);
-                    setNewResourceInput('');
-                    try {
-                      localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
-                    } catch {}
-                  }}
-                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold cursor-pointer"
-                >
-                  Add Link
-                </button>
-              </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {priorityResources.map((res, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-lg p-2.5">
-                    <span className="font-mono text-cyan-300 truncate mr-2">{res}</span>
-                    <button
-                      onClick={() => {
-                        const updated = priorityResources.filter((_, i) => i !== idx);
-                        setPriorityResources(updated);
-                        try {
-                          localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
-                        } catch {}
-                      }}
-                      className="text-rose-400 hover:text-rose-300 text-xs font-semibold cursor-pointer shrink-0"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Autopilot Job Description & Autonomous Decision Engine Tuning */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-white text-sm flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-indigo-400" /> Autopilot Job Description (JD) & Decision Engine Tuning
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => {
-                    try {
-                      localStorage.setItem('itcafeteria_autopilot_jd', autopilotJD);
-                      alert('Autopilot Job Description & Decision Engine tuning saved successfully!');
-                    } catch {}
-                  }}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold rounded-lg text-xs cursor-pointer shadow"
-                >
-                  Save Engine Settings
-                </button>
-              </div>
-              <p className="text-slate-400 text-xs">
-                Define Autopilot's exact role description (JD) and modify autonomous decision thresholds for background execution.
-              </p>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Autopilot Job Description (JD)</label>
-                  <textarea
-                    rows={3}
-                    value={autopilotJD}
-                    onChange={(e) => setAutopilotJD(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white font-mono text-xs focus:outline-none focus:border-cyan-400 resize-none"
-                  />
                 </div>
-                <div>
-                  <label className="text-slate-300 font-semibold block mb-1">Autonomous Decision Threshold</label>
-                  <select
-                    value={decisionThreshold}
-                    onChange={(e) => setDecisionThreshold(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-400"
-                  >
-                    <option value="0.92 (Strict Zero-Duplicate Confidence)">0.92 (Strict Zero-Duplicate Confidence)</option>
-                    <option value="0.85 (Balanced Growth & Fresh Angle)">0.85 (Balanced Growth & Fresh Angle)</option>
-                    <option value="0.75 (Aggressive Viral Exploration)">0.75 (Aggressive Viral Exploration)</option>
-                  </select>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {priorityResources.map((res, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-lg p-2.5">
+                      <span className="font-mono text-cyan-300 truncate mr-2">{res}</span>
+                      <button
+                        onClick={() => {
+                          const updated = priorityResources.filter((_, i) => i !== idx);
+                          setPriorityResources(updated);
+                          try {
+                            localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
+                          } catch {}
+                        }}
+                        className="text-rose-400 hover:text-rose-300 text-xs font-semibold cursor-pointer shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 

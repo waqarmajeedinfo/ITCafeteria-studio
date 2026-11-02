@@ -147,6 +147,9 @@ export interface AutopilotConfiguration {
   agentJDs: AutopilotAgentJD[];
   searchRules: AutopilotSearchRule[];
   customTriggerRules?: string;
+  enableDaily6AmCheck?: boolean;
+  autoPublishCompleted?: boolean;
+  duplicateCheckStrictness?: 'deep' | 'balanced' | 'strict';
 }
 
 export const DEFAULT_AUTOPILOT_CONFIG: AutopilotConfiguration = {
@@ -168,6 +171,9 @@ export const DEFAULT_AUTOPILOT_CONFIG: AutopilotConfiguration = {
   searchStrategy: 'deep_grounding',
   agentJDs: DEFAULT_AGENT_JDS,
   searchRules: DEFAULT_SEARCH_RULES,
+  enableDaily6AmCheck: true,
+  autoPublishCompleted: false,
+  duplicateCheckStrictness: 'deep',
   customTriggerRules:
     'Trigger 3-day sprint if pending stories count <= 1. Replenish single rotated category if pending stories count < 3. Cross-sync to Content Calendar and Thumbnail Studio.'
 };
