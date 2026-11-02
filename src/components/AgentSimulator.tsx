@@ -515,10 +515,10 @@ export const AgentSimulator: React.FC = () => {
         </div>
 
         {/* Startup Parameters Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-800 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-800 text-xs items-end">
           {/* Channel */}
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="min-h-[24px] flex items-center justify-between mb-1.5">
               <label className="text-slate-400 block font-medium">Active Channel (Q1)</label>
               <button
                 type="button"
@@ -533,7 +533,7 @@ export const AgentSimulator: React.FC = () => {
             <select
               value={draftChannel}
               onChange={(e) => handleDraftChannelChange(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
+              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
             >
               {Object.values(channels).map((ch, idx) => (
                 <option key={ch.id} value={ch.id}>
@@ -545,7 +545,7 @@ export const AgentSimulator: React.FC = () => {
 
           {/* Character Tag */}
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="min-h-[24px] flex items-center justify-between mb-1.5">
               <label className="flex items-center gap-1.5 text-slate-400">
                 Character Tag (Q3)
                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wide border ${
@@ -571,7 +571,7 @@ export const AgentSimulator: React.FC = () => {
             <select
               value={draftTag}
               onChange={(e) => setDraftTag(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono"
+              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono"
             >
               {draftProfile.tags.map((tag) => (
                 <option key={tag.value} value={tag.value}>{tag.label}</option>
@@ -581,16 +581,18 @@ export const AgentSimulator: React.FC = () => {
 
           {/* Category */}
           <div>
-            <label className="flex items-center gap-1.5 text-slate-400 mb-1">
-              Category & Playlist
-              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[9px] font-semibold tracking-wide">
-                AUTO-BIND
-              </span>
-            </label>
+            <div className="min-h-[24px] flex items-center justify-between mb-1.5">
+              <label className="flex items-center gap-1.5 text-slate-400">
+                Category & Playlist
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[9px] font-semibold tracking-wide">
+                  AUTO-BIND
+                </span>
+              </label>
+            </div>
             <select
               value={draftCategory}
               onChange={(e) => setDraftCategory(Number(e.target.value))}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
+              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
             >
               {draftProfile.categories.map(cat => (
                 <option key={cat.id} value={cat.id}>
@@ -602,11 +604,11 @@ export const AgentSimulator: React.FC = () => {
 
           {/* Video Aspect Ratio & Binding */}
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="min-h-[24px] flex items-center justify-between mb-1.5">
               <label className="text-slate-400 block font-medium">Aspect Ratio</label>
               <span className="text-[10px] text-cyan-400 font-mono">Bound/Override</span>
             </div>
-            <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg p-0.5">
+            <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg p-1 h-[36px]">
               <button
                 type="button"
                 onClick={() => setDraftAspectRatio('9:16')}
@@ -634,7 +636,7 @@ export const AgentSimulator: React.FC = () => {
 
           {/* Scene Count */}
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="min-h-[24px] flex items-center justify-between mb-1.5">
               <label className="text-slate-400 block">Duration & Scenes</label>
               <button
                 type="button"
@@ -648,7 +650,7 @@ export const AgentSimulator: React.FC = () => {
             <select
               value={draftSceneCount}
               onChange={(e) => setDraftSceneCount(Number(e.target.value))}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono text-xs"
+              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono text-xs"
             >
               {(simulatorConfig.scenePresets || [
                 { id: '1', count: 7, label: '7 Scenes (70s)' },

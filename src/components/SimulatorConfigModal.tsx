@@ -200,6 +200,19 @@ export const SCRIPT_RULE_PRESETS = [
   }
 ];
 
+export const IT_CAFETERIA_10_CATEGORY_RULES = [
+  { id: 1, name: '1. AI & Smart Tech', instructions: 'Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.' },
+  { id: 2, name: '2. AI Workflows', instructions: 'Deep productivity and automation tutorial format. Structure: Business problem, Architecture and trigger breakdown, Step-by-step logic nodes, Live testing.' },
+  { id: 3, name: '3. AI Prompt Hacks', instructions: 'Slash commands, prompt formulas for realistic images, reverse prompt engineering, and workflow productivity shortcuts.' },
+  { id: 4, name: '4. PC & Windows Hacks', instructions: 'Extended format (10-15 scenes, 7-beat, 0.3s anchor). God mode, clipboard history (Win+V), graphics driver reset, speed boosts.' },
+  { id: 5, name: '5. New Tech Tutorials', instructions: 'Step-by-step UI walkthrough, zero prior coding knowledge needed, practical product review.' },
+  { id: 6, name: '6. Future Tech', instructions: 'Visionary tech breakthroughs, autonomous smart home agents, and positive future outlook.' },
+  { id: 7, name: '7. Secrets (WhatsApp, etc.)', instructions: 'Show actual tool in title/topic, hidden shortcuts, date-wise chat search, biometric chat lock.' },
+  { id: 8, name: '8. Income & Skills', instructions: 'Passive income ideas, store management, freelance skills, with strict reminder of no income guarantees.' },
+  { id: 9, name: '9. YT Automation (16:9)', instructions: '16:9 format mandatory, multi-agent AI script systems, retention optimization, high-CTR storytelling.' },
+  { id: 10, name: '10. Custom Search', instructions: 'User-driven search query and research grounding with prioritized external links and web insights.' }
+];
+
 export const DEFAULT_SIMULATOR_CONFIG: SimulatorConfig = {
   baselineTag: 'Active',
   defaultSceneCount: 10,
@@ -517,6 +530,26 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
                   </div>
                 );
               })}
+            </div>
+
+            {/* 10 Category-Specific Script Rules & Automatic Binds */}
+            <div className="pt-3 border-t border-slate-800">
+              <div className="text-xs font-bold text-cyan-300 mb-2">
+                10 Category-Specific Script Rules & Automatic Binds (IT Cafeteria Modules):
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
+                {IT_CAFETERIA_10_CATEGORY_RULES.map((catRule) => (
+                  <div
+                    key={catRule.id}
+                    onClick={() => updateField('customInstructions', catRule.instructions)}
+                    className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-cyan-500/50 transition-all cursor-pointer text-left"
+                    title={`Click to bind: ${catRule.name}`}
+                  >
+                    <div className="font-bold text-cyan-200 text-[11px] mb-0.5 truncate">{catRule.name}</div>
+                    <p className="text-[10px] text-slate-400 line-clamp-2">{catRule.instructions}</p>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Active Instructions Textarea */}

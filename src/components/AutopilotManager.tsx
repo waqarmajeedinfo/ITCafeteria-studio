@@ -343,7 +343,25 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
   const [cadenceSeconds, setCadenceSeconds] = useState<number>(30);
   const [countdown, setCountdown] = useState<number>(30);
   const [isWorkerBusy, setIsWorkerBusy] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'queue' | 'sync' | 'logs' | 'triggers'>('queue');
+  const [activeTab, setActiveTab] = useState<'queue' | 'sync' | 'logs' | 'engine'>('queue');
+  const [priorityResources, setPriorityResources] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('itcafeteria_priority_resources');
+      return raw ? JSON.parse(raw) : ['https://blog.google/technology/ai/', 'https://github.com/trending'];
+    } catch {
+      return [];
+    }
+  });
+  const [newResourceInput, setNewResourceInput] = useState('');
+  const [autopilotJD, setAutopilotJD] = useState<string>(() => {
+    try {
+      const raw = localStorage.getItem('itcafeteria_autopilot_jd');
+      return raw || 'Chief Autonomous Content Producer & Growth Agent: Responsible for scanning tech trends, auditing duplicate coverage across 58+ published catalog items, executing 10-scene Roman Urdu script generation, and synchronizing state across Agent Simulator, Content Calendar, and Thumbnail Studio.';
+    } catch {
+      return 'Chief Autonomous Content Producer & Growth Agent';
+    }
+  });
+  const [decisionThreshold, setDecisionThreshold] = useState<string>('0.92 (Strict Zero-Duplicate Confidence)');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<AutopilotTask | null>(null);
   const [showTaskModal, setShowTaskModal] = useState<boolean>(false);
@@ -1466,7 +1484,127 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
             <Radio className="w-4 h-4 text-amber-400" />
             <span>Decision Logs Stream ({logs.length})</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('engine')}
+            className={`py-3 border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
+              activeTab === 'engine' ? 'border-cyan-400 text-cyan-300' : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sliders className="w-4 h-4 text-cyan-400" />
+            <span>Focus Links & Engine JDs</span>
+          </button>
         </div>
+
+        {/* Tab 4: Focus Links & Autonomous Engine JDs */}
+        {activeTab === 'engine' && (
+          <div className="p-4 sm:p-6 space-y-6 text-xs">
+            {/* Prioritized Focus Links Management */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                  <Target className="w-4 h-4 text-cyan-400" /> Prioritized Focus Links & Search Sources
+                </h4>
+                <span className="text-[10px] font-mono bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800/60">
+                  {priorityResources.length} Active Sources
+                </span>
+              </div>
+              <p className="text-slate-400 text-xs">
+                Enter specific external links, RSS feeds, or focus points that Autopilot must prioritize during autonomous web crawling and story search.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="https://example.com/feed or focus keyword"
+                  value={newResourceInput}
+                  onChange={(e) => setNewResourceInput(e.target.value)}
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newResourceInput.trim()) return;
+                    const updated = [...priorityResources, newResourceInput.trim()];
+                    setPriorityResources(updated);
+                    setNewResourceInput('');
+                    try {
+                      localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
+                    } catch {}
+                  }}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold cursor-pointer"
+                >
+                  Add Link
+                </button>
+              </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {priorityResources.map((res, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-lg p-2.5">
+                    <span className="font-mono text-cyan-300 truncate mr-2">{res}</span>
+                    <button
+                      onClick={() => {
+                        const updated = priorityResources.filter((_, i) => i !== idx);
+                        setPriorityResources(updated);
+                        try {
+                          localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
+                        } catch {}
+                      }}
+                      className="text-rose-400 hover:text-rose-300 text-xs font-semibold cursor-pointer shrink-0"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Autopilot Job Description & Autonomous Decision Engine Tuning */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-indigo-400" /> Autopilot Job Description (JD) & Decision Engine Tuning
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      localStorage.setItem('itcafeteria_autopilot_jd', autopilotJD);
+                      alert('Autopilot Job Description & Decision Engine tuning saved successfully!');
+                    } catch {}
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold rounded-lg text-xs cursor-pointer shadow"
+                >
+                  Save Engine Settings
+                </button>
+              </div>
+              <p className="text-slate-400 text-xs">
+                Define Autopilot's exact role description (JD) and modify autonomous decision thresholds for background execution.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Autopilot Job Description (JD)</label>
+                  <textarea
+                    rows={3}
+                    value={autopilotJD}
+                    onChange={(e) => setAutopilotJD(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white font-mono text-xs focus:outline-none focus:border-cyan-400 resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-300 font-semibold block mb-1">Autonomous Decision Threshold</label>
+                  <select
+                    value={decisionThreshold}
+                    onChange={(e) => setDecisionThreshold(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="0.92 (Strict Zero-Duplicate Confidence)">0.92 (Strict Zero-Duplicate Confidence)</option>
+                    <option value="0.85 (Balanced Growth & Fresh Angle)">0.85 (Balanced Growth & Fresh Angle)</option>
+                    <option value="0.75 (Aggressive Viral Exploration)">0.75 (Aggressive Viral Exploration)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tab 1: Autonomous Task Queue */}
         {activeTab === 'queue' && (
