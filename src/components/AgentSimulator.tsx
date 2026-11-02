@@ -10,7 +10,8 @@ import {
   RefreshCw,
   Sliders,
   Plus,
-  Settings
+  Settings,
+  X
 } from 'lucide-react';
 import { CHANNEL_PROFILES, type ChannelProfile } from '../data/channelData';
 import {
@@ -135,6 +136,33 @@ export const AgentSimulator: React.FC = () => {
   const [draftSceneCount, setDraftSceneCount] = useState<number>(
     () => simulatorConfig.defaultSceneCount || CHANNEL_PROFILES.itcafeteria.defaultSceneCount
   );
+  const [draftAspectRatio, setDraftAspectRatio] = useState<'9:16' | '16:9'>(() => {
+    return CHANNEL_PROFILES.itcafeteria.categoryRules?.[4]?.defaultRatio || '9:16';
+  });
+  const [searchStrategy, setSearchStrategy] = useState<'deep' | 'fast' | 'strict' | 'custom_links'>('deep');
+  const [priorityResources, setPriorityResources] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('itcafeteria_priority_resources');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showSearchStrategyMenu, setShowSearchStrategyMenu] = useState(false);
+  const [showPriorityModal, setShowPriorityModal] = useState(false);
+  const [newResourceInput, setNewResourceInput] = useState('');
+  const [customRules, setCustomRules] = useState<{ id: string; title: string; instructions: string }[]>(() => {
+    try {
+      const raw = localStorage.getItem('itcafeteria_custom_rules');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showCustomRuleModal, setShowCustomRuleModal] = useState(false);
+  const [newRuleTitle, setNewRuleTitle] = useState('');
+  const [newRuleInstructions, setNewRuleInstructions] = useState('');
+
   const [appliedSelection, setAppliedSelection] = useState<AgentTriggerSelection | null>(null);
   const [triggerOutcome, setTriggerOutcome] = useState<AgentTriggerOutcome | null>(null);
   const [memoryRecords, setMemoryRecords] = useState<AgentMemoryRecord[]>(loadMemoryRecords);
@@ -279,13 +307,22 @@ export const AgentSimulator: React.FC = () => {
     };
   }, [draftChannel, draftTag, draftSceneCount]);
 
+  useEffect(() => {
+    const rules = draftProfile.categoryRules;
+    const defRatio = rules?.[draftCategory]?.defaultRatio || (draftCategory === 9 ? '16:9' : '9:16');
+    setDraftAspectRatio(defRatio);
+  }, [draftChannel, draftCategory]);
+
   const handleDraftChannelChange = (channelId: string) => {
     const nextProfile = (channels[channelId] || profilesMap[channelId] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile;
     const saved = loadRotationState()[channelId as ChannelProfile['id']];
+    const newCat = resolveSavedCategory(nextProfile, saved?.categoryId);
     setDraftChannel(channelId);
     setDraftTag(resolveSavedTag(nextProfile, saved?.tag));
-    setDraftCategory(resolveSavedCategory(nextProfile, saved?.categoryId));
+    setDraftCategory(newCat);
     setDraftSceneCount(simulatorConfig.defaultSceneCount || nextProfile.defaultSceneCount);
+    const defRatio = nextProfile.categoryRules?.[newCat]?.defaultRatio || (newCat === 9 ? '16:9' : '9:16');
+    setDraftAspectRatio(defRatio);
   };
 
   const handleTrigger = () => {
@@ -294,8 +331,11 @@ export const AgentSimulator: React.FC = () => {
         channelId: draftChannel,
         tag: draftTag,
         categoryId: draftCategory,
-        sceneCount: draftSceneCount
-      });
+        sceneCount: draftSceneCount,
+        aspectRatio: draftAspectRatio,
+        searchStrategy,
+        priorityResources
+      } as any);
       setTriggerOutcome(null);
       setFlowOpen(true);
     } catch (err) {
@@ -422,10 +462,51 @@ export const AgentSimulator: React.FC = () => {
             }`}>
               {!appliedSelection ? 'Not triggered yet' : pendingChanges ? 'Pending changes — Trigger dabayein' : 'Selections processed'}
             </span>
+
+            {/* Search Strategy Modification Interface */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSearchStrategyMenu(!showSearchStrategyMenu)}
+                className="px-3 py-2 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
+                title="View & adjust auto-search and resource-handling strategies"
+              >
+                <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Strategy: {searchStrategy.toUpperCase()}</span>
+              </button>
+
+              {showSearchStrategyMenu && (
+                <div className="absolute right-0 top-11 z-50 w-72 bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-2xl space-y-2 text-xs">
+                  <div className="font-bold text-white mb-1">Search & Resource Strategy</div>
+                  {[
+                    { id: 'deep', label: 'Deep Grounding + Web Scan', desc: 'Prioritizes live web search & transcripts' },
+                    { id: 'fast', label: 'Fast In-Memory Engine', desc: 'Instant generation without deep crawl' },
+                    { id: 'strict', label: 'Strict Duplicate Defense', desc: 'Zero tolerance against catalog' },
+                    { id: 'custom_links', label: 'Priority External Links', desc: 'Focuses strictly on user-added priority URLs' }
+                  ].map((st) => (
+                    <button
+                      key={st.id}
+                      onClick={() => {
+                        setSearchStrategy(st.id as any);
+                        setShowSearchStrategyMenu(false);
+                      }}
+                      className={`w-full text-left p-2 rounded-lg border transition-colors cursor-pointer ${
+                        searchStrategy === st.id
+                          ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-200'
+                          : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="font-semibold">{st.label}</div>
+                      <div className="text-[10px] text-slate-400">{st.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={handleTrigger}
               title="Selected category ke liye AI story flow chalayein"
-              className="px-4 py-2 rounded-xl border border-cyan-400/40 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-opacity flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl border border-cyan-400/40 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer"
             >
               <Play className="w-3.5 h-3.5" />
               Trigger
@@ -434,7 +515,7 @@ export const AgentSimulator: React.FC = () => {
         </div>
 
         {/* Startup Parameters Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-slate-800 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-800 text-xs">
           {/* Channel */}
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -466,7 +547,7 @@ export const AgentSimulator: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="flex items-center gap-1.5 text-slate-400">
-                Character Tag Variant (Q3)
+                Character Tag (Q3)
                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wide border ${
                   draftProfile.tags?.[0]?.value === 'No-Character' || draftProfile.defaultTag === 'No-Character'
                     ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
@@ -501,9 +582,9 @@ export const AgentSimulator: React.FC = () => {
           {/* Category */}
           <div>
             <label className="flex items-center gap-1.5 text-slate-400 mb-1">
-              Category & Playlist (Section 9)
+              Category & Playlist
               <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[9px] font-semibold tracking-wide">
-                AUTO
+                AUTO-BIND
               </span>
             </label>
             <select
@@ -519,7 +600,39 @@ export const AgentSimulator: React.FC = () => {
             </select>
           </div>
 
-          {/* Scene Count (Configurable Presets 7-30) */}
+          {/* Video Aspect Ratio & Binding */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-slate-400 block font-medium">Aspect Ratio</label>
+              <span className="text-[10px] text-cyan-400 font-mono">Bound/Override</span>
+            </div>
+            <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => setDraftAspectRatio('9:16')}
+                className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-0.5 ${
+                  draftAspectRatio === '9:16'
+                    ? 'bg-cyan-500 text-slate-950 shadow'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                9:16 Shorts
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftAspectRatio('16:9')}
+                className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-0.5 ${
+                  draftAspectRatio === '16:9'
+                    ? 'bg-cyan-500 text-slate-950 shadow'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                16:9 Long
+              </button>
+            </div>
+          </div>
+
+          {/* Scene Count */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-slate-400 block">Duration & Scenes</label>
@@ -538,23 +651,72 @@ export const AgentSimulator: React.FC = () => {
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono text-xs"
             >
               {(simulatorConfig.scenePresets || [
-                { id: '1', count: 7, label: '7 Scenes (70s — Minimal Threshold)' },
-                { id: '2', count: 10, label: '10 Scenes (100s — Standard Short)' },
-                { id: '3', count: 12, label: '12 Scenes (120s — Extended)' },
-                { id: '4', count: 15, label: '15 Scenes (150s — Deep Tutorial)' },
-                { id: '5', count: 20, label: '20 Scenes (200s — Masterclass)' },
-                { id: '6', count: 25, label: '25 Scenes (250s — Extended Series)' },
-                { id: '7', count: 30, label: '30 Scenes (300s — Max Long-form Short)' }
+                { id: '1', count: 7, label: '7 Scenes (70s)' },
+                { id: '2', count: 10, label: '10 Scenes (100s)' },
+                { id: '3', count: 12, label: '12 Scenes (120s)' },
+                { id: '4', count: 15, label: '15 Scenes (150s)' },
+                { id: '5', count: 20, label: '20 Scenes (200s)' },
+                { id: '6', count: 30, label: '30 Scenes (300s)' }
               ]).map((sp) => (
                 <option key={sp.id || sp.count} value={sp.count}>
                   {sp.label}
                 </option>
               ))}
-              {/* Fallback if current draftSceneCount is a custom number not in presets */}
-              {!(simulatorConfig.scenePresets || []).some((sp) => sp.count === draftSceneCount) && (
-                <option value={draftSceneCount}>{draftSceneCount} Scenes ({draftSceneCount * 10}s — Custom)</option>
-              )}
             </select>
+          </div>
+        </div>
+
+        {/* Category-Specific Script Rule & Automatic Bind + Priority Links Section */}
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="md:col-span-2 rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3 text-xs space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-cyan-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                Category-Specific Script Rule & Automatic Bind:
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowCustomRuleModal(true)}
+                className="px-2 py-0.5 bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 rounded border border-cyan-500/40 text-[10px] font-semibold flex items-center gap-1 cursor-pointer"
+                title="Add new custom rule or guideline"
+              >
+                <Plus className="w-3 h-3" /> + Rule
+              </button>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              {draftProfile.categoryRules?.[draftCategory]?.instructions || `Automatically bound script rules for ${draftCategoryMeta.name} in Roman Urdu with high-retention pacing.`}
+            </p>
+            {customRules.length > 0 && (
+              <div className="pt-1 border-t border-cyan-500/20 text-[10px] text-slate-400 flex flex-wrap gap-1">
+                <span className="text-cyan-400 font-semibold">Custom Rules:</span>
+                {customRules.map((r) => (
+                  <span key={r.id} className="bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700 text-slate-200">
+                    {r.title}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-blue-500/30 bg-blue-950/20 p-3 text-xs flex flex-col justify-between">
+            <div>
+              <div className="font-bold text-blue-300 flex items-center justify-between mb-1">
+                <span>Prioritized Focus Links</span>
+                <span className="text-[10px] font-mono bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-200">
+                  {priorityResources.length} Active
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 line-clamp-2">
+                {priorityResources.length > 0 ? priorityResources[0] : 'No priority URLs added yet. Click manage to prioritize external sources.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPriorityModal(true)}
+              className="mt-2 w-full py-1 px-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/40 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1"
+            >
+              <Sliders className="w-3 h-3 text-blue-300" /> Manage Priority Links
+            </button>
           </div>
         </div>
 
@@ -748,6 +910,147 @@ export const AgentSimulator: React.FC = () => {
           setDraftTag(newTagVal);
         }}
       />
+
+      {/* Priority Resources Management Modal */}
+      {showPriorityModal && (
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 space-y-4 text-slate-100 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-cyan-400" /> Prioritized Resources & Focus Links
+              </h3>
+              <button onClick={() => setShowPriorityModal(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">
+              Input specific external links or focus points to be prioritized during the autonomous search and research grounding phase.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="https://example.com/tech-article or focus keyword"
+                value={newResourceInput}
+                onChange={(e) => setNewResourceInput(e.target.value)}
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newResourceInput.trim()) return;
+                  const updated = [...priorityResources, newResourceInput.trim()];
+                  setPriorityResources(updated);
+                  setNewResourceInput('');
+                  try {
+                    localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
+                  } catch {}
+                }}
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Add
+              </button>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {priorityResources.map((res, idx) => (
+                <div key={idx} className="flex items-center justify-between bg-slate-800/80 border border-slate-700 rounded-lg p-2.5 text-xs">
+                  <span className="font-mono text-cyan-300 truncate mr-2">{res}</span>
+                  <button
+                    onClick={() => {
+                      const updated = priorityResources.filter((_, i) => i !== idx);
+                      setPriorityResources(updated);
+                      try {
+                        localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
+                      } catch {}
+                    }}
+                    className="text-rose-400 hover:text-rose-300 text-xs font-semibold cursor-pointer shrink-0"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              {priorityResources.length === 0 && (
+                <p className="text-center text-xs text-slate-500 py-4">No priority resources added yet.</p>
+              )}
+            </div>
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowPriorityModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Rule Addition Modal */}
+      {showCustomRuleModal && (
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 space-y-4 text-slate-100 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <Plus className="w-4 h-4 text-cyan-400" /> Add Custom Rule or Guideline
+              </h3>
+              <button onClick={() => setShowCustomRuleModal(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">
+              Create a custom script rule or guideline for the engine structure.
+            </p>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Rule Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Strict Technical Vocabulary Rule"
+                  value={newRuleTitle}
+                  onChange={(e) => setNewRuleTitle(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Rule Instructions</label>
+                <textarea
+                  rows={4}
+                  placeholder="Describe precise instructions for script generation..."
+                  value={newRuleInstructions}
+                  onChange={(e) => setNewRuleInstructions(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-400 resize-none font-mono text-xs"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowCustomRuleModal(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newRuleTitle.trim() || !newRuleInstructions.trim()) return;
+                  const updated = [...customRules, { id: `rule-${Date.now()}`, title: newRuleTitle.trim(), instructions: newRuleInstructions.trim() }];
+                  setCustomRules(updated);
+                  setNewRuleTitle('');
+                  setNewRuleInstructions('');
+                  setShowCustomRuleModal(false);
+                  try {
+                    localStorage.setItem('itcafeteria_custom_rules', JSON.stringify(updated));
+                  } catch {}
+                }}
+                className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-xl text-xs font-bold cursor-pointer shadow-lg shadow-cyan-500/20"
+              >
+                Save Custom Rule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

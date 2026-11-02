@@ -618,6 +618,7 @@ export interface ChannelProfile {
   durations: ChannelDurationOption[];
   defaultSceneCount: number;
   sampleNotes: Record<number, { title: string; hook: string }>;
+  categoryRules?: Record<number, { title: string; instructions: string; defaultRatio?: '9:16' | '16:9' }>;
 }
 
 const BEAUTY_CATEGORIES: ChannelCategory[] = [
@@ -671,6 +672,18 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
       8: { title: "Shopify Store Management Se Remote Income Ka Tareeqa", hook: "Warning" },
       9: { title: "YouTube Automation Chapter 11: B-Roll & Generative Visuals", hook: "Reveal" },
       10: { title: "Custom Topic: Aapki Research Ke Mutabiq", hook: "Reveal" }
+    },
+    categoryRules: {
+      1: { title: "AI & Smart Technology Rule", instructions: "Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.", defaultRatio: "9:16" },
+      2: { title: "AI Chatbots & Workflows Rule", instructions: "Deep productivity and automation tutorial format. Structure: Business problem, Architecture and trigger breakdown, Step-by-step logic nodes, Live testing.", defaultRatio: "9:16" },
+      3: { title: "AI Prompt Hacks Rule", instructions: "Slash commands, prompt formulas for realistic images, reverse prompt engineering, and workflow productivity shortcuts.", defaultRatio: "9:16" },
+      4: { title: "PC & Windows Hacks Rule", instructions: "Extended format (10-15 scenes, 7-beat, 0.3s anchor). God mode, clipboard history (Win+V), graphics driver reset, speed boosts.", defaultRatio: "9:16" },
+      5: { title: "New Technology Rule", instructions: "Step-by-step UI walkthrough, zero prior coding knowledge needed, practical product review.", defaultRatio: "9:16" },
+      6: { title: "Future Tech Rule", instructions: "Visionary tech breakthroughs, autonomous smart home agents, and positive future outlook.", defaultRatio: "9:16" },
+      7: { title: "Secrets Rule", instructions: "Show actual tool in title/topic, hidden shortcuts, date-wise chat search, biometric chat lock.", defaultRatio: "9:16" },
+      8: { title: "Income & Skills Rule", instructions: "Passive income ideas, store management, freelance skills, with strict reminder of no income guarantees.", defaultRatio: "9:16" },
+      9: { title: "YT Automation Rule", instructions: "16:9 format mandatory, multi-agent AI script systems, retention optimization, high-CTR storytelling.", defaultRatio: "16:9" },
+      10: { title: "Custom Search Rule", instructions: "User-driven search query and research grounding with prioritized external links and web insights.", defaultRatio: "9:16" }
     }
   },
   beautyhub: {
@@ -702,6 +715,18 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
       7: { title: "Emergency Beauty Fix: 3 Quick Hacks", hook: "Reveal" },
       8: { title: "Affordable Makeup Kit: Worth It Ya Not?", hook: "Comparison" },
       9: { title: "Soft Glam Look: Pakistani Wedding Season Trending", hook: "Reveal" }
+    },
+    categoryRules: {
+      1: { title: "Makeup Rule", instructions: "5-minute everyday look, soft glam, beginner makeup tutorial in warm Urdu/English mix.", defaultRatio: "9:16" },
+      2: { title: "Skincare Rule", instructions: "Dull skin fix, 3-step morning routine, hydration and glow secrets.", defaultRatio: "9:16" },
+      3: { title: "Hair Rule", instructions: "Heatless hairstyles, salon volume look at home without damage.", defaultRatio: "9:16" },
+      4: { title: "Nails Rule", instructions: "Minimal nail art, quick hand care routine.", defaultRatio: "9:16" },
+      5: { title: "Bridal Rule", instructions: "Pakistani wedding season trends, bridal skincare timeline and makeup prep.", defaultRatio: "9:16" },
+      6: { title: "Grooming Rule", instructions: "10-minute self-grooming habits and daily care routines.", defaultRatio: "9:16" },
+      7: { title: "Beauty Hacks Rule", instructions: "Emergency beauty fixes and quick viral hacks.", defaultRatio: "9:16" },
+      8: { title: "Reviews Rule", instructions: "Affordable makeup kit testing: Worth it ya not?", defaultRatio: "9:16" },
+      9: { title: "Trends Rule", instructions: "Trending makeup looks and fashion style guides.", defaultRatio: "9:16" },
+      10: { title: "Custom Search Rule", instructions: "Custom beauty search and ingredient research.", defaultRatio: "9:16" }
     }
   }
 };
