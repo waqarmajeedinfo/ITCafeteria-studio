@@ -353,6 +353,13 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
     }
   });
   const [newResourceInput, setNewResourceInput] = useState('');
+  const [searchStrategy, setSearchStrategy] = useState<string>(() => {
+    try {
+      return localStorage.getItem('itcafeteria_search_strategy') || 'deep';
+    } catch {
+      return 'deep';
+    }
+  });
   const [autopilotJD, setAutopilotJD] = useState<string>(() => {
     try {
       const raw = localStorage.getItem('itcafeteria_autopilot_jd');
@@ -1499,6 +1506,47 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
         {/* Tab 4: Focus Links & Autonomous Engine JDs */}
         {activeTab === 'engine' && (
           <div className="p-4 sm:p-6 space-y-6 text-xs">
+            {/* Search Strategy Modification Interface */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-cyan-400" /> Search Strategy Modification & Resource Handling
+                </h4>
+                <span className="text-[10px] font-mono bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800/60">
+                  Mode: {searchStrategy.toUpperCase()}
+                </span>
+              </div>
+              <p className="text-slate-400 text-xs">
+                Modify how Autopilot and the search agent handle web crawling, grounding sources, and resource filtering.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { id: 'deep', label: 'Deep Grounding + Web Scan', desc: 'Prioritizes live web search & YouTube transcripts' },
+                  { id: 'fast', label: 'Fast In-Memory Engine', desc: 'Instant generation without deep crawl' },
+                  { id: 'strict', label: 'Strict Duplicate Defense', desc: 'Zero tolerance against catalog' },
+                  { id: 'custom_links', label: 'Priority External Links', desc: 'Focuses strictly on user-added priority URLs' }
+                ].map((st) => (
+                  <button
+                    key={st.id}
+                    onClick={() => {
+                      setSearchStrategy(st.id);
+                      try {
+                        localStorage.setItem('itcafeteria_search_strategy', st.id);
+                      } catch {}
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      searchStrategy === st.id
+                        ? 'bg-cyan-950/50 border-cyan-500 ring-1 ring-cyan-500/40 text-cyan-100'
+                        : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="font-bold text-white text-xs mb-1">{st.label}</div>
+                    <p className="text-[10px] text-slate-400">{st.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Prioritized Focus Links Management */}
             <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
