@@ -13,9 +13,11 @@ import {
   User,
   Layers,
   Clock,
-  Film,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Bot,
+  Sliders,
+  Cpu
 } from 'lucide-react';
 import {
   loadAllChannels,
@@ -23,7 +25,11 @@ import {
   deleteChannel,
   undoLastChannelAction,
   resetChannelsToDefault,
-  type ExtendedChannelProfile
+  getEngineConfigForChannel,
+  saveEngineConfigForChannel,
+  getDefaultEngineConfig,
+  type ExtendedChannelProfile,
+  type ChannelEngineConfig
 } from '../lib/channelStore';
 import { dirtyManager } from '../lib/dirtyStore';
 
@@ -53,6 +59,46 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
   const [sceneCount, setSceneCount] = useState(10);
   const [categoriesText, setCategoriesText] = useState('');
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16');
+
+  // Channel-Specific Engine Configuration State
+  const [dialectTone, setDialectTone] = useState('formal');
+  const [flowPromptFormat, setFlowPromptFormat] = useState('cinematic_3d');
+  const [duplicateStrictness, setDuplicateStrictness] = useState('balanced');
+  const [autonomousPriority, setAutonomousPriority] = useState<'URGENT' | 'HIGH' | 'NORMAL'>('HIGH');
+  const [presenterPersona, setPresenterPersona] = useState('');
+  const [targetAudience, setTargetAudience] = useState('');
+  const [nicheKeywordsText, setNicheKeywordsText] = useState('');
+  const [customInstructions, setCustomInstructions] = useState('');
+
+  const autoDraftEngineRules = () => {
+    const chName = name.trim() || 'Custom Channel';
+    const chPresenter = presenter.trim() || 'Presenter';
+    const chNiche = niche.trim() || 'Content';
+    const isBeauty =
+      chNiche.toLowerCase().includes('beauty') ||
+      chNiche.toLowerCase().includes('skin') ||
+      chNiche.toLowerCase().includes('groom') ||
+      chName.toLowerCase().includes('beauty');
+
+    if (isBeauty) {
+      setDialectTone('beauty_friendly');
+      setFlowPromptFormat('aesthetic_soft_glam');
+      setDuplicateStrictness('balanced');
+      setPresenterPersona(`${chPresenter} (${chName}) — Friendly beauty & skincare advisor, warm conversational Roman Urdu tone.`);
+      setTargetAudience('Daily skincare routines, makeup beginners, and bridal grooming enthusiasts');
+      setNicheKeywordsText('skincare, makeup hacks, hair routines, bridal glow, affordable beauty');
+      setCustomInstructions(`Warm, friendly sisterly tone in natural conversational Urdu/English mix for ${chName}. Structure: Relatable daily beauty mistake/problem hook (0-10s), Root skin/hair cause, 3-step easy home fix or routine, Before/After proof, Pro tip, Audience question in comments, Subscribe CTA.`);
+    } else {
+      setDialectTone('lahori_conversational');
+      setFlowPromptFormat('split_screen');
+      setDuplicateStrictness('deep');
+      setPresenterPersona(`${chPresenter} (${chName}) — Practical expert creator in ${chNiche}, clear and engaging in Roman Urdu.`);
+      setTargetAudience(`Audience interested in ${chNiche}`);
+      setNicheKeywordsText(`${chNiche.toLowerCase()}, tips, shortcuts, workflows, tutorial 2026`);
+      setCustomInstructions(`Channel rules for ${chName} (${chNiche}) in Roman Urdu. Structure: High-impact hook (0-10s), problem/topic breakdown, practical step-by-step points, clear takeaways, audience question in comment CTA, subscribe outro.`);
+    }
+    showStatus('Engine rules & persona template smart draft ho gaya!');
+  };
 
   // AI Suggestion states
   const [suggestingMeta, setSuggestingMeta] = useState(false);
@@ -109,6 +155,14 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     setSuggestedNiches([]);
     setSuggestedCategories([]);
     setAspectRatio('9:16');
+    setDialectTone('formal');
+    setFlowPromptFormat('cinematic_3d');
+    setDuplicateStrictness('balanced');
+    setAutonomousPriority('HIGH');
+    setPresenterPersona('');
+    setTargetAudience('');
+    setNicheKeywordsText('');
+    setCustomInstructions('');
     setEditingChannelId(null);
     setShowForm(false);
   };
@@ -177,6 +231,18 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     setAspectRatio(channel.aspectRatio || '9:16');
     setSuggestedNiches([]);
     setSuggestedCategories([]);
+
+    // Load channel-specific engine configuration
+    const eng = getEngineConfigForChannel(channel.id);
+    setDialectTone(eng.dialectTone || 'formal');
+    setFlowPromptFormat(eng.flowPromptFormat || 'cinematic_3d');
+    setDuplicateStrictness(eng.duplicateStrictness || 'balanced');
+    setAutonomousPriority((eng.autonomousPriority as any) || 'HIGH');
+    setPresenterPersona(eng.presenterPersonaPrompt || `${channel.presenter} (${channel.name})`);
+    setTargetAudience(eng.targetAudience || '');
+    setNicheKeywordsText((eng.nicheKeywords || []).join(', '));
+    setCustomInstructions(eng.customInstructions || '');
+
     setShowForm(true);
   };
 
@@ -198,6 +264,29 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
 
     const existing = channels[channelId];
 
+    // Build and save channel-specific engine configuration
+    const engineConfigToSave: ChannelEngineConfig = {
+      channelId,
+      baselineTag: cleanTag,
+      defaultSceneCount: sceneCount,
+      duplicateStrictness,
+      dialectTone,
+      lockPersonaAcrossScenes: true,
+      autoQueueSync: true,
+      flowPromptFormat,
+      customInstructions:
+        customInstructions.trim() ||
+        `Channel rules for ${name.trim()} (${niche.trim()}) in Roman Urdu. Structure: High-impact hook (0-10s), problem/topic breakdown, practical step-by-step points, clear takeaways, audience question in comment CTA, subscribe outro.`,
+      presenterPersonaPrompt: presenterPersona.trim() || `${presenter.trim()} (${name.trim()})`,
+      targetAudience: targetAudience.trim() || `Audience interested in ${niche.trim()}`,
+      nicheKeywords: nicheKeywordsText.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+      autonomousPriority,
+      aspectRatio,
+      searchGroundingRules: `Prioritize latest trends, viral hooks, and verified practices in ${niche.trim()}.`
+    };
+
+    saveEngineConfigForChannel(channelId, engineConfigToSave);
+
     const channelProfileToSave: ExtendedChannelProfile = {
       id: channelId as any,
       name: name.trim(),
@@ -206,6 +295,7 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
       platform,
       hasCharacterTag,
       aspectRatio,
+      engineConfig: engineConfigToSave,
       tags: hasCharacterTag
         ? [{ value: cleanTag, label: `${cleanTag} (Character Tag)` }]
         : [{ value: 'No-Character', label: 'Faceless / AI Storyboard (No Character)' }],
@@ -229,7 +319,11 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     setChannels(updated);
     onChannelsUpdated(updated);
     dirtyManager.clearDirty('channel_manager');
-    showStatus(editingChannelId ? `Channel "${name}" ke changes save ho gaye!` : `Naya Channel "${name}" add ho gaya!`);
+    showStatus(
+      editingChannelId
+        ? `Channel "${name}" aur iski dedicated Engine Configuration save ho gayi!`
+        : `Naya Channel "${name}" apni dedicated Engine Configuration ke sath create ho gaya!`
+    );
     resetFormFields();
   };
 
@@ -757,6 +851,185 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
                   <p className="text-[10px] text-slate-500 mt-1">
                     Har category par AI Story Engine rotation aur specific prompts chalata hai.
                   </p>
+                </div>
+
+                {/* --- Dedicated Channel Engine Configuration Section --- */}
+                <div className="p-4 bg-slate-950/90 border border-indigo-500/30 rounded-xl space-y-3.5 shadow-md">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="p-1 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/40">
+                          <Bot className="w-3.5 h-3.5" />
+                        </span>
+                        <h5 className="font-bold text-white text-xs">
+                          {name.trim() || 'Channel'} Engine Configuration (Profile-Wise Identity)
+                        </h5>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Yeh setting sirf is channel ke liye hogi taake har channel ka apna voice, style aur rules hon.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={autoDraftEngineRules}
+                      className="px-3 py-1 rounded-lg bg-indigo-950 hover:bg-indigo-900 border border-indigo-700/60 text-indigo-200 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-sm self-start sm:self-center"
+                      title="Niche aur name ke mutabiq engine configuration smart draft karein"
+                    >
+                      <Sparkles className="w-3 h-3 text-cyan-300" />
+                      <span>✨ Auto-Draft Engine Profile</span>
+                    </button>
+                  </div>
+
+                  {/* Engine Dialect & Visual Style */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">
+                        Engine Dialect &amp; Cadence Tone
+                      </label>
+                      <select
+                        value={dialectTone}
+                        onChange={(e) => setDialectTone(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-indigo-400"
+                      >
+                        <option value="lahori_conversational">Lahori Conversational (Pakistani Tech YouTuber)</option>
+                        <option value="formal">Natural Tech Urdu (Semi-formal)</option>
+                        <option value="beauty_friendly">Beauty &amp; Grooming Sisterly Advice (Warm Roman Urdu)</option>
+                        <option value="fast_paced">Fast-Paced Energetic (TikTok Viral Style)</option>
+                        <option value="documentary">Deep-Dive Documentary Explainer (Authoritative)</option>
+                        <option value="brotherly">Casual Senior Brotherly / Bhai Advice (Trustworthy)</option>
+                        <option value="workshop">Step-by-Step Hands-On Workshop (Instructor pace)</option>
+                        <option value="lifestyle_advisor">Lifestyle &amp; Wellness Advisor (Relaxing Urdu)</option>
+                      </select>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        AI stories likhte waqt is channel ki khas bolchal aur tone follow karega.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">
+                        Visual Directing / Google Flow Style
+                      </label>
+                      <select
+                        value={flowPromptFormat}
+                        onChange={(e) => setFlowPromptFormat(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-indigo-400"
+                      >
+                        <option value="cinematic_3d">Cinematic 3D Hologram + Anchor Split</option>
+                        <option value="split_screen">Live Split-Screen Hands-On Demo &amp; Facecam</option>
+                        <option value="aesthetic_soft_glam">Aesthetic Soft Glam Studio &amp; Macro Product (Beauty)</option>
+                        <option value="motion_graphics">Minimalist Clean Motion Graphics &amp; Code Screencast</option>
+                        <option value="kinetic">Kinetic Typography &amp; Dynamic Zoom Cutaways</option>
+                        <option value="standard">Standard YouTube Studio Desk</option>
+                        <option value="minimal">Minimal Prompt</option>
+                      </select>
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Flow scenes aur visual prompts ka camera &amp; lighting format.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Duplicate Tolerance & Autonomous Priority */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">
+                        Duplicate Check Strictness
+                      </label>
+                      <select
+                        value={duplicateStrictness}
+                        onChange={(e) => setDuplicateStrictness(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-indigo-400"
+                      >
+                        <option value="deep">Deep Sub-Point &amp; Feature Verification (Recommended)</option>
+                        <option value="balanced">Balanced (Allows fresh angles on previously covered tools)</option>
+                        <option value="strict">Strict (0-Tolerance against catalog videos)</option>
+                        <option value="relaxed">Relaxed (Experimental / Broad variations)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">
+                        Autopilot Priority
+                      </label>
+                      <select
+                        value={autonomousPriority}
+                        onChange={(e) => setAutonomousPriority(e.target.value as any)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-indigo-400"
+                      >
+                        <option value="HIGH">HIGH (Active Primary Rotation)</option>
+                        <option value="URGENT">URGENT (Accelerated Replenishment)</option>
+                        <option value="NORMAL">NORMAL (Standard Secondary Buffer)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Presenter Persona & Target Audience */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">
+                        Presenter Persona &amp; Voice Tone
+                      </label>
+                      <input
+                        type="text"
+                        value={presenterPersona}
+                        onChange={(e) => setPresenterPersona(e.target.value)}
+                        placeholder={`e.g. ${presenter || 'Host'} — Expert advisor in ${niche || 'topic'}`}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-indigo-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1">
+                        Target Audience
+                      </label>
+                      <input
+                        type="text"
+                        value={targetAudience}
+                        onChange={(e) => setTargetAudience(e.target.value)}
+                        placeholder="e.g. Youth, professionals, beginners, students"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-indigo-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Niche Grounding Keywords */}
+                  <div>
+                    <label className="text-slate-300 font-semibold block mb-1">
+                      Search Radar &amp; Grounding Keywords (Commas se alag karein)
+                    </label>
+                    <input
+                      type="text"
+                      value={nicheKeywordsText}
+                      onChange={(e) => setNicheKeywordsText(e.target.value)}
+                      placeholder="e.g. windows 11, ai shortcuts, chatgpt hacks, data tools"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-indigo-400"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Autopilot aur Grounding engine is channel ke liye in keywords se viral news aur research fetch karenge.
+                    </p>
+                  </div>
+
+                  {/* Custom Prompt Instructions for Channel */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-slate-300 font-semibold text-xs">
+                        Channel Engine System Prompt &amp; Script Rules
+                      </label>
+                      <span className="text-[10px] font-mono text-indigo-400">
+                        {customInstructions.length} characters
+                      </span>
+                    </div>
+                    <textarea
+                      value={customInstructions}
+                      onChange={(e) => setCustomInstructions(e.target.value)}
+                      placeholder="Channel-specific prompt rules that AI script writer will strictly follow..."
+                      rows={3}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white text-xs leading-relaxed focus:outline-none focus:border-indigo-400"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Script format, hook guidelines aur outro CTAs jo is channel ke har short ke andar lazmi follow honge.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Form Action Buttons: Distinct Save Changes vs Channel Creation buttons! */}

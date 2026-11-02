@@ -830,16 +830,35 @@ export default function App() {
               
               {/* Left / Center: Channel Identity & Live Dynamic Analytic Metrics in One Horizontal Sequence */}
               <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto">
-                {/* Channel & Verified Badge */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-sm shrink-0">
-                  <Youtube className="w-3.5 h-3.5 text-red-500" />
-                  <span className="font-bold text-white text-xs">{channels[activeChannelId]?.name || 'IT Cafeteria'}</span>
+                {/* Interactive Channel Selector & Profile Badge */}
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700 shadow-sm shrink-0">
+                  <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                  <select
+                    value={activeChannelId}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setActiveChannelId(nextId);
+                      const ch = channels[nextId];
+                      if (ch) {
+                        setCharacterTag(ch.defaultTag || (ch.tags && ch.tags[0]?.value) || '@Active');
+                        setActiveCategoryId(ch.defaultCategoryId || 1);
+                      }
+                    }}
+                    className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer pr-1"
+                    title="Active Channel aur iska Engine switch karein"
+                  >
+                    {Object.values(channels).map((ch) => (
+                      <option key={ch.id} value={ch.id} className="bg-slate-900 text-white">
+                        {ch.name} ({ch.presenter})
+                      </option>
+                    ))}
+                  </select>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                     liveAnalytics.isLinked
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                       : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                   }`}>
-                    {liveAnalytics.isLinked ? '● Live Linked' : '● Verified Studio'}
+                    {liveAnalytics.isLinked ? '● Live Linked' : '● Verified Engine'}
                   </span>
                 </div>
 

@@ -523,67 +523,124 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
       }
     ];
   } else {
-    // Dynamic generation incorporating exact title and category
-    hook = `Kya aap jante hain ke ${titleClean} aapka ghanton ka waqt bacha sakta hai?`;
-    description = `${titleClean}! Complete step-by-step masterclass in Roman Urdu.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
-    tags = [titleClean.toLowerCase(), category.toLowerCase(), 'it cafeteria', 'waqar majeed', 'tech tips urdu', 'ai shortcuts'];
-    hashtags = ['#Shorts', '#ITCafeteria', '#PakistanTech', '#TechHacks'];
-    tiktokCaption = `${titleClean} ka secret tarika! Dekhein aur try karein 🔥 #itcafeteria #shorts #techtips`;
+    // Dynamic generation incorporating exact title, category, and active channel profile
+    const isBeauty = lowerCat.includes('beauty') || lowerCat.includes('skincare') || lowerCat.includes('hair') || lowerCat.includes('makeup') || channelName.toLowerCase().includes('beauty');
+
+    hook = isBeauty
+      ? `Kya aap jante hain ke ${titleClean} se glowing aur healthy look hasil karna kitna asaan hai?`
+      : `Kya aap jante hain ke ${titleClean} aapka ghanton ka waqt bacha sakta hai?`;
+    description = `${titleClean}! Complete step-by-step masterclass in Roman Urdu.\n\nPresenter: ${presenter} • ${channelName}\nCategory: ${category}\nTag: ${charTag}`;
+    tags = [titleClean.toLowerCase(), category.toLowerCase(), channelName.toLowerCase(), presenter.toLowerCase(), 'tips urdu', 'trending guide'];
+    hashtags = ['#Shorts', `#${channelName.replace(/\s+/g, '')}`, '#ViralGuide', '#UrduContent'];
+    tiktokCaption = `${titleClean} ka secret tarika! Dekhein aur try karein 🔥 #${channelName.toLowerCase().replace(/\s+/g, '')} #shorts`;
     thumbnailHeadline = line1;
     thumbnailSubBadge = line2;
 
-    rawBeats = [
-      {
-        purpose: 'Disruptive Hook (Pattern Interrupt)',
-        visual: `${charTag} stands at cyber studio workstation, gestures urgently toward floating 3D headline: "${titleClean}".`,
-        dialogue: `Kya aap jante hain ke ${titleClean} se aapka ghanton ka kaam sirf chand seconds mein ho sakta hai?`
-      },
-      {
-        purpose: 'The Problem Exposed',
-        visual: 'Monitor screen displaying slow traditional manual workflow with red delay icon.',
-        dialogue: `Aksar creators aur professionals ${category} mein purana tareeqa use kar ke apna bohot sa qeemti waqt zaya karte hain.`
-      },
-      {
-        purpose: 'Secret Feature Reveal',
-        visual: `Camera swoops into dual screen setup highlighting the core mechanism for ${titleClean}.`,
-        dialogue: `Lekin aaj IT Cafeteria par mein aapko iska ek official secret shortcut dikha raha hoon jo 100% free aur working hai.`
-      },
-      {
-        purpose: 'Step 1: Configuration',
-        visual: 'Tactile keyboard shortcut execution with cyan ripple lighting on workspace.',
-        dialogue: `Pehla step: Apne system ya tool mein yeh hidden parameter open karein jese screen par highlight ho raha hai.`
-      },
-      {
-        purpose: 'Step 2: Core Execution',
-        visual: 'Real-time execution interface completing the operation with glowing progress bar.',
-        dialogue: `Doosra step: Yeh specific setting apply karein aur execute dabayein. Background ka saara manual process automate ho jayega!`
-      },
-      {
-        purpose: 'Live Verification Proof',
-        visual: 'Before vs after visual comparison proving 10x faster result with green validation checkmarks.',
-        dialogue: `Nateeja aapke samne hai! Jo kaam ghanton mein nahi hota tha ab sirf 5 seconds mein complete aur verified hai.`
-      },
-      {
-        purpose: 'Pro Tip & Optimization',
-        visual: 'Holographic callout widget displaying advanced recurring trigger or keyboard shortcut.',
-        dialogue: `Pro tip: Is setting ko default par save kar lein taake aapko har bar manual setup na karna pare.`
-      },
-      {
-        purpose: 'Mistake Avoidance',
-        visual: 'Red caution box highlighting common error that breaks workflow consistency.',
-        dialogue: `Dhyan rahe, is mein ghalti se extra parameters add na karein warna system output accurate nahi aayega.`
-      },
-      {
-        purpose: 'Executive Summary',
-        visual: `${charTag} framing the key takeaway cards in dynamic 3D space with confident smile.`,
-        dialogue: `Yeh chota sa workflow hack aapke daily digital production ko bohot asaan aur tez bana dega.`
-      },
-      {
-        purpose: 'Call to Action & Community',
-        visual: 'IT Cafeteria subscribe button pulse with Waqar Majeed studio end-card.',
-        dialogue: `Aise rozana high-value tech shortcuts seekhne ke liye IT Cafeteria ko follow karein aur doston se share karein!`
-      }
-    ];
+    rawBeats = isBeauty
+      ? [
+          {
+            purpose: 'Disruptive Hook (Pattern Interrupt)',
+            visual: `${charTag} in elegant vanity studio studio lights gesturing towards floating text: "${titleClean}".`,
+            dialogue: `Agar aap bhi ${titleClean} ke baare mein confused hain ya chemical products se thak chuke hain, to yeh zaroor dekhein!`
+          },
+          {
+            purpose: 'The Problem Exposed',
+            visual: 'Split screen displaying common skincare mistakes and unbalanced routine results.',
+            dialogue: `Aksar log galat products mix kar ke apni skin barrier ko damage kar lete hain aur results nahi milte.`
+          },
+          {
+            purpose: 'Secret Feature Reveal',
+            visual: `Soft studio focus on gentle dermatologically-approved ingredients and tools for ${titleClean}.`,
+            dialogue: `Lekin aaj ${channelName} par mein aapko iska ek natural aur verified formula dikha rahi hoon jo 100% safe hai.`
+          },
+          {
+            purpose: 'Step 1: Configuration',
+            visual: 'Clean application step with morning sunlight highlighting natural skin texture.',
+            dialogue: `Pehla step: Sab se pehle gentle cleanser se base clean karein aur yeh pehli step apply karein.`
+          },
+          {
+            purpose: 'Step 2: Core Execution',
+            visual: 'Smooth upward massage technique demonstration with timer overlay.',
+            dialogue: `Doosra step: Is product ko circular motion mein sirf do minute tak massage karein taake skin absorb kar sake.`
+          },
+          {
+            purpose: 'Live Verification Proof',
+            visual: 'Clear radiant glow comparison before and after with hydration moisture gauge.',
+            dialogue: `Farq dekhein! Skin instant hydrate aur glowing mehsoos ho rahi hai baghair kisi chipchipahat ke.`
+          },
+          {
+            purpose: 'Pro Tip & Optimization',
+            visual: 'Callout badge showing SPF sunscreen layer and night-time lock ritual.',
+            dialogue: `Pro tip: Subah ke waqt iske baad sunscreen lagana hargiz na bhoolein warna effect zaya ho jayega.`
+          },
+          {
+            purpose: 'Mistake Avoidance',
+            visual: 'Caution badge over harsh physical scrubs and expired cosmetic formulas.',
+            dialogue: `Khabardaar: Is routine ke doran harsh exfoliating scrubs mat lagayein taake redness na aaye.`
+          },
+          {
+            purpose: 'Executive Summary',
+            visual: `${charTag} smiling at camera holding completed daily skincare regimen kit.`,
+            dialogue: `Yeh asaan daily routine aapki skin ko natural glow aur permanent fresh look faraham karegi.`
+          },
+          {
+            purpose: 'Call to Action & Community',
+            visual: `${channelName} subscribe and follow animation with gentle pastel pink aesthetic.`,
+            dialogue: `Aise authentic beauty aur skincare secrets rozana seekhne ke liye ${channelName} ko foran follow karein!`
+          }
+        ]
+      : [
+          {
+            purpose: 'Disruptive Hook (Pattern Interrupt)',
+            visual: `${charTag} stands at dynamic presentation workstation, gestures urgently toward floating 3D headline: "${titleClean}".`,
+            dialogue: `Kya aap jante hain ke ${titleClean} se aapka ghanton ka kaam sirf chand seconds mein ho sakta hai?`
+          },
+          {
+            purpose: 'The Problem Exposed',
+            visual: 'Monitor screen displaying slow traditional manual workflow with red delay icon.',
+            dialogue: `Aksar creators aur professionals ${category} mein purana tareeqa use kar ke apna bohot sa qeemti waqt zaya karte hain.`
+          },
+          {
+            purpose: 'Secret Feature Reveal',
+            visual: `Camera swoops into dual screen setup highlighting the core mechanism for ${titleClean}.`,
+            dialogue: `Lekin aaj ${channelName} par mein aapko iska ek official secret shortcut dikha raha hoon jo 100% free aur working hai.`
+          },
+          {
+            purpose: 'Step 1: Configuration',
+            visual: 'Tactile keyboard shortcut execution with cyan ripple lighting on workspace.',
+            dialogue: `Pehla step: Apne system ya tool mein yeh hidden parameter open karein jese screen par highlight ho raha hai.`
+          },
+          {
+            purpose: 'Step 2: Core Execution',
+            visual: 'Real-time execution interface completing the operation with glowing progress bar.',
+            dialogue: `Doosra step: Yeh specific setting apply karein aur execute dabayein. Background ka saara manual process automate ho jayega!`
+          },
+          {
+            purpose: 'Live Verification Proof',
+            visual: 'Before vs after visual comparison proving 10x faster result with green validation checkmarks.',
+            dialogue: `Nateeja aapke samne hai! Jo kaam ghanton mein nahi hota tha ab sirf 5 seconds mein complete aur verified hai.`
+          },
+          {
+            purpose: 'Pro Tip & Optimization',
+            visual: 'Holographic callout widget displaying advanced recurring trigger or keyboard shortcut.',
+            dialogue: `Pro tip: Is setting ko default par save kar lein taake aapko har bar manual setup na karna pare.`
+          },
+          {
+            purpose: 'Mistake Avoidance',
+            visual: 'Red caution box highlighting common error that breaks workflow consistency.',
+            dialogue: `Dhyan rahe, is mein ghalti se extra parameters add na karein warna system output accurate nahi aayega.`
+          },
+          {
+            purpose: 'Executive Summary',
+            visual: `${charTag} framing the key takeaway cards in dynamic 3D space with confident smile.`,
+            dialogue: `Yeh chota sa workflow hack aapke daily digital production ko bohot asaan aur tez bana dega.`
+          },
+          {
+            purpose: 'Call to Action & Community',
+            visual: `${channelName} subscribe button pulse with ${presenter} presentation end-card.`,
+            dialogue: `Aise rozana high-value shortcuts aur tips seekhne ke liye ${channelName} ko follow karein aur doston se share karein!`
+          }
+        ];
   }
 
   // Construct scenes with cinematic directing & living phonetic dictionary rules
@@ -626,8 +683,8 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     thumbnailSubBadge,
     thumbnailLine1: line1,
     thumbnailLine2: line2,
-    thumbnailHologram: `a glowing cyan 3D hologram visualizing "${titleClean}" with floating UI panels and animated data stream nodes`,
-    thumbnailPrompt: `Vertical 9:16 high-tech YouTube Shorts thumbnail cover. Deep cyber navy background #070a13. Bold 3D embossed yellow text "${thumbnailHeadline}". Neon cyan frame, ultra-sharp 8k render with glowing holographic data panels.`,
+    thumbnailHologram: `a glowing 3D visual showcase representing "${titleClean}" with branding elements of ${channelName}`,
+    thumbnailPrompt: `Vertical 9:16 high-impact YouTube Shorts thumbnail cover for ${channelName}. Bold 3D embossed text "${thumbnailHeadline}". Ultra-sharp 8k cinematic render, vibrant focal lighting, modern digital studio aesthetics.`,
     seriesPlan: 'Daily Episode Sequence',
     memoryBlock: `MEM-${Date.now()}`,
     idea: {
@@ -643,8 +700,7 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
       `3. Confirm verified output in Scene 6.`
     ],
     outsourcedLinks: [
-      `https://www.youtube.com/@itcafeteria`,
-      `https://github.com/waqarmajeedinfo`
+      `https://www.youtube.com/@${channelName.toLowerCase().replace(/[^a-z0-9]/g, '')}`
     ],
     demoPrompt: isGoogleSheets
       ? `Extract first name and format official email from messy Column A data using Google Sheets AI Smart Fill (Ctrl + E).`

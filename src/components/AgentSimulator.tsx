@@ -31,7 +31,7 @@ import {
 } from './SimulatorConfigModal';
 import { ChannelManagerModal } from './ChannelManagerModal';
 import { TagManagerModal } from './TagManagerModal';
-import { loadAllChannels, type ExtendedChannelProfile } from '../lib/channelStore';
+import { loadAllChannels, getEngineConfigForChannel, type ExtendedChannelProfile } from '../lib/channelStore';
 
 const LATEST_STORY_KEY = 'itcafeteria_latest_story';
 const MEMORY_RECORDS_KEY = 'itcafeteria_memory_records';
@@ -320,9 +320,22 @@ export const AgentSimulator: React.FC = () => {
     setDraftChannel(channelId);
     setDraftTag(resolveSavedTag(nextProfile, saved?.tag));
     setDraftCategory(newCat);
-    setDraftSceneCount(simulatorConfig.defaultSceneCount || nextProfile.defaultSceneCount);
-    const defRatio = nextProfile.categoryRules?.[newCat]?.defaultRatio || (newCat === 9 ? '16:9' : '9:16');
-    setDraftAspectRatio(defRatio);
+
+    // Load and apply channel's dedicated Engine Configuration
+    const eng = getEngineConfigForChannel(channelId);
+    setSimulatorConfig((prev) => ({
+      ...prev,
+      baselineTag: eng.baselineTag || '@Active',
+      defaultSceneCount: eng.defaultSceneCount || nextProfile.defaultSceneCount || 10,
+      duplicateStrictness: eng.duplicateStrictness || 'balanced',
+      dialectTone: eng.dialectTone || 'formal',
+      flowPromptFormat: eng.flowPromptFormat || 'cinematic_3d',
+      customInstructions: eng.customInstructions || ''
+    }));
+
+    setDraftSceneCount(eng.defaultSceneCount || nextProfile.defaultSceneCount || 10);
+    const defRatio = eng.aspectRatio || nextProfile.categoryRules?.[newCat]?.defaultRatio || (newCat === 9 ? '16:9' : '9:16');
+    setDraftAspectRatio(defRatio as any);
   };
 
   const handleTrigger = () => {
@@ -882,7 +895,20 @@ export const AgentSimulator: React.FC = () => {
         isOpen={showSimulatorConfig}
         onClose={() => setShowSimulatorConfig(false)}
         config={simulatorConfig}
-        onReset={() => setSimulatorConfig(DEFAULT_SIMULATOR_CONFIG)}
+        activeChannelId={draftChannel}
+        onChannelChange={handleDraftChannelChange}
+        onReset={() => {
+          const fresh = getEngineConfigForChannel(draftChannel);
+          setSimulatorConfig({
+            ...simulatorConfig,
+            baselineTag: fresh.baselineTag,
+            defaultSceneCount: fresh.defaultSceneCount,
+            duplicateStrictness: fresh.duplicateStrictness,
+            dialectTone: fresh.dialectTone,
+            flowPromptFormat: fresh.flowPromptFormat,
+            customInstructions: fresh.customInstructions
+          });
+        }}
         onSave={(newCfg) => {
           setSimulatorConfig(newCfg);
           if (newCfg.defaultSceneCount) {

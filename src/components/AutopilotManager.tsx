@@ -41,7 +41,8 @@ import {
   Plus,
   Trash2,
   Edit2,
-  Save
+  Save,
+  Search
 } from 'lucide-react';
 
 import {
@@ -67,6 +68,7 @@ import {
   restoreDefaultAutopilotConfig,
   getAutopilotHistoryStacks,
   DEFAULT_AUTOPILOT_CONFIG,
+  DEFAULT_AGENT_JDS,
   type AutopilotConfiguration
 } from '../lib/autopilotConfigStore';
 import {
@@ -76,6 +78,7 @@ import {
   type ExtendedChannelProfile
 } from '../lib/channelStore';
 import { dirtyManager } from '../lib/dirtyStore';
+import { AutopilotConfigModal } from './AutopilotConfigModal';
 import type { TabType } from '../App';
 
 // --- Task & Queue Types ---
@@ -340,7 +343,8 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
     } catch {}
     return 'supervised'; // Default: Supervised (Manual trigger only)
   });
-  const [cadenceSeconds, setCadenceSeconds] = useState<number>(30);
+  const [autopilotConfig, setAutopilotConfig] = useState<AutopilotConfiguration>(loadAutopilotConfig);
+  const [cadenceSeconds, setCadenceSeconds] = useState<number>(() => loadAutopilotConfig().cadenceSeconds || 30);
   const [countdown, setCountdown] = useState<number>(30);
   const [isWorkerBusy, setIsWorkerBusy] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'queue' | 'sync' | 'logs' | 'engine'>('queue');
@@ -372,6 +376,7 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<AutopilotTask | null>(null);
   const [showTaskModal, setShowTaskModal] = useState<boolean>(false);
+  const [showAutopilotConfigModal, setShowAutopilotConfigModal] = useState<boolean>(false);
 
   // Sync All & PKT Scheduler States
   const [isSyncingAll, setIsSyncingAll] = useState<boolean>(false);
@@ -596,11 +601,21 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
       addLog('DECISION', '▶️ Autopilot Daemon started via manual control.');
     };
 
+    const handleConfigUpdated = (e: any) => {
+      const updated = e.detail?.config || loadAutopilotConfig();
+      setAutopilotConfig(updated);
+      if (updated.cadenceSeconds) {
+        setCadenceSeconds(updated.cadenceSeconds);
+      }
+    };
+
     window.addEventListener('itcafeteria_autopilot_stop_all', handleStopAll);
     window.addEventListener('itcafeteria_autopilot_start_all', handleStartAll);
+    window.addEventListener('itcafeteria_autopilot_config_updated', handleConfigUpdated);
     return () => {
       window.removeEventListener('itcafeteria_autopilot_stop_all', handleStopAll);
       window.removeEventListener('itcafeteria_autopilot_start_all', handleStartAll);
+      window.removeEventListener('itcafeteria_autopilot_config_updated', handleConfigUpdated);
     };
   }, [addLog]);
 
@@ -1196,6 +1211,17 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
               <span>⚡ Open Floating Overlay</span>
             </button>
 
+            {/* Autopilot Config Manager Button */}
+            <button
+              onClick={() => setShowAutopilotConfigModal(true)}
+              data-guide-target="autopilot-config-manager-btn"
+              className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-indigo-500/20 cursor-pointer transition-all border border-indigo-400/40"
+              title="Autopilot Priorities, JDs, Search Rules aur Triggers customize karein"
+            >
+              <Sliders className="w-3.5 h-3.5 text-cyan-200" />
+              <span>⚙️ Autopilot Manager</span>
+            </button>
+
             <div className="h-10 w-px bg-slate-800 hidden sm:block" />
 
             <div className="flex flex-col gap-1">
@@ -1262,6 +1288,36 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Autopilot Active Configuration Indicator Strip */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-900/90 border border-indigo-500/30 rounded-xl text-xs shadow-md">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5 text-slate-300">
+            <Bot className="w-4 h-4 text-cyan-400" />
+            <span className="text-slate-400">Team:</span>
+            <strong className="text-white">{(autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).filter(j => j.isActive).length} Active JDs</strong>
+          </div>
+          <div className="w-px h-3.5 bg-slate-800 hidden sm:block" />
+          <div className="flex items-center gap-1.5 text-slate-300">
+            <Search className="w-4 h-4 text-indigo-400" />
+            <span className="text-slate-400">Radar Grounding:</span>
+            <strong className="text-cyan-300 uppercase font-mono">{autopilotConfig.searchStrategy || 'DEEP_GROUNDING'}</strong>
+          </div>
+          <div className="w-px h-3.5 bg-slate-800 hidden sm:block" />
+          <div className="flex items-center gap-1.5 text-slate-300">
+            <Zap className="w-4 h-4 text-amber-400" />
+            <span className="text-slate-400">Autonomous Triggers:</span>
+            <strong className="text-amber-300 font-mono">Sprint &le; {autopilotConfig.criticalSprintThreshold ?? 1} | Replenish &lt; {autopilotConfig.lowInventoryThreshold || 3}</strong>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowAutopilotConfigModal(true)}
+          className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer hover:underline px-2.5 py-1 rounded-lg bg-cyan-950/40 border border-cyan-500/30 transition-colors"
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          <span>Modify Priorities &amp; JDs &rarr;</span>
+        </button>
       </div>
 
       {/* Sync Toast Notification */}
@@ -1975,6 +2031,16 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
         </div>,
         document.body
       ) : null}
+
+      {/* Autopilot Engine & JDs Configuration Manager Modal */}
+      <AutopilotConfigModal
+        isOpen={showAutopilotConfigModal}
+        onClose={() => setShowAutopilotConfigModal(false)}
+        onConfigSaved={(saved) => {
+          setAutopilotConfig(saved);
+          if (saved.cadenceSeconds) setCadenceSeconds(saved.cadenceSeconds);
+        }}
+      />
     </div>
   );
 };

@@ -22,6 +22,13 @@ import {
 } from 'lucide-react';
 import { dirtyManager } from '../lib/dirtyStore';
 import { PUBLISHED_VIDEOS } from '../data/channelData';
+import {
+  loadAllChannels,
+  getEngineConfigForChannel,
+  saveEngineConfigForChannel,
+  resetEngineConfigForChannel,
+  type ExtendedChannelProfile
+} from '../lib/channelStore';
 
 export interface ScenePresetItem {
   id: string;
@@ -108,6 +115,11 @@ export const DEFAULT_DIALECT_PRESETS: DialectPresetItem[] = [
     description: 'Clean, professional Urdu technical vocabulary suitable for enterprise workflows.'
   },
   {
+    id: 'beauty_friendly',
+    label: 'Beauty & Grooming Sisterly Advice (Warm Roman Urdu)',
+    description: 'Warm, approachable, friendly elder sister / beauty consultant tone with relatable skincare and self-care tips.'
+  },
+  {
     id: 'fast_paced',
     label: 'Fast-Paced Energetic (TikTok Viral Style)',
     description: 'High-speed urgency, rapid pattern-interrupts, and aggressive retention hooks.'
@@ -131,6 +143,11 @@ export const DEFAULT_DIALECT_PRESETS: DialectPresetItem[] = [
     id: 'workshop',
     label: 'Step-by-Step Hands-On Workshop (Instructor pace)',
     description: 'Calm, patient instructor cadence walking through complex interface workflows click by click.'
+  },
+  {
+    id: 'lifestyle_advisor',
+    label: 'Lifestyle & Wellness Advisor (Relaxing Urdu)',
+    description: 'Empathetic, reassuring lifestyle and wellness cadence focused on healthy habits and confidence.'
   }
 ];
 
@@ -144,14 +161,19 @@ export const DEFAULT_STYLE_PRESETS: StylePresetItem[] = [
     description: 'Prepends visual cinematic directing (9:16 vertical, 8K, anamorphic lens, cyan/amber volumetric lighting, left anchor split with floating holographic UI).'
   },
   {
-    id: 'motion_graphics',
-    label: 'Minimalist Clean Motion Graphics & Code Screencast',
-    description: 'Clean high-contrast vector motion graphics, code editor screencasts, and crisp syntax highlighting.'
-  },
-  {
     id: 'split_screen',
     label: 'Live Split-Screen Hands-On Demo & Facecam Reaction',
     description: 'Dual-camera split with presenter facecam reaction on left and real-time screen capture demonstration on right.'
+  },
+  {
+    id: 'aesthetic_soft_glam',
+    label: 'Aesthetic Soft Glam Studio & Macro Product Close-Ups (Beauty)',
+    description: 'Soft 5600K ring-light beauty studio, rose-gold accents, warm skin glow, macro close-ups of product textures and before/after comparisons.'
+  },
+  {
+    id: 'motion_graphics',
+    label: 'Minimalist Clean Motion Graphics & Code Screencast',
+    description: 'Clean high-contrast vector motion graphics, code editor screencasts, and crisp syntax highlighting.'
   },
   {
     id: 'kinetic',
@@ -266,6 +288,8 @@ interface SimulatorConfigModalProps {
   config: SimulatorConfig;
   onSave: (updated: SimulatorConfig) => void;
   onReset: () => void;
+  activeChannelId?: string;
+  onChannelChange?: (channelId: string) => void;
 }
 
 export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
@@ -273,15 +297,47 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
   onClose,
   config,
   onSave,
-  onReset
+  onReset,
+  activeChannelId,
+  onChannelChange
 }) => {
+  const [channels, setChannels] = useState<Record<string, ExtendedChannelProfile>>(loadAllChannels);
+  const [selectedChannelId, setSelectedChannelId] = useState<string>(activeChannelId || 'itcafeteria');
   const [local, setLocal] = useState<SimulatorConfig>(config);
   const [savedToast, setSavedToast] = useState(false);
   const [activeRulePattern, setActiveRulePattern] = useState<string>('bug_security');
 
+  // Sync when activeChannelId or config changes
   useEffect(() => {
-    setLocal(config);
-  }, [config, isOpen]);
+    setChannels(loadAllChannels());
+    const targetChannel = activeChannelId || selectedChannelId || 'itcafeteria';
+    setSelectedChannelId(targetChannel);
+    const eng = getEngineConfigForChannel(targetChannel);
+    setLocal({
+      ...config,
+      baselineTag: eng.baselineTag || config.baselineTag || '@Active',
+      defaultSceneCount: eng.defaultSceneCount || config.defaultSceneCount || 10,
+      duplicateStrictness: eng.duplicateStrictness || config.duplicateStrictness || 'deep',
+      dialectTone: eng.dialectTone || config.dialectTone || 'workshop',
+      flowPromptFormat: eng.flowPromptFormat || config.flowPromptFormat || 'split_screen',
+      customInstructions: eng.customInstructions || config.customInstructions || ''
+    });
+  }, [activeChannelId, isOpen]);
+
+  const handleChannelSelect = (chId: string) => {
+    setSelectedChannelId(chId);
+    if (onChannelChange) onChannelChange(chId);
+    const eng = getEngineConfigForChannel(chId);
+    setLocal((prev) => ({
+      ...prev,
+      baselineTag: eng.baselineTag || '@Active',
+      defaultSceneCount: eng.defaultSceneCount || 10,
+      duplicateStrictness: eng.duplicateStrictness || 'balanced',
+      dialectTone: eng.dialectTone || 'formal',
+      flowPromptFormat: eng.flowPromptFormat || 'cinematic_3d',
+      customInstructions: eng.customInstructions || prev.customInstructions
+    }));
+  };
 
   // Lock scroll
   useEffect(() => {
@@ -303,6 +359,19 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
   const handleSave = () => {
     onSave(local);
     saveSimulatorConfig(local);
+
+    // Save dedicated configuration specifically for the selected channel
+    saveEngineConfigForChannel(selectedChannelId, {
+      baselineTag: local.baselineTag,
+      defaultSceneCount: local.defaultSceneCount,
+      duplicateStrictness: local.duplicateStrictness,
+      dialectTone: local.dialectTone,
+      flowPromptFormat: local.flowPromptFormat,
+      customInstructions: local.customInstructions,
+      lockPersonaAcrossScenes: local.lockPersonaAcrossScenes,
+      autoQueueSync: local.autoQueueSync
+    });
+
     setSavedToast(true);
     setTimeout(() => {
       setSavedToast(false);
@@ -311,7 +380,16 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
   };
 
   const handleResetDefaults = () => {
-    setLocal(DEFAULT_SIMULATOR_CONFIG);
+    const fresh = resetEngineConfigForChannel(selectedChannelId);
+    setLocal((prev) => ({
+      ...prev,
+      baselineTag: fresh.baselineTag,
+      defaultSceneCount: fresh.defaultSceneCount,
+      duplicateStrictness: fresh.duplicateStrictness,
+      dialectTone: fresh.dialectTone,
+      flowPromptFormat: fresh.flowPromptFormat,
+      customInstructions: fresh.customInstructions
+    }));
     onReset();
     saveSimulatorConfig(DEFAULT_SIMULATOR_CONFIG);
   };
@@ -323,40 +401,60 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
 
   if (!isOpen) return null;
 
+  const currentProfile = channels[selectedChannelId] || channels['itcafeteria'];
   const charCount = local.customInstructions.length;
   const wordCount = local.customInstructions.trim() ? local.customInstructions.trim().split(/\s+/).length : 0;
-
-  const currentTolerance = DUPLICATE_TOLERANCE_OPTIONS.find(o => o.id === local.duplicateStrictness) || DUPLICATE_TOLERANCE_OPTIONS[0];
+  const currentTolerance = DUPLICATE_TOLERANCE_OPTIONS.find((o) => o.id === local.duplicateStrictness) || DUPLICATE_TOLERANCE_OPTIONS[0];
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl shadow-blue-950/80 overflow-hidden overscroll-contain text-slate-100">
-        
         {/* Modal Header */}
-        <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
+        <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-blue-500/20 text-blue-400 rounded-xl border border-blue-500/30">
               <Bot className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-white text-base">Agent Simulator Engine Configuration</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-white text-base">Channel Engine Configuration</h3>
                 <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-bold">
                   {local.baselineTag || 'Active'}
                 </span>
+                <span className="text-[11px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded font-mono">
+                  {currentProfile?.name || 'Channel'} Profile
+                </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Multi-Agent Story Engine ke rules, baseline status, scene settings, dialect aur pattern structure customize karein.
+                Multi-Agent Story Engine ke rules, dialect, persona aur prompt structure har channel ke mutabiq alag save hote hain.
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Interactive Channel Switcher Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-indigo-500/40 shadow-inner">
+              <span className="text-[11px] text-slate-400 font-semibold px-1">Channel:</span>
+              <select
+                value={selectedChannelId}
+                onChange={(e) => handleChannelSelect(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white font-bold focus:outline-none focus:border-cyan-400 cursor-pointer"
+              >
+                {Object.values(channels).map((ch) => (
+                  <option key={ch.id} value={ch.id}>
+                    {ch.name} ({ch.presenter})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
