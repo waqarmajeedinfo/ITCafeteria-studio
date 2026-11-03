@@ -119,37 +119,22 @@ class RenderDiagnosticsEngine {
     if (this.isInitialized || typeof window === 'undefined') return;
     this.isInitialized = true;
 
-    // Listen to network fetch failures for backend /api/* routes
-    const originalFetch = window.fetch;
-    window.fetch = async (...args) => {
-      try {
-        const response = await originalFetch(...args);
-        // If server returns 502/503/504 (Common Render.com deployment/spin-down errors)
-        const urlStr = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url || '';
-        if (urlStr.includes('/api/') && [502, 503, 504].includes(response.status)) {
-          this.logDeploymentFailure({
-            category: 'RENDER_PIPELINE',
-            title: `Render Backend Service Unavailable (${response.status})`,
-            message: `Endpoint ${urlStr} returned HTTP ${response.status}. Render container might be spinning up or deploying.`,
-            rootCause: 'Render Web Service is either sleeping (Free tier scale-to-zero) or building new commit.',
-            renderDashboardRemedy: 'Check Render.com Dashboard -> Logs. Ensure server start command "npm start" or "node server.js" is running.'
-          });
-        }
-        return response;
-      } catch (err: any) {
-        const urlStr = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url || '';
-        if (urlStr.includes('/api/')) {
-          this.logDeploymentFailure({
-            category: 'RUNTIME_SERVER',
-            title: 'Backend API Connection Failed',
-            message: `Failed to connect to ${urlStr}: ${err?.message || 'NetworkError'}`,
-            rootCause: 'Backend server process is unreachable or crashed.',
-            renderDashboardRemedy: 'Inspect Render.com deployment logs to verify if server.js started successfully on port 10000.'
-          });
-        }
-        throw err;
+    // Safely monitor for unhandled network or backend connection rejections without mutating window.fetch
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = event.reason;
+      const text = typeof reason === 'string' ? reason : reason?.message || JSON.stringify(reason || '');
+      
+      // If it's a backend /api/ failure
+      if (text.includes('/api/') || text.includes('502') || text.includes('503')) {
+        this.logDeploymentFailure({
+          category: 'RENDER_PIPELINE',
+          title: 'Render Backend Service Communication Anomaly',
+          message: text.slice(0, 160),
+          rootCause: 'Render Web Service is either starting up or encountered a connection drop.',
+          renderDashboardRemedy: 'Check Render.com Dashboard -> Logs. Ensure server start command "node server.js" is running.'
+        });
       }
-    };
+    });
   }
 
   /**

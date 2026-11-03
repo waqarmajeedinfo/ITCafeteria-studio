@@ -98,6 +98,7 @@ import { getAllPublishedVideos } from './lib/publishedLibraryStore';
 import { CATEGORIES_IT_CAFETERIA, CHANNEL_PROFILES } from './data/channelData';
 import { MultiUserManagerModal } from './components/MultiUserManagerModal';
 import { userAuthManager, USER_AUTH_UPDATED_EVENT, type UserSessionProfile } from './lib/userAuthStore';
+import { AuthGate } from './components/AuthGate';
 
 
 type TabType = 
@@ -798,6 +799,10 @@ export default function App() {
     setPendingTab(null);
   };
 
+
+  if (!currentUserProfile) {
+    return <AuthGate onAuthenticated={(user) => setCurrentUserProfile(user)} />;
+  }
 
   return (
     <div className="min-h-screen app-shell-bg text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white relative">

@@ -27,6 +27,39 @@ const WEBHOOK_CONFIG_FILE = path.resolve(DATA_ROOT, 'webhook-config.json');
 
 export type UserRole = 'admin' | 'standard';
 
+export interface UserPermissions {
+  canUseAutopilot: boolean;
+  canEditChannels: boolean;
+  canUseThumbnailStudio: boolean;
+  canPublishScheduledPosts: boolean;
+  canExportData: boolean;
+  canUseVoiceScriptGenerator: boolean;
+  maxChannelsAllowed: number;
+  dailyGenerationLimit: number;
+}
+
+export const DEFAULT_ADMIN_PERMISSIONS: UserPermissions = {
+  canUseAutopilot: true,
+  canEditChannels: true,
+  canUseThumbnailStudio: true,
+  canPublishScheduledPosts: true,
+  canExportData: true,
+  canUseVoiceScriptGenerator: true,
+  maxChannelsAllowed: 9999,
+  dailyGenerationLimit: 9999
+};
+
+export const DEFAULT_STANDARD_PERMISSIONS: UserPermissions = {
+  canUseAutopilot: true,
+  canEditChannels: true,
+  canUseThumbnailStudio: true,
+  canPublishScheduledPosts: true,
+  canExportData: false,
+  canUseVoiceScriptGenerator: true,
+  maxChannelsAllowed: 5,
+  dailyGenerationLimit: 25
+};
+
 export interface UserAccount {
   id: string;
   username: string;
@@ -39,6 +72,7 @@ export interface UserAccount {
   lastLogin: string;
   isActive: boolean;
   dedicatedRepoPath: string;
+  permissions: UserPermissions;
 }
 
 export interface WebhookConfig {
@@ -78,7 +112,12 @@ function initDefaultUsers(): UserAccount[] {
   if (fs.existsSync(USERS_FILE)) {
     try {
       const data = JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8'));
-      if (Array.isArray(data) && data.length > 0) return data;
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((u: any) => ({
+          ...u,
+          permissions: u.permissions || (u.role === 'admin' ? { ...DEFAULT_ADMIN_PERMISSIONS } : { ...DEFAULT_STANDARD_PERMISSIONS })
+        }));
+      }
     } catch (e) {
       console.warn('[MultiUser] Failed to read existing users, initializing defaults:', e);
     }
@@ -97,7 +136,8 @@ function initDefaultUsers(): UserAccount[] {
     createdAt: new Date().toISOString(),
     lastLogin: new Date().toISOString(),
     isActive: true,
-    dedicatedRepoPath: 'user-data/waqarmajeed'
+    dedicatedRepoPath: 'user-data/waqarmajeed',
+    permissions: { ...DEFAULT_ADMIN_PERMISSIONS }
   };
 
   const stdSalt = crypto.randomBytes(16).toString('hex');
@@ -112,7 +152,8 @@ function initDefaultUsers(): UserAccount[] {
     createdAt: new Date().toISOString(),
     lastLogin: new Date().toISOString(),
     isActive: true,
-    dedicatedRepoPath: 'user-data/noorwahid'
+    dedicatedRepoPath: 'user-data/noorwahid',
+    permissions: { ...DEFAULT_STANDARD_PERMISSIONS }
   };
 
   const users = [adminUser, stdUser];
@@ -381,7 +422,8 @@ export function registerMultiUserRoutes(app: Express) {
         createdAt: new Date().toISOString(),
         lastLogin: new Date().toISOString(),
         isActive: true,
-        dedicatedRepoPath: `user-data/${cleanUsername}`
+        dedicatedRepoPath: `user-data/${cleanUsername}`,
+        permissions: { ...DEFAULT_STANDARD_PERMISSIONS }
       };
 
       usersRegistry.push(newUser);
@@ -411,7 +453,8 @@ export function registerMultiUserRoutes(app: Express) {
           displayName: newUser.displayName,
           email: newUser.email,
           role: newUser.role,
-          dedicatedRepoPath: newUser.dedicatedRepoPath
+          dedicatedRepoPath: newUser.dedicatedRepoPath,
+          permissions: newUser.permissions
         }
       });
     } catch (e: any) {
@@ -478,7 +521,8 @@ export function registerMultiUserRoutes(app: Express) {
           displayName: user.displayName,
           email: user.email,
           role: user.role,
-          dedicatedRepoPath: user.dedicatedRepoPath
+          dedicatedRepoPath: user.dedicatedRepoPath,
+          permissions: user.permissions || (user.role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)
         }
       });
     } catch (e: any) {
@@ -497,7 +541,8 @@ export function registerMultiUserRoutes(app: Express) {
         displayName: user.displayName,
         email: user.email,
         role: user.role,
-        dedicatedRepoPath: user.dedicatedRepoPath
+        dedicatedRepoPath: user.dedicatedRepoPath,
+        permissions: user.permissions || (user.role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)
       }
     });
   });
@@ -605,9 +650,199 @@ export function registerMultiUserRoutes(app: Express) {
       createdAt: u.createdAt,
       lastLogin: u.lastLogin,
       isActive: u.isActive,
-      dedicatedRepoPath: u.dedicatedRepoPath
+      dedicatedRepoPath: u.dedicatedRepoPath,
+      permissions: u.permissions || (u.role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)
     }));
     res.json({ ok: true, users: list });
+  });
+
+  // 7b. ADMIN ONLY: Create New User with Custom Role & Permissions
+  app.post('/api/admin/users', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const adminActor = (req as any).user as UserAccount;
+      const { username, password, displayName, email, role, permissions } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Username aur password lazmi hain.' });
+      }
+
+      const cleanUsername = username.trim().toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '');
+      if (cleanUsername.length < 3) {
+        return res.status(400).json({ error: 'Username kam az kam 3 characters ka hona chahiye.' });
+      }
+
+      if (usersRegistry.some(u => u.username === cleanUsername)) {
+        return res.status(409).json({ error: `Username @${cleanUsername} pehle se mojood hai.` });
+      }
+
+      const userRole: UserRole = role === 'admin' ? 'admin' : 'standard';
+      const salt = crypto.randomBytes(16).toString('hex');
+      const assignedPermissions: UserPermissions = {
+        ...(userRole === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS),
+        ...(permissions || {})
+      };
+
+      const newUser: UserAccount = {
+        id: `user-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
+        username: cleanUsername,
+        displayName: displayName?.trim() || cleanUsername,
+        email: email?.trim() || `${cleanUsername}@itcafeteria.studio`,
+        role: userRole,
+        salt,
+        passwordHash: hashPassword(password, salt),
+        createdAt: new Date().toISOString(),
+        lastLogin: new Date().toISOString(),
+        isActive: true,
+        dedicatedRepoPath: `user-data/${cleanUsername}`,
+        permissions: assignedPermissions
+      };
+
+      usersRegistry.push(newUser);
+      saveUsersRegistry();
+      ensureUserStorage(newUser.username);
+
+      await logAuditEvent(
+        adminActor,
+        'ADMIN_USER_CREATED',
+        `Admin Waqar Majeed created new account @${newUser.username} with role ${newUser.role}`,
+        newUser.dedicatedRepoPath,
+        req.ip || '127.0.0.1'
+      );
+
+      res.status(201).json({ ok: true, message: `User @${newUser.username} kamyabi se create ho gaya.`, user: newUser });
+    } catch (e: any) {
+      res.status(500).json({ error: 'User creation failed', details: e?.message });
+    }
+  });
+
+  // 7c. ADMIN ONLY: Update User Details & Role
+  app.put('/api/admin/users/:username', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const adminActor = (req as any).user as UserAccount;
+      const targetUsername = req.params.username.toLowerCase();
+      const user = usersRegistry.find(u => u.username === targetUsername);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User nahi mila.' });
+      }
+
+      const { displayName, email, role, password, isActive, permissions } = req.body;
+
+      if (displayName !== undefined) user.displayName = displayName.trim();
+      if (email !== undefined) user.email = email.trim();
+      if (isActive !== undefined && targetUsername !== 'waqarmajeed') user.isActive = Boolean(isActive);
+
+      // Super Admin Waqar Majeed cannot be downgraded
+      if (role !== undefined && targetUsername !== 'waqarmajeed') {
+        user.role = role === 'admin' ? 'admin' : 'standard';
+      }
+
+      if (password && password.trim().length >= 4) {
+        user.salt = crypto.randomBytes(16).toString('hex');
+        user.passwordHash = hashPassword(password.trim(), user.salt);
+      }
+
+      if (permissions) {
+        user.permissions = {
+          ...(user.permissions || (user.role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)),
+          ...permissions
+        };
+      }
+
+      saveUsersRegistry();
+
+      await logAuditEvent(
+        adminActor,
+        'ADMIN_USER_UPDATED',
+        `Admin updated profile settings for @${user.username}`,
+        user.dedicatedRepoPath,
+        req.ip || '127.0.0.1'
+      );
+
+      res.json({ ok: true, message: `User @${user.username} update ho gaya.`, user });
+    } catch (e: any) {
+      res.status(500).json({ error: 'Update failed', details: e?.message });
+    }
+  });
+
+  // 7d. ADMIN ONLY: Delete User
+  app.delete('/api/admin/users/:username', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const adminActor = (req as any).user as UserAccount;
+      const targetUsername = req.params.username.toLowerCase();
+
+      if (targetUsername === 'waqarmajeed') {
+        return res.status(400).json({ error: 'Super Admin "waqarmajeed" account ko delete nahi kiya ja sakta.' });
+      }
+
+      const index = usersRegistry.findIndex(u => u.username === targetUsername);
+      if (index === -1) {
+        return res.status(404).json({ error: 'User nahi mila.' });
+      }
+
+      const deleted = usersRegistry.splice(index, 1)[0];
+      saveUsersRegistry();
+
+      // Clear any active sessions
+      for (const [token, sess] of activeSessions.entries()) {
+        if (sess.user.username === targetUsername) {
+          activeSessions.delete(token);
+        }
+      }
+
+      await logAuditEvent(
+        adminActor,
+        'ADMIN_USER_DELETED',
+        `Admin deleted user account @${deleted.username}`,
+        deleted.dedicatedRepoPath,
+        req.ip || '127.0.0.1'
+      );
+
+      res.json({ ok: true, message: `User @${deleted.username} ko delete kar diya gaya.` });
+    } catch (e: any) {
+      res.status(500).json({ error: 'Delete failed', details: e?.message });
+    }
+  });
+
+  // 7e. ADMIN ONLY: Adjust User Privileges and Feature Limits
+  app.put('/api/admin/users/:username/permissions', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const adminActor = (req as any).user as UserAccount;
+      const targetUsername = req.params.username.toLowerCase();
+      const user = usersRegistry.find(u => u.username === targetUsername);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User nahi mila.' });
+      }
+
+      const { permissions } = req.body;
+      if (!permissions || typeof permissions !== 'object') {
+        return res.status(400).json({ error: 'Valid permissions object required.' });
+      }
+
+      user.permissions = {
+        ...(user.permissions || (user.role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)),
+        ...permissions
+      };
+
+      saveUsersRegistry();
+
+      await logAuditEvent(
+        adminActor,
+        'USER_PRIVILEGES_UPDATED',
+        `Admin adjusted privileges & feature limits for @${user.username}`,
+        user.dedicatedRepoPath,
+        req.ip || '127.0.0.1'
+      );
+
+      res.json({
+        ok: true,
+        message: `User @${user.username} ki privileges aur limits kamyabi se update ho gayin.`,
+        permissions: user.permissions
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: 'Permissions update failed', details: e?.message });
+    }
   });
 
   // 8. ADMIN ONLY: View Specific User's Isolated Storage

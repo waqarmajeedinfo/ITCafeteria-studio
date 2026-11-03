@@ -4,6 +4,17 @@
 
 export type UserRole = 'admin' | 'standard';
 
+export interface UserPermissions {
+  canUseAutopilot: boolean;
+  canEditChannels: boolean;
+  canUseThumbnailStudio: boolean;
+  canPublishScheduledPosts: boolean;
+  canExportData: boolean;
+  canUseVoiceScriptGenerator: boolean;
+  maxChannelsAllowed: number;
+  dailyGenerationLimit: number;
+}
+
 export interface UserSessionProfile {
   id: string;
   username: string;
@@ -11,6 +22,7 @@ export interface UserSessionProfile {
   email: string;
   role: UserRole;
   dedicatedRepoPath: string;
+  permissions?: UserPermissions;
 }
 
 export interface AuditLogItem {
@@ -130,9 +142,6 @@ class UserAuthManager {
   private async init() {
     if (this.currentToken) {
       await this.refreshUser();
-    } else {
-      // Auto-login with default Admin profile for seamless development, or let user switch
-      await this.login('waqarmajeed', 'waqar2026').catch(() => {});
     }
   }
 
@@ -146,6 +155,18 @@ class UserAuthManager {
 
   public isAdmin(): boolean {
     return this.currentUser?.role === 'admin';
+  }
+
+  public hasPermission(key: keyof UserPermissions): boolean {
+    if (!this.currentUser) return false;
+    if (this.currentUser.role === 'admin') return true;
+    if (!this.currentUser.permissions) return true;
+    return Boolean(this.currentUser.permissions[key]);
+  }
+
+  public getPermissions(): UserPermissions | null {
+    if (!this.currentUser) return null;
+    return this.currentUser.permissions || null;
   }
 
   private setSession(token: string, user: UserSessionProfile) {
@@ -348,6 +369,81 @@ class UserAuthManager {
       headers: { 'x-user-token': this.currentToken }
     });
     return res.json();
+  }
+
+  // Admin User CRUD APIs
+  public async createAdminUser(data: {
+    username: string;
+    password: string;
+    displayName?: string;
+    email?: string;
+    role?: UserRole;
+    permissions?: Partial<UserPermissions>;
+  }) {
+    if (!this.currentToken || !this.isAdmin()) throw new Error('Admin privileges required');
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': this.currentToken
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to create user');
+    this.logSessionActivity('Admin Created User', `Created account @${data.username} (${data.role || 'standard'})`, 'AUTH', 'SUCCESS');
+    return result;
+  }
+
+  public async updateAdminUser(targetUsername: string, data: {
+    displayName?: string;
+    email?: string;
+    role?: UserRole;
+    password?: string;
+    isActive?: boolean;
+    permissions?: Partial<UserPermissions>;
+  }) {
+    if (!this.currentToken || !this.isAdmin()) throw new Error('Admin privileges required');
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(targetUsername)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': this.currentToken
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to update user');
+    this.logSessionActivity('Admin Updated User', `Updated settings for @${targetUsername}`, 'AUTH', 'SUCCESS');
+    return result;
+  }
+
+  public async deleteAdminUser(targetUsername: string) {
+    if (!this.currentToken || !this.isAdmin()) throw new Error('Admin privileges required');
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(targetUsername)}`, {
+      method: 'DELETE',
+      headers: { 'x-user-token': this.currentToken }
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to delete user');
+    this.logSessionActivity('Admin Deleted User', `Deleted user account @${targetUsername}`, 'AUTH', 'SUCCESS');
+    return result;
+  }
+
+  public async updateUserPermissions(targetUsername: string, permissions: Partial<UserPermissions>) {
+    if (!this.currentToken || !this.isAdmin()) throw new Error('Admin privileges required');
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(targetUsername)}/permissions`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': this.currentToken
+      },
+      body: JSON.stringify({ permissions })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Failed to update privileges');
+    this.logSessionActivity('Privileges Adjusted', `Updated feature privileges & limits for @${targetUsername}`, 'AUTH', 'SUCCESS');
+    return result;
   }
 }
 

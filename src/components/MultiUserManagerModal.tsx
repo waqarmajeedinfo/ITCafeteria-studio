@@ -28,7 +28,12 @@ import {
   HardDrive,
   GitCommit,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Trash2,
+  Pencil,
+  Plus,
+  Shield,
+  SlidersHorizontal
 } from 'lucide-react';
 import {
   userAuthManager,
@@ -36,7 +41,8 @@ import {
   USER_ACTIVITY_UPDATED_EVENT,
   type UserSessionProfile,
   type AuditLogItem,
-  type UserSessionActivity
+  type UserSessionActivity,
+  type UserPermissions
 } from '../lib/userAuthStore';
 import {
   syncLogger,
@@ -153,6 +159,37 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncLogs, setSyncLogs] = useState<SyncLogRecord[]>(() => syncLogger.getSyncLogs(currentUser?.username));
+
+  // Admin User Management State
+  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [adjustingUserPermissions, setAdjustingUserPermissions] = useState<any | null>(null);
+
+  // Form states for Admin Creating User
+  const [newAdminUsername, setNewAdminUsername] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newAdminDisplayName, setNewAdminDisplayName] = useState('');
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState<'admin' | 'standard'>('standard');
+
+  // Form state for Editing User
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState<'admin' | 'standard'>('standard');
+  const [editNewPassword, setEditNewPassword] = useState('');
+  const [editIsActive, setEditIsActive] = useState(true);
+
+  // Form state for Adjusting Permissions & Feature limits
+  const [permissionToggles, setPermissionToggles] = useState<UserPermissions>({
+    canUseAutopilot: true,
+    canEditChannels: true,
+    canUseThumbnailStudio: true,
+    canPublishScheduledPosts: true,
+    canExportData: false,
+    canUseVoiceScriptGenerator: true,
+    maxChannelsAllowed: 5,
+    dailyGenerationLimit: 25
+  });
 
   useEffect(() => {
     const handleAuthUpdate = (e: any) => {
@@ -305,6 +342,149 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
     setInspectingUsername(targetUsername);
     const data = await userAuthManager.fetchAdminUserData(targetUsername);
     setInspectUserData(data);
+  };
+
+  const openEditModal = (u: any) => {
+    setEditingUser(u);
+    setEditDisplayName(u.displayName || '');
+    setEditEmail(u.email || '');
+    setEditRole(u.role || 'standard');
+    setEditNewPassword('');
+    setEditIsActive(u.isActive !== false);
+  };
+
+  const openPermissionsModal = (u: any) => {
+    setAdjustingUserPermissions(u);
+    setPermissionToggles(u.permissions || {
+      canUseAutopilot: true,
+      canEditChannels: true,
+      canUseThumbnailStudio: true,
+      canPublishScheduledPosts: true,
+      canExportData: false,
+      canUseVoiceScriptGenerator: true,
+      maxChannelsAllowed: 5,
+      dailyGenerationLimit: 25
+    });
+  };
+
+  const handleAdminCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminUsername.trim() || !newAdminPassword.trim()) {
+      setAuthError('Username aur password dono darkaar hain.');
+      return;
+    }
+    setIsLoading(true);
+    setAuthError(null);
+    try {
+      await userAuthManager.createAdminUser({
+        username: newAdminUsername.trim(),
+        password: newAdminPassword.trim(),
+        displayName: newAdminDisplayName.trim() || newAdminUsername.trim(),
+        email: newAdminEmail.trim() || `${newAdminUsername.trim()}@itcafeteria.internal`,
+        role: newAdminRole,
+        permissions: newAdminRole === 'admin'
+          ? {
+              canUseAutopilot: true,
+              canEditChannels: true,
+              canUseThumbnailStudio: true,
+              canPublishScheduledPosts: true,
+              canExportData: true,
+              canUseVoiceScriptGenerator: true,
+              maxChannelsAllowed: 100,
+              dailyGenerationLimit: 9999
+            }
+          : {
+              canUseAutopilot: true,
+              canEditChannels: true,
+              canUseThumbnailStudio: true,
+              canPublishScheduledPosts: true,
+              canExportData: false,
+              canUseVoiceScriptGenerator: true,
+              maxChannelsAllowed: 5,
+              dailyGenerationLimit: 25
+            }
+      });
+      setAuthSuccess(`User @${newAdminUsername} kamyabi se create ho gaya!`);
+      setNewAdminUsername('');
+      setNewAdminPassword('');
+      setNewAdminDisplayName('');
+      setNewAdminEmail('');
+      setShowCreateUserModal(false);
+      const res = await userAuthManager.fetchAdminUsers();
+      if (res?.users) setAdminUsers(res.users);
+    } catch (err: any) {
+      setAuthError(err?.message || 'User create karne mein error aaya');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAdminUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setIsLoading(true);
+    setAuthError(null);
+    try {
+      await userAuthManager.updateAdminUser(editingUser.username, {
+        displayName: editDisplayName.trim() || editingUser.displayName,
+        email: editEmail.trim() || editingUser.email,
+        role: editRole,
+        password: editNewPassword.trim() ? editNewPassword.trim() : undefined,
+        isActive: editIsActive
+      });
+      setAuthSuccess(`User @${editingUser.username} ki profile kamyabi se update ho gayi!`);
+      setEditingUser(null);
+      const res = await userAuthManager.fetchAdminUsers();
+      if (res?.users) setAdminUsers(res.users);
+    } catch (err: any) {
+      setAuthError(err?.message || 'User update karne mein error aaya');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAdminDeleteUser = async (targetUsername: string) => {
+    if (targetUsername === 'waqarmajeed') {
+      setAuthError('Waqar Majeed (Super Admin) account delete nahi kiya ja sakta!');
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete user @${targetUsername}? Yeh action irreversible hai.`)) {
+      return;
+    }
+    setIsLoading(true);
+    setAuthError(null);
+    try {
+      await userAuthManager.deleteAdminUser(targetUsername);
+      setAuthSuccess(`User @${targetUsername} system se delete kar diya gaya.`);
+      const res = await userAuthManager.fetchAdminUsers();
+      if (res?.users) setAdminUsers(res.users);
+      if (inspectingUsername === targetUsername) {
+        setInspectingUsername(null);
+        setInspectUserData(null);
+      }
+    } catch (err: any) {
+      setAuthError(err?.message || 'User delete karne mein error aaya');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAdminSavePermissions = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustingUserPermissions) return;
+    setIsLoading(true);
+    setAuthError(null);
+    try {
+      await userAuthManager.updateUserPermissions(adjustingUserPermissions.username, permissionToggles);
+      setAuthSuccess(`@${adjustingUserPermissions.username} ki permissions aur limits update ho gayi hain!`);
+      setAdjustingUserPermissions(null);
+      const res = await userAuthManager.fetchAdminUsers();
+      if (res?.users) setAdminUsers(res.users);
+    } catch (err: any) {
+      setAuthError(err?.message || 'Permissions update karne mein error aaya');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -829,43 +1009,166 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
               <div className="p-4 bg-purple-950/40 border border-purple-500/40 rounded-xl space-y-2">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-purple-400" />
-                  <h4 className="font-bold text-white text-sm">Super Admin Privilege Dashboard</h4>
+                  <h4 className="font-bold text-white text-sm">Super Admin User &amp; Privilege Dashboard</h4>
                 </div>
                 <p className="text-purple-200 text-xs leading-relaxed">
-                  Superuser privileges aapko tamam registered users ke profiles, channels, isolated directories aur system settings par mukammal control deti hain.
+                  Aap Super Admin (Waqar Majeed) hain. Yahan se aap tamam registered users ko add kar sakte hain, edit kar sakte hain, delete kar sakte hain, aur unke features aur limits ko control kar sakte hain.
                 </p>
               </div>
 
               {/* All Users Registry */}
               <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
-                <h5 className="font-bold text-white text-xs uppercase tracking-wider flex items-center justify-between">
-                  <span>Registered Users in System ({adminUsers.length}):</span>
-                  <span className="text-[10px] text-slate-400 font-mono">Click user to inspect storage</span>
-                </h5>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                  <div>
+                    <h5 className="font-bold text-white text-xs uppercase tracking-wider">
+                      Registered Users Registry ({adminUsers.length})
+                    </h5>
+                    <p className="text-[11px] text-slate-400">
+                      Standard users ki limits aur allowed features yahan se configure karein
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateUserModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold shadow-lg shadow-purple-900/30 transition-all cursor-pointer self-start sm:self-auto"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Create New User</span>
+                  </button>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {adminUsers.map((u) => (
-                    <div
-                      key={u.id}
-                      onClick={() => handleInspectUser(u.username)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                        inspectingUsername === u.username
-                          ? 'bg-purple-950/60 border-purple-400 ring-1 ring-purple-400/40'
-                          : 'bg-slate-900 border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-white text-xs">{u.displayName}</span>
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
-                          u.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                        }`}>
-                          {u.role}
-                        </span>
+                <div className="grid grid-cols-1 gap-3">
+                  {adminUsers.map((u) => {
+                    const isSuperAdminAccount = u.username === 'waqarmajeed';
+                    const perms: UserPermissions = u.permissions || {
+                      canUseAutopilot: true,
+                      canEditChannels: true,
+                      canUseThumbnailStudio: true,
+                      canPublishScheduledPosts: true,
+                      canExportData: false,
+                      canUseVoiceScriptGenerator: true,
+                      maxChannelsAllowed: 5,
+                      dailyGenerationLimit: 25
+                    };
+
+                    return (
+                      <div
+                        key={u.id || u.username}
+                        className={`p-3.5 rounded-xl border transition-all ${
+                          inspectingUsername === u.username
+                            ? 'bg-purple-950/40 border-purple-400 ring-1 ring-purple-400/40'
+                            : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          {/* User info */}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-white text-sm">{u.displayName}</span>
+                              <span className="text-slate-400 text-xs font-mono">@{u.username}</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase ${
+                                u.role === 'admin'
+                                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                                  : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                              }`}>
+                                {u.role === 'admin' ? '👑 Super Admin' : '👤 Standard User'}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${
+                                u.isActive !== false
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                              }`}>
+                                {u.isActive !== false ? 'Active' : 'Suspended'}
+                              </span>
+                            </div>
+                            <p className="text-slate-400 text-[11px] font-mono">{u.email}</p>
+                            <p className="text-emerald-400 text-[10px] font-mono truncate">
+                              Mirror: {u.dedicatedRepoPath}
+                            </p>
+                          </div>
+
+                          {/* Quick Actions */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => openPermissionsModal(u)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-950/60 border border-indigo-500/40 hover:bg-indigo-900/50 text-indigo-300 text-xs font-medium cursor-pointer transition-colors"
+                              title="Feature Privileges aur Limits configure karein"
+                            >
+                              <SlidersHorizontal className="w-3.5 h-3.5" />
+                              <span>Privileges &amp; Limits</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(u)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-200 text-xs font-medium cursor-pointer transition-colors"
+                              title="Profile aur Password update karein"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleInspectUser(u.username)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-950/60 border border-purple-500/40 hover:bg-purple-900/50 text-purple-300 text-xs font-medium cursor-pointer transition-colors"
+                              title="GitHub Storage Inspect karein"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Inspect</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isSuperAdminAccount}
+                              onClick={() => handleAdminDeleteUser(u.username)}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                                isSuperAdminAccount
+                                  ? 'opacity-40 cursor-not-allowed bg-slate-900 border-slate-800 text-slate-500'
+                                  : 'bg-rose-950/60 border-rose-500/40 hover:bg-rose-900/50 text-rose-300 cursor-pointer'
+                              }`}
+                              title={isSuperAdminAccount ? 'Super Admin account delete nahi ho sakta' : 'User delete karein'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Privileges & Limits Badges */}
+                        <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                            <span className="text-slate-500 uppercase font-mono">Privileges:</span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canUseAutopilot ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
+                              Autopilot
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canEditChannels ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
+                              Channels
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canUseThumbnailStudio ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
+                              Thumbnails
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canPublishScheduledPosts ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
+                              Publish
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canExportData ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
+                              Export
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canUseVoiceScriptGenerator ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
+                              Voice Script
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                            <span>Max Channels: <strong className="text-white">{perms.maxChannelsAllowed ?? 5}</strong></span>
+                            <span>•</span>
+                            <span>Daily Limit: <strong className="text-white">{perms.dailyGenerationLimit ?? 25}</strong></span>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-slate-400 text-[11px]">Username: <strong className="text-slate-300">@{u.username}</strong></p>
-                      <p className="text-emerald-400 text-[10px] font-mono truncate mt-1">Repo: {u.dedicatedRepoPath}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -879,7 +1182,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                     </h5>
                     <button
                       onClick={() => setInspectUserData(null)}
-                      className="text-slate-400 hover:text-white"
+                      className="text-slate-400 hover:text-white cursor-pointer"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -894,6 +1197,353 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                         </pre>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* CREATE USER MODAL OVERLAY */}
+              {showCreateUserModal && (
+                <div className="fixed inset-0 z-[125] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-purple-500/40 rounded-2xl p-5 max-w-md w-full shadow-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-2">
+                        <UserPlus className="w-5 h-5 text-purple-400" />
+                        <h4 className="font-bold text-white text-sm">Create New User Account</h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateUserModal(false)}
+                        className="text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleAdminCreateUser} className="space-y-3">
+                      <div>
+                        <label className="block text-slate-300 text-xs mb-1 font-medium">Username *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newAdminUsername}
+                          onChange={(e) => setNewAdminUsername(e.target.value.toLowerCase())}
+                          placeholder="e.g. ali_raza"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 text-xs mb-1 font-medium">Password *</label>
+                        <input
+                          type="password"
+                          required
+                          value={newAdminPassword}
+                          onChange={(e) => setNewAdminPassword(e.target.value)}
+                          placeholder="Set user password"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-slate-300 text-xs mb-1 font-medium">Display Name</label>
+                          <input
+                            type="text"
+                            value={newAdminDisplayName}
+                            onChange={(e) => setNewAdminDisplayName(e.target.value)}
+                            placeholder="e.g. Ali Raza"
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-slate-300 text-xs mb-1 font-medium">Account Role</label>
+                          <select
+                            value={newAdminRole}
+                            onChange={(e) => setNewAdminRole(e.target.value as 'admin' | 'standard')}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                          >
+                            <option value="standard">Standard User</option>
+                            <option value="admin">Super Admin</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 text-xs mb-1 font-medium">Email Address</label>
+                        <input
+                          type="email"
+                          value={newAdminEmail}
+                          onChange={(e) => setNewAdminEmail(e.target.value)}
+                          placeholder="e.g. ali@itcafeteria.internal"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateUserModal(false)}
+                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isLoading}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg text-xs cursor-pointer disabled:opacity-50"
+                        >
+                          {isLoading ? 'Creating...' : 'Create Account'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* EDIT USER MODAL OVERLAY */}
+              {editingUser && (
+                <div className="fixed inset-0 z-[125] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl p-5 max-w-md w-full shadow-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Pencil className="w-5 h-5 text-indigo-400" />
+                        <h4 className="font-bold text-white text-sm">Edit User: @{editingUser.username}</h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingUser(null)}
+                        className="text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleAdminUpdateUser} className="space-y-3">
+                      <div>
+                        <label className="block text-slate-300 text-xs mb-1 font-medium">Display Name</label>
+                        <input
+                          type="text"
+                          value={editDisplayName}
+                          onChange={(e) => setEditDisplayName(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 text-xs mb-1 font-medium">Email Address</label>
+                        <input
+                          type="email"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-slate-300 text-xs mb-1 font-medium">Role</label>
+                          <select
+                            value={editRole}
+                            disabled={editingUser.username === 'waqarmajeed'}
+                            onChange={(e) => setEditRole(e.target.value as 'admin' | 'standard')}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                          >
+                            <option value="standard">Standard User</option>
+                            <option value="admin">Super Admin</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 text-xs mb-1 font-medium">Status</label>
+                          <select
+                            value={editIsActive ? 'active' : 'inactive'}
+                            disabled={editingUser.username === 'waqarmajeed'}
+                            onChange={(e) => setEditIsActive(e.target.value === 'active')}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                          >
+                            <option value="active">Active</option>
+                            <option value="inactive">Suspended</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 text-xs mb-1 font-medium">
+                          Reset Password (leave blank to keep current)
+                        </label>
+                        <input
+                          type="password"
+                          value={editNewPassword}
+                          onChange={(e) => setEditNewPassword(e.target.value)}
+                          placeholder="New password..."
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setEditingUser(null)}
+                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isLoading}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-xs cursor-pointer disabled:opacity-50"
+                        >
+                          {isLoading ? 'Saving...' : 'Save Changes'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* PRIVILEGES & LIMITS MODAL OVERLAY */}
+              {adjustingUserPermissions && (
+                <div className="fixed inset-0 z-[125] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl p-5 max-w-lg w-full shadow-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-2">
+                        <SlidersHorizontal className="w-5 h-5 text-cyan-400" />
+                        <div>
+                          <h4 className="font-bold text-white text-sm">Privileges &amp; Limits: @{adjustingUserPermissions.username}</h4>
+                          <span className="text-[11px] text-slate-400">Configure which features standard users can access</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAdjustingUserPermissions(null)}
+                        className="text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleAdminSavePermissions} className="space-y-4">
+                      {/* Feature Toggles */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block">Feature Permissions:</span>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canUseAutopilot}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canUseAutopilot: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Autopilot Decision Engine</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canEditChannels}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canEditChannels: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Channel Management</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canUseThumbnailStudio}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canUseThumbnailStudio: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Thumbnail Studio AI</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canPublishScheduledPosts}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canPublishScheduledPosts: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Publish Scheduled Posts</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canExportData}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canExportData: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Export System Data</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canUseVoiceScriptGenerator}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canUseVoiceScriptGenerator: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Voice Script Generator</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Numeric Limits */}
+                      <div className="space-y-2 pt-2 border-t border-slate-800">
+                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block">Standard User Limits:</span>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <label className="block text-slate-400 mb-1">Max Channels Allowed</label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={100}
+                              value={permissionToggles.maxChannelsAllowed}
+                              onChange={(e) => setPermissionToggles({
+                                ...permissionToggles,
+                                maxChannelsAllowed: parseInt(e.target.value) || 1
+                              })}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-cyan-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-400 mb-1">Daily Generation Limit</label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={1000}
+                              value={permissionToggles.dailyGenerationLimit}
+                              onChange={(e) => setPermissionToggles({
+                                ...permissionToggles,
+                                dailyGenerationLimit: parseInt(e.target.value) || 1
+                              })}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-cyan-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setAdjustingUserPermissions(null)}
+                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isLoading}
+                          className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded-lg text-xs cursor-pointer disabled:opacity-50"
+                        >
+                          {isLoading ? 'Saving...' : 'Save Privileges'}
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
               )}
