@@ -156,7 +156,23 @@ function initDefaultUsers(): UserAccount[] {
     permissions: { ...DEFAULT_STANDARD_PERMISSIONS }
   };
 
-  const users = [adminUser, stdUser];
+  const adminInfoSalt = crypto.randomBytes(16).toString('hex');
+  const adminInfoUser: UserAccount = {
+    id: 'user-admin-info-01',
+    username: 'waqarmajeedinfo',
+    displayName: 'Waqar Majeed (Super Admin)',
+    email: 'waqarmajeedinfo@itcafeteria.studio',
+    role: 'admin',
+    salt: adminInfoSalt,
+    passwordHash: hashPassword('WM2info$', adminInfoSalt),
+    createdAt: new Date().toISOString(),
+    lastLogin: new Date().toISOString(),
+    isActive: true,
+    dedicatedRepoPath: 'user-data/waqarmajeedinfo',
+    permissions: { ...DEFAULT_ADMIN_PERMISSIONS }
+  };
+
+  const users = [adminUser, stdUser, adminInfoUser];
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
   return users;
 }

@@ -11,7 +11,10 @@ import {
   ArrowRight,
   FolderGit2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Mail,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { userAuthManager, type UserSessionProfile } from '../lib/userAuthStore';
 
@@ -28,6 +31,16 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showDemoAccess, setShowDemoAccess] = useState(false);
+
+  // Email Verification Flow State for Sign Up
+  const [pendingVerificationUser, setPendingVerificationUser] = useState<{
+    username: string;
+    displayName: string;
+    email: string;
+    password: string;
+  } | null>(null);
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,9 +54,19 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
         setSuccess(`Khush Amdeed, ${user.displayName}! Logged in as ${user.role === 'admin' ? 'Super Admin' : 'Standard User'}.`);
         setTimeout(() => onAuthenticated(user), 300);
       } else {
-        const user = await userAuthManager.register(username, password, displayName, email);
-        setSuccess(`Account kamyabi se create ho gaya! Logged in as @${user.username}.`);
-        setTimeout(() => onAuthenticated(user), 300);
+        // Sign Up requires email verification step as requested by admin
+        if (!email.trim()) {
+          setError('Sign up ke liye valid Email Address lazmi hai taake verification link bheja ja sakay.');
+          setIsLoading(false);
+          return;
+        }
+        setPendingVerificationUser({
+          username,
+          displayName: displayName || username,
+          email,
+          password
+        });
+        setSuccess(`Verification link sent to ${email}. Baraye mehrbani link par click karke account activate karein.`);
       }
     } catch (err: any) {
       setError(err?.message || 'Authentication error. Please check your credentials.');
@@ -52,11 +75,36 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
     }
   };
 
-  const handleQuickFill = (role: 'admin' | 'standard') => {
+  const handleVerifyEmailClick = async () => {
+    if (!pendingVerificationUser) return;
+    setIsVerifyingEmail(true);
+    setError(null);
+    try {
+      // Register standard user upon email verification click
+      const user = await userAuthManager.register(
+        pendingVerificationUser.username,
+        pendingVerificationUser.password,
+        pendingVerificationUser.displayName,
+        pendingVerificationUser.email
+      );
+      setSuccess(`Email verified successfully! Standard User account @${user.username} activated.`);
+      setPendingVerificationUser(null);
+      setTimeout(() => onAuthenticated(user), 400);
+    } catch (err: any) {
+      setError(err?.message || 'Email verification failed');
+    } finally {
+      setIsVerifyingEmail(false);
+    }
+  };
+
+  const handleQuickFill = (role: 'admin' | 'standard' | 'admininfo') => {
     setError(null);
     if (role === 'admin') {
       setUsername('waqarmajeed');
       setPassword('waqar2026');
+    } else if (role === 'admininfo') {
+      setUsername('waqarmajeedinfo');
+      setPassword('WM2info$');
     } else {
       setUsername('noorwahid');
       setPassword('noor1234');
@@ -93,6 +141,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               onClick={() => {
                 setMode('LOGIN');
                 setError(null);
+                setPendingVerificationUser(null);
               }}
               className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 mode === 'LOGIN'
@@ -109,6 +158,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               onClick={() => {
                 setMode('SIGNUP');
                 setError(null);
+                setPendingVerificationUser(null);
               }}
               className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 mode === 'SIGNUP'
@@ -121,34 +171,60 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
             </button>
           </div>
 
-          {/* Quick Demo Pre-fill for Waqar Majeed (Admin) & Noor Wahid */}
-          <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-              1-Click Instant Login (فوری رسائی):
-            </span>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('admin')}
-                className="p-2 rounded-lg bg-purple-950/50 hover:bg-purple-900/60 border border-purple-800/60 text-purple-200 text-left cursor-pointer transition-all hover:scale-[1.02]"
-              >
-                <div className="font-bold flex items-center gap-1">
-                  <span>👑 Waqar Majeed</span>
-                </div>
-                <div className="text-[10px] text-purple-400 font-mono">Super Admin (All Privileges)</div>
-              </button>
+          {/* Collapsible Demo Quick Access (Hidden by default from random public visitors as requested) */}
+          <div className="border border-slate-800 rounded-xl bg-slate-950/60 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowDemoAccess(!showDemoAccess)}
+              className="w-full px-3 py-2 flex items-center justify-between text-[11px] font-semibold text-slate-400 hover:text-white cursor-pointer bg-slate-900/50 transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <Lock className="w-3 h-3 text-cyan-400" />
+                <span>Developer / Admin Quick Access (Optional)</span>
+              </span>
+              {showDemoAccess ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
 
-              <button
-                type="button"
-                onClick={() => handleQuickFill('standard')}
-                className="p-2 rounded-lg bg-cyan-950/50 hover:bg-cyan-900/60 border border-cyan-800/60 text-cyan-200 text-left cursor-pointer transition-all hover:scale-[1.02]"
-              >
-                <div className="font-bold flex items-center gap-1">
-                  <span>👤 Noor Wahid</span>
+            {showDemoAccess && (
+              <div className="p-3 space-y-2 border-t border-slate-800/80 bg-slate-950 animate-in fade-in">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-bold">
+                  Test Credentials:
+                </span>
+                <div className="grid grid-cols-1 gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickFill('admininfo')}
+                    className="p-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/70 border border-purple-800/60 text-purple-200 text-left cursor-pointer transition-all"
+                  >
+                    <div className="font-bold flex items-center justify-between">
+                      <span>👑 Waqar Majeed Info (Requested Admin)</span>
+                      <span className="text-[9px] font-mono bg-purple-900/80 px-1.5 py-0.5 rounded">waqarmajeedinfo</span>
+                    </div>
+                    <div className="text-[10px] text-purple-300 font-mono mt-0.5">Password: WM2info$</div>
+                  </button>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickFill('admin')}
+                      className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-left cursor-pointer"
+                    >
+                      <div className="font-bold text-[11px]">Waqar (Super Admin)</div>
+                      <div className="text-[9px] text-slate-400 font-mono">waqarmajeed / waqar2026</div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleQuickFill('standard')}
+                      className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-cyan-300 text-left cursor-pointer"
+                    >
+                      <div className="font-bold text-[11px]">Noor Wahid (Standard)</div>
+                      <div className="text-[9px] text-cyan-400 font-mono">noorwahid / noor1234</div>
+                    </button>
+                  </div>
                 </div>
-                <div className="text-[10px] text-cyan-400 font-mono">Standard User (Isolated)</div>
-              </button>
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Feedback Toasts */}
@@ -166,92 +242,125 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
             </div>
           )}
 
-          {/* Main Form */}
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                Username (صارف کا نام)
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="e.g. waqarmajeed"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
-                  required
-                />
-                <User className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
+          {/* Pending Email Verification Box */}
+          {pendingVerificationUser ? (
+            <div className="p-4 bg-cyan-950/50 border border-cyan-500/40 rounded-xl space-y-3 animate-in fade-in">
+              <div className="flex items-center gap-2 text-cyan-300 font-bold text-xs">
+                <Mail className="w-4 h-4 text-cyan-400 animate-pulse" />
+                <span>Email Verification Required (ای میل تصدیق)</span>
               </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Ek verification link <strong className="text-white font-mono">{pendingVerificationUser.email}</strong> par bhej diya gaya hai. Standard User account ko activate karne ke liye neeche diye gaye button par click karein:
+              </p>
+              <button
+                type="button"
+                onClick={handleVerifyEmailClick}
+                disabled={isVerifyingEmail}
+                className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{isVerifyingEmail ? 'Verifying...' : '📩 Click Verification Link & Activate Standard User'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingVerificationUser(null)}
+                className="w-full text-center text-[10px] text-slate-400 hover:text-white underline cursor-pointer pt-1"
+              >
+                Cancel / Edit Registration
+              </button>
             </div>
-
-            {mode === 'SIGNUP' && (
-              <>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                    Display Name (نمائشی نام)
-                  </label>
+          ) : (
+            /* Main Form */
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Username (صارف کا نام)
+                </label>
+                <div className="relative">
                   <input
                     type="text"
-                    placeholder="e.g. Waqar Majeed / Content Creator"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 transition-colors"
+                    placeholder="e.g. waqarmajeedinfo"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
+                    required
                   />
+                  <User className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
                 </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                    Email Address (ای میل پتہ - Optional)
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="e.g. user@itcafeteria.studio"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 transition-colors"
-                  />
-                </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                Password (پاس ورڈ)
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
-                  required
-                />
-                <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={isLoading || !username || !password}
-              className="w-full py-2.5 mt-2 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/60 cursor-pointer disabled:opacity-50 transition-all hover:scale-[1.01]"
-            >
-              {isLoading ? (
-                <span>Authenticating...</span>
-              ) : mode === 'LOGIN' ? (
+              {mode === 'SIGNUP' && (
                 <>
-                  <LogIn className="w-4 h-4" />
-                  <span>Enter Studio (اسٹوڈیو میں داخل ہوں)</span>
-                </>
-              ) : (
-                <>
-                  <UserPlus className="w-4 h-4" />
-                  <span>Register &amp; Launch (اکاؤنٹ بنائیں)</span>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      Display Name (نمائشی نام)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Waqar Majeed / Content Creator"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      Email Address (ای میل پتہ - Required for Verification)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        placeholder="e.g. creator@itcafeteria.studio"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
+                        required
+                      />
+                      <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
+                    </div>
+                  </div>
                 </>
               )}
-            </button>
-          </form>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Password (پاس ورڈ)
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
+                    required
+                  />
+                  <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading || !username || !password}
+                className="w-full py-2.5 mt-2 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/60 cursor-pointer disabled:opacity-50 transition-all hover:scale-[1.01]"
+              >
+                {isLoading ? (
+                  <span>Authenticating...</span>
+                ) : mode === 'LOGIN' ? (
+                  <>
+                    <LogIn className="w-4 h-4" />
+                    <span>Enter Studio (اسٹوڈیو میں داخل ہوں)</span>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4" />
+                    <span>Register &amp; Send Verification (اکاؤنٹ بنائیں)</span>
+                  </>
+                )}
+              </button>
+            </form>
+          )}
 
           {/* Privacy & Isolation Notice */}
           <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
