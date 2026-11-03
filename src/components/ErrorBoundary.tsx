@@ -27,6 +27,18 @@ export class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an unhandled rendering error:', error, errorInfo);
     this.setState({ errorInfo });
+    try {
+      import('../lib/selfHealingEngine').then(({ selfHealingEngine }) => {
+        selfHealingEngine.recordFault({
+          source: 'RUNTIME_ERROR',
+          severity: 'CRITICAL',
+          summary: `Component Rendering Fault: ${(error?.message || 'Render Exception').slice(0, 100)}`,
+          technicalDetails: String(error?.stack || errorInfo?.componentStack || ''),
+          remedyApplied: 'Captured safely by React ErrorBoundary. Component isolate preserved without blanking full viewport.',
+          permanentSolutionPrompt: `Inspect component props and state for undefined access causing "${error?.message}".`
+        });
+      });
+    } catch {}
   }
 
   private handleReset = () => {

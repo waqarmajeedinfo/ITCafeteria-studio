@@ -21,7 +21,7 @@ import {
   Edit3
 } from 'lucide-react';
 import { dirtyManager } from '../lib/dirtyStore';
-import { PUBLISHED_VIDEOS } from '../data/channelData';
+import { PUBLISHED_VIDEOS, CHANNEL_PROFILES } from '../data/channelData';
 import {
   loadAllChannels,
   getEngineConfigForChannel,
@@ -195,7 +195,7 @@ export const DEFAULT_STYLE_PRESETS: StylePresetItem[] = [
 /**
  * Screenshot 5: Agent Script Rules & Prompt Instructions Presets
  */
-export const SCRIPT_RULE_PRESETS = [
+export const IT_CAFETERIA_SCRIPT_RULE_PRESETS = [
   {
     id: '10_scene_short',
     title: '10-Scene Short',
@@ -222,6 +222,35 @@ export const SCRIPT_RULE_PRESETS = [
   }
 ];
 
+export const BEAUTY_HUB_SCRIPT_PRESETS = [
+  {
+    id: 'beauty_10_scene',
+    title: '10-Scene Beauty Short',
+    subtitle: 'Hook, Skin Concern, Instant Teaser, Step 1, Step 2, Live Glow Proof...',
+    instructions: 'Strict 10-Scene Beauty Short format in Roman Urdu. Structure: Disruptive visual hook (0-10s), Relatable skin or beauty concern, Teaser solution, Step 1 gentle technique, Step 2 key product or hack, Step 3 texture demonstration, Live before/after glow proof, Curiosity loop, CTA for daily skincare/makeup tips.'
+  },
+  {
+    id: 'skincare_routine',
+    title: 'Skincare Routine & Secrets',
+    subtitle: 'Morning/Night Routine, Key Ingredients, Blending, Mistake Warning...',
+    instructions: 'Skincare masterclass format in warm Roman Urdu. Structure: Morning vs night skin needs, Active ingredient safety (hyaluronic acid, niacinamide, sunscreen), Application order, Common mistake warning (harsh scrubbing), Glowing results timeline, Interactive viewer skin question in CTA.'
+  },
+  {
+    id: 'makeup_soft_glam',
+    title: 'Everyday Soft Glam Makeup',
+    subtitle: '5-Minute Quick Glam, Foundation Shade, Concealer Hack, Long-Lasting Lock...',
+    instructions: 'Everyday soft glam and beginner makeup tutorial format in friendly Urdu. Structure: Skin prep and hydration primer, Base matching without white cast, 2-minute eye and brow definition, Natural lip tint blending, Setting spray lock for Pakistani weather, Save this video CTA.'
+  },
+  {
+    id: 'beauty_product_review',
+    title: 'Product Review & Hacks',
+    subtitle: 'Viral Product Test, Honest Pros/Cons, Budget Dupes, Final Verdict...',
+    instructions: 'Honest beauty product review and budget alternatives. Structure: Viral product claim vs reality, Ingredient test, Live skin texture swatch, Honest pros and cons, Affordable local alternative, Final recommendation for dry/oily skin types.'
+  }
+];
+
+export const SCRIPT_RULE_PRESETS = IT_CAFETERIA_SCRIPT_RULE_PRESETS;
+
 export const IT_CAFETERIA_10_CATEGORY_RULES = [
   { id: 1, name: '1. AI & Smart Tech', instructions: 'Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.' },
   { id: 2, name: '2. AI Workflows', instructions: 'Deep productivity and automation tutorial format. Structure: Business problem, Architecture and trigger breakdown, Step-by-step logic nodes, Live testing.' },
@@ -234,6 +263,29 @@ export const IT_CAFETERIA_10_CATEGORY_RULES = [
   { id: 9, name: '9. YT Automation (16:9)', instructions: '16:9 format mandatory, multi-agent AI script systems, retention optimization, high-CTR storytelling.' },
   { id: 10, name: '10. Custom Search', instructions: 'User-driven search query and research grounding with prioritized external links and web insights.' }
 ];
+
+export function getScriptRulePresetsForProfile(profile?: any) {
+  const niche = (profile?.niche || '').toLowerCase();
+  const id = (profile?.id || '').toLowerCase();
+  if (id.includes('beauty') || niche.includes('beauty') || niche.includes('grooming') || niche.includes('makeup')) {
+    return BEAUTY_HUB_SCRIPT_PRESETS;
+  }
+  return IT_CAFETERIA_SCRIPT_RULE_PRESETS;
+}
+
+export function getCategoryRulesForProfile(profile?: any) {
+  if (!profile || !Array.isArray(profile.categories) || profile.categories.length === 0) {
+    return IT_CAFETERIA_10_CATEGORY_RULES;
+  }
+  return profile.categories.map((cat: any) => {
+    const existingRule = profile.categoryRules?.[cat.id];
+    return {
+      id: cat.id,
+      name: `${cat.id}. ${cat.name}`,
+      instructions: existingRule?.instructions || `Professional ${profile.name} tutorial on ${cat.name}. Structure: Engaging hook, practical demonstration, common mistakes warning, clear value delivery in Roman Urdu/English mix.`
+    };
+  });
+}
 
 export const DEFAULT_SIMULATOR_CONFIG: SimulatorConfig = {
   baselineTag: 'Active',
@@ -328,15 +380,21 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
     setSelectedChannelId(chId);
     if (onChannelChange) onChannelChange(chId);
     const eng = getEngineConfigForChannel(chId);
+    const prof = channels[chId] || (CHANNEL_PROFILES as any)[chId];
+    const isBeauty = chId.includes('beauty') || (prof?.niche || '').toLowerCase().includes('beauty');
+    const defaultBeautyInstruction = BEAUTY_HUB_SCRIPT_PRESETS[0].instructions;
+    const defaultTechInstruction = IT_CAFETERIA_SCRIPT_RULE_PRESETS[0].instructions;
+
     setLocal((prev) => ({
       ...prev,
-      baselineTag: eng.baselineTag || '@Active',
+      baselineTag: eng.baselineTag || (isBeauty ? '@MZ22-1' : '@Active'),
       defaultSceneCount: eng.defaultSceneCount || 10,
-      duplicateStrictness: eng.duplicateStrictness || 'balanced',
-      dialectTone: eng.dialectTone || 'formal',
-      flowPromptFormat: eng.flowPromptFormat || 'cinematic_3d',
-      customInstructions: eng.customInstructions || prev.customInstructions
+      duplicateStrictness: eng.duplicateStrictness || 'deep',
+      dialectTone: eng.dialectTone || (isBeauty ? 'beauty_friendly' : 'workshop'),
+      flowPromptFormat: eng.flowPromptFormat || (isBeauty ? 'aesthetic_soft_glam' : 'split_screen'),
+      customInstructions: eng.customInstructions || (isBeauty ? defaultBeautyInstruction : defaultTechInstruction)
     }));
+    setActiveRulePattern(isBeauty ? 'beauty_10_scene' : '10_scene_short');
   };
 
   // Lock scroll
@@ -606,9 +664,9 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
               </span>
             </div>
 
-            {/* 4 Clickable Pattern Cards */}
+            {/* 4 Clickable Channel-Adaptive Pattern Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-              {SCRIPT_RULE_PRESETS.map((preset) => {
+              {getScriptRulePresetsForProfile(currentProfile).map((preset) => {
                 const isActive = activeRulePattern === preset.id;
                 return (
                   <div
@@ -630,13 +688,16 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
               })}
             </div>
 
-            {/* 10 Category-Specific Script Rules & Automatic Binds */}
+            {/* Dynamic Category-Specific Script Rules & Automatic Binds */}
             <div className="pt-3 border-t border-slate-800">
-              <div className="text-xs font-bold text-cyan-300 mb-2">
-                10 Category-Specific Script Rules & Automatic Binds (IT Cafeteria Modules):
+              <div className="text-xs font-bold text-cyan-300 mb-2 flex items-center justify-between">
+                <span>
+                  {getCategoryRulesForProfile(currentProfile).length} Category-Specific Script Rules & Automatic Binds ({currentProfile?.name || 'Channel'} Modules):
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">Click card to apply rule</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
-                {IT_CAFETERIA_10_CATEGORY_RULES.map((catRule) => (
+                {getCategoryRulesForProfile(currentProfile).map((catRule: { id: number; name: string; instructions: string }) => (
                   <div
                     key={catRule.id}
                     onClick={() => updateField('customInstructions', catRule.instructions)}

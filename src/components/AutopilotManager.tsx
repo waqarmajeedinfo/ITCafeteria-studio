@@ -77,11 +77,14 @@ import {
 import {
   loadAllChannels,
   saveOrUpdateChannel,
+  getEngineConfigForChannel,
   deleteChannel,
   type ExtendedChannelProfile
 } from '../lib/channelStore';
 import { dirtyManager } from '../lib/dirtyStore';
 import { AutopilotConfigModal } from './AutopilotConfigModal';
+import { DiagnosticMessageBox } from './DiagnosticMessageBox';
+import { selfHealingEngine } from '../lib/selfHealingEngine';
 import type { TabType } from '../App';
 
 // --- Task & Queue Types ---
@@ -400,6 +403,121 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
   const [newSrEngineInline, setNewSrEngineInline] = useState<'google_grounding' | 'fast_internal' | 'custom_web'>('google_grounding');
   const [newSrFrequencyInline, setNewSrFrequencyInline] = useState<'continuous' | 'hourly' | 'daily_scheduled' | 'queue_depleted'>('continuous');
   const [newSrDomainsInline, setNewSrDomainsInline] = useState('blog.google, microsoft.com');
+
+  // Inline Edit JD state
+  const [editingJdIdInline, setEditingJdIdInline] = useState<string | null>(null);
+  const [editJdRoleInline, setEditJdRoleInline] = useState('');
+  const [editJdTitleInline, setEditJdTitleInline] = useState('');
+  const [editJdDescriptionInline, setEditJdDescriptionInline] = useState('');
+  const [editJdTriggerInline, setEditJdTriggerInline] = useState('');
+  const [editJdIntervalInline, setEditJdIntervalInline] = useState('');
+  const [editJdQueryInline, setEditJdQueryInline] = useState('');
+  const [editJdPriorityInline, setEditJdPriorityInline] = useState(8);
+
+  // Inline Edit Search Rule state
+  const [editingSrIdInline, setEditingSrIdInline] = useState<string | null>(null);
+  const [editSrNameInline, setEditSrNameInline] = useState('');
+  const [editSrCategoryInline, setEditSrCategoryInline] = useState('');
+  const [editSrQueryInline, setEditSrQueryInline] = useState('');
+  const [editSrEngineInline, setEditSrEngineInline] = useState<'google_grounding' | 'fast_internal' | 'custom_web'>('google_grounding');
+  const [editSrFrequencyInline, setEditSrFrequencyInline] = useState<'continuous' | 'hourly' | 'daily_scheduled' | 'queue_depleted'>('continuous');
+  const [editSrDomainsInline, setEditSrDomainsInline] = useState('');
+
+  // Inline Edit Channel Scope state
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const [editChPresenter, setEditChPresenter] = useState('');
+  const [editChNiche, setEditChNiche] = useState('');
+  const [editChDialect, setEditChDialect] = useState('');
+  const [editChSceneCount, setEditChSceneCount] = useState(10);
+  const [editChPriority, setEditChPriority] = useState<'URGENT' | 'HIGH' | 'NORMAL'>('HIGH');
+
+  const startEditChannel = (ch: ExtendedChannelProfile) => {
+    setEditingChannelId(ch.id);
+    setEditChPresenter(ch.presenter || '');
+    setEditChNiche(ch.niche || '');
+    setEditChDialect(ch.engineConfig?.dialectTone || 'Lahori Tech');
+    setEditChSceneCount(ch.defaultSceneCount || 10);
+    setEditChPriority(ch.engineConfig?.autonomousPriority || 'HIGH');
+  };
+
+  const saveEditChannel = (ch: ExtendedChannelProfile) => {
+    const baseEngine = ch.engineConfig || getEngineConfigForChannel(ch.id);
+    const updated: ExtendedChannelProfile = {
+      ...ch,
+      presenter: editChPresenter.trim() || ch.presenter,
+      niche: editChNiche.trim() || ch.niche,
+      defaultSceneCount: Math.max(5, Math.min(30, Number(editChSceneCount) || 10)),
+      engineConfig: {
+        ...baseEngine,
+        dialectTone: editChDialect.trim() || baseEngine.dialectTone || 'Lahori Tech',
+        autonomousPriority: editChPriority
+      }
+    };
+    saveOrUpdateChannel(updated);
+    setEditingChannelId(null);
+    setSyncToast(`⚡ Channel "${ch.name}" scope updated successfully!`);
+    setTimeout(() => setSyncToast(null), 3500);
+  };
+
+  const startEditJdInline = (jd: AutopilotAgentJD) => {
+    setEditingJdIdInline(jd.id);
+    setEditJdRoleInline(jd.roleName);
+    setEditJdTitleInline(jd.agentTitle);
+    setEditJdDescriptionInline(jd.description);
+    setEditJdTriggerInline(jd.triggerCondition);
+    setEditJdIntervalInline(jd.executionInterval);
+    setEditJdQueryInline(jd.searchQueryTemplate || '');
+    setEditJdPriorityInline(jd.priorityWeight);
+  };
+
+  const saveEditJdInline = (id: string) => {
+    if (!editJdRoleInline.trim() || !editJdDescriptionInline.trim()) return;
+    const nextJds = (autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).map((j) =>
+      j.id === id
+        ? {
+            ...j,
+            roleName: editJdRoleInline.trim(),
+            agentTitle: editJdTitleInline.trim() || editJdRoleInline.trim(),
+            description: editJdDescriptionInline.trim(),
+            triggerCondition: editJdTriggerInline.trim(),
+            executionInterval: editJdIntervalInline.trim(),
+            searchQueryTemplate: editJdQueryInline.trim(),
+            priorityWeight: Number(editJdPriorityInline) || 8
+          }
+        : j
+    );
+    handleUpdateAutopilotConfig({ agentJDs: nextJds }, `Updated JD: ${editJdRoleInline.trim()}`);
+    setEditingJdIdInline(null);
+  };
+
+  const startEditSrInline = (sr: AutopilotSearchRule) => {
+    setEditingSrIdInline(sr.id);
+    setEditSrNameInline(sr.name);
+    setEditSrCategoryInline(sr.targetNicheOrCategory);
+    setEditSrQueryInline(sr.queryTemplate);
+    setEditSrEngineInline(sr.searchEngine);
+    setEditSrFrequencyInline(sr.frequency);
+    setEditSrDomainsInline(sr.domainsPriority.join(', '));
+  };
+
+  const saveEditSrInline = (id: string) => {
+    if (!editSrNameInline.trim() || !editSrQueryInline.trim()) return;
+    const nextRules = (autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).map((r) =>
+      r.id === id
+        ? {
+            ...r,
+            name: editSrNameInline.trim(),
+            targetNicheOrCategory: editSrCategoryInline.trim() || 'All Categories',
+            queryTemplate: editSrQueryInline.trim(),
+            searchEngine: editSrEngineInline,
+            frequency: editSrFrequencyInline,
+            domainsPriority: editSrDomainsInline.split(',').map((d) => d.trim()).filter(Boolean)
+          }
+        : r
+    );
+    handleUpdateAutopilotConfig({ searchRules: nextRules }, `Updated Search Rule: ${editSrNameInline.trim()}`);
+    setEditingSrIdInline(null);
+  };
 
   const handleUpdateAutopilotConfig = (updates: Partial<AutopilotConfiguration>, message?: string) => {
     const next = { ...autopilotConfig, ...updates };
@@ -1277,10 +1395,11 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
             {/* Autopilot Settings Dashboard (Inline) Button */}
             <button
               onClick={() => {
+                selfHealingEngine.healScrollLock(true);
                 setActiveTab('engine');
                 setTimeout(() => {
                   const el = document.getElementById('autopilot-settings-dashboard');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 100);
               }}
               data-guide-target="autopilot-settings-inline-btn"
@@ -1412,6 +1531,9 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
           </button>
         </div>
       )}
+
+      {/* Self-Healing & Diagnostic Message Center HUD */}
+      <DiagnosticMessageBox embedInHud={true} />
 
       {/* 6:00 AM PKT Autonomous Replenishment Trigger Card */}
       <div className="bg-slate-900/90 border border-indigo-500/40 rounded-2xl p-5 shadow-xl relative overflow-hidden">
@@ -1946,110 +2068,230 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
 
                 {/* Agent JDs Cards List */}
                 <div className="space-y-3">
-                  {(autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).map((jd) => (
-                    <div
-                      key={jd.id}
-                      className={`p-4 rounded-xl border transition-all ${
-                        jd.isActive
-                          ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
-                          : 'bg-slate-950/60 border-slate-900 opacity-60'
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextJds = (autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).map((j) =>
-                                j.id === jd.id ? { ...j, isActive: !j.isActive } : j
-                              );
-                              handleUpdateAutopilotConfig({ agentJDs: nextJds }, `${jd.roleName} ${!jd.isActive ? 'Activated' : 'Paused'}`);
-                            }}
-                            className={`p-2 rounded-xl border mt-0.5 transition-colors cursor-pointer ${
-                              jd.isActive
-                                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                                : 'bg-slate-800 text-slate-500 border-slate-700'
-                            }`}
-                            title={jd.isActive ? 'Click to Pause Agent' : 'Click to Activate Agent'}
-                          >
-                            <Bot className="w-4 h-4" />
-                          </button>
+                  {(autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).map((jd) => {
+                    const isEditing = editingJdIdInline === jd.id;
 
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h5 className="font-bold text-white text-sm">{jd.roleName}</h5>
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
-                                {jd.agentTitle}
-                              </span>
-                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                                jd.isActive
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                                  : 'bg-slate-800 text-slate-400'
-                              }`}>
-                                {jd.isActive ? 'ACTIVE' : 'PAUSED'}
-                              </span>
-                            </div>
-                            <p className="text-slate-300 text-xs mt-1 leading-relaxed">
-                              {jd.description}
-                            </p>
+                    if (isEditing) {
+                      return (
+                        <div key={jd.id} className="p-4 bg-slate-950 border border-cyan-500/50 rounded-xl space-y-3 shadow-lg shadow-cyan-950/30">
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                              <Edit2 className="w-3.5 h-3.5" /> Edit Agent JD: {jd.roleName}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingJdIdInline(null)}
+                              className="text-slate-400 hover:text-white"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
-                        </div>
-
-                        {/* Controls: Priority & Actions */}
-                        <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
-                          <div className="flex flex-col items-end">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold">Priority (1-10)</span>
-                            <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Role Name</label>
+                              <input
+                                type="text"
+                                value={editJdRoleInline}
+                                onChange={(e) => setEditJdRoleInline(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Agent Title / Badge</label>
+                              <input
+                                type="text"
+                                value={editJdTitleInline}
+                                onChange={(e) => setEditJdTitleInline(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Priority Weight (1-10)</label>
                               <input
                                 type="number"
                                 min={1}
                                 max={10}
-                                value={jd.priorityWeight}
-                                onChange={(e) => {
-                                  const val = Math.max(1, Math.min(10, Number(e.target.value) || 1));
-                                  const nextJds = (autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).map((j) =>
-                                    j.id === jd.id ? { ...j, priorityWeight: val } : j
-                                  );
-                                  handleUpdateAutopilotConfig({ agentJDs: nextJds });
-                                }}
-                                className="w-14 bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-center text-cyan-300 font-mono font-bold text-xs"
+                                value={editJdPriorityInline}
+                                onChange={(e) => setEditJdPriorityInline(Number(e.target.value) || 1)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono focus:outline-none focus:border-cyan-400"
                               />
                             </div>
                           </div>
+                          <div>
+                            <label className="text-[11px] text-slate-300 font-semibold block mb-1">Job Description &amp; Responsibilities</label>
+                            <textarea
+                              rows={2}
+                              value={editJdDescriptionInline}
+                              onChange={(e) => setEditJdDescriptionInline(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Trigger Condition</label>
+                              <input
+                                type="text"
+                                value={editJdTriggerInline}
+                                onChange={(e) => setEditJdTriggerInline(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Execution Interval</label>
+                              <input
+                                type="text"
+                                value={editJdIntervalInline}
+                                onChange={(e) => setEditJdIntervalInline(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Search Query / Pattern</label>
+                              <input
+                                type="text"
+                                value={editJdQueryInline}
+                                onChange={(e) => setEditJdQueryInline(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => setEditingJdIdInline(null)}
+                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => saveEditJdInline(jd.id)}
+                              className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-cyan-950"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                              <span>Save Changes</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm(`Kya aap "${jd.roleName}" JD ko delete karna chahte hain?`)) {
-                                const nextJds = (autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).filter((j) => j.id !== jd.id);
-                                handleUpdateAutopilotConfig({ agentJDs: nextJds }, `Deleted ${jd.roleName}`);
-                              }
-                            }}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors"
-                            title="Delete JD"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                    return (
+                      <div
+                        key={jd.id}
+                        className={`p-4 rounded-xl border transition-all ${
+                          jd.isActive
+                            ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                            : 'bg-slate-950/60 border-slate-900 opacity-60'
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextJds = (autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).map((j) =>
+                                  j.id === jd.id ? { ...j, isActive: !j.isActive } : j
+                                );
+                                handleUpdateAutopilotConfig({ agentJDs: nextJds }, `${jd.roleName} ${!jd.isActive ? 'Activated' : 'Paused'}`);
+                              }}
+                              className={`p-2 rounded-xl border mt-0.5 transition-colors cursor-pointer ${
+                                jd.isActive
+                                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                                  : 'bg-slate-800 text-slate-500 border-slate-700'
+                              }`}
+                              title={jd.isActive ? 'Click to Pause Agent' : 'Click to Activate Agent'}
+                            >
+                              <Bot className="w-4 h-4" />
+                            </button>
+
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h5 className="font-bold text-white text-sm">{jd.roleName}</h5>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                                  {jd.agentTitle}
+                                </span>
+                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                                  jd.isActive
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                    : 'bg-slate-800 text-slate-400'
+                                }`}>
+                                  {jd.isActive ? 'ACTIVE' : 'PAUSED'}
+                                </span>
+                              </div>
+                              <p className="text-slate-300 text-xs mt-1 leading-relaxed">
+                                {jd.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Controls: Priority & Actions */}
+                          <div className="flex items-center gap-2.5 self-end sm:self-center shrink-0">
+                            <div className="flex flex-col items-end">
+                              <span className="text-[10px] text-slate-400 uppercase font-bold">Priority (1-10)</span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={10}
+                                  value={jd.priorityWeight}
+                                  onChange={(e) => {
+                                    const val = Math.max(1, Math.min(10, Number(e.target.value) || 1));
+                                    const nextJds = (autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).map((j) =>
+                                      j.id === jd.id ? { ...j, priorityWeight: val } : j
+                                    );
+                                    handleUpdateAutopilotConfig({ agentJDs: nextJds });
+                                  }}
+                                  className="w-14 bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-center text-cyan-300 font-mono font-bold text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Edit JD Button */}
+                            <button
+                              type="button"
+                              onClick={() => startEditJdInline(jd)}
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950/60 text-slate-300 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
+                              title="Edit this Agent JD"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                              <span className="hidden md:inline">Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`Kya aap "${jd.roleName}" JD ko delete karna chahte hain?`)) {
+                                  const nextJds = (autopilotConfig.agentJDs || DEFAULT_AGENT_JDS).filter((j) => j.id !== jd.id);
+                                  handleUpdateAutopilotConfig({ agentJDs: nextJds }, `Deleted ${jd.roleName}`);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors cursor-pointer"
+                              title="Delete JD"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Details Strip */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-slate-800/80 text-[11px]">
+                          <div className="flex items-center gap-1.5 text-slate-400">
+                            <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span className="truncate"><strong>Trigger:</strong> {jd.triggerCondition}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-slate-400">
+                            <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                            <span className="truncate"><strong>Interval:</strong> {jd.executionInterval}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-slate-400">
+                            <Search className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span className="truncate font-mono text-[10px]"><strong>Query:</strong> {jd.searchQueryTemplate || 'N/A'}</span>
+                          </div>
                         </div>
                       </div>
-
-                      {/* Details Strip */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-slate-800/80 text-[11px]">
-                        <div className="flex items-center gap-1.5 text-slate-400">
-                          <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <span className="truncate"><strong>Trigger:</strong> {jd.triggerCondition}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-slate-400">
-                          <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                          <span className="truncate"><strong>Interval:</strong> {jd.executionInterval}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-slate-400">
-                          <Search className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                          <span className="truncate font-mono text-[10px]"><strong>Query:</strong> {jd.searchQueryTemplate || 'N/A'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -2240,67 +2482,190 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
 
                   {/* Rules Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {(autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).map((rule) => (
-                      <div
-                        key={rule.id}
-                        className={`p-3.5 rounded-xl border transition-all ${
-                          rule.isActive
-                            ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
-                            : 'bg-slate-950/60 border-slate-900 opacity-60'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h5 className="font-bold text-white text-xs truncate">{rule.name}</h5>
-                              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
-                                {rule.targetNicheOrCategory}
+                    {(autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).map((rule) => {
+                      const isEditing = editingSrIdInline === rule.id;
+
+                      if (isEditing) {
+                        return (
+                          <div
+                            key={rule.id}
+                            className="p-4 bg-slate-950 border border-cyan-500/50 rounded-xl space-y-3 shadow-lg shadow-cyan-950/30 md:col-span-2"
+                          >
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                              <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                                <Edit2 className="w-3.5 h-3.5" /> Edit Radar Rule: {rule.name}
                               </span>
+                              <button
+                                type="button"
+                                onClick={() => setEditingSrIdInline(null)}
+                                className="text-slate-400 hover:text-white"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
                             </div>
-                            <div className="font-mono text-cyan-300 text-[11px] truncate mt-1">
-                              {rule.queryTemplate}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-[11px] text-slate-300 font-semibold block mb-1">Rule Name</label>
+                                <input
+                                  type="text"
+                                  value={editSrNameInline}
+                                  onChange={(e) => setEditSrNameInline(e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] text-slate-300 font-semibold block mb-1">Category Target</label>
+                                <input
+                                  type="text"
+                                  value={editSrCategoryInline}
+                                  onChange={(e) => setEditSrCategoryInline(e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Search Query Pattern</label>
+                              <input
+                                type="text"
+                                value={editSrQueryInline}
+                                onChange={(e) => setEditSrQueryInline(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="text-[11px] text-slate-300 font-semibold block mb-1">Search Engine</label>
+                                <select
+                                  value={editSrEngineInline}
+                                  onChange={(e) => setNewSrEngineInline(e.target.value as any)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                                >
+                                  <option value="google_grounding">Google Search Grounding (Live Web)</option>
+                                  <option value="fast_internal">Fast Internal Catalog Scan</option>
+                                  <option value="custom_web">Custom Priority URLs Scan</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[11px] text-slate-300 font-semibold block mb-1">Execution Cadence</label>
+                                <select
+                                  value={editSrFrequencyInline}
+                                  onChange={(e) => setEditSrFrequencyInline(e.target.value as any)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                                >
+                                  <option value="continuous">Continuous (Every Cadence Cycle)</option>
+                                  <option value="hourly">Hourly Rotation</option>
+                                  <option value="daily_scheduled">Daily Scheduled (6:00 AM PKT)</option>
+                                  <option value="queue_depleted">Only When Queue Depleted (&lt; 3)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[11px] text-slate-300 font-semibold block mb-1">Priority Domains (comma-separated)</label>
+                                <input
+                                  type="text"
+                                  value={editSrDomainsInline}
+                                  onChange={(e) => setEditSrDomainsInline(e.target.value)}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                              <button
+                                type="button"
+                                onClick={() => setEditingSrIdInline(null)}
+                                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => saveEditSrInline(rule.id)}
+                                className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-cyan-950"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                                <span>Save Changes</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={rule.id}
+                          className={`p-3.5 rounded-xl border transition-all ${
+                            rule.isActive
+                              ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
+                              : 'bg-slate-950/60 border-slate-900 opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h5 className="font-bold text-white text-xs truncate">{rule.name}</h5>
+                                <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
+                                  {rule.targetNicheOrCategory}
+                                </span>
+                              </div>
+                              <div className="font-mono text-cyan-300 text-[11px] truncate mt-1">
+                                {rule.queryTemplate}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextRules = (autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).map(r =>
+                                    r.id === rule.id ? { ...r, isActive: !r.isActive } : r
+                                  );
+                                  handleUpdateAutopilotConfig({ searchRules: nextRules });
+                                }}
+                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors ${
+                                  rule.isActive
+                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                                }`}
+                              >
+                                {rule.isActive ? 'ACTIVE' : 'OFF'}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => startEditSrInline(rule)}
+                                className="p-1 rounded hover:bg-cyan-950/60 text-slate-400 hover:text-cyan-300 transition-colors"
+                                title="Edit Rule"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`Kya aap "${rule.name}" search rule delete karna chahte hain?`)) {
+                                    const nextRules = (autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).filter(r => r.id !== rule.id);
+                                    handleUpdateAutopilotConfig({ searchRules: nextRules }, `Deleted Rule: ${rule.name}`);
+                                  }
+                                }}
+                                className="p-1 rounded hover:bg-rose-950/60 text-slate-500 hover:text-rose-400 transition-colors"
+                                title="Delete Rule"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const nextRules = (autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).map(r =>
-                                  r.id === rule.id ? { ...r, isActive: !r.isActive } : r
-                                );
-                                handleUpdateAutopilotConfig({ searchRules: nextRules });
-                              }}
-                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors ${
-                                rule.isActive
-                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                                  : 'bg-slate-800 text-slate-400 border-slate-700'
-                              }`}
-                            >
-                              {rule.isActive ? 'ACTIVE' : 'OFF'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const nextRules = (autopilotConfig.searchRules || DEFAULT_SEARCH_RULES).filter(r => r.id !== rule.id);
-                                handleUpdateAutopilotConfig({ searchRules: nextRules });
-                              }}
-                              className="p-1 rounded hover:bg-rose-950/60 text-slate-500 hover:text-rose-400 transition-colors"
-                              title="Delete Rule"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                          <div className="flex items-center gap-3 text-[10px] text-slate-400 pt-2 border-t border-slate-800">
+                            <span>Engine: <strong className="text-slate-300">{rule.searchEngine}</strong></span>
+                            <span>•</span>
+                            <span>Frequency: <strong className="text-slate-300">{rule.frequency}</strong></span>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-3 text-[10px] text-slate-400 pt-2 border-t border-slate-800">
-                          <span>Engine: <strong className="text-slate-300">{rule.searchEngine}</strong></span>
-                          <span>•</span>
-                          <span>Frequency: <strong className="text-slate-300">{rule.frequency}</strong></span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -2480,26 +2845,136 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {Object.values(loadAllChannels()).map((ch) => (
-                    <div
-                      key={ch.id}
-                      className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 hover:border-slate-700 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <h5 className="font-bold text-white text-xs truncate">{ch.name}</h5>
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
-                          {ch.engineConfig?.autonomousPriority || 'PRIORITY'}
-                        </span>
+                  {Object.values(loadAllChannels()).map((ch) => {
+                    const isEditing = editingChannelId === ch.id;
+
+                    if (isEditing) {
+                      return (
+                        <div
+                          key={ch.id}
+                          className="p-4 bg-slate-950 border border-emerald-500/50 rounded-xl space-y-3 shadow-lg shadow-emerald-950/30 sm:col-span-2 md:col-span-3"
+                        >
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                              <Edit2 className="w-3.5 h-3.5" /> Edit Channel Engine Scope: {ch.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingChannelId(null)}
+                              className="text-slate-400 hover:text-white"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Presenter</label>
+                              <input
+                                type="text"
+                                value={editChPresenter}
+                                onChange={(e) => setEditChPresenter(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Channel Niche</label>
+                              <input
+                                type="text"
+                                value={editChNiche}
+                                onChange={(e) => setEditChNiche(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Dialect / Tone</label>
+                              <input
+                                type="text"
+                                value={editChDialect}
+                                onChange={(e) => setEditChDialect(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Default Scene Count</label>
+                              <input
+                                type="number"
+                                min={5}
+                                max={30}
+                                value={editChSceneCount}
+                                onChange={(e) => setEditChSceneCount(Number(e.target.value) || 10)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono focus:outline-none focus:border-emerald-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-300 font-semibold block mb-1">Autonomous Priority</label>
+                              <select
+                                value={editChPriority}
+                                onChange={(e) => setEditChPriority(e.target.value as any)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                              >
+                                <option value="URGENT">URGENT (Daily Priority Runs)</option>
+                                <option value="HIGH">HIGH (Standard Queue Runs)</option>
+                                <option value="NORMAL">NORMAL (Alternate Runs)</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => setEditingChannelId(null)}
+                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => saveEditChannel(ch)}
+                              className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-950"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                              <span>Save Channel Scope</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={ch.id}
+                        className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2 hover:border-slate-700 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h5 className="font-bold text-white text-xs truncate">{ch.name}</h5>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                              {ch.engineConfig?.autonomousPriority || 'PRIORITY'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => startEditChannel(ch)}
+                              className="p-1 rounded bg-slate-800 hover:bg-emerald-950/60 text-slate-400 hover:text-emerald-300 border border-slate-700 transition-colors cursor-pointer"
+                              title="Edit Channel Engine Scope"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          Presenter: <strong className="text-slate-300">{ch.presenter}</strong> • Niche: <strong className="text-slate-300">{ch.niche}</strong>
+                        </p>
+                        <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
+                          <span>Dialect: <strong className="text-indigo-300">{ch.engineConfig?.dialectTone || 'Lahori Tech'}</strong></span>
+                          <span>Scenes: <strong className="text-cyan-300">{ch.defaultSceneCount || 10}</strong></span>
+                        </div>
                       </div>
-                      <p className="text-[11px] text-slate-400 truncate">
-                        Presenter: <strong className="text-slate-300">{ch.presenter}</strong> • Niche: <strong className="text-slate-300">{ch.niche}</strong>
-                      </p>
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>Dialect: <strong className="text-indigo-300">{ch.engineConfig?.dialectTone || 'Lahori Tech'}</strong></span>
-                        <span>Scenes: <strong className="text-cyan-300">{ch.defaultSceneCount || 10}</strong></span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

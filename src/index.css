@@ -10,12 +10,13 @@ body {
   min-height: 100vh;
 }
 
-/* Strict Viewport Containment: Disables whole-window scrolling when modals are open */
-html.modal-open,
+/* Balanced Viewport Containment: Prevents background page jump while keeping modals and content smoothly scrollable */
+html.modal-open {
+  overflow-y: hidden;
+}
+
 body.modal-open {
-  overflow: hidden !important;
-  height: 100vh !important;
-  touch-action: none;
+  overflow-y: hidden;
 }
 
 .overscroll-contain {

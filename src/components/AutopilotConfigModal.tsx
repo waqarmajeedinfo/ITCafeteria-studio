@@ -73,6 +73,25 @@ export const AutopilotConfigModal: React.FC<AutopilotConfigModalProps> = ({
   const [newSrFrequency, setNewSrFrequency] = useState<'continuous' | 'hourly' | 'daily_scheduled' | 'queue_depleted'>('continuous');
   const [newSrDomains, setNewSrDomains] = useState('blog.google, microsoft.com');
 
+  // Edit Agent JD form state
+  const [editingJdId, setEditingJdId] = useState<string | null>(null);
+  const [editJdRole, setEditJdRole] = useState('');
+  const [editJdTitle, setEditJdTitle] = useState('');
+  const [editJdDescription, setEditJdDescription] = useState('');
+  const [editJdTrigger, setEditJdTrigger] = useState('');
+  const [editJdInterval, setEditJdInterval] = useState('');
+  const [editJdQuery, setEditJdQuery] = useState('');
+  const [editJdPriority, setEditJdPriority] = useState(8);
+
+  // Edit Search Rule form state
+  const [editingSrId, setEditingSrId] = useState<string | null>(null);
+  const [editSrName, setEditSrName] = useState('');
+  const [editSrCategory, setEditSrCategory] = useState('');
+  const [editSrQuery, setEditSrQuery] = useState('');
+  const [editSrEngine, setEditSrEngine] = useState<'google_grounding' | 'fast_internal' | 'custom_web'>('google_grounding');
+  const [editSrFrequency, setEditSrFrequency] = useState<'continuous' | 'hourly' | 'daily_scheduled' | 'queue_depleted'>('continuous');
+  const [editSrDomains, setEditSrDomains] = useState('');
+
   useEffect(() => {
     if (isOpen) {
       setConfig(loadAutopilotConfig());
@@ -206,6 +225,68 @@ export const AutopilotConfigModal: React.FC<AutopilotConfigModalProps> = ({
     setNewSrQuery('');
     setShowAddSearchRule(false);
     showStatus(`Naya Search Rule "${newRule.name}" add ho gaya!`);
+  };
+
+  const startEditJd = (jd: AutopilotAgentJD) => {
+    setEditingJdId(jd.id);
+    setEditJdRole(jd.roleName);
+    setEditJdTitle(jd.agentTitle);
+    setEditJdDescription(jd.description);
+    setEditJdTrigger(jd.triggerCondition);
+    setEditJdInterval(jd.executionInterval);
+    setEditJdQuery(jd.searchQueryTemplate || '');
+    setEditJdPriority(jd.priorityWeight);
+  };
+
+  const saveEditJd = (id: string) => {
+    if (!editJdRole.trim() || !editJdDescription.trim()) return;
+    const nextJds = (config.agentJDs || DEFAULT_AGENT_JDS).map((j) =>
+      j.id === id
+        ? {
+            ...j,
+            roleName: editJdRole.trim(),
+            agentTitle: editJdTitle.trim() || editJdRole.trim(),
+            description: editJdDescription.trim(),
+            triggerCondition: editJdTrigger.trim(),
+            executionInterval: editJdInterval.trim(),
+            searchQueryTemplate: editJdQuery.trim(),
+            priorityWeight: Number(editJdPriority) || 8
+          }
+        : j
+    );
+    handleUpdate({ agentJDs: nextJds });
+    setEditingJdId(null);
+    showStatus(`Agent JD "${editJdRole.trim()}" kamyabi se update ho gaya!`);
+  };
+
+  const startEditSr = (sr: AutopilotSearchRule) => {
+    setEditingSrId(sr.id);
+    setEditSrName(sr.name);
+    setEditSrCategory(sr.targetNicheOrCategory);
+    setEditSrQuery(sr.queryTemplate);
+    setEditSrEngine(sr.searchEngine);
+    setEditSrFrequency(sr.frequency);
+    setEditSrDomains(sr.domainsPriority.join(', '));
+  };
+
+  const saveEditSr = (id: string) => {
+    if (!editSrName.trim() || !editSrQuery.trim()) return;
+    const nextRules = (config.searchRules || DEFAULT_SEARCH_RULES).map((r) =>
+      r.id === id
+        ? {
+            ...r,
+            name: editSrName.trim(),
+            targetNicheOrCategory: editSrCategory.trim() || 'All Categories',
+            queryTemplate: editSrQuery.trim(),
+            searchEngine: editSrEngine,
+            frequency: editSrFrequency,
+            domainsPriority: editSrDomains.split(',').map((d) => d.trim()).filter(Boolean)
+          }
+        : r
+    );
+    handleUpdate({ searchRules: nextRules });
+    setEditingSrId(null);
+    showStatus(`Search Rule "${editSrName.trim()}" kamyabi se update ho gaya!`);
   };
 
   const modalContent = (
@@ -471,65 +552,183 @@ export const AutopilotConfigModal: React.FC<AutopilotConfigModalProps> = ({
                         : 'bg-slate-950/40 border-slate-900 opacity-60'
                     }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h5 className="font-bold text-white text-xs">{jd.roleName}</h5>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800/60 font-semibold">
-                            {jd.agentTitle}
+                    {editingJdId === jd.id ? (
+                      /* Inline JD Editor Form */
+                      <div className="space-y-3 bg-slate-900/90 p-3 rounded-lg border border-cyan-500/50">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <span className="font-bold text-cyan-300 text-xs flex items-center gap-1.5">
+                            <Edit2 className="w-3.5 h-3.5" /> Edit Agent JD: {jd.roleName}
                           </span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-950 text-purple-300 border border-purple-800/60">
-                            Priority: {jd.priorityWeight}/10
-                          </span>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            jd.isActive
-                              ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
-                          }`}>
-                            {jd.isActive ? '● Active' : '○ Disabled'}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingJdId(null)}
+                            className="text-slate-400 hover:text-white"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                        <p className="text-slate-300 text-[11px] leading-relaxed">
-                          {jd.description}
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[10px] text-slate-400 font-mono">
-                          <div>
-                            <span className="text-slate-500">Trigger:</span> {jd.triggerCondition}
-                          </div>
-                          <div>
-                            <span className="text-slate-500">Interval:</span> {jd.executionInterval}
-                          </div>
-                          {jd.searchQueryTemplate && (
-                            <div className="sm:col-span-2">
-                              <span className="text-slate-500">Query Pattern:</span>{' '}
-                              <span className="text-cyan-400">{jd.searchQueryTemplate}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
 
-                      <div className="flex items-center gap-2 self-end sm:self-start shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleJd(jd.id)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border transition-colors ${
-                            jd.isActive
-                              ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                              : 'bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border-emerald-800'
-                          }`}
-                        >
-                          {jd.isActive ? 'Pause' : 'Activate'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteJd(jd.id)}
-                          className="p-1 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-800 transition-colors cursor-pointer"
-                          title="Delete Agent JD"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Role Name</label>
+                            <input
+                              type="text"
+                              value={editJdRole}
+                              onChange={(e) => setEditJdRole(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Agent Title / Badge</label>
+                            <input
+                              type="text"
+                              value={editJdTitle}
+                              onChange={(e) => setEditJdTitle(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Job Description & Responsibilities</label>
+                          <textarea
+                            value={editJdDescription}
+                            onChange={(e) => setEditJdDescription(e.target.value)}
+                            rows={2}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-cyan-400 resize-none"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Trigger Condition</label>
+                            <input
+                              type="text"
+                              value={editJdTrigger}
+                              onChange={(e) => setEditJdTrigger(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Execution Interval</label>
+                            <input
+                              type="text"
+                              value={editJdInterval}
+                              onChange={(e) => setEditJdInterval(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Priority Weight (1-10)</label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={editJdPriority}
+                              onChange={(e) => setEditJdPriority(Number(e.target.value))}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-cyan-300 font-mono font-bold text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Query / Prompt Pattern</label>
+                          <input
+                            type="text"
+                            value={editJdQuery}
+                            onChange={(e) => setEditJdQuery(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-cyan-400 font-mono text-[11px]"
+                          />
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-1 border-t border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => setEditingJdId(null)}
+                            className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveEditJd(jd.id)}
+                            className="px-4 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Save Changes</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="space-y-1.5 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h5 className="font-bold text-white text-xs">{jd.roleName}</h5>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800/60 font-semibold">
+                              {jd.agentTitle}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-purple-950 text-purple-300 border border-purple-800/60">
+                              Priority: {jd.priorityWeight}/10
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                              jd.isActive
+                                ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}>
+                              {jd.isActive ? '● Active' : '○ Disabled'}
+                            </span>
+                          </div>
+                          <p className="text-slate-300 text-[11px] leading-relaxed">
+                            {jd.description}
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[10px] text-slate-400 font-mono">
+                            <div>
+                              <span className="text-slate-500">Trigger:</span> {jd.triggerCondition}
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Interval:</span> {jd.executionInterval}
+                            </div>
+                            {jd.searchQueryTemplate && (
+                              <div className="sm:col-span-2">
+                                <span className="text-slate-500">Query Pattern:</span>{' '}
+                                <span className="text-cyan-400">{jd.searchQueryTemplate}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-start shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => startEditJd(jd)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 border border-slate-700 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors"
+                            title="Edit Agent JD"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleJd(jd.id)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border transition-colors ${
+                              jd.isActive
+                                ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                                : 'bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border-emerald-800'
+                            }`}
+                          >
+                            {jd.isActive ? 'Pause' : 'Activate'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteJd(jd.id)}
+                            className="p-1 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-800 transition-colors cursor-pointer"
+                            title="Delete Agent JD"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -701,49 +900,162 @@ export const AutopilotConfigModal: React.FC<AutopilotConfigModalProps> = ({
                         : 'bg-slate-950/40 border-slate-900 opacity-60'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-white text-xs">{sr.name}</span>
-                          <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
-                            {sr.targetNicheOrCategory}
+                    {editingSrId === sr.id ? (
+                      /* Inline Search Rule Editor */
+                      <div className="space-y-3 bg-slate-900/90 p-3 rounded-lg border border-cyan-500/50">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <span className="font-bold text-cyan-300 text-xs flex items-center gap-1.5">
+                            <Edit2 className="w-3.5 h-3.5" /> Edit Search Rule: {sr.name}
                           </span>
-                          <span className="px-2 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800/60 font-mono">
-                            {sr.searchEngine}
-                          </span>
-                          <span className="px-2 py-0.5 rounded text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800/60 font-mono">
-                            {sr.frequency}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingSrId(null)}
+                            className="text-slate-400 hover:text-white"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                        <p className="text-cyan-300 font-mono text-[11px]">
-                          Query: "{sr.queryTemplate}"
-                        </p>
-                        <p className="text-slate-400 text-[10px] font-mono">
-                          Domains: {sr.domainsPriority.join(', ')}
-                        </p>
-                      </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleSearchRule(sr.id)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border transition-colors ${
-                            sr.isActive
-                              ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                              : 'bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border-emerald-800'
-                          }`}
-                        >
-                          {sr.isActive ? 'Disable' : 'Enable'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSearchRule(sr.id)}
-                          className="p-1 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-800 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Rule Name</label>
+                            <input
+                              type="text"
+                              value={editSrName}
+                              onChange={(e) => setEditSrName(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Target Niche or Category</label>
+                            <input
+                              type="text"
+                              value={editSrCategory}
+                              onChange={(e) => setEditSrCategory(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Search Query Pattern</label>
+                          <input
+                            type="text"
+                            value={editSrQuery}
+                            onChange={(e) => setEditSrQuery(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-cyan-400 font-mono text-xs focus:outline-none focus:border-cyan-400"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Search Engine</label>
+                            <select
+                              value={editSrEngine}
+                              onChange={(e) => setEditSrEngine(e.target.value as any)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:border-cyan-400"
+                            >
+                              <option value="google_grounding">Google Grounding API</option>
+                              <option value="fast_internal">Fast Internal Bank</option>
+                              <option value="custom_web">Custom Web Crawler</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Frequency</label>
+                            <select
+                              value={editSrFrequency}
+                              onChange={(e) => setEditSrFrequency(e.target.value as any)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:border-cyan-400"
+                            >
+                              <option value="continuous">Continuous (Every Cycle)</option>
+                              <option value="hourly">Hourly Rotation</option>
+                              <option value="daily_scheduled">Daily Scheduled (6:00 AM PKT)</option>
+                              <option value="queue_depleted">Only When Queue Depleted (&lt; 3)</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Priority Domains</label>
+                            <input
+                              type="text"
+                              value={editSrDomains}
+                              onChange={(e) => setEditSrDomains(e.target.value)}
+                              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-white text-xs font-mono focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-1 border-t border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => setEditingSrId(null)}
+                            className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveEditSr(sr.id)}
+                            className="px-4 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Save Rule Changes</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-white text-xs">{sr.name}</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
+                              {sr.targetNicheOrCategory}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800/60 font-mono">
+                              {sr.searchEngine}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-800/60 font-mono">
+                              {sr.frequency}
+                            </span>
+                          </div>
+                          <p className="text-cyan-300 font-mono text-[11px]">
+                            Query: "{sr.queryTemplate}"
+                          </p>
+                          <p className="text-slate-400 text-[10px] font-mono">
+                            Domains: {sr.domainsPriority.join(', ')}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => startEditSr(sr)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 border border-slate-700 text-xs font-semibold cursor-pointer flex items-center gap-1 transition-colors"
+                            title="Edit Search Rule"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSearchRule(sr.id)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer border transition-colors ${
+                              sr.isActive
+                                ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                                : 'bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border-emerald-800'
+                            }`}
+                          >
+                            {sr.isActive ? 'Disable' : 'Enable'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSearchRule(sr.id)}
+                            className="p-1 rounded-lg bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-800 hover:border-rose-800 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -50,6 +50,7 @@ import { LiveInsights, type OAuthNotice } from './components/LiveInsights';
 import { AgentSimulator } from './components/AgentSimulator';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { AutopilotManager } from './components/AutopilotManager';
+import { DiagnosticMessageBox } from './components/DiagnosticMessageBox';
 import { DuplicateChecker } from './components/DuplicateChecker';
 import { UpscalingRoadmap } from './components/UpscalingRoadmap';
 import { MasterListTracker } from './components/MasterListTracker';
@@ -1181,7 +1182,11 @@ export default function App() {
         >
           {activeTab === 'analytics' && <ChannelAnalytics />}
           {activeTab === 'pending' && <PendingQueueTracker onNavigateTab={(tab) => selectTab(tab as TabType)} />}
-          {activeTab === 'autopilot' && <AutopilotManager onNavigateTab={(tab) => selectTab(tab as TabType)} />}
+          {activeTab === 'autopilot' && (
+            <ErrorBoundary fallbackTitle="Autopilot Engine Error Auto-Recovered">
+              <AutopilotManager onNavigateTab={(tab) => selectTab(tab as TabType)} />
+            </ErrorBoundary>
+          )}
           {activeTab === 'live' && (
             <LiveInsights
               oauthNotice={oauthNotice}
@@ -1805,6 +1810,8 @@ export default function App() {
         onCancel={handleCancelTabSwitch}
       />
 
+
+      <DiagnosticMessageBox />
 
       <StudioAssistant
         currentTab={activeTab}
