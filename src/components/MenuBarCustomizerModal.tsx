@@ -191,6 +191,8 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     };
     setLocalConfig(next);
     markDirty(next);
+  };
+
   // Move an entire top-level menu group left/right (Reorder top navbar)
   const handleMoveGroup = (index: number, direction: 'left' | 'right') => {
     const targetIndex = direction === 'left' ? index - 1 : index + 1;

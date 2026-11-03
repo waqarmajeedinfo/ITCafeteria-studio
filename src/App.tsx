@@ -25,6 +25,7 @@ import {
   X,
   Calendar as CalendarIcon,
   Users,
+  User,
   Vote,
   ChevronDown,
   Menu,
@@ -95,6 +96,8 @@ import { TagManagerModal } from './components/TagManagerModal';
 import { loadAllChannels, type ExtendedChannelProfile } from './lib/channelStore';
 import { getAllPublishedVideos } from './lib/publishedLibraryStore';
 import { CATEGORIES_IT_CAFETERIA, CHANNEL_PROFILES } from './data/channelData';
+import { MultiUserManagerModal } from './components/MultiUserManagerModal';
+import { userAuthManager, USER_AUTH_UPDATED_EVENT, type UserSessionProfile } from './lib/userAuthStore';
 
 
 type TabType = 
@@ -153,6 +156,8 @@ export default function App() {
   const [isLiveActive, setIsLiveActive] = useState(false);
   const [showChannelManager, setShowChannelManager] = useState(false);
   const [showTagManager, setShowTagManager] = useState(false);
+  const [showMultiUserModal, setShowMultiUserModal] = useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState<UserSessionProfile | null>(() => userAuthManager.getUser());
   const [channels, setChannels] = useState<Record<string, ExtendedChannelProfile>>(loadAllChannels);
   const [activeChannelId, setActiveChannelId] = useState<string>('itcafeteria');
   const [characterTag, setCharacterTag] = useState<string>('@WM25-1');
@@ -241,11 +246,17 @@ export default function App() {
     };
     window.addEventListener('itcafeteria_open_simulator_for_topic', handleOpenTopic);
 
+    const handleAuthChange = (e: any) => {
+      setCurrentUserProfile(e.detail || userAuthManager.getUser());
+    };
+    window.addEventListener(USER_AUTH_UPDATED_EVENT, handleAuthChange);
+
     return () => {
       window.removeEventListener('itcafeteria_published_library_updated', handleLibUpdate);
       window.removeEventListener('itcafeteria_story_published', handleLibUpdate);
       window.removeEventListener(PHONETIC_UPDATED_EVENT, handlePhoneticUpdate);
       window.removeEventListener('itcafeteria_open_simulator_for_topic', handleOpenTopic);
+      window.removeEventListener(USER_AUTH_UPDATED_EVENT, handleAuthChange);
     };
   }, []);
 
@@ -917,6 +928,20 @@ export default function App() {
                 >
                   <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Holo BG</span>
+                </button>
+
+                {/* Multi-User Profile & RBAC Switcher */}
+                <button
+                  onClick={() => setShowMultiUserModal(true)}
+                  className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold backdrop-blur-md shadow-md transition-all cursor-pointer ${
+                    currentUserProfile?.role === 'admin'
+                      ? 'bg-purple-950/80 border-purple-500/50 text-purple-200 hover:border-purple-300'
+                      : 'bg-cyan-950/80 border-cyan-500/50 text-cyan-200 hover:border-cyan-300'
+                  }`}
+                  title="Multi-User Profiles, RBAC & Dedicated Directory GitHub Sync"
+                >
+                  <User className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>{currentUserProfile?.role === 'admin' ? '👑 Admin' : '👤 User'}: {currentUserProfile?.username || 'Profile'}</span>
                 </button>
               </div>
             </div>
@@ -1808,6 +1833,12 @@ export default function App() {
         onConfirmSaveAndSwitch={handleConfirmSaveAndSwitch}
         onDiscardAndSwitch={handleDiscardAndSwitch}
         onCancel={handleCancelTabSwitch}
+      />
+
+      {/* Backend Multi-User Authentication & Storage Isolation Modal */}
+      <MultiUserManagerModal
+        isOpen={showMultiUserModal}
+        onClose={() => setShowMultiUserModal(false)}
       />
 
 

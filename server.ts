@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { buildMasterThumbnailPrompt, splitHeadline } from './src/lib/thumbnailMaster';
 import { INTEGRATION_PUBLIC_PATHS, registerIntegrationRoutes } from './integrations';
+import { registerMultiUserRoutes } from './server_multiuser';
 
 dotenv.config();
 
@@ -1901,6 +1902,7 @@ app.post('/api/autopilot/trigger-daily', async (req, res) => {
 });
 
 registerIntegrationRoutes(app);
+registerMultiUserRoutes(app);
 
 // Setup Vite middleware in dev or static files in prod
 async function startServer() {

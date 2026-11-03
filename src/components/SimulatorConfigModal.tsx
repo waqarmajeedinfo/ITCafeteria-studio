@@ -648,7 +648,7 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
     setNewRuleName('');
     setNewRuleInstructions('');
     setNewRuleBoundIds([]);
-    setSavedToast(`New rule "${newRule.name}" bound to categories: ${newRule.boundCategoryIds.join(', ')}`);
+    setSavedToast(`New rule "${newRule.name}" bound to categories: ${(newRule.boundCategoryIds || []).join(', ')}`);
     setTimeout(() => setSavedToast(null), 3000);
   };
 
