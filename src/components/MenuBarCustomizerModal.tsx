@@ -737,3 +737,4 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
 
   return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };
+}
