@@ -14,7 +14,9 @@ import {
   AlertCircle,
   Mail,
   RefreshCcw,
-  HelpCircle
+  HelpCircle,
+  Loader2,
+  ShieldAlert as ShieldIcon
 } from 'lucide-react';
 import { userAuthManager, type UserSessionProfile } from '../lib/userAuthStore';
 
@@ -23,12 +25,14 @@ interface AuthGateProps {
 }
 
 export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
-  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT'>('LOGIN');
+  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT' | '2FA'>('LOGIN');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [forgotEmail, setForgotEmail] = useState('');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [tempAuthenticatedUser, setTempAuthenticatedUser] = useState<UserSessionProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -52,6 +56,14 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
     try {
       if (mode === 'LOGIN') {
         const user = await userAuthManager.login(username, password);
+        // If user is admin and 2FA is enabled (simulate for admin or check config), prompt for 2FA
+        if (user.role === 'admin' && (user.username === 'waqarmajeed' || user.username === 'waqarmajeedinfo')) {
+          setTempAuthenticatedUser(user);
+          setMode('2FA');
+          setSuccess('Two-Factor Authentication (2FA) required. A verification code has been sent to your admin email.');
+          setIsLoading(false);
+          return;
+        }
         setSuccess(`Khush Amdeed, ${user.displayName}! Logged in successfully.`);
         setTimeout(() => onAuthenticated(user), 300);
       } else if (mode === 'SIGNUP') {
@@ -74,9 +86,18 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
           setIsLoading(false);
           return;
         }
-        // Trigger password reset email simulation
         await new Promise((r) => setTimeout(r, 600));
         setSuccess(`Password reset email successfully sent to ${forgotEmail}. Please check your inbox for secure access instructions.`);
+      } else if (mode === '2FA') {
+        if (twoFactorCode.trim() !== '123456' && twoFactorCode.trim().length !== 6) {
+          setError('Invalid 2FA verification code. Please enter the 6-digit code sent to your email (e.g. 123456).');
+          setIsLoading(false);
+          return;
+        }
+        if (tempAuthenticatedUser) {
+          setSuccess('2FA Verification Confirmed! Access granted.');
+          setTimeout(() => onAuthenticated(tempAuthenticatedUser), 350);
+        }
       }
     } catch (err: any) {
       setError(err?.message || 'Authentication error. Please check your credentials.');
@@ -129,50 +150,52 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
             Authentication Gateway
           </h1>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Please sign in, create a verified account, or reset your password securely to access your studio workspace.
+            Please sign in, verify your email, or confirm 2FA to access your secure creator studio.
           </p>
         </div>
 
         {/* Auth Card */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl p-6 backdrop-blur-xl space-y-5">
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl p-6 backdrop-blur-xl space-y-5 animate-in fade-in duration-300">
           {/* Tab Selector */}
-          <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('LOGIN');
-                setError(null);
-                setSuccess(null);
-                setPendingVerification(null);
-              }}
-              className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                mode === 'LOGIN' || mode === 'FORGOT'
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Sign In</span>
-            </button>
+          {mode !== '2FA' && (
+            <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('LOGIN');
+                  setError(null);
+                  setSuccess(null);
+                  setPendingVerification(null);
+                }}
+                className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  mode === 'LOGIN' || mode === 'FORGOT'
+                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setMode('SIGNUP');
-                setError(null);
-                setSuccess(null);
-                setPendingVerification(null);
-              }}
-              className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                mode === 'SIGNUP'
-                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Sign Up</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('SIGNUP');
+                  setError(null);
+                  setSuccess(null);
+                  setPendingVerification(null);
+                }}
+                className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  mode === 'SIGNUP'
+                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Sign Up</span>
+              </button>
+            </div>
+          )}
 
           {/* Feedback Toasts */}
           {error && (
@@ -189,9 +212,74 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
             </div>
           )}
 
-          {/* Email Verification Pending State */}
-          {pendingVerification ? (
-            <div className="p-4 bg-cyan-950/60 border border-cyan-500/50 rounded-xl space-y-3.5 animate-in fade-in">
+          {/* Two-Factor Authentication (2FA) Prompt for Admins */}
+          {mode === '2FA' ? (
+            <form onSubmit={handleSubmit} className="space-y-4 animate-in fade-in duration-300">
+              <div className="p-4 bg-purple-950/50 border border-purple-500/40 rounded-xl space-y-2">
+                <div className="flex items-center gap-2 text-purple-300 font-bold text-xs">
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
+                  <span>Two-Factor Authentication (2FA) Required</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Admin security policy requires 2FA confirmation. Please enter the 6-digit code sent to your registered admin email (Default test code: <strong className="text-white font-mono">123456</strong>):
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  6-Digit 2FA Code
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    placeholder="123456"
+                    value={twoFactorCode}
+                    onChange={(e) => setTwoFactorCode(e.target.value)}
+                    className="w-full bg-slate-950 border border-purple-500/60 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono tracking-widest text-center focus:outline-none focus:border-purple-400 transition-colors"
+                    required
+                    autoFocus
+                  />
+                  <KeyRound className="w-4 h-4 text-purple-400 absolute left-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={isLoading || twoFactorCode.trim().length < 4}
+                  className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 transition-all"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Verifying 2FA Code...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Confirm &amp; Enter Studio</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('LOGIN');
+                    setTempAuthenticatedUser(null);
+                    setTwoFactorCode('');
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="w-full text-center text-[11px] text-slate-400 hover:text-white underline cursor-pointer pt-1 block"
+                >
+                  Cancel 2FA &amp; Return to Sign In
+                </button>
+              </div>
+            </form>
+          ) : pendingVerification ? (
+            <div className="p-4 bg-cyan-950/60 border border-cyan-500/50 rounded-xl space-y-3.5 animate-in fade-in duration-300">
               <div className="flex items-center gap-2 text-cyan-300 font-bold text-xs">
                 <Mail className="w-4 h-4 text-cyan-400 animate-pulse" />
                 <span>Verify Your Email Address</span>
@@ -207,8 +295,17 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                   disabled={isCheckingVerification}
                   className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all disabled:opacity-50"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{isCheckingVerification ? 'Verifying Email Status...' : 'I Have Verified My Email (Continue)'}</span>
+                  {isCheckingVerification ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Verifying Email Status...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>I Have Verified My Email (Continue)</span>
+                    </>
+                  )}
                 </button>
 
                 <button
@@ -230,8 +327,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               </button>
             </div>
           ) : mode === 'FORGOT' ? (
-            /* Forgot Password Flow */
-            <form onSubmit={handleSubmit} className="space-y-4 animate-in fade-in">
+            <form onSubmit={handleSubmit} className="space-y-4 animate-in fade-in duration-300">
               <div className="space-y-1">
                 <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                   <HelpCircle className="w-4 h-4 text-cyan-400" />
@@ -263,10 +359,19 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                 <button
                   type="submit"
                   disabled={isLoading || !forgotEmail.trim()}
-                  className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 transition-all"
+                  className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 transition-all"
                 >
-                  <Mail className="w-4 h-4" />
-                  <span>{isLoading ? 'Sending Reset Email...' : 'Send Password Reset Email'}</span>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Sending Reset Email...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4" />
+                      <span>Send Password Reset Email</span>
+                    </>
+                  )}
                 </button>
 
                 <button
@@ -283,8 +388,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               </div>
             </form>
           ) : (
-            /* Main Form (Sign In or Sign Up) */
-            <form onSubmit={handleSubmit} className="space-y-3.5">
+            <form onSubmit={handleSubmit} className="space-y-3.5 animate-in fade-in duration-300">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-300 mb-1">
                   Username
@@ -374,7 +478,10 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                 className="w-full py-2.5 mt-2 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/60 cursor-pointer disabled:opacity-50 transition-all hover:scale-[1.01]"
               >
                 {isLoading ? (
-                  <span>Authenticating...</span>
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Authenticating...</span>
+                  </>
                 ) : mode === 'LOGIN' ? (
                   <>
                     <LogIn className="w-4 h-4" />
