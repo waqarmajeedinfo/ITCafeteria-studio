@@ -33,7 +33,8 @@ import {
   Pencil,
   Plus,
   Shield,
-  SlidersHorizontal
+  SlidersHorizontal,
+  FolderTree
 } from 'lucide-react';
 import {
   userAuthManager,
@@ -137,7 +138,7 @@ const UserRecentActionsWidget: React.FC<{ username?: string }> = ({ username }) 
 
 export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ isOpen, onClose }) => {
   const [currentUser, setCurrentUser] = useState<UserSessionProfile | null>(userAuthManager.getUser());
-  const [activeTab, setActiveTab] = useState<'PROFILE' | 'ISOLATED_STORAGE' | 'WEBHOOK_LOGS' | 'ADMIN_SUPERUSER'>('PROFILE');
+  const [activeTab, setActiveTab] = useState<'PROFILE' | 'ISOLATED_STORAGE' | 'WEBHOOK_LOGS' | 'ADMIN_SUPERUSER' | 'PERMISSION_OVERVIEW' | 'AUDIT_LOG_DETAILS'>('PROFILE');
 
   // Auth Forms
   const [authMode, setAuthMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
@@ -230,10 +231,10 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
     if (activeTab === 'ISOLATED_STORAGE') {
       const data = await userAuthManager.loadUserFiles();
       setUserFiles(data);
-    } else if (activeTab === 'WEBHOOK_LOGS') {
+    } else if (activeTab === 'WEBHOOK_LOGS' || activeTab === 'AUDIT_LOG_DETAILS') {
       const logs = await userAuthManager.fetchAuditLogs();
       setAuditLogs(logs);
-    } else if (activeTab === 'ADMIN_SUPERUSER' && userAuthManager.isAdmin()) {
+    } else if ((activeTab === 'ADMIN_SUPERUSER' || activeTab === 'PERMISSION_OVERVIEW') && userAuthManager.isAdmin()) {
       const usersData = await userAuthManager.fetchAdminUsers();
       if (usersData?.users) setAdminUsers(usersData.users);
     }
@@ -564,15 +565,37 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
             </button>
 
             {currentUser?.role === 'admin' && (
-              <button
-                onClick={() => setActiveTab('ADMIN_SUPERUSER')}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === 'ADMIN_SUPERUSER' ? 'bg-purple-600 text-white shadow-md' : 'text-purple-300 hover:text-white bg-purple-950/40 border border-purple-800/60'
-                }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-purple-300" />
-                <span>Superuser Privileges</span>
-              </button>
+              <>
+                <button
+                  onClick={() => setActiveTab('ADMIN_SUPERUSER')}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'ADMIN_SUPERUSER' ? 'bg-purple-600 text-white shadow-md' : 'text-purple-300 hover:text-white bg-purple-950/40 border border-purple-800/60'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-purple-300" />
+                  <span>Superuser Privileges</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('PERMISSION_OVERVIEW')}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'PERMISSION_OVERVIEW' ? 'bg-emerald-600 text-white shadow-md' : 'text-emerald-300 hover:text-white bg-emerald-950/40 border border-emerald-800/60'
+                  }`}
+                >
+                  <FolderTree className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Permission Overview</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('AUDIT_LOG_DETAILS')}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === 'AUDIT_LOG_DETAILS' ? 'bg-indigo-600 text-white shadow-md' : 'text-indigo-300 hover:text-white bg-indigo-950/40 border border-indigo-800/60'
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5 text-indigo-300" />
+                  <span>Audit Log</span>
+                </button>
+              </>
             )}
           </div>
 
@@ -1547,6 +1570,167 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: Permission Overview (Summary Audit Table) */}
+          {activeTab === 'PERMISSION_OVERVIEW' && currentUser?.role === 'admin' && (
+            <div className="space-y-4 animate-in fade-in">
+              <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 rounded-xl space-y-2">
+                <div className="flex items-center gap-2">
+                  <FolderTree className="w-5 h-5 text-emerald-400" />
+                  <h4 className="font-bold text-white text-sm">Permission Overview &amp; Access Audit Table</h4>
+                </div>
+                <p className="text-emerald-200 text-xs leading-relaxed">
+                  Yahan aap tamam registered users aur unki assigned menu &amp; feature permissions ko ek hi summary table mein audit kar sakte hain bina har user ko alag se open kiye.
+                </p>
+              </div>
+
+              <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase font-mono text-[10px]">
+                        <th className="p-3">User</th>
+                        <th className="p-3">Role</th>
+                        <th className="p-3 text-center">Autopilot</th>
+                        <th className="p-3 text-center">Channels</th>
+                        <th className="p-3 text-center">Thumbnails</th>
+                        <th className="p-3 text-center">Publish</th>
+                        <th className="p-3 text-center">Export</th>
+                        <th className="p-3 text-center">Voice Script</th>
+                        <th className="p-3 text-center">Max Ch.</th>
+                        <th className="p-3 text-center">Daily Limit</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/80">
+                      {adminUsers.map((u) => {
+                        const p = u.permissions || {
+                          canUseAutopilot: true,
+                          canEditChannels: true,
+                          canUseThumbnailStudio: true,
+                          canPublishScheduledPosts: true,
+                          canExportData: false,
+                          canUseVoiceScriptGenerator: true,
+                          maxChannelsAllowed: 5,
+                          dailyGenerationLimit: 25
+                        };
+                        return (
+                          <tr key={u.username} className="hover:bg-slate-900/60 transition-colors">
+                            <td className="p-3">
+                              <div className="font-bold text-white">{u.displayName}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">@{u.username}</div>
+                            </td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                                u.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                              }`}>
+                                {u.role}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${p.canUseAutopilot ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                                {p.canUseAutopilot ? 'YES' : 'NO'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${p.canEditChannels ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                                {p.canEditChannels ? 'YES' : 'NO'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${p.canUseThumbnailStudio ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                                {p.canUseThumbnailStudio ? 'YES' : 'NO'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${p.canPublishScheduledPosts ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                                {p.canPublishScheduledPosts ? 'YES' : 'NO'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${p.canExportData ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                                {p.canExportData ? 'YES' : 'NO'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${p.canUseVoiceScriptGenerator ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                                {p.canUseVoiceScriptGenerator ? 'YES' : 'NO'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center font-mono text-white font-bold">
+                              {p.maxChannelsAllowed ?? 5}
+                            </td>
+                            <td className="p-3 text-center font-mono text-white font-bold">
+                              {p.dailyGenerationLimit ?? 25}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: Dedicated Audit Log Component */}
+          {activeTab === 'AUDIT_LOG_DETAILS' && currentUser?.role === 'admin' && (
+            <div className="space-y-4 animate-in fade-in">
+              <div className="p-4 bg-indigo-950/40 border border-indigo-500/40 rounded-xl space-y-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-indigo-400" />
+                  <h4 className="font-bold text-white text-sm">Critical Admin &amp; System Audit Log Component</h4>
+                </div>
+                <p className="text-indigo-200 text-xs leading-relaxed">
+                  Yeh dedicated audit log component administrative actions (user privilege adjustments, role changes, creations, deletions, and system configuration updates) ko track karta hai.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {auditLogs.length === 0 ? (
+                  <div className="p-6 bg-slate-950 text-center text-slate-500 rounded-xl border border-slate-800">
+                    No critical admin audit log entries recorded yet.
+                  </div>
+                ) : (
+                  auditLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-start justify-between gap-2.5"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono ${
+                            log.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                          }`}>
+                            @{log.username} ({log.role})
+                          </span>
+                          <span className="font-bold text-white text-xs">{log.action}</span>
+                        </div>
+                        <p className="text-slate-300 text-xs">{log.details}</p>
+                        {log.targetFile && (
+                          <div className="text-[10px] font-mono text-emerald-400">
+                            Target Resource: {log.targetFile}
+                          </div>
+                        )}
+                      </div>
+
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase font-mono shrink-0 ${
+                        log.status === 'DISPATCHED'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : log.status === 'LOCAL_LOGGED'
+                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      }`}>
+                        {log.status}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>

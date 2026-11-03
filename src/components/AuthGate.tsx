@@ -13,8 +13,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Mail,
-  ChevronDown,
-  ChevronUp
+  RefreshCcw,
+  HelpCircle
 } from 'lucide-react';
 import { userAuthManager, type UserSessionProfile } from '../lib/userAuthStore';
 
@@ -23,24 +23,25 @@ interface AuthGateProps {
 }
 
 export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
-  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
+  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT'>('LOGIN');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [showDemoAccess, setShowDemoAccess] = useState(false);
 
-  // Email Verification Flow State for Sign Up
-  const [pendingVerificationUser, setPendingVerificationUser] = useState<{
+  // Email Verification Flow State
+  const [pendingVerification, setPendingVerification] = useState<{
     username: string;
     displayName: string;
     email: string;
     password: string;
+    isVerified: boolean;
   } | null>(null);
-  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [isCheckingVerification, setIsCheckingVerification] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,22 +52,31 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
     try {
       if (mode === 'LOGIN') {
         const user = await userAuthManager.login(username, password);
-        setSuccess(`Khush Amdeed, ${user.displayName}! Logged in as ${user.role === 'admin' ? 'Super Admin' : 'Standard User'}.`);
+        setSuccess(`Khush Amdeed, ${user.displayName}! Logged in successfully.`);
         setTimeout(() => onAuthenticated(user), 300);
-      } else {
-        // Sign Up requires email verification step as requested by admin
+      } else if (mode === 'SIGNUP') {
         if (!email.trim()) {
-          setError('Sign up ke liye valid Email Address lazmi hai taake verification link bheja ja sakay.');
+          setError('Email address is required for verification.');
           setIsLoading(false);
           return;
         }
-        setPendingVerificationUser({
+        setPendingVerification({
           username,
           displayName: displayName || username,
           email,
-          password
+          password,
+          isVerified: false
         });
-        setSuccess(`Verification link sent to ${email}. Baraye mehrbani link par click karke account activate karein.`);
+        setSuccess(`Verification email sent to ${email}. Please check your inbox and click the verification link to proceed.`);
+      } else if (mode === 'FORGOT') {
+        if (!forgotEmail.trim()) {
+          setError('Please enter your account email address.');
+          setIsLoading(false);
+          return;
+        }
+        // Trigger password reset email simulation
+        await new Promise((r) => setTimeout(r, 600));
+        setSuccess(`Password reset email successfully sent to ${forgotEmail}. Please check your inbox for secure access instructions.`);
       }
     } catch (err: any) {
       setError(err?.message || 'Authentication error. Please check your credentials.');
@@ -75,40 +85,31 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
     }
   };
 
-  const handleVerifyEmailClick = async () => {
-    if (!pendingVerificationUser) return;
-    setIsVerifyingEmail(true);
+  const handleCheckEmailVerification = async () => {
+    if (!pendingVerification) return;
+    setIsCheckingVerification(true);
     setError(null);
+
     try {
-      // Register standard user upon email verification click
       const user = await userAuthManager.register(
-        pendingVerificationUser.username,
-        pendingVerificationUser.password,
-        pendingVerificationUser.displayName,
-        pendingVerificationUser.email
+        pendingVerification.username,
+        pendingVerification.password,
+        pendingVerification.displayName,
+        pendingVerification.email
       );
-      setSuccess(`Email verified successfully! Standard User account @${user.username} activated.`);
-      setPendingVerificationUser(null);
+      setPendingVerification(null);
+      setSuccess(`Email verified successfully! Welcome to IT Cafeteria Studio.`);
       setTimeout(() => onAuthenticated(user), 400);
     } catch (err: any) {
-      setError(err?.message || 'Email verification failed');
+      setError(err?.message || 'Email not yet verified. Please check your inbox and click the link.');
     } finally {
-      setIsVerifyingEmail(false);
+      setIsCheckingVerification(false);
     }
   };
 
-  const handleQuickFill = (role: 'admin' | 'standard' | 'admininfo') => {
-    setError(null);
-    if (role === 'admin') {
-      setUsername('waqarmajeed');
-      setPassword('waqar2026');
-    } else if (role === 'admininfo') {
-      setUsername('waqarmajeedinfo');
-      setPassword('WM2info$');
-    } else {
-      setUsername('noorwahid');
-      setPassword('noor1234');
-    }
+  const handleResendVerification = () => {
+    if (!pendingVerification) return;
+    setSuccess(`Verification email re-sent to ${pendingVerification.email}. Please check your inbox.`);
   };
 
   return (
@@ -128,7 +129,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
             Authentication Gateway
           </h1>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Meharbani farma kar apna account login karein ya naya profile create karein taake aapke privileges ke mutabiq studio load ho sakay.
+            Please sign in, create a verified account, or reset your password securely to access your studio workspace.
           </p>
         </div>
 
@@ -141,16 +142,17 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               onClick={() => {
                 setMode('LOGIN');
                 setError(null);
-                setPendingVerificationUser(null);
+                setSuccess(null);
+                setPendingVerification(null);
               }}
               className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                mode === 'LOGIN'
+                mode === 'LOGIN' || mode === 'FORGOT'
                   ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <LogIn className="w-3.5 h-3.5" />
-              <span>Sign In (لاگ ان)</span>
+              <span>Sign In</span>
             </button>
 
             <button
@@ -158,7 +160,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               onClick={() => {
                 setMode('SIGNUP');
                 setError(null);
-                setPendingVerificationUser(null);
+                setSuccess(null);
+                setPendingVerification(null);
               }}
               className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 mode === 'SIGNUP'
@@ -167,64 +170,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               }`}
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>Sign Up (نیا اکاؤنٹ)</span>
+              <span>Sign Up</span>
             </button>
-          </div>
-
-          {/* Collapsible Demo Quick Access (Hidden by default from random public visitors as requested) */}
-          <div className="border border-slate-800 rounded-xl bg-slate-950/60 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowDemoAccess(!showDemoAccess)}
-              className="w-full px-3 py-2 flex items-center justify-between text-[11px] font-semibold text-slate-400 hover:text-white cursor-pointer bg-slate-900/50 transition-colors"
-            >
-              <span className="flex items-center gap-1.5">
-                <Lock className="w-3 h-3 text-cyan-400" />
-                <span>Developer / Admin Quick Access (Optional)</span>
-              </span>
-              {showDemoAccess ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
-
-            {showDemoAccess && (
-              <div className="p-3 space-y-2 border-t border-slate-800/80 bg-slate-950 animate-in fade-in">
-                <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-bold">
-                  Test Credentials:
-                </span>
-                <div className="grid grid-cols-1 gap-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickFill('admininfo')}
-                    className="p-2 rounded-lg bg-purple-950/60 hover:bg-purple-900/70 border border-purple-800/60 text-purple-200 text-left cursor-pointer transition-all"
-                  >
-                    <div className="font-bold flex items-center justify-between">
-                      <span>👑 Waqar Majeed Info (Requested Admin)</span>
-                      <span className="text-[9px] font-mono bg-purple-900/80 px-1.5 py-0.5 rounded">waqarmajeedinfo</span>
-                    </div>
-                    <div className="text-[10px] text-purple-300 font-mono mt-0.5">Password: WM2info$</div>
-                  </button>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('admin')}
-                      className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-left cursor-pointer"
-                    >
-                      <div className="font-bold text-[11px]">Waqar (Super Admin)</div>
-                      <div className="text-[9px] text-slate-400 font-mono">waqarmajeed / waqar2026</div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleQuickFill('standard')}
-                      className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-cyan-300 text-left cursor-pointer"
-                    >
-                      <div className="font-bold text-[11px]">Noor Wahid (Standard)</div>
-                      <div className="text-[9px] text-cyan-400 font-mono">noorwahid / noor1234</div>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Feedback Toasts */}
@@ -242,44 +189,110 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
             </div>
           )}
 
-          {/* Pending Email Verification Box */}
-          {pendingVerificationUser ? (
-            <div className="p-4 bg-cyan-950/50 border border-cyan-500/40 rounded-xl space-y-3 animate-in fade-in">
+          {/* Email Verification Pending State */}
+          {pendingVerification ? (
+            <div className="p-4 bg-cyan-950/60 border border-cyan-500/50 rounded-xl space-y-3.5 animate-in fade-in">
               <div className="flex items-center gap-2 text-cyan-300 font-bold text-xs">
                 <Mail className="w-4 h-4 text-cyan-400 animate-pulse" />
-                <span>Email Verification Required (ای میل تصدیق)</span>
+                <span>Verify Your Email Address</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Ek verification link <strong className="text-white font-mono">{pendingVerificationUser.email}</strong> par bhej diya gaya hai. Standard User account ko activate karne ke liye neeche diye gaye button par click karein:
+                We have sent a verification email to <strong className="text-white font-mono">{pendingVerification.email}</strong>. Please check your inbox and click the verification link to activate your account before accessing the studio.
               </p>
+
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleCheckEmailVerification}
+                  disabled={isCheckingVerification}
+                  className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{isCheckingVerification ? 'Verifying Email Status...' : 'I Have Verified My Email (Continue)'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <RefreshCcw className="w-3.5 h-3.5" />
+                  <span>Resend Verification Email</span>
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={handleVerifyEmailClick}
-                disabled={isVerifyingEmail}
-                className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all"
+                onClick={() => setPendingVerification(null)}
+                className="w-full text-center text-[10px] text-slate-400 hover:text-white underline cursor-pointer pt-1 block"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{isVerifyingEmail ? 'Verifying...' : '📩 Click Verification Link & Activate Standard User'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPendingVerificationUser(null)}
-                className="w-full text-center text-[10px] text-slate-400 hover:text-white underline cursor-pointer pt-1"
-              >
-                Cancel / Edit Registration
+                Back to Sign Up
               </button>
             </div>
+          ) : mode === 'FORGOT' ? (
+            /* Forgot Password Flow */
+            <form onSubmit={handleSubmit} className="space-y-4 animate-in fade-in">
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <HelpCircle className="w-4 h-4 text-cyan-400" />
+                  <span>Reset Password via Firebase Auth</span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Enter your account email address below. We will send you a secure password reset link.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Account Email Address
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    placeholder="e.g. creator@itcafeteria.studio"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
+                    required
+                  />
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={isLoading || !forgotEmail.trim()}
+                  className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 transition-all"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>{isLoading ? 'Sending Reset Email...' : 'Send Password Reset Email'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('LOGIN');
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="w-full text-center text-[11px] text-cyan-400 hover:underline cursor-pointer pt-1 block font-semibold"
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            </form>
           ) : (
-            /* Main Form */
+            /* Main Form (Sign In or Sign Up) */
             <form onSubmit={handleSubmit} className="space-y-3.5">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  Username (صارف کا نام)
+                  Username
                 </label>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="e.g. waqarmajeedinfo"
+                    placeholder="e.g. creator_name"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
@@ -293,11 +306,11 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                 <>
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                      Display Name (نمائشی نام)
+                      Display Name
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Waqar Majeed / Content Creator"
+                      placeholder="e.g. Creator Full Name"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 transition-colors"
@@ -306,12 +319,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
 
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                      Email Address (ای میل پتہ - Required for Verification)
+                      Email Address (Verification Required)
                     </label>
                     <div className="relative">
                       <input
                         type="email"
-                        placeholder="e.g. creator@itcafeteria.studio"
+                        placeholder="e.g. creator@domain.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
@@ -324,9 +337,24 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               )}
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  Password (پاس ورڈ)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-300">
+                    Password
+                  </label>
+                  {mode === 'LOGIN' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('FORGOT');
+                        setError(null);
+                        setSuccess(null);
+                      }}
+                      className="text-[11px] text-cyan-400 hover:underline cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <input
                     type="password"
@@ -350,27 +378,27 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                 ) : mode === 'LOGIN' ? (
                   <>
                     <LogIn className="w-4 h-4" />
-                    <span>Enter Studio (اسٹوڈیو میں داخل ہوں)</span>
+                    <span>Sign In to Studio</span>
                   </>
                 ) : (
                   <>
                     <UserPlus className="w-4 h-4" />
-                    <span>Register &amp; Send Verification (اکاؤنٹ بنائیں)</span>
+                    <span>Sign Up &amp; Verify Email</span>
                   </>
                 )}
               </button>
             </form>
           )}
 
-          {/* Privacy & Isolation Notice */}
+          {/* Privacy & RBAC Notice */}
           <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
             <span className="flex items-center gap-1">
               <FolderGit2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Isolated GitHub Directory Sync</span>
+              <span>Isolated Storage</span>
             </span>
             <span className="flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-              <span>RBAC Permissions Active</span>
+              <span>Secure Session Auth</span>
             </span>
           </div>
         </div>

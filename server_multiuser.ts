@@ -113,10 +113,40 @@ function initDefaultUsers(): UserAccount[] {
     try {
       const data = JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8'));
       if (Array.isArray(data) && data.length > 0) {
-        return data.map((u: any) => ({
+        const users = data.map((u: any) => ({
           ...u,
           permissions: u.permissions || (u.role === 'admin' ? { ...DEFAULT_ADMIN_PERMISSIONS } : { ...DEFAULT_STANDARD_PERMISSIONS })
         }));
+        
+        // Ensure waqarmajeedinfo admin user exists and has correct password hash for WM2info$
+        const adminInfoIndex = users.findIndex((u: any) => u.username === 'waqarmajeedinfo');
+        if (adminInfoIndex === -1) {
+          const adminInfoSalt = crypto.randomBytes(16).toString('hex');
+          const adminInfoUser: UserAccount = {
+            id: 'user-admin-info-01',
+            username: 'waqarmajeedinfo',
+            displayName: 'Waqar Majeed (Super Admin)',
+            email: 'waqarmajeedinfo@itcafeteria.studio',
+            role: 'admin',
+            salt: adminInfoSalt,
+            passwordHash: hashPassword('WM2info$', adminInfoSalt),
+            createdAt: new Date().toISOString(),
+            lastLogin: new Date().toISOString(),
+            isActive: true,
+            dedicatedRepoPath: 'user-data/waqarmajeedinfo',
+            permissions: { ...DEFAULT_ADMIN_PERMISSIONS }
+          };
+          users.push(adminInfoUser);
+          fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
+        } else {
+          const salt = users[adminInfoIndex].salt || crypto.randomBytes(16).toString('hex');
+          users[adminInfoIndex].salt = salt;
+          users[adminInfoIndex].passwordHash = hashPassword('WM2info$', salt);
+          users[adminInfoIndex].role = 'admin';
+          users[adminInfoIndex].isActive = true;
+          fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
+        }
+        return users;
       }
     } catch (e) {
       console.warn('[MultiUser] Failed to read existing users, initializing defaults:', e);

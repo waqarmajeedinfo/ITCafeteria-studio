@@ -18,7 +18,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
-  CheckCircle2
+  CheckCircle2,
+  Shield
 } from 'lucide-react';
 import type { TabType } from '../App';
 import { dirtyManager } from '../lib/dirtyStore';
@@ -35,6 +36,7 @@ export interface MenuItemConfig {
   label: string;
   groupId: string;
   isLocked: boolean;
+  roleVisibility?: 'all' | 'admin' | 'standard';
 }
 
 export interface MenuCustomizerState {
@@ -51,31 +53,31 @@ export const DEFAULT_MENU_STATE: MenuCustomizerState = {
   ],
   items: [
     // Core Channel (4)
-    { id: 'analytics', label: 'Channel Diagnostics', groupId: 'core', isLocked: true },
-    { id: 'live', label: 'Live Insights (YouTube + TikTok)', groupId: 'core', isLocked: true },
-    { id: 'signals', label: 'Growth Signals & Anomalies', groupId: 'core', isLocked: true },
-    { id: 'benchmarking', label: 'Competitor Benchmarks', groupId: 'core', isLocked: true },
+    { id: 'analytics', label: 'Channel Diagnostics', groupId: 'core', isLocked: true, roleVisibility: 'all' },
+    { id: 'live', label: 'Live Insights (YouTube + TikTok)', groupId: 'core', isLocked: true, roleVisibility: 'all' },
+    { id: 'signals', label: 'Growth Signals & Anomalies', groupId: 'core', isLocked: true, roleVisibility: 'all' },
+    { id: 'benchmarking', label: 'Competitor Benchmarks', groupId: 'core', isLocked: true, roleVisibility: 'all' },
 
     // Autopilot & Agents (3)
-    { id: 'autopilot', label: 'Autopilot Coordinator', groupId: 'automation', isLocked: true },
-    { id: 'simulator', label: 'Agent Flow Simulator', groupId: 'automation', isLocked: true },
-    { id: 'community', label: 'Community Polls', groupId: 'automation', isLocked: true },
+    { id: 'autopilot', label: 'Autopilot Coordinator', groupId: 'automation', isLocked: true, roleVisibility: 'all' },
+    { id: 'simulator', label: 'Agent Flow Simulator', groupId: 'automation', isLocked: true, roleVisibility: 'all' },
+    { id: 'community', label: 'Community Polls', groupId: 'automation', isLocked: true, roleVisibility: 'all' },
 
     // Management & Queue (5)
-    { id: 'pending', label: 'Pending Stories & Target Queue', groupId: 'management', isLocked: true },
-    { id: 'calendar', label: 'Content Calendar', groupId: 'management', isLocked: true },
-    { id: 'duplicates', label: 'Duplicate Checker', groupId: 'management', isLocked: true },
-    { id: 'masterlist', label: 'Master List', groupId: 'management', isLocked: true },
-    { id: 'roadmap', label: 'Upscaling (v3.42+)', groupId: 'management', isLocked: true },
+    { id: 'pending', label: 'Pending Stories & Target Queue', groupId: 'management', isLocked: true, roleVisibility: 'all' },
+    { id: 'calendar', label: 'Content Calendar', groupId: 'management', isLocked: true, roleVisibility: 'all' },
+    { id: 'duplicates', label: 'Duplicate Checker', groupId: 'management', isLocked: true, roleVisibility: 'all' },
+    { id: 'masterlist', label: 'Master List', groupId: 'management', isLocked: true, roleVisibility: 'all' },
+    { id: 'roadmap', label: 'Upscaling (v3.42+)', groupId: 'management', isLocked: true, roleVisibility: 'all' },
 
     // AI Studios (7)
-    { id: 'chat', label: 'AI Script Chatbot', groupId: 'ai', isLocked: true },
-    { id: 'search', label: 'Search Grounding', groupId: 'ai', isLocked: true },
-    { id: 'video', label: 'Omni Flash Video', groupId: 'ai', isLocked: true },
-    { id: 'image', label: 'Thumbnails (Nano Banana)', groupId: 'ai', isLocked: true },
-    { id: 'transcribe', label: 'Voice Dictation', groupId: 'ai', isLocked: true },
-    { id: 'music', label: 'Music Generator', groupId: 'ai', isLocked: true },
-    { id: '3d', label: '3D Virtual Studio', groupId: 'ai', isLocked: true },
+    { id: 'chat', label: 'AI Script Chatbot', groupId: 'ai', isLocked: true, roleVisibility: 'all' },
+    { id: 'search', label: 'Search Grounding', groupId: 'ai', isLocked: true, roleVisibility: 'all' },
+    { id: 'video', label: 'Omni Flash Video', groupId: 'ai', isLocked: true, roleVisibility: 'all' },
+    { id: 'image', label: 'Thumbnails (Nano Banana)', groupId: 'ai', isLocked: true, roleVisibility: 'all' },
+    { id: 'transcribe', label: 'Voice Dictation', groupId: 'ai', isLocked: true, roleVisibility: 'all' },
+    { id: 'music', label: 'Music Generator', groupId: 'ai', isLocked: true, roleVisibility: 'all' },
+    { id: '3d', label: '3D Virtual Studio', groupId: 'ai', isLocked: true, roleVisibility: 'all' },
   ]
 };
 
@@ -88,12 +90,14 @@ export function loadMenuConfig(): MenuCustomizerState {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed.groups) && Array.isArray(parsed.items)) {
-        // Sanitize any stale hardcoded "(58)" from duplicates label
         const sanitizedItems = parsed.items.map((it: MenuItemConfig) => {
           if (it.id === 'duplicates' && it.label && (it.label.includes('(58)') || it.label.includes('(63)'))) {
             return { ...it, label: 'Duplicate Checker' };
           }
-          return it;
+          return {
+            ...it,
+            roleVisibility: it.roleVisibility || 'all'
+          };
         });
         return { ...parsed, items: sanitizedItems };
       }
@@ -138,7 +142,6 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
   const [lockWarning, setLockWarning] = useState<string | null>(null);
   const [saveToast, setSaveToast] = useState(false);
 
-  // References to guarantee no typed label is ever lost during click/blur race condition
   const tempLabelRef = useRef<string>('');
   const editingItemIdRef = useRef<TabType | null>(null);
   const editingGroupIdRef = useRef<string | null>(null);
@@ -159,7 +162,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     dirtyManager.setDirty({
       id: 'menu_customizer',
       title: 'Menu Bar Customizer',
-      description: 'Menu layout aur sub-menu names ki tabdeeliyaan ghair mehfooz hain.',
+      description: 'Menu layout aur role visibility ki tabdeeliyaan ghair mehfooz hain.',
       onSave: () => handleApply(newConfig),
       onDiscard: () => {
         setLocalConfig(config);
@@ -193,7 +196,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     markDirty(next);
   };
 
-  // Move an entire top-level menu group left/right (Reorder top navbar)
+  // Move an entire top-level menu group left/right
   const handleMoveGroup = (index: number, direction: 'left' | 'right') => {
     const targetIndex = direction === 'left' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= localConfig.groups.length) return;
@@ -254,37 +257,40 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     markDirty(next);
   };
 
-  // Move an item to a new group (STRICT NO-DUPLICATE RULE)
+  // Change Role Visibility for an Item
+  const handleRoleVisibilityChange = (itemId: TabType, visibility: 'all' | 'admin' | 'standard') => {
+    const next = {
+      ...localConfig,
+      items: localConfig.items.map((item) => (item.id === itemId ? { ...item, roleVisibility: visibility } : item))
+    };
+    setLocalConfig(next);
+    markDirty(next);
+  };
+
+  // Move an item to a new group
   const handleMoveItem = (itemId: TabType, targetGroupId: string) => {
     const item = localConfig.items.find((i) => i.id === itemId);
     if (!item) return;
 
     if (item.isLocked) {
-      setLockWarning(
-        `"${item.label}" is waqt LOCKED hai! Ghalti se move hone se bachane ke liye isay pehle unlock karein.`
-      );
+      setLockWarning(`"${item.label}" is waqt LOCKED hai! Ghalti se move hone se bachane ke liye isay pehle unlock karein.`);
       return;
     }
 
     const currentGroup = localConfig.groups.find((g) => g.id === item.groupId);
     if (currentGroup?.isLocked) {
-      setLockWarning(
-        `Parent Menu "${currentGroup.label}" is waqt LOCKED hai! Pehle parent menu ko unlock karein.`
-      );
+      setLockWarning(`Parent Menu "${currentGroup.label}" is waqt LOCKED hai! Pehle parent menu ko unlock karein.`);
       return;
     }
 
     const targetGroup = localConfig.groups.find((g) => g.id === targetGroupId);
     if (targetGroup?.isLocked) {
-      setLockWarning(
-        `Destination Menu "${targetGroup.label}" is waqt LOCKED hai! Pehle destination menu ko unlock karein.`
-      );
+      setLockWarning(`Destination Menu "${targetGroup.label}" is waqt LOCKED hai! Pehle destination menu ko unlock karein.`);
       return;
     }
 
     setLockWarning(null);
 
-    // Update assignment (item stays unique across the whole app)
     const next = {
       ...localConfig,
       items: localConfig.items.map((i) => (i.id === itemId ? { ...i, groupId: targetGroupId } : i))
@@ -357,7 +363,6 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     tempLabelRef.current = '';
   };
 
-  // Unlock item on warning prompt
   const unlockItemFromWarning = () => {
     if (selectedItemId) {
       toggleItemLock(selectedItemId);
@@ -369,7 +374,6 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     const base = overrideConfig || localConfig;
     let finalConfig = { ...base };
 
-    // Commit any currently open editing inputs before saving via refs to eliminate blur race conditions!
     const activeItemId = editingItemIdRef.current || editingItemId;
     const activeGroupId = editingGroupIdRef.current || editingGroupId;
     const activeLabel = (tempLabelRef.current || tempLabel).trim();
@@ -423,13 +427,13 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-white text-base">Menu Bar Handler &amp; Customizer</h3>
+                <h3 className="font-bold text-white text-base">Menu Bar Handler &amp; Role Visibility</h3>
                 <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-mono">
-                  Movable Top Bar
+                  RBAC Menu Access
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Menus ko rename karein, items ko shift karein, aur Main Top-Bar Menus ko move/reorder (#1, #2, #3, #4) karein.
+                Menus ko rename karein, items ko shift karein, aur har item ke liye 'Role Visibility' (Admin Only / Standard / All) configure karein.
               </p>
             </div>
           </div>
@@ -472,9 +476,8 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
           </div>
         )}
 
-        {/* Content Body — Interactive Grid of 4 Menu Categories (Scrollable only within modal) */}
+        {/* Content Body — Interactive Grid of Menu Categories */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll p-4 sm:p-5 space-y-4">
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {localConfig.groups.map((group, groupIndex) => {
               const groupItems = localConfig.items.filter((i) => i.groupId === group.id);
@@ -488,14 +491,13 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                       : 'bg-slate-900/90 border-cyan-500/40 shadow-lg shadow-cyan-950/30'
                   }`}
                 >
-                  {/* Category Header with Lock, Reordering & Rename */}
+                  {/* Category Header */}
                   <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="p-1 rounded-lg bg-slate-800 text-cyan-400">
                         <Layers className="w-4 h-4" />
                       </span>
 
-                      {/* Top Bar Order Position Badge */}
                       <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
                         group.isLocked
                           ? 'bg-slate-800 text-slate-400'
@@ -538,7 +540,6 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Move Top Menu Left / Right Controls when Unlocked */}
                       {!group.isLocked && (
                         <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
                           <button
@@ -546,7 +547,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                             onClick={() => handleMoveGroup(groupIndex, 'left')}
                             disabled={groupIndex === 0}
                             className="p-1 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 disabled:opacity-25 transition-colors cursor-pointer"
-                            title="Move Menu Left in Top Bar"
+                            title="Move Menu Left"
                           >
                             <ChevronLeft className="w-3.5 h-3.5" />
                           </button>
@@ -565,7 +566,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                             onClick={() => handleMoveGroup(groupIndex, 'right')}
                             disabled={groupIndex === localConfig.groups.length - 1}
                             className="p-1 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 disabled:opacity-25 transition-colors cursor-pointer"
-                            title="Move Menu Right in Top Bar"
+                            title="Move Menu Right"
                           >
                             <ChevronRight className="w-3.5 h-3.5" />
                           </button>
@@ -583,113 +584,156 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                             ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
                             : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
                         }`}
-                        title={group.isLocked ? 'Menu Locked (Click to Unlock & Move)' : 'Menu Unlocked (Click to Lock)'}
+                        title={group.isLocked ? 'Menu Locked' : 'Menu Unlocked'}
                       >
                         {group.isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
                       </button>
                     </div>
                   </div>
 
-                  {/* Items in this Menu */}
+                  {/* Items in this Menu with Role Visibility Toggle */}
                   <div className="mt-3 space-y-2 flex-1">
                     {groupItems.length === 0 ? (
                       <div className="p-4 border border-dashed border-slate-800 rounded-xl text-center text-xs text-slate-500">
-                        Is menu mein koi item nahi hai. Doosre menu se shift karein.
+                        Is menu mein koi item nahi hai.
                       </div>
                     ) : (
                       groupItems.map((item) => {
                         const isSelected = selectedItemId === item.id;
+                        const roleVis = item.roleVisibility || 'all';
 
                         return (
                           <div
                             key={item.id}
                             onClick={() => setSelectedItemId(item.id)}
-                            className={`p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-all cursor-pointer ${
+                            className={`p-2.5 rounded-xl border flex flex-col gap-2 transition-all cursor-pointer ${
                               isSelected
-                                ? 'bg-cyan-950/60 border-cyan-400 ring-1 ring-cyan-400/40 shadow-md shadow-cyan-950/60'
+                                ? 'bg-cyan-950/60 border-cyan-400 ring-1 ring-cyan-400/40 shadow-md'
                                 : 'bg-slate-900 border-slate-800 hover:border-slate-700'
                             }`}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span
-                                className={`w-2 h-2 rounded-full shrink-0 ${
-                                  item.isLocked ? 'bg-amber-400' : 'bg-emerald-400'
-                                }`}
-                              />
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${item.isLocked ? 'bg-amber-400' : 'bg-emerald-400'}`} />
 
-                              {editingItemId === item.id ? (
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <input
-                                    type="text"
-                                    value={tempLabel}
-                                    onChange={(e) => setTempLabel(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && saveEditItem(item.id)}
-                                    onBlur={() => saveEditItem(item.id)}
-                                    className="bg-slate-800 border border-cyan-400 text-white rounded px-2 py-0.5 text-xs font-medium focus:outline-none w-44"
-                                    autoFocus
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                  <button
-                                    onMouseDown={(e) => {
-                                      e.stopPropagation();
-                                      saveEditItem(item.id);
-                                    }}
-                                    className="p-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white shrink-0 cursor-pointer"
-                                    title="Save Rename"
+                                {editingItemId === item.id ? (
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <input
+                                      type="text"
+                                      value={tempLabel}
+                                      onChange={(e) => setTempLabel(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && saveEditItem(item.id)}
+                                      onBlur={() => saveEditItem(item.id)}
+                                      className="bg-slate-800 border border-cyan-400 text-white rounded px-2 py-0.5 text-xs font-medium focus:outline-none w-36"
+                                      autoFocus
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <button
+                                      onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                        saveEditItem(item.id);
+                                      }}
+                                      className="p-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white shrink-0 cursor-pointer"
+                                    >
+                                      <Save className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <span className="text-xs font-semibold text-slate-200 truncate">{item.label}</span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startEditItem(item);
+                                      }}
+                                      className="p-0.5 text-slate-400 hover:text-cyan-300 cursor-pointer"
+                                      title="Rename item"
+                                    >
+                                      <Edit2 className="w-2.5 h-2.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => toggleItemLock(item.id)}
+                                  className={`p-1 rounded-lg border text-xs cursor-pointer transition-colors ${
+                                    item.isLocked
+                                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                  }`}
+                                  title={item.isLocked ? 'Locked' : 'Unlocked'}
+                                >
+                                  {item.isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                                </button>
+
+                                <div className="relative flex items-center gap-1 text-[11px] bg-slate-800/80 border border-slate-700 rounded-lg px-1.5 py-0.5">
+                                  <span className="text-slate-400 text-[10px]">Move:</span>
+                                  <select
+                                    value={item.groupId}
+                                    onChange={(e) => handleMoveItem(item.id, e.target.value)}
+                                    disabled={item.isLocked}
+                                    className={`bg-transparent text-slate-200 text-[11px] focus:outline-none cursor-pointer ${
+                                      item.isLocked ? 'opacity-40 cursor-not-allowed' : ''
+                                    }`}
                                   >
-                                    <Save className="w-3 h-3" />
-                                  </button>
+                                    {localConfig.groups.map((g) => (
+                                      <option key={g.id} value={g.id} className="bg-slate-900 text-white">
+                                        {g.label}
+                                      </option>
+                                    ))}
+                                  </select>
                                 </div>
-                              ) : (
-                                <div className="flex items-center gap-1.5 truncate">
-                                  <span className="text-xs font-semibold text-slate-200 truncate">
-                                    {item.label}
-                                  </span>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      startEditItem(item);
-                                    }}
-                                    className="p-0.5 text-slate-400 hover:text-cyan-300 cursor-pointer"
-                                    title="Rename item"
-                                  >
-                                    <Edit2 className="w-2.5 h-2.5" />
-                                  </button>
-                                </div>
-                              )}
+                              </div>
                             </div>
 
-                            {/* Item Actions: Lock/Unlock & Shift dropdown */}
-                            <div className="flex items-center gap-1.5 shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => toggleItemLock(item.id)}
-                                className={`p-1 rounded-lg border text-xs cursor-pointer transition-colors ${
-                                  item.isLocked
-                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                }`}
-                                title={item.isLocked ? 'Locked (Click to Unlock)' : 'Unlocked (Click to Lock)'}
-                              >
-                                {item.isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                              </button>
+                            {/* Role Visibility Toggle Bar */}
+                            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-slate-400 flex items-center gap-1 font-medium">
+                                <Shield className="w-3 h-3 text-cyan-400" />
+                                <span>Role Visibility:</span>
+                              </span>
 
-                              {/* Move / Shift Dropdown */}
-                              <div className="relative flex items-center gap-1 text-[11px] bg-slate-800/80 border border-slate-700 rounded-lg px-1.5 py-0.5">
-                                <span className="text-slate-400 text-[10px]">Move to:</span>
-                                <select
-                                  value={item.groupId}
-                                  onChange={(e) => handleMoveItem(item.id, e.target.value)}
-                                  disabled={item.isLocked}
-                                  className={`bg-transparent text-slate-200 text-[11px] focus:outline-none cursor-pointer ${
-                                    item.isLocked ? 'opacity-40 cursor-not-allowed' : ''
+                              <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRoleVisibilityChange(item.id, 'all')}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                                    roleVis === 'all'
+                                      ? 'bg-cyan-600 text-white shadow'
+                                      : 'text-slate-400 hover:text-white'
                                   }`}
+                                  title="Visible to All Users (Standard & Admin)"
                                 >
-                                  {localConfig.groups.map((g) => (
-                                    <option key={g.id} value={g.id} className="bg-slate-900 text-white">
-                                      {g.label}
-                                    </option>
-                                  ))}
-                                </select>
+                                  All
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRoleVisibilityChange(item.id, 'admin')}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                                    roleVis === 'admin'
+                                      ? 'bg-purple-600 text-white shadow'
+                                      : 'text-slate-400 hover:text-white'
+                                  }`}
+                                  title="Restrict to Admin Role Only"
+                                >
+                                  Admin Only
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRoleVisibilityChange(item.id, 'standard')}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors ${
+                                    roleVis === 'standard'
+                                      ? 'bg-blue-600 text-white shadow'
+                                      : 'text-slate-400 hover:text-white'
+                                  }`}
+                                  title="Standard Role Only"
+                                >
+                                  Standard
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -727,7 +771,6 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
               onClick={() => handleApply()}
               className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-semibold text-xs shadow-lg shadow-cyan-950 cursor-pointer"
             >
-
               <Check className="w-3.5 h-3.5" />
               <span>Save Menu Layout</span>
             </button>
@@ -736,6 +779,6 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
       </div>
     </div>
   );
-
-  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };
+
+export default MenuBarCustomizerModal;
