@@ -23,19 +23,111 @@ import {
   UserPlus,
   LogIn,
   Sliders,
-  Sparkles
+  Sparkles,
+  History,
+  HardDrive,
+  GitCommit,
+  Clock,
+  ArrowRight
 } from 'lucide-react';
 import {
   userAuthManager,
   USER_AUTH_UPDATED_EVENT,
+  USER_ACTIVITY_UPDATED_EVENT,
   type UserSessionProfile,
-  type AuditLogItem
+  type AuditLogItem,
+  type UserSessionActivity
 } from '../lib/userAuthStore';
+import {
+  syncLogger,
+  SYNC_LOGGER_UPDATED_EVENT,
+  type SyncLogRecord,
+  type UserSyncSummary
+} from '../lib/syncLogger';
 
 interface MultiUserManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+/**
+ * Component to display the last 5 actions performed by current user
+ */
+const UserRecentActionsWidget: React.FC<{ username?: string }> = ({ username }) => {
+  const [actions, setActions] = useState<UserSessionActivity[]>(() => userAuthManager.getLastUserActions(5));
+
+  useEffect(() => {
+    const handleActivity = () => {
+      setActions(userAuthManager.getLastUserActions(5));
+    };
+    window.addEventListener(USER_ACTIVITY_UPDATED_EVENT, handleActivity);
+    return () => window.removeEventListener(USER_ACTIVITY_UPDATED_EVENT, handleActivity);
+  }, [username]);
+
+  if (actions.length === 0) {
+    return (
+      <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1.5">
+        <div className="flex items-center gap-2 text-slate-300 font-bold text-xs uppercase tracking-wider">
+          <History className="w-4 h-4 text-cyan-400" />
+          <span>Last 5 User Actions (Session Activity History)</span>
+        </div>
+        <p className="text-[11px] text-slate-500 italic">Is session mein abhi tak koi actions record nahi huway.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 bg-slate-950/90 border border-slate-800 rounded-xl space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <History className="w-4 h-4 text-cyan-400" />
+          <h5 className="font-bold text-white text-xs uppercase tracking-wider">
+            Last 5 User Actions (Session Activity History)
+          </h5>
+        </div>
+        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60 font-bold">
+          Active: @{username || 'guest'}
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        {actions.map((act) => (
+          <div
+            key={act.id}
+            className="p-2.5 bg-slate-900/90 border border-slate-800 rounded-lg flex items-start justify-between gap-3 text-xs hover:border-slate-700 transition-colors"
+          >
+            <div className="flex items-start gap-2.5">
+              <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                act.status === 'SUCCESS' ? 'bg-emerald-400' : act.status === 'FAILED' ? 'bg-rose-400' : 'bg-amber-400'
+              }`} />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white text-xs">{act.action}</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-slate-800 text-slate-400">
+                    {act.category}
+                  </span>
+                </div>
+                {act.details && (
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{act.details}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="text-right shrink-0">
+              <span className="text-[10px] font-mono text-slate-500 block">{act.timestamp}</span>
+              <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold uppercase ${
+                act.status === 'SUCCESS' ? 'text-emerald-400' : 'text-rose-400'
+              }`}>
+                {act.status}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 
 export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ isOpen, onClose }) => {
   const [currentUser, setCurrentUser] = useState<UserSessionProfile | null>(userAuthManager.getUser());
@@ -60,20 +152,36 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
   // Sync state
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncLogs, setSyncLogs] = useState<SyncLogRecord[]>(() => syncLogger.getSyncLogs(currentUser?.username));
 
   useEffect(() => {
     const handleAuthUpdate = (e: any) => {
       setCurrentUser(e.detail);
+      setSyncLogs(syncLogger.getSyncLogs(e.detail?.username));
     };
+
+    const handleSyncUpdate = (e: any) => {
+      setSyncLogs(e.detail || syncLogger.getSyncLogs(currentUser?.username));
+    };
+
     window.addEventListener(USER_AUTH_UPDATED_EVENT, handleAuthUpdate);
-    return () => window.removeEventListener(USER_AUTH_UPDATED_EVENT, handleAuthUpdate);
-  }, []);
+    window.addEventListener(SYNC_LOGGER_UPDATED_EVENT, handleSyncUpdate);
+    syncLogger.fetchServerSyncLogs().then(() => {
+      setSyncLogs(syncLogger.getSyncLogs(currentUser?.username));
+    }).catch(() => {});
+
+    return () => {
+      window.removeEventListener(USER_AUTH_UPDATED_EVENT, handleAuthUpdate);
+      window.removeEventListener(SYNC_LOGGER_UPDATED_EVENT, handleSyncUpdate);
+    };
+  }, [currentUser?.username]);
 
   useEffect(() => {
     if (isOpen) {
       document.documentElement.classList.add('modal-open');
       document.body.classList.add('modal-open');
       loadTabContent();
+      setSyncLogs(syncLogger.getSyncLogs(currentUser?.username));
       return () => {
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
@@ -151,11 +259,32 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
   const handleGitHubSync = async () => {
     setIsSyncing(true);
     setSyncStatus(null);
+    const start = Date.now();
     try {
       const res = await userAuthManager.syncWithGitHub();
       setSyncStatus(`✅ ${res.message}`);
+      syncLogger.recordSyncOperation({
+        operation: 'GIT_MIRROR',
+        targetFile: `user-data/${currentUser?.username || 'user'}`,
+        username: currentUser?.username || 'guest',
+        status: 'SYNCED',
+        details: res.message || 'Storage synchronized to dedicated GitHub directory',
+        repoPath: currentUser?.dedicatedRepoPath || 'user-data',
+        syncLatencyMs: Date.now() - start
+      });
+      setSyncLogs(syncLogger.getSyncLogs(currentUser?.username));
     } catch (e: any) {
       setSyncStatus(`❌ Sync error: ${e?.message}`);
+      syncLogger.recordSyncOperation({
+        operation: 'GIT_MIRROR',
+        targetFile: `user-data/${currentUser?.username || 'user'}`,
+        username: currentUser?.username || 'guest',
+        status: 'ERROR',
+        details: e?.message || 'Sync operation failed',
+        repoPath: currentUser?.dedicatedRepoPath || 'user-data',
+        syncLatencyMs: Date.now() - start
+      });
+      setSyncLogs(syncLogger.getSyncLogs(currentUser?.username));
     } finally {
       setIsSyncing(false);
     }
@@ -358,6 +487,9 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                 </div>
               </div>
 
+              {/* Last 5 Actions performed by current user */}
+              <UserRecentActionsWidget username={currentUser?.username} />
+
               {/* Login / Register Form for Custom Users */}
               <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -454,23 +586,123 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                       Dedicated Repository Directory: <span className="font-mono text-emerald-300">{currentUser?.dedicatedRepoPath}</span>
                     </h4>
                     <p className="text-slate-400 text-xs mt-0.5">
-                      Standard user ka tamam created data (channels, stories, prompts) is directory mein automatically save hota hai aur kisi doosre standard user ko visible nahi hota.
+                      Standard user ka تمام created data (channels, stories, prompts) is directory mein automatically save hota hai aur kisi doosre standard user ko visible nahi hota.
                     </p>
                   </div>
 
-                  <button
-                    onClick={handleGitHubSync}
-                    disabled={isSyncing}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950 cursor-pointer disabled:opacity-50 shrink-0"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                    <span>{isSyncing ? 'Syncing...' : 'Sync with GitHub Repo'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleGitHubSync}
+                      disabled={isSyncing}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950 cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                      <span>{isSyncing ? 'Syncing...' : 'Sync with GitHub Repo'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {syncStatus && (
                   <div className="p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-slate-200">
                     {syncStatus}
+                  </div>
+                )}
+
+                {/* Real-Time Sync Summary Badges */}
+                {(() => {
+                  const summary = syncLogger.getSyncSummary(currentUser?.username || 'guest');
+                  return (
+                    <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="p-2 bg-slate-900/90 rounded-lg border border-slate-800 text-[11px]">
+                        <span className="text-slate-400 block text-[10px]">Sync Pipeline:</span>
+                        <span className="font-bold text-emerald-400 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>{summary.isSynced ? '100% Synced' : 'Sync Required'}</span>
+                        </span>
+                      </div>
+                      <div className="p-2 bg-slate-900/90 rounded-lg border border-slate-800 text-[11px]">
+                        <span className="text-slate-400 block text-[10px]">Storage Mode:</span>
+                        <span className="font-bold text-cyan-300 font-mono">Isolated FS</span>
+                      </div>
+                      <div className="p-2 bg-slate-900/90 rounded-lg border border-slate-800 text-[11px]">
+                        <span className="text-slate-400 block text-[10px]">Target Folder:</span>
+                        <span className="font-bold text-purple-300 font-mono truncate block">
+                          {summary.dedicatedRepoPath}
+                        </span>
+                      </div>
+                      <div className="p-2 bg-slate-900/90 rounded-lg border border-slate-800 text-[11px]">
+                        <span className="text-slate-400 block text-[10px]">Sync Operations:</span>
+                        <span className="font-bold text-white font-mono">{syncLogs.length} Logged</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Real-Time File System Sync Logger Feed */}
+              <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <HardDrive className="w-4 h-4 text-emerald-400" />
+                    <h5 className="font-bold text-white text-xs uppercase tracking-wider">
+                      Real-Time File System &amp; Multi-User Sync Logger:
+                    </h5>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        syncLogger.clearLogs();
+                        setSyncLogs([]);
+                      }}
+                      className="text-[10px] text-slate-400 hover:text-rose-400 cursor-pointer"
+                    >
+                      Clear Sync Logs
+                    </button>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/60 font-bold">
+                      Live FS Hook
+                    </span>
+                  </div>
+                </div>
+
+                {syncLogs.length === 0 ? (
+                  <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800 text-center text-slate-500 text-xs">
+                    File system sync operations will appear here in real-time as users save files or mirror repositories.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto custom-modal-scroll">
+                    {syncLogs.slice(0, 10).map((log) => (
+                      <div
+                        key={log.id}
+                        className="p-2.5 bg-slate-900/90 border border-slate-800/80 rounded-lg flex items-start justify-between gap-2.5 text-xs hover:border-slate-700 transition-colors"
+                      >
+                        <div className="flex items-start gap-2 min-w-0">
+                          <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                            log.status === 'SYNCED' ? 'bg-emerald-400' : log.status === 'ERROR' ? 'bg-rose-400' : 'bg-cyan-400'
+                          }`} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-white text-[11px] font-mono">{log.targetFile}</span>
+                              <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-slate-800 text-cyan-300">
+                                {log.operation}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-mono">
+                                @{log.username}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 truncate mt-0.5">{log.details}</p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] font-mono text-slate-500 block">{log.timestamp}</span>
+                          <span className={`text-[9px] font-mono font-bold uppercase ${
+                            log.status === 'SYNCED' ? 'text-emerald-400' : 'text-rose-400'
+                          }`}>
+                            {log.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

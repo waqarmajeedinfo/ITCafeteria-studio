@@ -144,7 +144,17 @@ function extractJsonObject(raw: string): any | null {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'IT Cafeteria Studio', uptime: process.uptime() });
+  res.json({
+    ok: true,
+    service: 'IT Cafeteria Studio',
+    uptime: process.uptime(),
+    nodeVersion: process.version,
+    environment: process.env.NODE_ENV || 'development',
+    port: port,
+    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    hasAccessKey: Boolean(process.env.APP_ACCESS_KEY),
+    renderReady: true
+  });
 });
 
 // 1. AI Chatbot API (gemini-3.8-flash, gemini-4-argon, gemini-3.1-flash-lite)

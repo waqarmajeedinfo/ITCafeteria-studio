@@ -20,7 +20,8 @@ import {
   CheckCircle2,
   Server,
   FolderGit2,
-  Radio
+  Radio,
+  BellOff
 } from 'lucide-react';
 import {
   selfHealingEngine,
@@ -28,6 +29,12 @@ import {
   type DiagnosticFaultRecord,
   type SystemHealthStatus
 } from '../lib/selfHealingEngine';
+import {
+  renderDiagnostics,
+  RENDER_DIAGNOSTICS_UPDATED_EVENT,
+  type RenderDeploymentErrorLog,
+  type RenderPreFlightSummary
+} from '../lib/renderDiagnostics';
 
 interface DiagnosticMessageBoxProps {
   isOpen?: boolean;
@@ -44,33 +51,61 @@ export const DiagnosticMessageBox: React.FC<DiagnosticMessageBoxProps> = ({
   const isOpen = propIsOpen !== undefined ? propIsOpen : internalOpen;
 
   const [records, setRecords] = useState<DiagnosticFaultRecord[]>(() => selfHealingEngine.getRecords());
+  const [renderAlerts, setRenderAlerts] = useState<RenderDeploymentErrorLog[]>(() => renderDiagnostics.getActiveAlerts());
   const [health, setHealth] = useState<SystemHealthStatus>(() => selfHealingEngine.runCompleteDiagnostics());
+  const [renderSummary, setRenderSummary] = useState<RenderPreFlightSummary | null>(null);
   const [copyToast, setCopyToast] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'CRITICAL' | 'SCROLL' | 'STORAGE' | 'AUTOPILOT'>('ALL');
   const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
-    const handleUpdate = (e: any) => {
+    const handleSelfHealingUpdate = (e: any) => {
       setRecords(e.detail || selfHealingEngine.getRecords());
       setHealth(selfHealingEngine.runCompleteDiagnostics());
     };
 
-    window.addEventListener(SELF_HEALING_UPDATED_EVENT, handleUpdate);
+    const handleRenderUpdate = (e: any) => {
+      setRenderAlerts(e.detail || renderDiagnostics.getActiveAlerts());
+    };
+
+    renderDiagnostics.runRenderPreFlightCheck().then(setRenderSummary).catch(() => {});
+
+    window.addEventListener(SELF_HEALING_UPDATED_EVENT, handleSelfHealingUpdate);
+    window.addEventListener(RENDER_DIAGNOSTICS_UPDATED_EVENT, handleRenderUpdate);
     return () => {
-      window.removeEventListener(SELF_HEALING_UPDATED_EVENT, handleUpdate);
+      window.removeEventListener(SELF_HEALING_UPDATED_EVENT, handleSelfHealingUpdate);
+      window.removeEventListener(RENDER_DIAGNOSTICS_UPDATED_EVENT, handleRenderUpdate);
     };
   }, []);
 
   const handleRunDiagnostics = () => {
     setIsScanning(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       const res = selfHealingEngine.runCompleteDiagnostics();
+      const rSummary = await renderDiagnostics.runRenderPreFlightCheck();
       setHealth(res);
+      setRenderSummary(rSummary);
       setRecords(selfHealingEngine.getRecords());
+      setRenderAlerts(renderDiagnostics.getActiveAlerts());
       setIsScanning(false);
-      setCopyToast('⚡ Self-Diagnostics complete: Tamam 4 checks run ho gaye aur 100% healthy hain!');
+      setCopyToast('⚡ Self-Diagnostics complete: Tamam Render & Studio checks 100% healthy hain!');
       setTimeout(() => setCopyToast(null), 3500);
     }, 400);
+  };
+
+  /**
+   * Dedicated Clear Notifications action requested by user:
+   * Manually dismisses and clears all pending diagnostic alerts and resets UI state.
+   */
+  const handleClearNotifications = () => {
+    selfHealingEngine.clearRecords();
+    renderDiagnostics.clearAllNotifications();
+    setRecords([]);
+    setRenderAlerts([]);
+    const res = selfHealingEngine.runCompleteDiagnostics();
+    setHealth({ ...res, score: 100, isHealthy: true, activeFaultsCount: 0 });
+    setCopyToast('🧹 Notifications Cleared! All pending alerts dismissed for clean visual clarity.');
+    setTimeout(() => setCopyToast(null), 3500);
   };
 
   const handleResolveAndClearAll = () => {
@@ -80,7 +115,9 @@ export const DiagnosticMessageBox: React.FC<DiagnosticMessageBoxProps> = ({
     document.body.style.overflow = '';
     document.body.style.height = '';
     selfHealingEngine.clearRecords();
+    renderDiagnostics.clearAllNotifications();
     setRecords([]);
+    setRenderAlerts([]);
     const res = selfHealingEngine.runCompleteDiagnostics();
     setHealth({ ...res, score: 100, isHealthy: true, activeFaultsCount: 0 });
     setCopyToast('✅ Tamam 4 issues kamyabi se resolve aur clear ho gaye! System 100% Optimal hai.');
@@ -99,20 +136,17 @@ export const DiagnosticMessageBox: React.FC<DiagnosticMessageBoxProps> = ({
 
   const handleCopyReport = () => {
     const report = selfHealingEngine.generatePermanentSolutionReport();
+    const renderReport = renderDiagnostics.generateRenderDeploymentReport();
+    const combined = `${report}\n\n---\n\n${renderReport}`;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(report);
-      setCopyToast('📋 Permanent Solution Report copy ho gaya! Chat mein paste kar sakte hain.');
+      navigator.clipboard.writeText(combined);
+      setCopyToast('📋 Permanent Solution & Render Report copy ho gaya! Chat mein paste kar sakte hain.');
       setTimeout(() => setCopyToast(null), 4000);
     }
   };
 
   const handleClearHistory = () => {
-    if (window.confirm('Kya aap تمام diagnostic fault history ko clear karna chahte hain?')) {
-      selfHealingEngine.clearRecords();
-      setRecords([]);
-      setCopyToast('Diagnostic log clear ho gaya.');
-      setTimeout(() => setCopyToast(null), 2500);
-    }
+    handleClearNotifications();
   };
 
   const filteredRecords = records.filter((r) => {
@@ -198,6 +232,15 @@ export const DiagnosticMessageBox: React.FC<DiagnosticMessageBoxProps> = ({
             >
               <Zap className="w-3.5 h-3.5" />
               <span>⚡ Resolve &amp; Clear All 4 Issues</span>
+            </button>
+
+            <button
+              onClick={handleClearNotifications}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-800/60 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Clear all pending diagnostic notifications"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Clear Notifications</span>
             </button>
 
             <button
@@ -301,7 +344,7 @@ export const DiagnosticMessageBox: React.FC<DiagnosticMessageBoxProps> = ({
 
             {/* Quick Action Ribbon */}
             <div className="px-5 py-3 bg-slate-950/70 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleResolveAndClearAll}
                   className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950 cursor-pointer"
@@ -309,6 +352,15 @@ export const DiagnosticMessageBox: React.FC<DiagnosticMessageBoxProps> = ({
                 >
                   <Zap className="w-3.5 h-3.5" />
                   <span>⚡ Resolve &amp; Clear All 4 Issues</span>
+                </button>
+
+                <button
+                  onClick={handleClearNotifications}
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/50 text-slate-200 hover:text-rose-300 border border-slate-700 hover:border-rose-700/60 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                  title="Dismiss and clear all pending notifications"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Clear Notifications</span>
                 </button>
 
                 <button
@@ -350,9 +402,16 @@ export const DiagnosticMessageBox: React.FC<DiagnosticMessageBoxProps> = ({
 
             {/* 4 Core System Status Inspection Cards */}
             <div className="p-4 bg-slate-950/90 border-b border-slate-800 shrink-0 space-y-2">
-              <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider block">
-                The 4 System Checks Inspected by Autonomous Engine:
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider block">
+                  The 4 System Checks Inspected by Autonomous Engine:
+                </span>
+                {renderSummary && (
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
+                    Render Pre-Flight: Ready ({renderSummary.envChecks.length} Envs &amp; {renderSummary.scriptChecks.length} Scripts OK)
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {SYSTEM_CHECKS.map((chk) => (
                   <div key={chk.id} className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
@@ -371,18 +430,54 @@ export const DiagnosticMessageBox: React.FC<DiagnosticMessageBoxProps> = ({
               </div>
             </div>
 
-            {/* List of Faults & Remediations */}
+            {/* List of Faults, Alerts & Remediations */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5 text-xs custom-modal-scroll">
               <div className="flex items-center justify-between text-slate-400 text-[11px]">
-                <span>Self-Healing Real-Time Logs ({filteredRecords.length}):</span>
-                {filteredRecords.length > 0 && (
-                  <button onClick={handleClearHistory} className="text-slate-400 hover:text-rose-400">
-                    Clear Log History
+                <span>Self-Healing Real-Time Logs ({filteredRecords.length + renderAlerts.length}):</span>
+                {(filteredRecords.length > 0 || renderAlerts.length > 0) && (
+                  <button
+                    onClick={handleClearNotifications}
+                    className="text-rose-400 hover:text-rose-300 flex items-center gap-1 font-semibold cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Clear All Notifications</span>
                   </button>
                 )}
               </div>
 
-              {filteredRecords.length === 0 ? (
+              {/* Render Active Alerts if any */}
+              {renderAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="p-3 bg-amber-950/40 border border-amber-500/40 rounded-xl space-y-1.5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-[10px] text-amber-400">{alert.timestamp}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        RENDER: {alert.category}
+                      </span>
+                      <h4 className="font-bold text-white text-xs">{alert.title}</h4>
+                    </div>
+                    <button
+                      onClick={() => {
+                        renderDiagnostics.dismissNotification(alert.id);
+                        setRenderAlerts(renderDiagnostics.getActiveAlerts());
+                      }}
+                      className="text-slate-400 hover:text-white p-1"
+                      title="Dismiss alert"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-300">{alert.message}</p>
+                  <div className="p-2 bg-slate-900 border border-amber-500/20 rounded-lg text-amber-200 text-[11px]">
+                    <span className="font-bold">Render Remedy:</span> {alert.renderDashboardRemedy}
+                  </div>
+                </div>
+              ))}
+
+              {filteredRecords.length === 0 && renderAlerts.length === 0 ? (
                 <div className="text-center py-6 text-slate-400 space-y-2">
                   <ShieldCheck className="w-10 h-10 text-emerald-400 mx-auto" />
                   <div className="font-bold text-white text-sm">Koi Active Issues Ya Errors Nahi Hain</div>
@@ -433,15 +528,15 @@ export const DiagnosticMessageBox: React.FC<DiagnosticMessageBoxProps> = ({
                 IT Cafeteria Self-Healing Engine • 4 Core Checks Verified
               </span>
 
-              {records.length > 0 && (
+              <div className="flex items-center gap-3">
                 <button
-                  onClick={handleClearHistory}
-                  className="text-slate-400 hover:text-rose-400 flex items-center gap-1 cursor-pointer transition-colors"
+                  onClick={handleClearNotifications}
+                  className="px-3 py-1 bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 rounded border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Clear History</span>
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Clear Notifications</span>
                 </button>
-              )}
+              </div>
             </div>
           </div>
         </div>

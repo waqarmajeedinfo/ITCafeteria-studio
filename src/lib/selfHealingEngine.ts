@@ -93,8 +93,16 @@ class SelfHealingEngine {
 
     window.addEventListener('error', (event) => {
       const msg = event.message || 'Unknown window runtime error';
-      // Suppress benign third-party or chrome extension noise
-      if (msg.includes('ResizeObserver') || msg.includes('Script error')) return;
+      // Suppress benign third-party, chrome extension, and dev-server websocket noise
+      if (
+        msg.includes('ResizeObserver') ||
+        msg.includes('Script error') ||
+        msg.includes('WebSocket') ||
+        msg.includes('websocket') ||
+        msg.includes('@vite/client')
+      ) {
+        return;
+      }
 
       this.recordFault({
         source: 'RUNTIME_ERROR',
@@ -110,8 +118,17 @@ class SelfHealingEngine {
     window.addEventListener('unhandledrejection', (event) => {
       const reason = event.reason;
       const text = typeof reason === 'string' ? reason : reason?.message || JSON.stringify(reason || '');
-      // Suppress aborted fetch noise
-      if (text.includes('AbortError') || text.includes('Failed to fetch')) return;
+      // Suppress aborted fetch noise and benign Vite dev websocket closures (HMR disabled in AI Studio preview)
+      if (
+        text.includes('AbortError') ||
+        text.includes('Failed to fetch') ||
+        text.includes('WebSocket closed without opened') ||
+        text.includes('failed to connect to websocket') ||
+        text.includes('@vite/client')
+      ) {
+        event.preventDefault?.();
+        return;
+      }
 
       this.recordFault({
         source: 'API',

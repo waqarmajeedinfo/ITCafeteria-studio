@@ -26,14 +26,28 @@ export interface AuditLogItem {
   status: 'DISPATCHED' | 'LOCAL_LOGGED' | 'FAILED';
 }
 
+export interface UserSessionActivity {
+  id: string;
+  timestamp: string;
+  action: string;
+  details?: string;
+  category: 'AUTH' | 'STORAGE' | 'SYNC' | 'AUTOPILOT' | 'SETTINGS' | 'CHANNEL';
+  status: 'SUCCESS' | 'FAILED' | 'PENDING';
+  userId?: string;
+  username?: string;
+}
+
 const TOKEN_KEY = 'itcafeteria_user_auth_token';
 const USER_CACHE_KEY = 'itcafeteria_user_cached_profile';
+const ACTIVITY_STORAGE_KEY = 'itcafeteria_user_session_activity';
 
 export const USER_AUTH_UPDATED_EVENT = 'itcafeteria_user_auth_updated';
+export const USER_ACTIVITY_UPDATED_EVENT = 'itcafeteria_user_activity_updated';
 
 class UserAuthManager {
   private currentToken: string | null = null;
   private currentUser: UserSessionProfile | null = null;
+  private sessionActivityHistory: UserSessionActivity[] = [];
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -42,9 +56,75 @@ class UserAuthManager {
         const cached = localStorage.getItem(USER_CACHE_KEY);
         if (cached) this.currentUser = JSON.parse(cached);
       } catch {}
+      this.sessionActivityHistory = this.loadActivityHistory();
       // Automatically verify or auto-login with default admin if clean session
       this.init();
     }
+  }
+
+  private loadActivityHistory(): UserSessionActivity[] {
+    try {
+      const raw = localStorage.getItem(ACTIVITY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  }
+
+  private saveActivityHistory() {
+    try {
+      localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(this.sessionActivityHistory.slice(0, 50)));
+      window.dispatchEvent(new CustomEvent(USER_ACTIVITY_UPDATED_EVENT, { detail: this.sessionActivityHistory }));
+    } catch (e) {
+      console.warn('[UserAuthStore] Failed to save session activity:', e);
+    }
+  }
+
+  public logSessionActivity(
+    action: string,
+    details?: string,
+    category: UserSessionActivity['category'] = 'STORAGE',
+    status: UserSessionActivity['status'] = 'SUCCESS'
+  ): UserSessionActivity {
+    const entry: UserSessionActivity = {
+      id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toLocaleTimeString('en-US', { hour12: true }),
+      action,
+      details,
+      category,
+      status,
+      userId: this.currentUser?.id,
+      username: this.currentUser?.username || 'guest'
+    };
+
+    this.sessionActivityHistory.unshift(entry);
+    if (this.sessionActivityHistory.length > 50) {
+      this.sessionActivityHistory = this.sessionActivityHistory.slice(0, 50);
+    }
+    this.saveActivityHistory();
+    return entry;
+  }
+
+  public getSessionActivityHistory(): UserSessionActivity[] {
+    return [...this.sessionActivityHistory];
+  }
+
+  public getLastUserActions(count: number = 5): UserSessionActivity[] {
+    const currentUsername = this.currentUser?.username;
+    if (!currentUsername) {
+      return this.sessionActivityHistory.slice(0, count);
+    }
+    const userSpecific = this.sessionActivityHistory.filter(
+      a => !a.username || a.username === currentUsername
+    );
+    return userSpecific.slice(0, count);
+  }
+
+  public clearSessionActivityHistory() {
+    this.sessionActivityHistory = [];
+    this.saveActivityHistory();
   }
 
   private async init() {
@@ -100,17 +180,26 @@ class UserAuthManager {
   }
 
   public async login(username: string, password: string): Promise<UserSessionProfile> {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Login failed');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        this.logSessionActivity('Login Failed', `Failed attempt for @${username}: ${data.error || 'Invalid credentials'}`, 'AUTH', 'FAILED');
+        throw new Error(data.error || 'Login failed');
+      }
+      this.setSession(data.token, data.user);
+      this.logSessionActivity('User Logged In', `Session initialized as @${data.user.username} (${data.user.role})`, 'AUTH', 'SUCCESS');
+      return data.user;
+    } catch (err: any) {
+      if (!err.message?.includes('Login Failed')) {
+        this.logSessionActivity('Login Error', err.message || 'Connection failure', 'AUTH', 'FAILED');
+      }
+      throw err;
     }
-    this.setSession(data.token, data.user);
-    return data.user;
   }
 
   public async register(
@@ -119,26 +208,34 @@ class UserAuthManager {
     displayName?: string,
     email?: string
   ): Promise<UserSessionProfile> {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, displayName, email })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Registration failed');
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, displayName, email })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        this.logSessionActivity('Registration Failed', `Failed registering @${username}: ${data.error}`, 'AUTH', 'FAILED');
+        throw new Error(data.error || 'Registration failed');
+      }
+      this.setSession(data.token, data.user);
+      this.logSessionActivity('New Account Created', `Profile @${data.user.username} created with dedicated GitHub repository directory`, 'AUTH', 'SUCCESS');
+      return data.user;
+    } catch (err: any) {
+      throw err;
     }
-    this.setSession(data.token, data.user);
-    return data.user;
   }
 
   public async logout() {
+    const priorUser = this.currentUser?.username;
     if (this.currentToken) {
       fetch('/api/auth/logout', {
         method: 'POST',
         headers: { 'x-user-token': this.currentToken }
       }).catch(() => {});
     }
+    this.logSessionActivity('User Logged Out', `Session ended for @${priorUser || 'current user'}`, 'AUTH', 'SUCCESS');
     this.currentToken = null;
     this.currentUser = null;
     try {
@@ -151,17 +248,30 @@ class UserAuthManager {
   // Save an addition to the user's isolated storage directory
   public async saveAddition(fileKey: string, data: any, actionDescription?: string) {
     if (!this.currentToken) throw new Error('Not authenticated');
-    const res = await fetch('/api/user-storage/save-addition', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-token': this.currentToken
-      },
-      body: JSON.stringify({ fileKey, data, actionDescription })
-    });
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error || 'Save failed');
-    return result;
+    try {
+      const res = await fetch('/api/user-storage/save-addition', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-token': this.currentToken
+        },
+        body: JSON.stringify({ fileKey, data, actionDescription })
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        this.logSessionActivity(`Save Failed (${fileKey})`, result.error || 'Failed to save addition', 'STORAGE', 'FAILED');
+        throw new Error(result.error || 'Save failed');
+      }
+      this.logSessionActivity(
+        `File Saved: ${fileKey}`,
+        actionDescription || `Isolated profile file ${fileKey}.json updated in user-data/${this.currentUser?.username}`,
+        'STORAGE',
+        'SUCCESS'
+      );
+      return result;
+    } catch (err: any) {
+      throw err;
+    }
   }
 
   // Load user files from isolated storage
@@ -192,13 +302,26 @@ class UserAuthManager {
   // GitHub Repository Sync Trigger
   public async syncWithGitHub() {
     if (!this.currentToken) throw new Error('Not authenticated');
-    const res = await fetch('/api/github/sync-directory', {
-      method: 'POST',
-      headers: { 'x-user-token': this.currentToken }
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'GitHub sync failed');
-    return data;
+    try {
+      const res = await fetch('/api/github/sync-directory', {
+        method: 'POST',
+        headers: { 'x-user-token': this.currentToken }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        this.logSessionActivity('GitHub Sync Failed', data.error || 'Sync request failed', 'SYNC', 'FAILED');
+        throw new Error(data.error || 'GitHub sync failed');
+      }
+      this.logSessionActivity(
+        'GitHub Storage Synced',
+        `Synchronized ${data.filesSynced || 0} user files to dedicated GitHub directory at ${data.repoPath || 'repo'}`,
+        'SYNC',
+        'SUCCESS'
+      );
+      return data;
+    } catch (err: any) {
+      throw err;
+    }
   }
 
   // Admin APIs

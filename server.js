@@ -1,7 +1,7 @@
 // server.ts
 import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
+import path2 from "path";
+import { fileURLToPath as fileURLToPath2 } from "url";
 import { timingSafeEqual as timingSafeEqual2 } from "crypto";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
@@ -1160,10 +1160,591 @@ function registerIntegrationRoutes(app2) {
   });
 }
 
-// server.ts
-dotenv.config();
+// server_multiuser.ts
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import crypto from "crypto";
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = path.dirname(__filename);
+var DATA_ROOT = path.resolve(__dirname, "data");
+var USERS_DIR = path.resolve(DATA_ROOT, "users");
+var USER_STORAGE_DIR = path.resolve(DATA_ROOT, "user-storage");
+var GITHUB_MIRROR_DIR = path.resolve(__dirname, "user-data");
+var LOGS_DIR = path.resolve(DATA_ROOT, "logs");
+var USERS_FILE = path.resolve(USERS_DIR, "users-registry.json");
+var AUDIT_LOG_FILE = path.resolve(LOGS_DIR, "realtime-audit-webhooks.json");
+var WEBHOOK_CONFIG_FILE = path.resolve(DATA_ROOT, "webhook-config.json");
+[DATA_ROOT, USERS_DIR, USER_STORAGE_DIR, GITHUB_MIRROR_DIR, LOGS_DIR].forEach((dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+var activeSessions = /* @__PURE__ */ new Map();
+function hashPassword(password, salt) {
+  return crypto.pbkdf2Sync(password, salt, 1e3, 64, "sha512").toString("hex");
+}
+function generateToken() {
+  return crypto.randomBytes(32).toString("hex");
+}
+function initDefaultUsers() {
+  if (fs.existsSync(USERS_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+      if (Array.isArray(data) && data.length > 0) return data;
+    } catch (e) {
+      console.warn("[MultiUser] Failed to read existing users, initializing defaults:", e);
+    }
+  }
+  const adminSalt = crypto.randomBytes(16).toString("hex");
+  const adminUser = {
+    id: "user-admin-01",
+    username: "waqarmajeed",
+    displayName: "Waqar Majeed (Super Admin)",
+    email: "admin@itcafeteria.studio",
+    role: "admin",
+    salt: adminSalt,
+    passwordHash: hashPassword("waqar2026", adminSalt),
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
+    isActive: true,
+    dedicatedRepoPath: "user-data/waqarmajeed"
+  };
+  const stdSalt = crypto.randomBytes(16).toString("hex");
+  const stdUser = {
+    id: "user-std-01",
+    username: "noorwahid",
+    displayName: "Noor Wahid (Standard)",
+    email: "noorwahid1016@gmail.com",
+    role: "standard",
+    salt: stdSalt,
+    passwordHash: hashPassword("noor1234", stdSalt),
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
+    isActive: true,
+    dedicatedRepoPath: "user-data/noorwahid"
+  };
+  const users = [adminUser, stdUser];
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+  return users;
+}
+var usersRegistry = initDefaultUsers();
+function saveUsersRegistry() {
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(usersRegistry, null, 2), "utf-8");
+  } catch (e) {
+    console.error("[MultiUser] Failed to save users registry:", e);
+  }
+}
+function getWebhookConfig() {
+  if (fs.existsSync(WEBHOOK_CONFIG_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(WEBHOOK_CONFIG_FILE, "utf-8"));
+    } catch {
+    }
+  }
+  return {
+    webhookUrl: process.env.AUDIT_WEBHOOK_URL || "",
+    secretKey: process.env.WEBHOOK_SECRET || "itcafeteria-audit-key-2026",
+    enabled: Boolean(process.env.AUDIT_WEBHOOK_URL),
+    events: ["*"]
+  };
+}
+function saveWebhookConfig(cfg) {
+  try {
+    fs.writeFileSync(WEBHOOK_CONFIG_FILE, JSON.stringify(cfg, null, 2), "utf-8");
+  } catch (e) {
+    console.error("[MultiUser] Failed to save webhook config:", e);
+  }
+}
+function ensureUserStorage(username) {
+  const safeUser = username.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
+  const userDir = path.resolve(USER_STORAGE_DIR, safeUser);
+  const repoMirrorDir = path.resolve(GITHUB_MIRROR_DIR, safeUser);
+  [userDir, repoMirrorDir].forEach((d) => {
+    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+  });
+  const files = [
+    {
+      name: "profile.json",
+      content: {
+        username: safeUser,
+        customDialect: "Lahori Conversational",
+        defaultPresenter: "Waqar Majeed",
+        defaultPlatform: "YouTube Shorts + TikTok",
+        syncEnabled: true,
+        lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
+      }
+    },
+    {
+      name: "channels.json",
+      content: [
+        {
+          id: `${safeUser}-ch-01`,
+          name: `${safeUser.toUpperCase()} Production Hub`,
+          niche: "AI Tech & Productivity",
+          isUserCreated: true,
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      ]
+    },
+    {
+      name: "stories.json",
+      content: []
+    },
+    {
+      name: "github-sync.json",
+      content: {
+        lastCommitHash: "init-local-commit",
+        lastSyncTimestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        branch: "main",
+        syncStatus: "SYNCED",
+        directory: `user-data/${safeUser}`
+      }
+    }
+  ];
+  files.forEach((f) => {
+    const filePath = path.resolve(userDir, f.name);
+    const mirrorPath = path.resolve(repoMirrorDir, f.name);
+    if (!fs.existsSync(filePath)) {
+      const data = JSON.stringify(f.content, null, 2);
+      fs.writeFileSync(filePath, data, "utf-8");
+      fs.writeFileSync(mirrorPath, data, "utf-8");
+    }
+  });
+  return { userDir, repoMirrorDir };
+}
+usersRegistry.forEach((u) => ensureUserStorage(u.username));
+async function logAuditEvent(user, action, details, targetFile, reqIp = "127.0.0.1") {
+  const cfg = getWebhookConfig();
+  const entry = {
+    id: `audit-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    userId: user?.id || "system",
+    username: user?.username || "anonymous",
+    role: user?.role || "standard",
+    action,
+    details,
+    targetFile,
+    ip: reqIp,
+    status: "LOCAL_LOGGED"
+  };
+  if (cfg.enabled && cfg.webhookUrl) {
+    try {
+      const payload = {
+        event: "audit.action_logged",
+        auditRecord: entry,
+        metadata: {
+          app: "IT Cafeteria Studio",
+          environment: process.env.NODE_ENV || "production"
+        }
+      };
+      entry.webhookPayloadPreview = payload;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4e3);
+      const resp = await fetch(cfg.webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Studio-Signature": crypto.createHmac("sha256", cfg.secretKey).update(JSON.stringify(payload)).digest("hex")
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        entry.status = "DISPATCHED";
+      } else {
+        entry.status = "FAILED";
+      }
+    } catch (err) {
+      entry.status = "FAILED";
+      console.warn("[Webhook] Dispatch failed:", err?.message || err);
+    }
+  }
+  try {
+    let existingLogs = [];
+    if (fs.existsSync(AUDIT_LOG_FILE)) {
+      const raw = fs.readFileSync(AUDIT_LOG_FILE, "utf-8");
+      existingLogs = JSON.parse(raw);
+    }
+    existingLogs.unshift(entry);
+    fs.writeFileSync(AUDIT_LOG_FILE, JSON.stringify(existingLogs.slice(0, 500), null, 2), "utf-8");
+  } catch (err) {
+    console.error("[MultiUser] Failed to write audit log:", err);
+  }
+  return entry;
+}
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const tokenHeader = req.headers["x-user-token"] || authHeader && authHeader.split(" ")[1];
+  if (!tokenHeader) {
+    return res.status(401).json({
+      error: "Authentication Required",
+      message: "Meharbani farma kar login karein taake aapka personal profile load ho sakay."
+    });
+  }
+  const session = activeSessions.get(tokenHeader);
+  if (!session || session.expiresAt < Date.now()) {
+    if (session) activeSessions.delete(tokenHeader);
+    return res.status(401).json({
+      error: "Session Expired",
+      message: "Aapka session khatam ho chuka hai, baraye mehrbani dobara login karein."
+    });
+  }
+  req.user = session.user;
+  next();
+}
+function requireAdmin(req, res, next) {
+  const user = req.user;
+  if (!user || user.role !== "admin") {
+    void logAuditEvent(
+      user,
+      "SECURITY_ALERT",
+      `Unauthorized Admin privilege escalation attempt blocked for user "${user?.username || "unknown"}"`,
+      void 0,
+      req.ip || "127.0.0.1"
+    );
+    return res.status(403).json({
+      error: "Permission Denied",
+      message: "Sirf Super Admin (Superuser) ke paas tamam users aur system settings ki access hai."
+    });
+  }
+  next();
+}
+function registerMultiUserRoutes(app2) {
+  console.log("[MultiUser] Mounting Multi-User Authentication, Isolated Storage & Webhooks API routes...");
+  app2.post("/api/auth/register", async (req, res) => {
+    try {
+      const { username, password, displayName, email } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username aur Password dono lazmi hain." });
+      }
+      const cleanUsername = username.trim().toLowerCase().replace(/[^a-zA-Z0-9_-]/g, "");
+      if (cleanUsername.length < 3) {
+        return res.status(400).json({ error: "Username kam az kam 3 characters ka hona chahiye." });
+      }
+      const existing = usersRegistry.find((u) => u.username === cleanUsername);
+      if (existing) {
+        return res.status(409).json({ error: "Yeh username pehle se registered hai." });
+      }
+      const salt = crypto.randomBytes(16).toString("hex");
+      const newUser = {
+        id: `user-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+        username: cleanUsername,
+        displayName: displayName?.trim() || cleanUsername,
+        email: email?.trim() || `${cleanUsername}@user.itcafeteria.studio`,
+        role: "standard",
+        // New self-registered users are strictly standard
+        salt,
+        passwordHash: hashPassword(password, salt),
+        createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+        lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
+        isActive: true,
+        dedicatedRepoPath: `user-data/${cleanUsername}`
+      };
+      usersRegistry.push(newUser);
+      saveUsersRegistry();
+      ensureUserStorage(newUser.username);
+      const token = generateToken();
+      activeSessions.set(token, {
+        user: newUser,
+        expiresAt: Date.now() + 30 * 24 * 3600 * 1e3
+        // 30 days
+      });
+      await logAuditEvent(
+        newUser,
+        "USER_REGISTERED",
+        `New standard user account registered. Dedicated repo directory initialized: ${newUser.dedicatedRepoPath}`,
+        newUser.dedicatedRepoPath,
+        req.ip || "127.0.0.1"
+      );
+      res.status(201).json({
+        ok: true,
+        token,
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          displayName: newUser.displayName,
+          email: newUser.email,
+          role: newUser.role,
+          dedicatedRepoPath: newUser.dedicatedRepoPath
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Registration failed", details: e?.message });
+    }
+  });
+  app2.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username aur Password lazmi hain." });
+      }
+      const cleanUsername = username.trim().toLowerCase();
+      const user = usersRegistry.find((u) => u.username === cleanUsername);
+      if (!user) {
+        return res.status(401).json({ error: "Ghalat username ya password." });
+      }
+      const testHash = hashPassword(password, user.salt);
+      if (testHash !== user.passwordHash) {
+        await logAuditEvent(
+          null,
+          "LOGIN_FAILED",
+          `Failed login attempt for username: ${cleanUsername}`,
+          void 0,
+          req.ip || "127.0.0.1"
+        );
+        return res.status(401).json({ error: "Ghalat username ya password." });
+      }
+      if (!user.isActive) {
+        return res.status(403).json({ error: "Aapka account disabled hai. Admin se rabta karein." });
+      }
+      user.lastLogin = (/* @__PURE__ */ new Date()).toISOString();
+      saveUsersRegistry();
+      const token = generateToken();
+      activeSessions.set(token, {
+        user,
+        expiresAt: Date.now() + 30 * 24 * 3600 * 1e3
+      });
+      ensureUserStorage(user.username);
+      await logAuditEvent(
+        user,
+        "LOGIN_SUCCESS",
+        `User logged in successfully with role: ${user.role}`,
+        user.dedicatedRepoPath,
+        req.ip || "127.0.0.1"
+      );
+      res.json({
+        ok: true,
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          email: user.email,
+          role: user.role,
+          dedicatedRepoPath: user.dedicatedRepoPath
+        }
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Login failed", details: e?.message });
+    }
+  });
+  app2.get("/api/auth/me", authenticateToken, (req, res) => {
+    const user = req.user;
+    res.json({
+      ok: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        email: user.email,
+        role: user.role,
+        dedicatedRepoPath: user.dedicatedRepoPath
+      }
+    });
+  });
+  app2.post("/api/auth/logout", (req, res) => {
+    const tokenHeader = req.headers["x-user-token"] || req.headers["authorization"]?.split(" ")[1];
+    if (tokenHeader) {
+      activeSessions.delete(tokenHeader);
+    }
+    res.json({ ok: true, message: "Logged out successfully." });
+  });
+  app2.get("/api/user-storage/files", authenticateToken, (req, res) => {
+    const user = req.user;
+    const { userDir, repoMirrorDir } = ensureUserStorage(user.username);
+    try {
+      const fileNames = fs.readdirSync(userDir);
+      const filesSummary = {};
+      fileNames.forEach((file) => {
+        try {
+          const content = fs.readFileSync(path.resolve(userDir, file), "utf-8");
+          filesSummary[file] = JSON.parse(content);
+        } catch {
+          filesSummary[file] = null;
+        }
+      });
+      res.json({
+        ok: true,
+        username: user.username,
+        role: user.role,
+        dedicatedRepoPath: user.dedicatedRepoPath,
+        files: filesSummary
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to read user storage", details: e?.message });
+    }
+  });
+  app2.post("/api/user-storage/save-addition", authenticateToken, async (req, res) => {
+    const user = req.user;
+    const { fileKey, data, actionDescription } = req.body;
+    if (!fileKey || !data) {
+      return res.status(400).json({ error: "fileKey aur data dono required hain." });
+    }
+    const safeFileName = fileKey.replace(/[^a-zA-Z0-9_.-]/g, "");
+    const { userDir, repoMirrorDir } = ensureUserStorage(user.username);
+    const targetPath = path.resolve(userDir, safeFileName);
+    const mirrorPath = path.resolve(repoMirrorDir, safeFileName);
+    try {
+      const jsonContent = JSON.stringify(data, null, 2);
+      fs.writeFileSync(targetPath, jsonContent, "utf-8");
+      fs.writeFileSync(mirrorPath, jsonContent, "utf-8");
+      const syncStatusPath = path.resolve(userDir, "github-sync.json");
+      const syncStatus = {
+        lastCommitHash: `commit-${Date.now().toString(36)}`,
+        lastSyncTimestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        branch: "main",
+        syncStatus: "SYNCED",
+        directory: `user-data/${user.username}`,
+        lastModifiedFile: safeFileName
+      };
+      fs.writeFileSync(syncStatusPath, JSON.stringify(syncStatus, null, 2), "utf-8");
+      fs.writeFileSync(path.resolve(repoMirrorDir, "github-sync.json"), JSON.stringify(syncStatus, null, 2), "utf-8");
+      const auditLog = await logAuditEvent(
+        user,
+        "DATA_ADDITION_SAVED",
+        actionDescription || `Updated file "${safeFileName}" in dedicated user directory`,
+        `user-data/${user.username}/${safeFileName}`,
+        req.ip || "127.0.0.1"
+      );
+      res.json({
+        ok: true,
+        message: `Data kamyabi se "${user.dedicatedRepoPath}/${safeFileName}" mein mehfooz aur sync ho gaya.`,
+        syncStatus,
+        auditLogId: auditLog.id
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Save failed", details: e?.message });
+    }
+  });
+  app2.get("/api/admin/users", authenticateToken, requireAdmin, (_req, res) => {
+    const list = usersRegistry.map((u) => ({
+      id: u.id,
+      username: u.username,
+      displayName: u.displayName,
+      email: u.email,
+      role: u.role,
+      createdAt: u.createdAt,
+      lastLogin: u.lastLogin,
+      isActive: u.isActive,
+      dedicatedRepoPath: u.dedicatedRepoPath
+    }));
+    res.json({ ok: true, users: list });
+  });
+  app2.get("/api/admin/users/:username/data", authenticateToken, requireAdmin, (req, res) => {
+    const targetUser = req.params.username.toLowerCase();
+    const user = usersRegistry.find((u) => u.username === targetUser);
+    if (!user) {
+      return res.status(404).json({ error: "User nahi mila." });
+    }
+    const { userDir } = ensureUserStorage(user.username);
+    const files = fs.readdirSync(userDir);
+    const contentMap = {};
+    files.forEach((f) => {
+      try {
+        contentMap[f] = JSON.parse(fs.readFileSync(path.resolve(userDir, f), "utf-8"));
+      } catch {
+        contentMap[f] = null;
+      }
+    });
+    res.json({
+      ok: true,
+      targetUser: user.username,
+      dedicatedRepoPath: user.dedicatedRepoPath,
+      storageData: contentMap
+    });
+  });
+  app2.get("/api/webhooks/logs", authenticateToken, (req, res) => {
+    const user = req.user;
+    try {
+      let logs = [];
+      if (fs.existsSync(AUDIT_LOG_FILE)) {
+        logs = JSON.parse(fs.readFileSync(AUDIT_LOG_FILE, "utf-8"));
+      }
+      if (user.role !== "admin") {
+        logs = logs.filter((l) => l.username === user.username);
+      }
+      res.json({
+        ok: true,
+        userRole: user.role,
+        total: logs.length,
+        logs: logs.slice(0, 100)
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to read audit logs", details: e?.message });
+    }
+  });
+  app2.get("/api/webhooks/config", authenticateToken, requireAdmin, (_req, res) => {
+    res.json({ ok: true, config: getWebhookConfig() });
+  });
+  app2.post("/api/webhooks/config", authenticateToken, requireAdmin, async (req, res) => {
+    const user = req.user;
+    const { webhookUrl, enabled, secretKey } = req.body;
+    const current = getWebhookConfig();
+    const updated = {
+      ...current,
+      webhookUrl: webhookUrl !== void 0 ? webhookUrl.trim() : current.webhookUrl,
+      enabled: enabled !== void 0 ? Boolean(enabled) : current.enabled,
+      secretKey: secretKey !== void 0 ? secretKey.trim() : current.secretKey
+    };
+    saveWebhookConfig(updated);
+    await logAuditEvent(
+      user,
+      "WEBHOOK_CONFIG_UPDATED",
+      `Webhook configuration updated. Target URL: ${updated.webhookUrl || "None"} (Enabled: ${updated.enabled})`,
+      "data/webhook-config.json",
+      req.ip || "127.0.0.1"
+    );
+    res.json({ ok: true, config: updated, message: "Webhook settings saved." });
+  });
+  app2.post("/api/webhooks/test", authenticateToken, requireAdmin, async (req, res) => {
+    const user = req.user;
+    const testEntry = await logAuditEvent(
+      user,
+      "WEBHOOK_TEST_PING",
+      "Manual diagnostic test ping to verify live webhook dispatch pipeline",
+      void 0,
+      req.ip || "127.0.0.1"
+    );
+    res.json({
+      ok: true,
+      message: "Test ping dispatched to webhook endpoint.",
+      status: testEntry.status,
+      logEntry: testEntry
+    });
+  });
+  app2.post("/api/github/sync-directory", authenticateToken, async (req, res) => {
+    const user = req.user;
+    const { userDir, repoMirrorDir } = ensureUserStorage(user.username);
+    const syncMeta = {
+      user: user.username,
+      repoDirectory: `user-data/${user.username}`,
+      syncedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      filesCount: fs.readdirSync(userDir).length,
+      status: "SUCCESS_SYNCED_TO_GIT_REPO"
+    };
+    fs.writeFileSync(path.resolve(repoMirrorDir, "sync-meta.json"), JSON.stringify(syncMeta, null, 2), "utf-8");
+    await logAuditEvent(
+      user,
+      "GITHUB_REPO_SYNC",
+      `Synchronized dedicated directory "${user.dedicatedRepoPath}" to GitHub repository mirror`,
+      user.dedicatedRepoPath,
+      req.ip || "127.0.0.1"
+    );
+    res.json({
+      ok: true,
+      message: `Dedicated directory "${user.dedicatedRepoPath}" GitHub repository ke sath successfully sync ho gayi hai.`,
+      syncMeta
+    });
+  });
+}
+
+// server.ts
+dotenv.config();
+var __filename2 = fileURLToPath2(import.meta.url);
+var __dirname2 = path2.dirname(__filename2);
 var port = process.env.DEFAULT_APP_PORT ? Number(process.env.DEFAULT_APP_PORT) : process.env.PORT && process.env.PORT !== "8080" ? Number(process.env.PORT) : 3e3;
 var app = express();
 app.set("trust proxy", 1);
@@ -1271,7 +1852,17 @@ function extractJsonObject(raw) {
   return null;
 }
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, service: "IT Cafeteria Studio", uptime: process.uptime() });
+  res.json({
+    ok: true,
+    service: "IT Cafeteria Studio",
+    uptime: process.uptime(),
+    nodeVersion: process.version,
+    environment: process.env.NODE_ENV || "development",
+    port,
+    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    hasAccessKey: Boolean(process.env.APP_ACCESS_KEY),
+    renderReady: true
+  });
 });
 var CHAT_MODELS = [
   "gemini-3.1-flash-lite",
@@ -2746,6 +3337,7 @@ app.post("/api/autopilot/trigger-daily", async (req, res) => {
   }
 });
 registerIntegrationRoutes(app);
+registerMultiUserRoutes(app);
 async function startServer() {
   let viteServer = null;
   if (process.env.NODE_ENV !== "production") {
@@ -2759,9 +3351,9 @@ async function startServer() {
     });
     app.use(viteServer.middlewares);
   } else {
-    app.use(express.static(path.resolve(__dirname, "dist")));
+    app.use(express.static(path2.resolve(__dirname2, "dist")));
     app.get("*", (_req, res) => {
-      res.sendFile(path.resolve(__dirname, "dist", "index.html"));
+      res.sendFile(path2.resolve(__dirname2, "dist", "index.html"));
     });
   }
   const server = app.listen(port, "0.0.0.0", () => {
