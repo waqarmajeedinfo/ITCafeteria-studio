@@ -363,6 +363,8 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
     }
   });
   const [newResourceInput, setNewResourceInput] = useState('');
+  const [editingUrlIdx, setEditingUrlIdx] = useState<number | null>(null);
+  const [editingUrlText, setEditingUrlText] = useState<string>('');
   const [searchStrategy, setSearchStrategy] = useState<string>(() => {
     try {
       return localStorage.getItem('itcafeteria_search_strategy') || 'deep';
@@ -1342,148 +1344,161 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
   return (
     <div className="space-y-6">
       {/* Top Banner: Autonomous Logic Layer Control Center */}
-      <div className="relative rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border border-indigo-500/30 p-6 overflow-hidden shadow-2xl">
+      <div className="relative rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border border-indigo-500/30 p-5 sm:p-6 overflow-hidden shadow-2xl space-y-4">
         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-10 left-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="px-3 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-full text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
-                <Cpu className="w-3.5 h-3.5 text-cyan-400 animate-pulse" /> Autopilot Logic Layer v3.6
-              </span>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 border ${
-                isDaemonActive
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                  : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-              }`}>
-                <Radio className={`w-3 h-3 ${isDaemonActive ? 'text-emerald-400 animate-ping' : 'text-amber-400'}`} />
-                {isDaemonActive ? 'Autonomous Daemon: ACTIVE' : 'Daemon: PAUSED'}
-              </span>
-              <span className="text-xs text-slate-400 font-mono">
-                Cadence: {cadenceSeconds}s cycle (Next in: <strong className="text-cyan-400">{countdown}s</strong>)
-              </span>
-            </div>
-
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-              IT Cafeteria Autonomous Decision Engine
-            </h2>
-            <p className="text-slate-300 text-sm max-w-3xl leading-relaxed">
-              Yeh logic layer <strong>Agent Simulator</strong>, <strong>Content Calendar</strong>, aur <strong>Thumbnail Studio</strong> ko background task queue ke zariye aapas mein jodti hai. Yeh bina manual clicks ke khud faislay karti hai: auto-posting, metadata refinement, aur cross-studio sync background mein chalti rehti hai.
-            </p>
+        {/* Row 1: Badges, Title & Full-Width Description */}
+        <div className="relative z-10 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-3 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-full text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
+              <Cpu className="w-3.5 h-3.5 text-cyan-400 animate-pulse" /> Autopilot Logic Layer v3.6
+            </span>
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 border ${
+              isDaemonActive
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+            }`}>
+              <Radio className={`w-3 h-3 ${isDaemonActive ? 'text-emerald-400 animate-ping' : 'text-amber-400'}`} />
+              {isDaemonActive ? 'Autonomous Daemon: ACTIVE' : 'Daemon: PAUSED'}
+            </span>
+            <span className="text-xs text-slate-400 font-mono">
+              Cadence: {cadenceSeconds}s cycle (Next in: <strong className="text-cyan-400">{countdown}s</strong>)
+            </span>
           </div>
 
-          {/* Quick Daemon Controls */}
-          <div data-guide-target="autopilot-daemon-hud" className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-slate-950/80 p-4 rounded-xl border border-slate-800 shrink-0">
-            {/* Floating Overlay Button */}
-            <button
-              onClick={() => {
-                window.dispatchEvent(
-                  new CustomEvent('itcafeteria_open_assistant_overlay', {
-                    detail: { mode: 'span' }
-                  })
-                );
-              }}
-              data-guide-target="autopilot-overlay-btn"
-              className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-cyan-500/20 cursor-pointer transition-all border border-cyan-400/30"
-              title="Open floating adjustable overlay across active page"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-cyan-200 animate-pulse" />
-              <span>⚡ Open Floating Overlay</span>
-            </button>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+            IT Cafeteria Autonomous Decision Engine
+          </h2>
+          <p className="text-slate-300 text-sm leading-relaxed max-w-5xl">
+            Yeh logic layer <strong>Agent Simulator</strong>, <strong>Content Calendar</strong>, aur <strong>Thumbnail Studio</strong> ko background task queue ke zariye aapas mein jodti hai. Yeh bina manual clicks ke khud faislay karti hai: auto-posting, metadata refinement, aur cross-studio sync background mein chalti rehti hai.
+          </p>
+        </div>
 
-            {/* Autopilot Settings Dashboard (Inline) Button */}
-            <button
-              onClick={() => {
-                selfHealingEngine.healScrollLock(true);
-                setActiveTab('engine');
-                setTimeout(() => {
-                  const el = document.getElementById('autopilot-settings-dashboard');
-                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 100);
-              }}
-              data-guide-target="autopilot-settings-inline-btn"
-              className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-indigo-950 cursor-pointer transition-all border border-cyan-400/40"
-              title="Autopilot Settings Dashboard (JDs, Priorities & Search Rules) inline kholein"
-            >
-              <Sliders className="w-3.5 h-3.5 text-cyan-200" />
-              <span>⚙️ Autopilot Settings</span>
-            </button>
+        {/* Row 2: Structured Multi-Panel Control Deck */}
+        <div data-guide-target="autopilot-daemon-hud" className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+          {/* Card 1: Navigation & Studio Views */}
+          <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 flex flex-col justify-between space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> Studio Navigation &amp; Views
+            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent('itcafeteria_open_assistant_overlay', {
+                      detail: { mode: 'span' }
+                    })
+                  );
+                }}
+                data-guide-target="autopilot-overlay-btn"
+                className="flex-1 px-3 py-1.5 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-cyan-500/20 cursor-pointer transition-all border border-cyan-400/30"
+                title="Open floating adjustable overlay across active page"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-cyan-200 animate-pulse" />
+                <span>⚡ Floating Overlay</span>
+              </button>
 
-            {/* Autopilot Config Popup Modal Button */}
-            <button
-              onClick={() => setShowAutopilotConfigModal(true)}
-              data-guide-target="autopilot-config-manager-btn"
-              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-slate-700 hover:border-indigo-400/50"
-              title="Popup Modal Dialog mein Autopilot settings kholein"
-            >
-              <Tv className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="hidden sm:inline">Popup View</span>
-            </button>
+              <button
+                onClick={() => {
+                  selfHealingEngine.healScrollLock(true);
+                  setActiveTab('engine');
+                  setTimeout(() => {
+                    const el = document.getElementById('autopilot-settings-dashboard');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 100);
+                }}
+                data-guide-target="autopilot-settings-inline-btn"
+                className="flex-1 px-3 py-1.5 bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-indigo-950 cursor-pointer transition-all border border-cyan-400/40"
+                title="Autopilot Settings Dashboard (JDs, Priorities &amp; Search Rules) inline kholein"
+              >
+                <Sliders className="w-3.5 h-3.5 text-cyan-200" />
+                <span>⚙️ Settings</span>
+              </button>
 
-            <div className="h-10 w-px bg-slate-800 hidden sm:block" />
-
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Manual Control</span>
-              <div className="flex items-center gap-2">
-                {isDaemonActive ? (
-                  <button
-                    onClick={() => {
-                      setIsDaemonActive(false);
-                      window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
-                    }}
-                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-950 animate-pulse"
-                    title="Click to STOP Autopilot Daemon immediately"
-                  >
-                    <Square className="w-3.5 h-3.5 fill-current" />
-                    <span>STOP AUTOPILOT</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setIsDaemonActive(true);
-                      window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_start_all'));
-                    }}
-                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
-                    title="Click to Start Autopilot"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>Start Autopilot</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={forceSyncAll}
-                  disabled={isSyncingAll}
-                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/50 text-slate-200 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all font-semibold"
-                  title="Force Sync Cross-Studios"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isSyncingAll ? 'animate-spin' : ''}`} />
-                  <span>{isSyncingAll ? 'Syncing...' : 'Sync All'}</span>
-                </button>
-              </div>
+              <button
+                onClick={() => setShowAutopilotConfigModal(true)}
+                data-guide-target="autopilot-config-manager-btn"
+                className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all border border-slate-700 hover:border-indigo-400/50"
+                title="Popup Modal Dialog mein Autopilot settings kholein"
+              >
+                <Tv className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Popup</span>
+              </button>
             </div>
+          </div>
 
-            <div className="h-10 w-px bg-slate-800 hidden sm:block" />
+          {/* Card 2: Manual Daemon Engine Controls */}
+          <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 flex flex-col justify-between space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5 text-emerald-400" /> Autonomous Engine Controls
+            </span>
+            <div className="flex items-center gap-2">
+              {isDaemonActive ? (
+                <button
+                  onClick={() => {
+                    setIsDaemonActive(false);
+                    window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_stop_all'));
+                  }}
+                  className="flex-1 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-950 animate-pulse"
+                  title="Click to STOP Autopilot Daemon immediately"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                  <span>STOP AUTOPILOT</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsDaemonActive(true);
+                    window.dispatchEvent(new CustomEvent('itcafeteria_autopilot_start_all'));
+                  }}
+                  className="flex-1 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/20"
+                  title="Click to Start Autopilot"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Start Autopilot</span>
+                </button>
+              )}
 
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Autonomous Sprints</span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => enqueueNewSprint(3)}
-                  disabled={isWorkerBusy}
-                  className="px-2.5 py-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800/60 text-cyan-300 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-40"
-                >
-                  +3 Days
-                </button>
-                <button
-                  onClick={() => enqueueNewSprint(7)}
-                  disabled={isWorkerBusy}
-                  className="px-2.5 py-1.5 bg-blue-950/80 hover:bg-blue-900 border border-blue-800/60 text-blue-300 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-40"
-                >
-                  +7 Days
-                </button>
-              </div>
+              <button
+                onClick={forceSyncAll}
+                disabled={isSyncingAll}
+                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-cyan-500/50 text-slate-200 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all font-semibold"
+                title="Force Sync Cross-Studios"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isSyncingAll ? 'animate-spin' : ''}`} />
+                <span>{isSyncingAll ? 'Syncing...' : 'Sync All'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Card 3: Autonomous Queue Sprints */}
+          <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 flex flex-col justify-between space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Flame className="w-3.5 h-3.5 text-amber-400" /> Rapid Content Sprints
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => enqueueNewSprint(3)}
+                disabled={isWorkerBusy}
+                className="px-2.5 py-1.5 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800/60 text-cyan-300 rounded-xl text-xs font-medium cursor-pointer disabled:opacity-40 text-center"
+              >
+                +3 Days
+              </button>
+              <button
+                onClick={() => enqueueNewSprint(7)}
+                disabled={isWorkerBusy}
+                className="px-2.5 py-1.5 bg-blue-950/80 hover:bg-blue-900 border border-blue-800/60 text-blue-300 rounded-xl text-xs font-medium cursor-pointer disabled:opacity-40 text-center"
+              >
+                +7 Days
+              </button>
+              <button
+                onClick={() => enqueueNewSprint(14)}
+                disabled={isWorkerBusy}
+                className="px-2.5 py-1.5 bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-800/60 text-indigo-300 rounded-xl text-xs font-medium cursor-pointer disabled:opacity-40 text-center"
+              >
+                +14 Days
+              </button>
             </div>
           </div>
         </div>
@@ -3018,23 +3033,78 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
                   </button>
                 </div>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {priorityResources.map((res, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-lg p-2.5">
-                      <span className="font-mono text-cyan-300 truncate mr-2">{res}</span>
-                      <button
-                        onClick={() => {
-                          const updated = priorityResources.filter((_, i) => i !== idx);
-                          setPriorityResources(updated);
-                          try {
-                            localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
-                          } catch {}
-                        }}
-                        className="text-rose-400 hover:text-rose-300 text-xs font-semibold cursor-pointer shrink-0"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+                  {priorityResources.map((res, idx) => {
+                    const isEditing = editingUrlIdx === idx;
+
+                    if (isEditing) {
+                      return (
+                        <div key={idx} className="flex items-center gap-2 bg-slate-950 border border-cyan-500/50 rounded-lg p-2">
+                          <input
+                            type="text"
+                            value={editingUrlText}
+                            onChange={(e) => setEditingUrlText(e.target.value)}
+                            className="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:outline-none focus:border-cyan-400"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!editingUrlText.trim()) return;
+                              const updated = [...priorityResources];
+                              updated[idx] = editingUrlText.trim();
+                              setPriorityResources(updated);
+                              setEditingUrlIdx(null);
+                              try {
+                                localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
+                              } catch {}
+                            }}
+                            className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-bold cursor-pointer"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingUrlIdx(null)}
+                            className="px-2 py-1 bg-slate-800 text-slate-300 rounded text-xs cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={idx} className="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-lg p-2.5">
+                        <span className="font-mono text-cyan-300 truncate mr-2">{res}</span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingUrlIdx(idx);
+                              setEditingUrlText(res);
+                            }}
+                            className="p-1 rounded bg-slate-800 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                            title="Edit URL"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = priorityResources.filter((_, i) => i !== idx);
+                              setPriorityResources(updated);
+                              try {
+                                localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
+                              } catch {}
+                            }}
+                            className="text-rose-400 hover:text-rose-300 text-xs font-semibold cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

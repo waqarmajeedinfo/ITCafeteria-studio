@@ -18,7 +18,12 @@ import {
   Trash2,
   Sliders,
   Lock,
-  Edit3
+  Edit2,
+  Edit3,
+  Link,
+  Tag,
+  Save,
+  AlertCircle
 } from 'lucide-react';
 import { dirtyManager } from '../lib/dirtyStore';
 import { PUBLISHED_VIDEOS, CHANNEL_PROFILES } from '../data/channelData';
@@ -46,6 +51,20 @@ export interface StylePresetItem {
   id: string;
   label: string;
   description: string;
+}
+
+export interface ScriptPresetItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  instructions: string;
+}
+
+export interface CategoryRuleItem {
+  id: number | string;
+  name: string;
+  instructions: string;
+  boundCategoryIds?: number[];
 }
 
 export interface SimulatorConfig {
@@ -195,7 +214,7 @@ export const DEFAULT_STYLE_PRESETS: StylePresetItem[] = [
 /**
  * Screenshot 5: Agent Script Rules & Prompt Instructions Presets
  */
-export const IT_CAFETERIA_SCRIPT_RULE_PRESETS = [
+export const IT_CAFETERIA_SCRIPT_RULE_PRESETS: ScriptPresetItem[] = [
   {
     id: '10_scene_short',
     title: '10-Scene Short',
@@ -222,7 +241,7 @@ export const IT_CAFETERIA_SCRIPT_RULE_PRESETS = [
   }
 ];
 
-export const BEAUTY_HUB_SCRIPT_PRESETS = [
+export const BEAUTY_HUB_SCRIPT_PRESETS: ScriptPresetItem[] = [
   {
     id: 'beauty_10_scene',
     title: '10-Scene Beauty Short',
@@ -251,20 +270,20 @@ export const BEAUTY_HUB_SCRIPT_PRESETS = [
 
 export const SCRIPT_RULE_PRESETS = IT_CAFETERIA_SCRIPT_RULE_PRESETS;
 
-export const IT_CAFETERIA_10_CATEGORY_RULES = [
-  { id: 1, name: '1. AI & Smart Tech', instructions: 'Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.' },
-  { id: 2, name: '2. AI Workflows', instructions: 'Deep productivity and automation tutorial format. Structure: Business problem, Architecture and trigger breakdown, Step-by-step logic nodes, Live testing.' },
-  { id: 3, name: '3. AI Prompt Hacks', instructions: 'Slash commands, prompt formulas for realistic images, reverse prompt engineering, and workflow productivity shortcuts.' },
-  { id: 4, name: '4. PC & Windows Hacks', instructions: 'Extended format (10-15 scenes, 7-beat, 0.3s anchor). God mode, clipboard history (Win+V), graphics driver reset, speed boosts.' },
-  { id: 5, name: '5. New Tech Tutorials', instructions: 'Step-by-step UI walkthrough, zero prior coding knowledge needed, practical product review.' },
-  { id: 6, name: '6. Future Tech', instructions: 'Visionary tech breakthroughs, autonomous smart home agents, and positive future outlook.' },
-  { id: 7, name: '7. Secrets (WhatsApp, etc.)', instructions: 'Show actual tool in title/topic, hidden shortcuts, date-wise chat search, biometric chat lock.' },
-  { id: 8, name: '8. Income & Skills', instructions: 'Passive income ideas, store management, freelance skills, with strict reminder of no income guarantees.' },
-  { id: 9, name: '9. YT Automation (16:9)', instructions: '16:9 format mandatory, multi-agent AI script systems, retention optimization, high-CTR storytelling.' },
-  { id: 10, name: '10. Custom Search', instructions: 'User-driven search query and research grounding with prioritized external links and web insights.' }
+export const IT_CAFETERIA_10_CATEGORY_RULES: CategoryRuleItem[] = [
+  { id: 1, name: '1. AI & Smart Tech', instructions: 'Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.', boundCategoryIds: [1] },
+  { id: 2, name: '2. AI Workflows', instructions: 'Deep productivity and automation tutorial format. Structure: Business problem, Architecture and trigger breakdown, Step-by-step logic nodes, Live testing.', boundCategoryIds: [2] },
+  { id: 3, name: '3. AI Prompt Hacks', instructions: 'Slash commands, prompt formulas for realistic images, reverse prompt engineering, and workflow productivity shortcuts.', boundCategoryIds: [3] },
+  { id: 4, name: '4. PC & Windows Hacks', instructions: 'Extended format (10-15 scenes, 7-beat, 0.3s anchor). God mode, clipboard history (Win+V), graphics driver reset, speed boosts.', boundCategoryIds: [4] },
+  { id: 5, name: '5. New Tech Tutorials', instructions: 'Step-by-step UI walkthrough, zero prior coding knowledge needed, practical product review.', boundCategoryIds: [5] },
+  { id: 6, name: '6. Future Tech', instructions: 'Visionary tech breakthroughs, autonomous smart home agents, and positive future outlook.', boundCategoryIds: [6] },
+  { id: 7, name: '7. Secrets (WhatsApp, etc.)', instructions: 'Show actual tool in title/topic, hidden shortcuts, date-wise chat search, biometric chat lock.', boundCategoryIds: [7] },
+  { id: 8, name: '8. Income & Skills', instructions: 'Passive income ideas, store management, freelance skills, with strict reminder of no income guarantees.', boundCategoryIds: [8] },
+  { id: 9, name: '9. YT Automation (16:9)', instructions: '16:9 format mandatory, multi-agent AI script systems, retention optimization, high-CTR storytelling.', boundCategoryIds: [9] },
+  { id: 10, name: '10. Custom Search', instructions: 'User-driven search query and research grounding with prioritized external links and web insights.', boundCategoryIds: [10] }
 ];
 
-export function getScriptRulePresetsForProfile(profile?: any) {
+export function getScriptRulePresetsForProfile(profile?: any): ScriptPresetItem[] {
   const niche = (profile?.niche || '').toLowerCase();
   const id = (profile?.id || '').toLowerCase();
   if (id.includes('beauty') || niche.includes('beauty') || niche.includes('grooming') || niche.includes('makeup')) {
@@ -273,7 +292,7 @@ export function getScriptRulePresetsForProfile(profile?: any) {
   return IT_CAFETERIA_SCRIPT_RULE_PRESETS;
 }
 
-export function getCategoryRulesForProfile(profile?: any) {
+export function getCategoryRulesForProfile(profile?: any): CategoryRuleItem[] {
   if (!profile || !Array.isArray(profile.categories) || profile.categories.length === 0) {
     return IT_CAFETERIA_10_CATEGORY_RULES;
   }
@@ -282,9 +301,48 @@ export function getCategoryRulesForProfile(profile?: any) {
     return {
       id: cat.id,
       name: `${cat.id}. ${cat.name}`,
-      instructions: existingRule?.instructions || `Professional ${profile.name} tutorial on ${cat.name}. Structure: Engaging hook, practical demonstration, common mistakes warning, clear value delivery in Roman Urdu/English mix.`
+      instructions: existingRule?.instructions || `Professional ${profile.name} tutorial on ${cat.name}. Structure: Engaging hook, practical demonstration, common mistakes warning, clear value delivery in Roman Urdu/English mix.`,
+      boundCategoryIds: [cat.id]
     };
   });
+}
+
+export function loadCustomScriptPresets(channelId: string, profile?: any): ScriptPresetItem[] {
+  const defaults = getScriptRulePresetsForProfile(profile);
+  if (typeof window === 'undefined') return defaults;
+  try {
+    const raw = localStorage.getItem(`itcafeteria_custom_script_presets_${channelId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return defaults;
+}
+
+export function saveCustomScriptPresets(channelId: string, presets: ScriptPresetItem[]) {
+  try {
+    localStorage.setItem(`itcafeteria_custom_script_presets_${channelId}`, JSON.stringify(presets));
+  } catch {}
+}
+
+export function loadCustomCategoryRules(channelId: string, profile?: any): CategoryRuleItem[] {
+  const defaults = getCategoryRulesForProfile(profile);
+  if (typeof window === 'undefined') return defaults;
+  try {
+    const raw = localStorage.getItem(`itcafeteria_custom_category_rules_${channelId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return defaults;
+}
+
+export function saveCustomCategoryRules(channelId: string, rules: CategoryRuleItem[]) {
+  try {
+    localStorage.setItem(`itcafeteria_custom_category_rules_${channelId}`, JSON.stringify(rules));
+  } catch {}
 }
 
 export const DEFAULT_SIMULATOR_CONFIG: SimulatorConfig = {
@@ -356,12 +414,40 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
   const [channels, setChannels] = useState<Record<string, ExtendedChannelProfile>>(loadAllChannels);
   const [selectedChannelId, setSelectedChannelId] = useState<string>(activeChannelId || 'itcafeteria');
   const [local, setLocal] = useState<SimulatorConfig>(config);
-  const [savedToast, setSavedToast] = useState(false);
+  const [savedToast, setSavedToast] = useState<string | null>(null);
   const [activeRulePattern, setActiveRulePattern] = useState<string>('bug_security');
+
+  // Script Presets (Top row of 4)
+  const currentProfile = channels[selectedChannelId] || channels['itcafeteria'];
+  const [scriptPresets, setScriptPresets] = useState<ScriptPresetItem[]>(() =>
+    loadCustomScriptPresets(selectedChannelId, currentProfile)
+  );
+
+  // Category Rules & Multi-Category Binds (Bottom rows)
+  const [categoryRules, setCategoryRules] = useState<CategoryRuleItem[]>(() =>
+    loadCustomCategoryRules(selectedChannelId, currentProfile)
+  );
+
+  // Modal Editing States
+  const [editingPreset, setEditingPreset] = useState<ScriptPresetItem | null>(null);
+  const [editPresetTitle, setEditPresetTitle] = useState('');
+  const [editPresetSubtitle, setEditPresetSubtitle] = useState('');
+  const [editPresetInstructions, setEditPresetInstructions] = useState('');
+
+  const [editingCategoryRule, setEditingCategoryRule] = useState<CategoryRuleItem | null>(null);
+  const [editCatRuleName, setEditCatRuleName] = useState('');
+  const [editCatRuleInstructions, setEditCatRuleInstructions] = useState('');
+  const [editCatRuleBoundIds, setEditCatRuleBoundIds] = useState<number[]>([]);
+
+  const [showAddRuleModal, setShowAddRuleModal] = useState(false);
+  const [newRuleName, setNewRuleName] = useState('');
+  const [newRuleInstructions, setNewRuleInstructions] = useState('');
+  const [newRuleBoundIds, setNewRuleBoundIds] = useState<number[]>([]);
 
   // Sync when activeChannelId or config changes
   useEffect(() => {
-    setChannels(loadAllChannels());
+    const loadedChannels = loadAllChannels();
+    setChannels(loadedChannels);
     const targetChannel = activeChannelId || selectedChannelId || 'itcafeteria';
     setSelectedChannelId(targetChannel);
     const eng = getEngineConfigForChannel(targetChannel);
@@ -374,6 +460,10 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
       flowPromptFormat: eng.flowPromptFormat || config.flowPromptFormat || 'split_screen',
       customInstructions: eng.customInstructions || config.customInstructions || ''
     });
+
+    const prof = loadedChannels[targetChannel] || loadedChannels['itcafeteria'];
+    setScriptPresets(loadCustomScriptPresets(targetChannel, prof));
+    setCategoryRules(loadCustomCategoryRules(targetChannel, prof));
   }, [activeChannelId, isOpen]);
 
   const handleChannelSelect = (chId: string) => {
@@ -395,6 +485,9 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
       customInstructions: eng.customInstructions || (isBeauty ? defaultBeautyInstruction : defaultTechInstruction)
     }));
     setActiveRulePattern(isBeauty ? 'beauty_10_scene' : '10_scene_short');
+
+    setScriptPresets(loadCustomScriptPresets(chId, prof));
+    setCategoryRules(loadCustomCategoryRules(chId, prof));
   };
 
   // Lock scroll
@@ -430,9 +523,9 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
       autoQueueSync: local.autoQueueSync
     });
 
-    setSavedToast(true);
+    setSavedToast('Settings saved successfully!');
     setTimeout(() => {
-      setSavedToast(false);
+      setSavedToast(null);
       onClose();
     }, 600);
   };
@@ -450,23 +543,141 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
     }));
     onReset();
     saveSimulatorConfig(DEFAULT_SIMULATOR_CONFIG);
+
+    const defaultPresets = getScriptRulePresetsForProfile(currentProfile);
+    const defaultRules = getCategoryRulesForProfile(currentProfile);
+    setScriptPresets(defaultPresets);
+    setCategoryRules(defaultRules);
+    saveCustomScriptPresets(selectedChannelId, defaultPresets);
+    saveCustomCategoryRules(selectedChannelId, defaultRules);
+    setSavedToast('Reset to system defaults!');
+    setTimeout(() => setSavedToast(null), 2500);
   };
 
-  const selectRulePattern = (preset: typeof SCRIPT_RULE_PRESETS[0]) => {
+  const selectRulePattern = (preset: ScriptPresetItem) => {
     setActiveRulePattern(preset.id);
     updateField('customInstructions', preset.instructions);
   };
 
+  // Handle Opening Preset Editor
+  const startEditPreset = (preset: ScriptPresetItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingPreset(preset);
+    setEditPresetTitle(preset.title);
+    setEditPresetSubtitle(preset.subtitle);
+    setEditPresetInstructions(preset.instructions);
+  };
+
+  // Save Preset Edit
+  const handleSavePresetEdit = () => {
+    if (!editingPreset) return;
+    const updated = scriptPresets.map((p) =>
+      p.id === editingPreset.id
+        ? {
+            ...p,
+            title: editPresetTitle.trim() || p.title,
+            subtitle: editPresetSubtitle.trim() || p.subtitle,
+            instructions: editPresetInstructions.trim() || p.instructions
+          }
+        : p
+    );
+    setScriptPresets(updated);
+    saveCustomScriptPresets(selectedChannelId, updated);
+
+    // If currently active preset was edited, update the prompt too!
+    if (activeRulePattern === editingPreset.id) {
+      updateField('customInstructions', editPresetInstructions.trim() || editingPreset.instructions);
+    }
+
+    setEditingPreset(null);
+    setSavedToast(`Preset "${editPresetTitle}" saved!`);
+    setTimeout(() => setSavedToast(null), 2500);
+  };
+
+  // Handle Opening Category Rule & Multi-Bind Editor
+  const startEditCategoryRule = (rule: CategoryRuleItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingCategoryRule(rule);
+    setEditCatRuleName(rule.name);
+    setEditCatRuleInstructions(rule.instructions);
+    setEditCatRuleBoundIds(rule.boundCategoryIds && rule.boundCategoryIds.length > 0 ? [...rule.boundCategoryIds] : [Number(rule.id) || 1]);
+  };
+
+  // Toggle Category Binding in Multi-Select
+  const toggleCategoryBinding = (catId: number) => {
+    setEditCatRuleBoundIds((prev) =>
+      prev.includes(catId) ? prev.filter((id) => id !== catId) : [...prev, catId].sort((a, b) => a - b)
+    );
+  };
+
+  // Save Category Rule Edit & Category Binds
+  const handleSaveCategoryRuleEdit = () => {
+    if (!editingCategoryRule) return;
+    const updated = categoryRules.map((r) =>
+      r.id === editingCategoryRule.id
+        ? {
+            ...r,
+            name: editCatRuleName.trim() || r.name,
+            instructions: editCatRuleInstructions.trim() || r.instructions,
+            boundCategoryIds: editCatRuleBoundIds.length > 0 ? editCatRuleBoundIds : [Number(r.id) || 1]
+          }
+        : r
+    );
+    setCategoryRules(updated);
+    saveCustomCategoryRules(selectedChannelId, updated);
+
+    setEditingCategoryRule(null);
+    setSavedToast(`Category rule & bindings saved for ${editCatRuleBoundIds.length} categories!`);
+    setTimeout(() => setSavedToast(null), 3000);
+  };
+
+  // Save New Custom Category Rule
+  const handleSaveNewCategoryRule = () => {
+    if (!newRuleName.trim()) return;
+    const nextId = Date.now();
+    const newRule: CategoryRuleItem = {
+      id: nextId,
+      name: newRuleName.trim(),
+      instructions: newRuleInstructions.trim() || 'Custom instructions for target categories.',
+      boundCategoryIds: newRuleBoundIds.length > 0 ? newRuleBoundIds : [1]
+    };
+    const updated = [...categoryRules, newRule];
+    setCategoryRules(updated);
+    saveCustomCategoryRules(selectedChannelId, updated);
+    setShowAddRuleModal(false);
+    setNewRuleName('');
+    setNewRuleInstructions('');
+    setNewRuleBoundIds([]);
+    setSavedToast(`New rule "${newRule.name}" bound to categories: ${newRule.boundCategoryIds.join(', ')}`);
+    setTimeout(() => setSavedToast(null), 3000);
+  };
+
   if (!isOpen) return null;
 
-  const currentProfile = channels[selectedChannelId] || channels['itcafeteria'];
   const charCount = local.customInstructions.length;
   const wordCount = local.customInstructions.trim() ? local.customInstructions.trim().split(/\s+/).length : 0;
   const currentTolerance = DUPLICATE_TOLERANCE_OPTIONS.find((o) => o.id === local.duplicateStrictness) || DUPLICATE_TOLERANCE_OPTIONS[0];
 
+  // Available categories list for binding
+  const availableCategories: Array<{ id: number; name: string }> =
+    currentProfile?.categories && Array.isArray(currentProfile.categories) && currentProfile.categories.length > 0
+      ? currentProfile.categories
+      : [
+          { id: 1, name: 'AI & Smart Tech' },
+          { id: 2, name: 'AI Workflows' },
+          { id: 3, name: 'AI Prompt Hacks' },
+          { id: 4, name: 'PC & Windows Hacks' },
+          { id: 5, name: 'New Tech Tutorials' },
+          { id: 6, name: 'Future Tech' },
+          { id: 7, name: 'Secrets (WhatsApp, etc.)' },
+          { id: 8, name: 'Income & Skills' },
+          { id: 9, name: 'YT Automation (16:9)' },
+          { id: 10, name: 'Custom Search' }
+        ];
+
   const modalContent = (
-    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl shadow-blue-950/80 overflow-hidden overscroll-contain text-slate-100">
+    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-y-auto animate-in fade-in duration-200">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl shadow-blue-950/80 overflow-hidden overscroll-contain text-slate-100 my-auto">
         {/* Modal Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
@@ -484,7 +695,7 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Multi-Agent Story Engine ke rules, dialect, persona aur prompt structure har channel ke mutabiq alag save hote hain.
+                Multi-Agent Story Engine ke rules, script presets, aur category binds har channel ke mutabiq alag save hote hain.
               </p>
             </div>
           </div>
@@ -517,6 +728,18 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
 
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs">
+          {savedToast && (
+            <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 rounded-xl text-emerald-200 text-xs font-semibold flex items-center justify-between gap-2 shadow-lg animate-in fade-in">
+              <span className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                {savedToast}
+              </span>
+              <button onClick={() => setSavedToast(null)} className="text-emerald-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* Baseline Tag Status */}
           <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
@@ -560,7 +783,7 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
                 <select
                   value={local.defaultSceneCount}
                   onChange={(e) => updateField('defaultSceneCount', Number(e.target.value))}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
                 >
                   {DEFAULT_SCENE_PRESETS.map((p) => (
                     <option key={p.id} value={p.count}>
@@ -584,7 +807,7 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
                 <select
                   value={local.duplicateStrictness}
                   onChange={(e) => updateField('duplicateStrictness', e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
                 >
                   {DUPLICATE_TOLERANCE_OPTIONS.map((opt) => (
                     <option key={opt.id} value={opt.id}>
@@ -600,12 +823,12 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
               {/* Dialect & Cadence */}
               <div>
                 <label className="text-slate-300 font-semibold block mb-1.5 text-xs">
-                  Dialect & Cadence
+                  Dialect &amp; Cadence
                 </label>
                 <select
                   value={local.dialectTone}
                   onChange={(e) => updateField('dialectTone', e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
                 >
                   {DEFAULT_DIALECT_PRESETS.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -623,7 +846,7 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
                 <select
                   value={local.flowPromptFormat}
                   onChange={(e) => updateField('flowPromptFormat', e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
                 >
                   {DEFAULT_STYLE_PRESETS.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -641,7 +864,7 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
                   type="checkbox"
                   checked={local.autoQueueSync}
                   onChange={(e) => updateField('autoQueueSync', e.target.checked)}
-                  className="rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-400 h-4 w-4"
+                  className="rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-400 h-4 w-4 cursor-pointer"
                 />
                 <span className="text-xs">
                   Generate hote hi kahani ko Target Queue aur Content Calendar mein auto-save karein
@@ -651,63 +874,151 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
           </div>
 
           {/* Agent Script Rules & Prompt Instructions */}
-          <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+          <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-4">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-cyan-400" />
                 <h4 className="font-bold text-white text-xs uppercase tracking-wider">
-                  Agent Script Rules & Prompt Instructions
+                  Agent Script Rules &amp; Prompt Instructions
                 </h4>
               </div>
               <span className="text-[10px] text-cyan-400 font-mono">
-                Click any pattern below to load, or type custom instructions:
+                Click any preset to apply, or click Edit to modify prompts:
               </span>
             </div>
 
-            {/* 4 Clickable Channel-Adaptive Pattern Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-              {getScriptRulePresetsForProfile(currentProfile).map((preset) => {
-                const isActive = activeRulePattern === preset.id;
-                return (
-                  <div
-                    key={preset.id}
-                    onClick={() => selectRulePattern(preset)}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer relative ${
-                      isActive
-                        ? 'bg-slate-900 border-cyan-400 ring-1 ring-cyan-400/50 shadow-md shadow-cyan-950'
-                        : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
-                    }`}
-                  >
-                    {isActive && (
-                      <span className="w-2 h-2 rounded-full bg-cyan-400 absolute top-2.5 right-2.5 shadow-sm shadow-cyan-400" />
-                    )}
-                    <div className="font-bold text-white text-xs mb-1 line-clamp-1">{preset.title}</div>
-                    <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">{preset.subtitle}</p>
-                  </div>
-                );
-              })}
+            {/* Row 1: 4 Script Presets with Individual Edit Buttons */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400 text-[11px] font-semibold">
+                  Script Presets (Click card to load • Click ✏️ Edit to modify):
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                {scriptPresets.map((preset) => {
+                  const isActive = activeRulePattern === preset.id;
+                  return (
+                    <div
+                      key={preset.id}
+                      onClick={() => selectRulePattern(preset)}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer relative group ${
+                        isActive
+                          ? 'bg-slate-900 border-cyan-400 ring-1 ring-cyan-400/50 shadow-md shadow-cyan-950'
+                          : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-1 mb-1">
+                        <div className="font-bold text-white text-xs line-clamp-1 pr-1">{preset.title}</div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {isActive && (
+                            <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => startEditPreset(preset, e)}
+                            className="p-1 rounded-md bg-slate-800/80 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition-colors cursor-pointer"
+                            title={`Edit "${preset.title}" Preset`}
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">{preset.subtitle}</p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Dynamic Category-Specific Script Rules & Automatic Binds */}
-            <div className="pt-3 border-t border-slate-800">
-              <div className="text-xs font-bold text-cyan-300 mb-2 flex items-center justify-between">
-                <span>
-                  {getCategoryRulesForProfile(currentProfile).length} Category-Specific Script Rules & Automatic Binds ({currentProfile?.name || 'Channel'} Modules):
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">Click card to apply rule</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
-                {getCategoryRulesForProfile(currentProfile).map((catRule: { id: number; name: string; instructions: string }) => (
-                  <div
-                    key={catRule.id}
-                    onClick={() => updateField('customInstructions', catRule.instructions)}
-                    className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-cyan-500/50 transition-all cursor-pointer text-left"
-                    title={`Click to bind: ${catRule.name}`}
+            {/* Row 2 & 3: Category-Specific Script Rules & Multi-Category Binding */}
+            <div className="pt-3 border-t border-slate-800 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>
+                    {categoryRules.length} Category-Specific Script Rules &amp; Multi-Category Binds ({currentProfile?.name || 'Channel'}):
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewRuleName('');
+                      setNewRuleInstructions('');
+                      setNewRuleBoundIds([1]);
+                      setShowAddRuleModal(true);
+                    }}
+                    className="px-2.5 py-1 bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-200 border border-cyan-500/40 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
                   >
-                    <div className="font-bold text-cyan-200 text-[11px] mb-0.5 truncate">{catRule.name}</div>
-                    <p className="text-[10px] text-slate-400 line-clamp-2">{catRule.instructions}</p>
-                  </div>
-                ))}
+                    <Plus className="w-3 h-3" />
+                    <span>+ Add Custom Rule</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const defaults = getCategoryRulesForProfile(currentProfile);
+                      setCategoryRules(defaults);
+                      saveCustomCategoryRules(selectedChannelId, defaults);
+                      setSavedToast('Category rules reset to default mappings.');
+                      setTimeout(() => setSavedToast(null), 2500);
+                    }}
+                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Reset category rules and bindings to defaults"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                    <span>Reset Binds</span>
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-slate-400 leading-relaxed">
+                Click any card to apply prompt instructions. Click <strong>Edit &amp; Bind</strong> to modify the rule or bind 1 rule to multiple categories (e.g. 2, 3 or more categories ek sath bind karein).
+              </p>
+
+              {/* Grid of Category Rules */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
+                {categoryRules.map((catRule) => {
+                  const boundCount = catRule.boundCategoryIds?.length || 0;
+                  const boundLabels = (catRule.boundCategoryIds || []).map((id) => `Cat ${id}`).join(', ');
+
+                  return (
+                    <div
+                      key={catRule.id}
+                      onClick={() => {
+                        updateField('customInstructions', catRule.instructions);
+                        setSavedToast(`Applied rule: "${catRule.name}" (Bound to: ${boundLabels || 'Category ' + catRule.id})`);
+                        setTimeout(() => setSavedToast(null), 2500);
+                      }}
+                      className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-cyan-500/60 hover:bg-slate-900 transition-all cursor-pointer text-left relative group flex flex-col justify-between"
+                      title={`Click to apply rule: ${catRule.name}`}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-1 mb-1">
+                          <div className="font-bold text-cyan-200 text-[11px] truncate">{catRule.name}</div>
+                          <button
+                            type="button"
+                            onClick={(e) => startEditCategoryRule(catRule, e)}
+                            className="p-1 rounded bg-slate-800/90 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/50 transition-colors shrink-0 cursor-pointer"
+                            title={`Edit rule and bind categories: ${catRule.name}`}
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-400 line-clamp-2 leading-snug">{catRule.instructions}</p>
+                      </div>
+
+                      {/* Bound Categories Strip */}
+                      <div className="mt-2 pt-1.5 border-t border-slate-800 flex items-center justify-between text-[9px]">
+                        <span className="font-mono text-indigo-300 truncate" title={`Bound: ${boundLabels}`}>
+                          🔗 {boundCount > 1 ? `${boundCount} Binds (${boundLabels})` : boundLabels || `Cat ${catRule.id}`}
+                        </span>
+                        <span className="text-slate-500 group-hover:text-cyan-400 transition-colors font-semibold">
+                          Apply
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -728,7 +1039,7 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-between items-center">
+        <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-between items-center shrink-0">
           <button
             type="button"
             onClick={handleResetDefaults}
@@ -757,6 +1068,331 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* SUB-MODAL 1: Edit Script Preset (Row 1 of 4 Cards) */}
+      {editingPreset && (
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-cyan-500/50 rounded-2xl w-full max-w-xl p-5 shadow-2xl space-y-4 text-xs text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-cyan-400" />
+                <h4 className="font-bold text-white text-sm">Edit Script Preset ({editingPreset.title})</h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingPreset(null)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Preset Title</label>
+                <input
+                  type="text"
+                  value={editPresetTitle}
+                  onChange={(e) => setEditPresetTitle(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-400 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Subtitle / Quick Summary</label>
+                <input
+                  type="text"
+                  value={editPresetSubtitle}
+                  onChange={(e) => setEditPresetSubtitle(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Prompt Instructions Template</label>
+                <textarea
+                  value={editPresetInstructions}
+                  onChange={(e) => setEditPresetInstructions(e.target.value)}
+                  rows={5}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white font-mono focus:outline-none focus:border-cyan-400 leading-relaxed resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setEditingPreset(null)}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePresetEdit}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-cyan-950 cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save Preset Changes</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-MODAL 2: Edit Category Rule & Multi-Category Binding */}
+      {editingCategoryRule && (
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-cyan-500/50 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col p-5 shadow-2xl space-y-4 text-xs text-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <Link className="w-4 h-4 text-cyan-400" />
+                <div>
+                  <h4 className="font-bold text-white text-sm">Edit Rule &amp; Bind to Multiple Categories</h4>
+                  <p className="text-[11px] text-slate-400">
+                    Ek hi rule ko aap 2, 3 ya ziada categories ke sath bind kar sakte hain.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCategoryRule(null)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Rule Name / Module Title</label>
+                <input
+                  type="text"
+                  value={editCatRuleName}
+                  onChange={(e) => setEditCatRuleName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-400 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Rule Prompt Instructions</label>
+                <textarea
+                  value={editCatRuleInstructions}
+                  onChange={(e) => setEditCatRuleInstructions(e.target.value)}
+                  rows={4}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white font-mono focus:outline-none focus:border-cyan-400 leading-relaxed resize-none"
+                />
+              </div>
+
+              {/* Multi-Category Binding Checklist */}
+              <div className="p-3.5 bg-slate-950 border border-indigo-500/30 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-200 font-bold flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Bind this Rule to Categories (Select all that apply):</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditCatRuleBoundIds(availableCategories.map((c) => c.id))}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-slate-600">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditCatRuleBoundIds([])}
+                      className="text-[10px] text-slate-400 hover:text-white font-semibold"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-slate-400">
+                  Currently bound to <strong>{editCatRuleBoundIds.length}</strong> categories. In categories par yeh rule auto-apply hoga:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 max-h-48 overflow-y-auto">
+                  {availableCategories.map((cat) => {
+                    const isChecked = editCatRuleBoundIds.includes(cat.id);
+                    return (
+                      <label
+                        key={cat.id}
+                        onClick={() => toggleCategoryBinding(cat.id)}
+                        className={`p-2 rounded-lg border flex items-center gap-2.5 cursor-pointer transition-all ${
+                          isChecked
+                            ? 'bg-cyan-950/60 border-cyan-400 text-white'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}} // handled by label onClick
+                          className="rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-400 h-3.5 w-3.5"
+                        />
+                        <span className="font-mono text-cyan-300 font-bold shrink-0">#{cat.id}</span>
+                        <span className="truncate text-xs">{cat.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t border-slate-800 shrink-0">
+              <span className="text-[10px] font-mono text-slate-400">
+                Bound: {editCatRuleBoundIds.length > 0 ? editCatRuleBoundIds.map((id) => `#${id}`).join(', ') : 'None'}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingCategoryRule(null)}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCategoryRuleEdit}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-cyan-950 cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Rule &amp; Category Binds</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-MODAL 3: Add New Custom Category Rule */}
+      {showAddRuleModal && (
+        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-cyan-500/50 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col p-5 shadow-2xl space-y-4 text-xs text-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <Plus className="w-4 h-4 text-cyan-400" />
+                <div>
+                  <h4 className="font-bold text-white text-sm">Naya Category Script Rule Shamil Karein</h4>
+                  <p className="text-[11px] text-slate-400">
+                    Naya rule banayein aur ek ya ziada categories ke sath bind karein.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddRuleModal(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Rule Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. AI Video & Automation Master Rule"
+                  value={newRuleName}
+                  onChange={(e) => setNewRuleName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-400 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 font-semibold block mb-1">Script &amp; Prompt Instructions</label>
+                <textarea
+                  placeholder="Detailed multi-scene instructions for this category group..."
+                  value={newRuleInstructions}
+                  onChange={(e) => setNewRuleInstructions(e.target.value)}
+                  rows={4}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white font-mono focus:outline-none focus:border-cyan-400 leading-relaxed resize-none"
+                />
+              </div>
+
+              {/* Multi-Category Binding Selection */}
+              <div className="p-3.5 bg-slate-950 border border-indigo-500/30 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-200 font-bold flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Select Categories to Bind:</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewRuleBoundIds(availableCategories.map((c) => c.id))}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-slate-600">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setNewRuleBoundIds([])}
+                      className="text-[10px] text-slate-400 hover:text-white font-semibold"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 max-h-48 overflow-y-auto">
+                  {availableCategories.map((cat) => {
+                    const isChecked = newRuleBoundIds.includes(cat.id);
+                    return (
+                      <label
+                        key={cat.id}
+                        onClick={() => {
+                          setNewRuleBoundIds((prev) =>
+                            prev.includes(cat.id) ? prev.filter((id) => id !== cat.id) : [...prev, cat.id].sort((a, b) => a - b)
+                          );
+                        }}
+                        className={`p-2 rounded-lg border flex items-center gap-2.5 cursor-pointer transition-all ${
+                          isChecked
+                            ? 'bg-cyan-950/60 border-cyan-400 text-white'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-400 h-3.5 w-3.5"
+                        />
+                        <span className="font-mono text-cyan-300 font-bold shrink-0">#{cat.id}</span>
+                        <span className="truncate text-xs">{cat.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowAddRuleModal(false)}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveNewCategoryRule}
+                disabled={!newRuleName.trim()}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-95 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-cyan-950 cursor-pointer disabled:opacity-50"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create &amp; Bind Rule</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

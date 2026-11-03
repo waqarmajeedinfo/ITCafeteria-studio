@@ -15,6 +15,9 @@ import {
   Sparkles,
   ShieldCheck,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
   CheckCircle2
 } from 'lucide-react';
 import type { TabType } from '../App';
@@ -188,6 +191,55 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     };
     setLocalConfig(next);
     markDirty(next);
+  // Move an entire top-level menu group left/right (Reorder top navbar)
+  const handleMoveGroup = (index: number, direction: 'left' | 'right') => {
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= localConfig.groups.length) return;
+
+    const currentGroup = localConfig.groups[index];
+    if (currentGroup.isLocked) {
+      setLockWarning(`"${currentGroup.label}" LOCKED hai. Reorder karne ke liye pehle unlock karein.`);
+      return;
+    }
+
+    const targetGroup = localConfig.groups[targetIndex];
+    if (targetGroup.isLocked) {
+      setLockWarning(`"${targetGroup.label}" LOCKED hai. Reorder karne ke liye isay bhi unlock karein.`);
+      return;
+    }
+
+    setLockWarning(null);
+    const nextGroups = [...localConfig.groups];
+    const [moved] = nextGroups.splice(index, 1);
+    nextGroups.splice(targetIndex, 0, moved);
+
+    const next = { ...localConfig, groups: nextGroups };
+    setLocalConfig(next);
+    markDirty(next);
+  };
+
+  const handleSetGroupPosition = (currentIndex: number, newIndex: number) => {
+    if (newIndex === currentIndex || newIndex < 0 || newIndex >= localConfig.groups.length) return;
+    const currentGroup = localConfig.groups[currentIndex];
+    if (currentGroup.isLocked) {
+      setLockWarning(`"${currentGroup.label}" LOCKED hai. Reorder karne ke liye pehle unlock karein.`);
+      return;
+    }
+
+    const targetGroup = localConfig.groups[newIndex];
+    if (targetGroup.isLocked) {
+      setLockWarning(`"${targetGroup.label}" LOCKED hai. Reorder karne ke liye isay bhi unlock karein.`);
+      return;
+    }
+
+    setLockWarning(null);
+    const nextGroups = [...localConfig.groups];
+    const [moved] = nextGroups.splice(currentIndex, 1);
+    nextGroups.splice(newIndex, 0, moved);
+
+    const next = { ...localConfig, groups: nextGroups };
+    setLocalConfig(next);
+    markDirty(next);
   };
 
   // Toggle Lock for an Item
@@ -358,7 +410,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-y-auto animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-4xl max-h-[85vh] h-full sm:h-auto flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden overscroll-contain text-slate-100">
 
         {/* Header */}
@@ -369,13 +421,13 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-white text-base">Menu Bar Handler & Customizer</h3>
+                <h3 className="font-bold text-white text-base">Menu Bar Handler &amp; Customizer</h3>
                 <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-mono">
-                  WordPress Style
+                  Movable Top Bar
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Menus ko rename karein, sub-menu items ko shift/move karein, aur ghalti se bachne ke liye Lock/Unlock karein.
+                Menus ko rename karein, items ko shift karein, aur Main Top-Bar Menus ko move/reorder (#1, #2, #3, #4) karein.
               </p>
             </div>
           </div>
@@ -422,7 +474,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll p-4 sm:p-5 space-y-4">
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {localConfig.groups.map((group) => {
+            {localConfig.groups.map((group, groupIndex) => {
               const groupItems = localConfig.items.filter((i) => i.groupId === group.id);
 
               return (
@@ -434,11 +486,20 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                       : 'bg-slate-900/90 border-cyan-500/40 shadow-lg shadow-cyan-950/30'
                   }`}
                 >
-                  {/* Category Header with Lock & Rename */}
+                  {/* Category Header with Lock, Reordering & Rename */}
                   <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="p-1 rounded-lg bg-slate-800 text-cyan-400">
                         <Layers className="w-4 h-4" />
+                      </span>
+
+                      {/* Top Bar Order Position Badge */}
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                        group.isLocked
+                          ? 'bg-slate-800 text-slate-400'
+                          : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      }`} title={`Top Bar Position #${groupIndex + 1}`}>
+                        #{groupIndex + 1}
                       </span>
 
                       {editingGroupId === group.id ? (
@@ -475,6 +536,40 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Move Top Menu Left / Right Controls when Unlocked */}
+                      {!group.isLocked && (
+                        <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveGroup(groupIndex, 'left')}
+                            disabled={groupIndex === 0}
+                            className="p-1 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 disabled:opacity-25 transition-colors cursor-pointer"
+                            title="Move Menu Left in Top Bar"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                          </button>
+                          <select
+                            value={groupIndex}
+                            onChange={(e) => handleSetGroupPosition(groupIndex, Number(e.target.value))}
+                            className="bg-slate-900 border-none text-[10px] text-cyan-300 font-mono font-bold focus:outline-none px-1 py-0.5 cursor-pointer"
+                            title="Top Bar Slot Number"
+                          >
+                            {localConfig.groups.map((_, idx) => (
+                              <option key={idx} value={idx}>#{idx + 1}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveGroup(groupIndex, 'right')}
+                            disabled={groupIndex === localConfig.groups.length - 1}
+                            className="p-1 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 disabled:opacity-25 transition-colors cursor-pointer"
+                            title="Move Menu Right in Top Bar"
+                          >
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+
                       <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
                         {groupItems.length} items
                       </span>
@@ -486,7 +581,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                             ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
                             : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
                         }`}
-                        title={group.isLocked ? 'Menu Locked (Click to Unlock)' : 'Menu Unlocked (Click to Lock)'}
+                        title={group.isLocked ? 'Menu Locked (Click to Unlock & Move)' : 'Menu Unlocked (Click to Lock)'}
                       >
                         {group.isLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
                       </button>
