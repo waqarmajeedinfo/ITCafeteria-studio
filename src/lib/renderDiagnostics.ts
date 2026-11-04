@@ -100,7 +100,14 @@ class RenderDiagnosticsEngine {
       const raw = localStorage.getItem(STORAGE_KEY_RENDER_LOGS);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((l: any) =>
+            !l.title?.toLowerCase().includes('websocket') &&
+            !l.title?.toLowerCase().includes('web socket') &&
+            !l.message?.toLowerCase().includes('websocket') &&
+            !l.message?.toLowerCase().includes('web socket')
+          );
+        }
       }
     } catch {}
     return [];
@@ -123,6 +130,12 @@ class RenderDiagnosticsEngine {
     window.addEventListener('unhandledrejection', (event) => {
       const reason = event.reason;
       const text = typeof reason === 'string' ? reason : reason?.message || JSON.stringify(reason || '');
+      const textLower = text.toLowerCase();
+
+      // Suppress benign websocket or abort noise
+      if (textLower.includes('websocket') || textLower.includes('web socket') || textLower.includes('abort')) {
+        return;
+      }
       
       // If it's a backend /api/ failure
       if (text.includes('/api/') || text.includes('502') || text.includes('503')) {

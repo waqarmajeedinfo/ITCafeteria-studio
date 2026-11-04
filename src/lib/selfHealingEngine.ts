@@ -73,10 +73,14 @@ class SelfHealingEngine {
       if (raw) {
         let parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          // Auto-clean obsolete or resolved errors from notification bar
+          // Auto-clean obsolete, dev-server HMR websocket, or benign errors from notification bar
           return parsed.filter((r: any) =>
             !r.summary?.includes('Cannot set property fetch') &&
-            !r.technicalDetails?.includes('Cannot set property fetch')
+            !r.technicalDetails?.includes('Cannot set property fetch') &&
+            !r.summary?.toLowerCase().includes('web socket') &&
+            !r.summary?.toLowerCase().includes('websocket') &&
+            !r.technicalDetails?.toLowerCase().includes('web socket') &&
+            !r.technicalDetails?.toLowerCase().includes('websocket')
           );
         }
       }
@@ -99,12 +103,14 @@ class SelfHealingEngine {
 
     window.addEventListener('error', (event) => {
       const msg = event.message || 'Unknown window runtime error';
-      // Suppress benign third-party, chrome extension, and dev-server websocket noise
+      const msgLower = msg.toLowerCase();
+      // Suppress benign third-party, chrome extension, and dev-server websocket noise (HMR disabled in preview)
       if (
         msg.includes('ResizeObserver') ||
         msg.includes('Script error') ||
-        msg.includes('WebSocket') ||
-        msg.includes('websocket') ||
+        msgLower.includes('websocket') ||
+        msgLower.includes('web socket') ||
+        msgLower.includes('connect to web socket') ||
         msg.includes('@vite/client') ||
         msg.includes('Cannot set property fetch')
       ) {
@@ -125,12 +131,14 @@ class SelfHealingEngine {
     window.addEventListener('unhandledrejection', (event) => {
       const reason = event.reason;
       const text = typeof reason === 'string' ? reason : reason?.message || JSON.stringify(reason || '');
+      const textLower = text.toLowerCase();
       // Suppress aborted fetch noise and benign Vite dev websocket closures (HMR disabled in AI Studio preview)
       if (
         text.includes('AbortError') ||
         text.includes('Failed to fetch') ||
-        text.includes('WebSocket closed without opened') ||
-        text.includes('failed to connect to websocket') ||
+        textLower.includes('websocket') ||
+        textLower.includes('web socket') ||
+        textLower.includes('failed to connect to web socket') ||
         text.includes('@vite/client') ||
         text.includes('Cannot set property fetch')
       ) {

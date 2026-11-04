@@ -611,8 +611,27 @@ export function initGlobalLogCleanup() {
     ];
     staleDebugKeys.forEach((key) => localStorage.removeItem(key));
 
-    // 3. Trigger session activity update event
-    console.info('[IT Cafeteria Studio] Global log cleanup initialized: persistent debug buffers purged.');
+    // 3. Purge any stale websocket error records from self-healing and render diagnostic logs
+    const purgeWebsocketEntries = (key: string) => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const cleaned = list.filter((item: any) => {
+              const text = `${item.title || ''} ${item.summary || ''} ${item.message || ''} ${item.technicalDetails || ''}`.toLowerCase();
+              return !text.includes('websocket') && !text.includes('web socket');
+            });
+            localStorage.setItem(key, JSON.stringify(cleaned));
+          }
+        }
+      } catch {}
+    };
+    purgeWebsocketEntries('itcafeteria_self_healing_kb_v1');
+    purgeWebsocketEntries('itcafeteria_render_diagnostics_records');
+
+    // 4. Trigger session activity update event
+    console.info('[IT Cafeteria Studio] Global log cleanup initialized: persistent debug buffers and websocket noise purged.');
   } catch (err) {
     console.warn('[IT Cafeteria Studio] Global log cleanup warning:', err);
   }

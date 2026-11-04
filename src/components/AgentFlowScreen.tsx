@@ -32,6 +32,7 @@ import { StoryPackageView, type GeneratedStory, type StoryIdea, type StoryScene 
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import type { SimulatorConfig } from './SimulatorConfigModal';
 import { checkDeletedStoryBlacklist, loadDeletedStoryBlacklist } from '../lib/deletedStoryRegistry';
+import { applyPhoneticFixes } from '../lib/phoneticDictionaryStore';
 
 export interface AgentTriggerSelection {
   channelId: ChannelProfile['id'];
@@ -647,10 +648,12 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
       const scenes: StoryScene[] = rawScenes
         .filter((scene: any) => scene && (scene.script || scene.dialogue))
         .map((scene: any, index: number) => {
-          const dialogue = String(scene.dialogue || '').trim();
+          // Mandatory Phonetic Dictionary Check: Read living dictionary and replace mispronunciations
+          const rawDialogue = String(scene.dialogue || '').trim();
+          const dialogue = applyPhoneticFixes(rawDialogue);
           const visual = String(scene.visual || '').trim();
           const rawScript = String(scene.script || '').trim() || `${selection.tag} — ${visual}\nHe says: "${dialogue}"`;
-          const script = applyCinematicDirecting(index + 1, rawScript, undefined, scene.purpose);
+          const script = applyCinematicDirecting(index + 1, applyPhoneticFixes(rawScript), undefined, scene.purpose);
           const words = dialogue ? dialogue.split(/\s+/).filter(Boolean).length : Number(scene.words) || 0;
           return {
             num: index + 1,

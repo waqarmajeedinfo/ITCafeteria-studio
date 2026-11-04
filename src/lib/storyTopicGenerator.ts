@@ -910,8 +910,8 @@ export function rewriteCompleteStoryPackage(currentStory: GeneratedStory, prefer
       ? pool[Math.floor(Math.random() * pool.length)]
       : { visual: oldScene.visual, dialogue: oldScene.dialogue };
 
-    const freshVisual = pick.visual;
-    const freshDialogue = pick.dialogue;
+    const rawFreshDialogue = pick.dialogue;
+    const freshDialogue = applyPhoneticFixes(rawFreshDialogue);
     const freshScript = `[PRESENTER & ACTION]: ${charTag} ${freshVisual.replace(charTag, '').trim()}.\n[CAMERA & LIGHTING]: Studio 4K, 60fps cinematic key light, cyan accents. Duration: 0-10s.\n[VOICEOVER / DIALOGUE]: "${freshDialogue}"`;
     const wordCount = freshDialogue.split(/\s+/).filter(Boolean).length;
 
@@ -926,12 +926,12 @@ export function rewriteCompleteStoryPackage(currentStory: GeneratedStory, prefer
 
   return {
     ...currentStory,
-    hook: freshHook,
+    hook: applyPhoneticFixes(freshHook),
     dateLabel: todayLabel,
     thumbnailHeadline: currentStory.thumbnailHeadline || 'SMART TECH TRICK',
     thumbnailSubBadge: chosenAngle.name.toUpperCase(),
     scenes: rewrittenScenes,
-    discussionNotes: `Story completely rewritten with angle: "${chosenAngle.name}" on ${todayLabel}. Fresh dialogues, new visual actions, and 100% unique phrasing generated.`
+    discussionNotes: `Story completely rewritten with angle: "${chosenAngle.name}" on ${todayLabel}. Fresh dialogues, new visual actions, and 100% unique phrasing verified against living phonetic rules dictionary.`
   };
 }
 
@@ -960,7 +960,8 @@ export function rewriteSingleScene(currentStory: GeneratedStory, sceneNum: numbe
     `${charTag} points decisively at the screen benchmark graph surging with vibrant green particles.`
   ];
 
-  const newDialogue = freshDialogueOptions[Math.floor(Math.random() * freshDialogueOptions.length)];
+  const rawDialogue = freshDialogueOptions[Math.floor(Math.random() * freshDialogueOptions.length)];
+  const newDialogue = applyPhoneticFixes(rawDialogue);
   const newVisual = freshVisualOptions[Math.floor(Math.random() * freshVisualOptions.length)];
   const words = newDialogue.split(/\s+/).filter(Boolean).length;
   const newScript = `[PRESENTER & ACTION]: ${charTag} ${newVisual.replace(charTag, '').trim()}.\n[CAMERA & LIGHTING]: Studio 4K, 60fps cinematic key light. Duration: 0-10s.\n[VOICEOVER / DIALOGUE]: "${newDialogue}"`;
