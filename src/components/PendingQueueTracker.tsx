@@ -56,7 +56,11 @@ import {
   CINEMATIC_PRESETS,
   CINEMATIC_STAGE_DIRECTIONS
 } from '../lib/cinematicDirector';
-import { generateTopicAccurateStoryPackage, isStoryPackageMismatched } from '../lib/storyTopicGenerator';
+import {
+  generateTopicAccurateStoryPackage,
+  isStoryPackageMismatched,
+  rewriteCompleteStoryPackage
+} from '../lib/storyTopicGenerator';
 
 interface PendingQueueTrackerProps {
   onNavigateTab?: (tab: string) => void;
@@ -215,9 +219,12 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     const presetObj = CINEMATIC_PRESETS.find((p) => p.id === refreshPreset);
     const chosenDirection = refreshCustomDirection.trim() || presetObj?.prefix;
 
+    // Creatively rewrite the story with brand new Roman Urdu dialogue and new angles
+    const rewritten = rewriteCompleteStoryPackage(refreshTargetStory.storyPackage);
+
     const refreshedPackage = enforceCinematicStoryPackage(
       {
-        ...refreshTargetStory.storyPackage,
+        ...rewritten,
         dateLabel: todayLabel
       },
       chosenDirection
@@ -227,6 +234,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
       if (item.id === refreshTargetStory.id) {
         return {
           ...item,
+          hook: refreshedPackage.hook,
           storyPackage: refreshedPackage
         };
       }
@@ -236,7 +244,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     setQueue(updatedQueue);
     savePendingQueue(updatedQueue);
     setRefreshTargetStory(null);
-    showToast(`"${refreshTargetStory.title.slice(0, 30)}..." par Cinematic Directing layer refresh aur save ho gaya!`);
+    showToast(`"${refreshTargetStory.title.slice(0, 30)}..." naye dialogues, visual scenes aur fresh cinematic direction ke sath mukammal rewrite ho gayi!`);
   };
 
   const handleFullAiReanalyze = async () => {
@@ -247,14 +255,16 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     const presetObj = CINEMATIC_PRESETS.find((p) => p.id === refreshPreset);
     const chosenDirection = refreshCustomDirection.trim() || presetObj?.prefix;
 
-    await new Promise((r) => setTimeout(r, 1100));
+    await new Promise((r) => setTimeout(r, 900));
+
+    // Full deep rewrite with alternative creative angle
+    const rewritten = rewriteCompleteStoryPackage(refreshTargetStory.storyPackage);
 
     const refreshedPackage = enforceCinematicStoryPackage(
       {
-        ...refreshTargetStory.storyPackage,
+        ...rewritten,
         dateLabel: todayLabel,
-        hook: `[Fresh ${todayLabel}] ${refreshTargetStory.storyPackage.hook.replace(/^\[Fresh[^\]]*\]\s*/i, '')}`,
-        description: `Verified for current date requirements (${todayLabel}).\n\n${refreshTargetStory.storyPackage.description.replace(/^Verified for current date requirements[^\n]*\n\n/i, '')}`
+        description: `Verified for current date requirements (${todayLabel}).\n\n${rewritten.description}`
       },
       chosenDirection
     );
@@ -263,6 +273,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
       if (item.id === refreshTargetStory.id) {
         return {
           ...item,
+          hook: refreshedPackage.hook,
           storyPackage: refreshedPackage
         };
       }
@@ -273,7 +284,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     savePendingQueue(updatedQueue);
     setIsReanalyzing(false);
     setRefreshTargetStory(null);
-    showToast(`Story content date requirements ke sath re-analyze ho kar fresh cinematic directing ke sath update ho gayi!`);
+    showToast(`AI Re-analysis Mukammal! Story ka har scene aur dialogue naye style mein rewrite ho gaya!`);
   };
 
   const handleCreateDraft = (e: React.FormEvent) => {

@@ -12,6 +12,7 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Activity,
   Layers,
   Database,
@@ -517,6 +518,22 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
       setIsLoading(false);
     }
   };
+
+  const handleAdminToggleApproval = async (targetUsername: string, currentStatus: boolean) => {
+    setIsLoading(true);
+    setAuthError(null);
+    try {
+      await userAuthManager.toggleUserApproval(targetUsername, !currentStatus);
+      setAuthSuccess(`@${targetUsername} ka approval status ${!currentStatus ? 'Approved (منظور)' : 'Pending'} ho gaya!`);
+      const res = await userAuthManager.fetchAdminUsers();
+      if (res?.users) setAdminUsers(res.users);
+    } catch (err: any) {
+      setAuthError(err?.message || 'Approval status change karne mein error aaya');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   const handleAdminSavePermissions = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1083,8 +1100,23 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                   <h4 className="font-bold text-white text-sm">Super Admin User &amp; Privilege Dashboard</h4>
                 </div>
                 <p className="text-purple-200 text-xs leading-relaxed">
-                  Aap Super Admin (Waqar Majeed) hain. Yahan se aap tamam registered users ko add kar sakte hain, edit kar sakte hain, delete kar sakte hain, aur unke features aur limits ko control kar sakte hain.
+                  Aap Super Admin (Waqar Majeed) hain. Yahan se aap tamam registered users ko add kar sakte hain, edit kar sakte hain, delete kar sakte hain, aur unke features aur limits ko control kar sakte hain. Naye signups tab tak login nahi kar sakte jab tak aap unhein approve na karein.
                 </p>
+
+                {/* Pending Approvals Alert Badge */}
+                {adminUsers.filter((u) => u.isApproved === false).length > 0 && (
+                  <div className="p-2.5 bg-amber-950/80 border border-amber-500/60 rounded-lg flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-amber-200 font-semibold">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>
+                        {adminUsers.filter((u) => u.isApproved === false).length} standard user(s) awaiting your approval to access the system.
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      ACTION REQUIRED
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* All Users Registry */}
@@ -1151,6 +1183,15 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                               }`}>
                                 {u.isActive !== false ? 'Active' : 'Suspended'}
                               </span>
+
+                              {/* Admin Approval Status Badge */}
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                                u.isApproved !== false
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                              }`}>
+                                {u.isApproved !== false ? '✓ Approved' : '⏳ Pending Admin Approval'}
+                              </span>
                             </div>
                             <p className="text-slate-400 text-[11px] font-mono">{u.email}</p>
                             <p className="text-emerald-400 text-[10px] font-mono truncate">
@@ -1160,6 +1201,23 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
 
                           {/* Quick Actions */}
                           <div className="flex items-center gap-1.5 flex-wrap">
+                            {/* Admin Account Approval Action */}
+                            {!isSuperAdminAccount && (
+                              <button
+                                type="button"
+                                onClick={() => handleAdminToggleApproval(u.username, u.isApproved !== false)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-colors ${
+                                  u.isApproved !== false
+                                    ? 'bg-amber-950/60 border-amber-500/40 hover:bg-amber-900/60 text-amber-300'
+                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950'
+                                }`}
+                                title={u.isApproved !== false ? 'Account ko pending status par set karein' : 'Naye user ko approve karein taake woh login kar sake'}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>{u.isApproved !== false ? 'Revoke Approval' : 'Approve User (منظور کریں)'}</span>
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               onClick={() => openPermissionsModal(u)}

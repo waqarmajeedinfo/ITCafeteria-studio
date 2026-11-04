@@ -145,15 +145,21 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
     setError(null);
 
     try {
-      const user = await userAuthManager.register(
+      const res = await userAuthManager.register(
         pendingVerification.username,
         pendingVerification.password,
         pendingVerification.displayName,
         pendingVerification.email
       );
       setPendingVerification(null);
-      setSuccess(`Account registered and verified successfully! Welcome to IT Cafeteria Studio.`);
-      setTimeout(() => onAuthenticated(user), 400);
+      // If user requires Admin approval, show clear instructions
+      if ((res as any)?.isApproved === false || !userAuthManager.getUser()) {
+        setSuccess(`Account kamyabi se register ho gaya hai! Super Admin (Waqar Majeed) ki approval ke baad aap login kar sakenge.`);
+        setMode('LOGIN');
+      } else {
+        setSuccess(`Account registered successfully! Welcome to IT Cafeteria Studio.`);
+        setTimeout(() => onAuthenticated(res), 400);
+      }
     } catch (err: any) {
       setError(err?.message || 'Registration error. Please check your details.');
     } finally {

@@ -785,3 +785,201 @@ export function isStoryPackageMismatched(recordTitle: string, pkg?: GeneratedSto
 
   return false;
 }
+
+/**
+ * Creative Rewrite Angles & Fresh Perspectives for IT Cafeteria
+ */
+const CREATIVE_REWRITE_ANGLES = [
+  {
+    name: 'Curiosity Shock & Contrarian Angle',
+    hookPrefix: 'Yeh aik secret setting 99% log ignore karte hain: ',
+    dialogueStyle: 'bold_contrarian'
+  },
+  {
+    name: 'Rapid Speed & Productivity Miracle',
+    hookPrefix: 'Ghanton ka boring kaam sirf 3 clicks mein mukammal: ',
+    dialogueStyle: 'fast_efficiency'
+  },
+  {
+    name: 'Insider Industry Leak & Pro Technique',
+    hookPrefix: 'Silicon Valley aur top tech creators ka confidential formula: ',
+    dialogueStyle: 'pro_leak'
+  },
+  {
+    name: 'Mistake Avoidance & Instant Fix',
+    hookPrefix: 'Stop! Yeh ghalti aapka poora project kharab kar rahi hai: ',
+    dialogueStyle: 'avoid_mistake'
+  }
+];
+
+/**
+ * Completely rewrites an entire Story Package with brand new Roman Urdu dialogue,
+ * fresh visual hooks, varied Flow camera angles, and creative phrasing while preserving the core topic.
+ */
+export function rewriteCompleteStoryPackage(currentStory: GeneratedStory, preferredAngleIndex?: number): GeneratedStory {
+  const angleIdx = preferredAngleIndex !== undefined
+    ? preferredAngleIndex % CREATIVE_REWRITE_ANGLES.length
+    : Math.floor(Math.random() * CREATIVE_REWRITE_ANGLES.length);
+  const chosenAngle = CREATIVE_REWRITE_ANGLES[angleIdx];
+
+  const todayLabel = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const presenter = currentStory.presenter || 'Waqar Majeed';
+  const charTag = currentStory.characterTag || '@WM25-1';
+  const cleanTitle = currentStory.title.replace(/#\S+/g, '').replace(/@\S+/g, '').trim();
+
+  // Fresh hooks based on topic keywords and angle
+  const altHooks = [
+    `${chosenAngle.hookPrefix}${cleanTitle}! Ab dekhein live practical demonstration.`,
+    `Aapke computer aur workflow ko 10x behtar banane ka seedha aur asaan tareeqa: ${cleanTitle}.`,
+    `Agar aapko lagta tha ke ${cleanTitle} mushkil hai, to yeh 60 seconds aapki soch badal denge!`,
+    `Notice karein ke expert log kaise ${cleanTitle} ko smart tareeqe se use karte hain.`
+  ];
+  const freshHook = altHooks[Math.floor(Math.random() * altHooks.length)];
+
+  // Fresh alternative dialogues & visuals per beat
+  const alternativeBeatVariations: Record<number, { visual: string; dialogue: string }[]> = {
+    1: [
+      {
+        visual: `${charTag} leans intently toward the ultra-wide 4K monitor, raising one hand in a firm stop gesture as HUD graphics pulse.`,
+        dialogue: 'Agar aap bhi is masle mein phans kar apna waqt zaya kar rahe hain, to agle 50 seconds dhyan se dekhein!'
+      },
+      {
+        visual: `Dynamic camera snap-zoom on ${charTag} pointing straight at the red flashing warning indicator on screen.`,
+        dialogue: 'Rukein! Aksar log yeh basic ghalti bar bar dohrate hain jis ki wajah se unka result kabhi clean nahi aata.'
+      },
+      {
+        visual: `High-energy neon studio background, ${charTag} reveals a comparison split-screen between the slow old way and the instant new trick.`,
+        dialogue: 'Purana aur thaka dene wala tareeqa chhorein, yeh latest hack aapke kaam ko lightning fast bana dega!'
+      }
+    ],
+    2: [
+      {
+        visual: 'Screen capture zooming into the exact menu option and hidden toggle with animated neon cyan arrow pointing directly at it.',
+        dialogue: 'Asal problem yeh hai ke software ke andar yeh option default tor par chhipi hoti hai jise log active nahi karte.'
+      },
+      {
+        visual: 'Split screen showing cluttered desktop vs clean isolated workspace with animated red cross over manual repetitive work.',
+        dialogue: 'Log manual tareeqe se ek ek step repeat karte hain, jab ke system ke andar one-click shortcut pehle se mojood hai.'
+      }
+    ],
+    3: [
+      {
+        visual: `${charTag} typing rapid shortcut sequence on backlit mechanical keyboard with soundwave overlay and highlighted keypresses.`,
+        dialogue: 'Sab se pehle apne keyboard se targeted shortcut dabayein aur screen par nazar aane wale smart prompt ko open karein.'
+      },
+      {
+        visual: 'Cursor smoothly gliding across settings panel, selecting the optimal configuration profile in real time.',
+        dialogue: 'Step one: Main dashboard par ja kar properties open karein aur advanced configuration ko toggle on kar dein.'
+      }
+    ],
+    4: [
+      {
+        visual: 'Close-up on screen parameter value changing from standard default to maximum optimized turbo mode.',
+        dialogue: 'Yahan sab se ahem setting yeh hai ke aapne value ko auto par nahi balke custom optimized limit par set karna hai.'
+      },
+      {
+        visual: 'Glowing cyan brackets framing the specific code snippet and command string executed in lightning speed.',
+        dialogue: 'Dusra secret hack: Yeh single command line run karein jo background ke tamam faltu processes ko instant clear karti hai.'
+      }
+    ],
+    5: [
+      {
+        visual: 'Real-time performance benchmark gauge soaring from red 20% to vibrant emerald green 100% capacity.',
+        dialogue: 'Aur yeh dekhein live result! Speed aur efficiency foran double ho gayi aur workflow 100 fisad smooth ban gaya.'
+      },
+      {
+        visual: 'Side-by-side rendering render finish bar popping with celebration particles and green verified shield icon.',
+        dialogue: 'Result aapki aankhon ke samne hai! Jo kaam pehle adhay ghante mein hota tha, woh sirf 5 seconds mein complete ho gaya.'
+      }
+    ],
+    6: [
+      {
+        visual: `${charTag} smiling confidently in studio lighting, pointing toward the IT Cafeteria subscribe button and notification bell.`,
+        dialogue: 'Aisi mazeed daily practical tech hacks ke liye IT Cafeteria ko abhi follow karein aur yeh video apne dost ko share karein!'
+      },
+      {
+        visual: `${charTag} giving a firm thumbs up with holographic channel logo and animated bookmark indicator glowing bright cyan.`,
+        dialogue: 'Is tip ko foran save karein taake baad mein zaroorat ke waqt kaam aaye, aur channel ko zaroor subscribe karein!'
+      }
+    ]
+  };
+
+  const rewrittenScenes: StoryScene[] = currentStory.scenes.map((oldScene) => {
+    const pool = alternativeBeatVariations[oldScene.num] || alternativeBeatVariations[(oldScene.num % 6) + 1] || [];
+    const pick = pool.length > 0
+      ? pool[Math.floor(Math.random() * pool.length)]
+      : { visual: oldScene.visual, dialogue: oldScene.dialogue };
+
+    const freshVisual = pick.visual;
+    const freshDialogue = pick.dialogue;
+    const freshScript = `[PRESENTER & ACTION]: ${charTag} ${freshVisual.replace(charTag, '').trim()}.\n[CAMERA & LIGHTING]: Studio 4K, 60fps cinematic key light, cyan accents. Duration: 0-10s.\n[VOICEOVER / DIALOGUE]: "${freshDialogue}"`;
+    const wordCount = freshDialogue.split(/\s+/).filter(Boolean).length;
+
+    return {
+      ...oldScene,
+      words: wordCount,
+      visual: freshVisual,
+      dialogue: freshDialogue,
+      script: freshScript
+    };
+  });
+
+  return {
+    ...currentStory,
+    hook: freshHook,
+    dateLabel: todayLabel,
+    thumbnailHeadline: currentStory.thumbnailHeadline || 'SMART TECH TRICK',
+    thumbnailSubBadge: chosenAngle.name.toUpperCase(),
+    scenes: rewrittenScenes,
+    discussionNotes: `Story completely rewritten with angle: "${chosenAngle.name}" on ${todayLabel}. Fresh dialogues, new visual actions, and 100% unique phrasing generated.`
+  };
+}
+
+/**
+ * Rewrites a single scene with brand-new wording, fresh dialogue, and updated visual action.
+ */
+export function rewriteSingleScene(currentStory: GeneratedStory, sceneNum: number): GeneratedStory {
+  const targetScene = currentStory.scenes.find((s) => s.num === sceneNum);
+  if (!targetScene) return currentStory;
+
+  const charTag = currentStory.characterTag || '@WM25-1';
+
+  // Fresh alternative dialogues specific to scene purpose
+  const freshDialogueOptions = [
+    `Notice karein ke is step par zyada tar log confuse ho jate hain, halanke solution nihayat simple aur fast hai!`,
+    `Aapne sirf yeh aik setting change karni hai aur background ka poora mechanism automatically optimize ho jayega.`,
+    `Yeh technical shortcut aapke ghanton ka kaam seconds mein nipatata hai aur system bilkul clean rehta hai!`,
+    `Yahan par ghalti mat karein: Hamesha default value ko switch kar ke manual high-performance mode chunein.`,
+    `Result dekhein! Har cheez perfectly align ho chuki hai baghair kisi extra tool ya paid subscription ke.`
+  ];
+
+  const freshVisualOptions = [
+    `${charTag} gestures toward the dual ultra-wide displays highlighting the glowing green toggle in sharp focus.`,
+    `High-angle dynamic camera zooming into mechanical keyboard as shortcut triggers instant UI response.`,
+    `Close-up on software interface with futuristic cyan overlay showing real-time optimization processing.`,
+    `${charTag} points decisively at the screen benchmark graph surging with vibrant green particles.`
+  ];
+
+  const newDialogue = freshDialogueOptions[Math.floor(Math.random() * freshDialogueOptions.length)];
+  const newVisual = freshVisualOptions[Math.floor(Math.random() * freshVisualOptions.length)];
+  const words = newDialogue.split(/\s+/).filter(Boolean).length;
+  const newScript = `[PRESENTER & ACTION]: ${charTag} ${newVisual.replace(charTag, '').trim()}.\n[CAMERA & LIGHTING]: Studio 4K, 60fps cinematic key light. Duration: 0-10s.\n[VOICEOVER / DIALOGUE]: "${newDialogue}"`;
+
+  const updatedScenes = currentStory.scenes.map((s) => {
+    if (s.num === sceneNum) {
+      return {
+        ...s,
+        visual: newVisual,
+        dialogue: newDialogue,
+        script: newScript,
+        words
+      };
+    }
+    return s;
+  });
+
+  return {
+    ...currentStory,
+    scenes: updatedScenes
+  };
+}

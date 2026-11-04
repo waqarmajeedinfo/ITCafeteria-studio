@@ -652,12 +652,23 @@ export function upsertPendingStoryRecord(record: PendingStoryRecord): PendingSto
   return updated;
 }
 
+import { recordDeletedStory } from './deletedStoryRegistry';
+
 export function deletePendingStoryRecord(idOrTitle: string): PendingStoryRecord[] {
   const current = loadPendingQueue();
+  // Find matching story to permanently blacklist it before removing
+  const target = current.find(
+    (item) => item.id === idOrTitle || item.title === idOrTitle || item.storyPackage?.title === idOrTitle
+  );
+  if (target) {
+    recordDeletedStory(target.id, target.title, target.category, target.hook);
+  }
+
   const updated = current.filter(
     (item) => item.id !== idOrTitle && item.title !== idOrTitle && item.storyPackage?.title !== idOrTitle
   );
   savePendingQueue(updated);
   return updated;
 }
+
 

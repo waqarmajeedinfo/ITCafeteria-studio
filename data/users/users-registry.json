@@ -54,7 +54,7 @@
     "salt": "f86c9d7aa9533ee088f127e1b54a9362",
     "passwordHash": "e8fed0cc4ddf1113e56e3e15954c46665da66b62d0b430f6f66c78a2358e0449838f79d27ddc4462f2c19932baaa86f74116964ffbc17ecb58a9be8ac6aff85e",
     "createdAt": "2026-11-04T01:06:46.535Z",
-    "lastLogin": "2026-11-04T01:32:40.121Z",
+    "lastLogin": "2026-11-04T17:34:39.707Z",
     "isActive": true,
     "dedicatedRepoPath": "user-data/waqarmajeedinfo",
     "permissions": {
@@ -66,6 +66,47 @@
       "canUseVoiceScriptGenerator": true,
       "maxChannelsAllowed": 9999,
       "dailyGenerationLimit": 9999
+    }
+  },
+  {
+    "id": "user-1793813683810-2767e6",
+    "username": "teststandard1",
+    "displayName": "Test Candidate",
+    "email": "test@example.com",
+    "role": "standard",
+    "salt": "ca63a308753667bea6aa7359a42f3db1",
+    "passwordHash": "203f71e203e5dbb84cb8a97163c94bd30390c1f15a083003ca556e5c62656dde3d2c1548a79008254319fdb02b5ae106a9cab4a70bcd26fd15df098992118b57",
+    "createdAt": "2026-11-04T17:34:43.810Z",
+    "lastLogin": "2026-11-04T17:34:56.535Z",
+    "isActive": true,
+    "isApproved": true,
+    "dedicatedRepoPath": "user-data/teststandard1",
+    "permissions": {
+      "canAccessDiagnostics": true,
+      "canAccessLive": true,
+      "canAccessSignals": true,
+      "canAccessBenchmarking": true,
+      "canUseAutopilot": true,
+      "canAccessSimulator": true,
+      "canAccessCommunity": true,
+      "canAccessPending": true,
+      "canAccessCalendar": true,
+      "canAccessDuplicates": true,
+      "canAccessMasterlist": true,
+      "canAccessRoadmap": true,
+      "canAccessChat": true,
+      "canAccessSearch": true,
+      "canAccessVideo": true,
+      "canUseThumbnailStudio": true,
+      "canAccessTranscribe": true,
+      "canAccessMusic": true,
+      "canAccess3D": true,
+      "canEditChannels": true,
+      "canPublishScheduledPosts": true,
+      "canExportData": false,
+      "canUseVoiceScriptGenerator": true,
+      "maxChannelsAllowed": 5,
+      "dailyGenerationLimit": 25
     }
   }
 ]

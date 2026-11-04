@@ -33,6 +33,7 @@ import {
 } from '../lib/pendingQueueStore';
 import { publishStoryDirectly } from '../lib/publishedLibraryStore';
 import { recordDialogueEdit, addPhoneticRule } from '../lib/phoneticDictionaryStore';
+import { rewriteCompleteStoryPackage, rewriteSingleScene } from '../lib/storyTopicGenerator';
 
 export interface StoryIdea {
   title: string;
@@ -534,6 +535,60 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
     showToast('✓ Story Pending Queue mein kamyabi se save ho gayi!');
   };
 
+  // Complete Story Creative Rewrite
+  const handleRefreshEntireStory = () => {
+    const rewritten = rewriteCompleteStoryPackage(story);
+    if (onUpdateStory) {
+      onUpdateStory(rewritten);
+    }
+    if (storyId) {
+      upsertPendingStoryRecord({
+        id: storyId,
+        title: rewritten.title,
+        hook: rewritten.hook,
+        category: rewritten.categoryName,
+        categoryId: 1,
+        characterTag: rewritten.characterTag,
+        scheduledTime: '6:00 PM PKT',
+        scheduledDate: rewritten.dateLabel,
+        targetSlotReason: 'User creatively refreshed story package',
+        status: (currentStatus as any) || 'pending',
+        source: 'simulator',
+        priority: 'HIGH',
+        createdAt: new Date().toISOString(),
+        storyPackage: rewritten
+      });
+    }
+    showToast('✨ Puri Story naye alfaaz, naye dialogues aur fresh Roman Urdu style mein rewrite ho gayi!');
+  };
+
+  // Single Scene Creative Rewrite
+  const handleRefreshScene = (sceneNum: number) => {
+    const rewritten = rewriteSingleScene(story, sceneNum);
+    if (onUpdateStory) {
+      onUpdateStory(rewritten);
+    }
+    if (storyId) {
+      upsertPendingStoryRecord({
+        id: storyId,
+        title: rewritten.title,
+        hook: rewritten.hook,
+        category: rewritten.categoryName,
+        categoryId: 1,
+        characterTag: rewritten.characterTag,
+        scheduledTime: '6:00 PM PKT',
+        scheduledDate: rewritten.dateLabel,
+        targetSlotReason: 'User refreshed single scene',
+        status: (currentStatus as any) || 'pending',
+        source: 'simulator',
+        priority: 'HIGH',
+        createdAt: new Date().toISOString(),
+        storyPackage: rewritten
+      });
+    }
+    showToast(`⚡ Scene ${sceneNum} naye dialogues aur fresh visual script ke sath rewrite ho gaya!`);
+  };
+
   // Current Status Controls: Delete Story
   const handleDeleteStory = () => {
     if (window.confirm(`Kya aap waqai is story ko delete karna chahte hain?\n"${story.title}"`)) {
@@ -541,7 +596,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
         deletePendingStoryRecord(storyId);
       }
       deletePendingStoryRecord(story.title);
-      showToast('Story delete kar di gayi.');
+      showToast('Story delete kar di gayi aur blacklist mein permanently mehfooz ho gayi.');
       onDeleteStory?.();
     }
   };
@@ -593,8 +648,17 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
             </p>
           </div>
 
-          {/* Copy Actions */}
+          {/* Copy & Refresh Actions */}
           <div className="flex flex-wrap sm:flex-col items-stretch gap-1.5 shrink-0">
+            <button
+              onClick={handleRefreshEntireStory}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-500/25 transition-all cursor-pointer"
+              title="Poori story naye dialogues aur fresh Roman Urdu style mein rewrite karein"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-purple-200" />
+              <span>Rewrite Story (نئے انداز میں ریفریش)</span>
+            </button>
+
             <button
               onClick={() => copyText(buildStoryPackageText(story), 'all')}
               className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 hover:opacity-95 transition-all cursor-pointer"
@@ -668,8 +732,17 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
                   </span>
                 </div>
 
-                {/* Header Action Buttons: Copy Scene AND Edit Scene */}
-                <div className="flex items-center gap-2">
+                {/* Header Action Buttons: Refresh Scene, Edit Scene, and Copy Scene */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => handleRefreshScene(scene.num)}
+                    className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-purple-950/70 hover:bg-purple-900/80 text-purple-200 rounded-lg transition-colors border border-purple-500/40 cursor-pointer"
+                    title="Is specific scene ko naye dialogues aur visual cue ke sath rewrite karein"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-purple-300" />
+                    <span>Refresh Scene (سین ریفریش)</span>
+                  </button>
+
                   <button
                     onClick={() => {
                       if (isThisEditing) {
@@ -678,7 +751,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
                         handleStartEditScene(scene);
                       }
                     }}
-                    className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg transition-colors border cursor-pointer ${
+                    className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition-colors border cursor-pointer ${
                       isThisEditing
                         ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold'
                         : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
@@ -691,7 +764,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
 
                   <button
                     onClick={() => copyScene(scene)}
-                    className="flex items-center gap-1 text-xs px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700 cursor-pointer"
+                    className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700 cursor-pointer"
                     title="Google Flow copy-paste script copy karein"
                   >
                     {copiedScene === scene.num ? (

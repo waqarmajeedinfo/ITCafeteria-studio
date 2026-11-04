@@ -31,6 +31,7 @@ import { loadPendingQueue } from '../lib/pendingQueueStore';
 import { StoryPackageView, type GeneratedStory, type StoryIdea, type StoryScene } from './StoryPackageView';
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import type { SimulatorConfig } from './SimulatorConfigModal';
+import { checkDeletedStoryBlacklist, loadDeletedStoryBlacklist } from '../lib/deletedStoryRegistry';
 
 export interface AgentTriggerSelection {
   channelId: ChannelProfile['id'];
@@ -49,7 +50,7 @@ export interface AgentMemoryRecord {
 }
 
 export interface DuplicateMatch {
-  source: 'Catalog' | 'Session Memory';
+  source: 'Catalog' | 'Session Memory' | 'Deleted Story (Permanent Blacklist)';
   id: string;
   title: string;
   tool: string;
@@ -204,6 +205,21 @@ export function findDuplicateMatches(
   const combinedCandidate = `${title} ${points}`.toLowerCase();
   const candidateTokens = tokenizeForMatch(combinedCandidate);
   if (!candidateTokens.length && !combinedCandidate.trim()) return [];
+
+  // 0. Permanent Blacklist Check: If story was deleted by user, immediately flag as duplicate
+  const deletedCheck = checkDeletedStoryBlacklist(title, points);
+  if (deletedCheck) {
+    return [
+      {
+        source: 'Deleted Story (Permanent Blacklist)',
+        id: `DELETED-BLACK-LIST`,
+        title: deletedCheck.matchedStoryTitle,
+        tool: 'Permanent Blacklist (Do Not Search)',
+        points: `Previously deleted story. System instruction: deleted stories must never be searched or regenerated. (${deletedCheck.reason})`,
+        matchedKeywords: ['DELETED_STORY', 'PERMANENT_BLACKLIST']
+      }
+    ];
+  }
 
   // Check if candidate is explicitly a Sequel / Part 2 / Episode 2.
   // Approved sequels to previously published videos should NOT be blocked as duplicates.
@@ -519,13 +535,15 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
   }
 
   function buildExcludedTitles(extra: string[] = []) {
+    const deletedBlacklist = loadDeletedStoryBlacklist();
     const titles = new Set<string>([
       ...PUBLISHED_VIDEOS.map((video) => video.title),
       ...memoryRecords.filter((record) => record.channelId === profile.id).map((record) => record.title),
       ...duplicates.map((match) => match.title),
+      ...deletedBlacklist.map((d) => d.title),
       ...extra
     ]);
-    return Array.from(titles).filter(Boolean).slice(0, 80);
+    return Array.from(titles).filter(Boolean).slice(0, 120);
   }
 
   async function fetchIdeas(seed: string, mode: 'search' | 'duplicate') {
@@ -552,7 +570,9 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
           points: String(idea?.points || '').trim(),
           whyFresh: String(idea?.whyFresh || '').trim()
         }))
-        .filter((idea: StoryIdea) => idea.title);
+        .filter((idea: StoryIdea) => idea.title)
+        // Strictly filter out any idea matching deleted story blacklist
+        .filter((idea: StoryIdea) => !checkDeletedStoryBlacklist(idea.title, idea.points));
 
       const freshIdeas = rawIdeas.filter(
         (idea) => findDuplicateMatches(idea.title, idea.points, profile.id, memoryRecords).length === 0
@@ -560,7 +580,7 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
       const finalIdeas = freshIdeas.length ? freshIdeas : rawIdeas;
 
       if (!finalIdeas.length) {
-        throw new Error('AI ne koi fresh idea return nahi kiya');
+        throw new Error('AI ne koi fresh idea return nahi kiya (tamam suggestions deleted blacklist ya duplicates mein hain)');
       }
 
       if (!mountedRef.current) return;

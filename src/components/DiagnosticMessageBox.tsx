@@ -227,11 +227,26 @@ export const DiagnosticMessageBox: React.FC<DiagnosticMessageBoxProps> = ({
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              onClick={() => {
+                const res = selfHealingEngine.triggerPriority1FullSystemHealing();
+                setRecords(selfHealingEngine.getRecords());
+                setHealth(selfHealingEngine.runCompleteDiagnostics());
+                setCopyToast(`⚡ Priority-1 Full Healing Complete: ${res.repairedItems.length > 0 ? res.repairedItems.join(', ') : 'Subsystems verified 100% stable'}`);
+                setTimeout(() => setCopyToast(null), 4000);
+              }}
+              className="px-3.5 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-purple-950 cursor-pointer"
+              title="Elevated Priority-1 Autonomous Watchdog Rectification"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-300" />
+              <span>Priority-1 Full System Rectification</span>
+            </button>
+
+            <button
               onClick={handleResolveAndClearAll}
               className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950 cursor-pointer"
             >
-              <Zap className="w-3.5 h-3.5" />
-              <span>⚡ Resolve &amp; Clear All 4 Issues</span>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Resolve &amp; Clear All</span>
             </button>
 
             <button

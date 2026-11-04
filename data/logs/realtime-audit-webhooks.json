@@ -1,5 +1,65 @@
 [
   {
+    "id": "audit-1793813696535-18fab4",
+    "timestamp": "2026-11-04T17:34:56.535Z",
+    "userId": "user-1793813683810-2767e6",
+    "username": "teststandard1",
+    "role": "standard",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: standard",
+    "targetFile": "user-data/teststandard1",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793813693398-03d760",
+    "timestamp": "2026-11-04T17:34:53.398Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "USER_APPROVED",
+    "details": "Super Admin Waqar Majeed set approval status to true for @teststandard1",
+    "targetFile": "user-data/teststandard1",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793813690110-6a5a75",
+    "timestamp": "2026-11-04T17:34:50.111Z",
+    "userId": "user-1793813683810-2767e6",
+    "username": "teststandard1",
+    "role": "standard",
+    "action": "LOGIN_BLOCKED_PENDING_APPROVAL",
+    "details": "Standard user @teststandard1 login blocked: Account is awaiting Super Admin approval.",
+    "targetFile": "user-data/teststandard1",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793813683811-b76348",
+    "timestamp": "2026-11-04T17:34:43.811Z",
+    "userId": "user-1793813683810-2767e6",
+    "username": "teststandard1",
+    "role": "standard",
+    "action": "USER_REGISTERED_PENDING_APPROVAL",
+    "details": "New standard user account registered: @teststandard1. Pending Admin approval before login access is granted. Dedicated repo directory initialized: user-data/teststandard1",
+    "targetFile": "user-data/teststandard1",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793813679708-5f926c",
+    "timestamp": "2026-11-04T17:34:39.708Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
     "id": "audit-1793755965538-d7a6ef",
     "timestamp": "2026-11-04T01:32:45.538Z",
     "userId": "user-std-01",

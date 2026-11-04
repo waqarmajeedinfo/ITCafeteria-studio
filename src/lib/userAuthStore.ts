@@ -105,6 +105,7 @@ export interface UserSessionProfile {
   displayName: string;
   email: string;
   role: UserRole;
+  isApproved?: boolean;
   dedicatedRepoPath: string;
   permissions?: UserPermissions;
 }
@@ -527,6 +528,28 @@ class UserAuthManager {
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'Failed to update privileges');
     this.logSessionActivity('Privileges Adjusted', `Updated feature privileges & limits for @${targetUsername}`, 'AUTH', 'SUCCESS');
+    return result;
+  }
+
+  // Super Admin: Approve or Reject Standard User Account
+  public async toggleUserApproval(targetUsername: string, isApproved: boolean): Promise<any> {
+    if (!this.currentToken) throw new Error('Admin authentication token required');
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(targetUsername)}/approval`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': this.currentToken
+      },
+      body: JSON.stringify({ isApproved })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Approval update failed');
+    this.logSessionActivity(
+      isApproved ? 'User Account Approved' : 'User Account Set Pending',
+      `Super Admin approved account status for @${targetUsername}`,
+      'AUTH',
+      'SUCCESS'
+    );
     return result;
   }
 

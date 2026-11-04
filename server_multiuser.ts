@@ -133,6 +133,7 @@ export interface UserAccount {
   createdAt: string;
   lastLogin: string;
   isActive: boolean;
+  isApproved?: boolean;
   dedicatedRepoPath: string;
   permissions: UserPermissions;
 }
@@ -533,6 +534,7 @@ export function registerMultiUserRoutes(app: Express) {
         createdAt: new Date().toISOString(),
         lastLogin: new Date().toISOString(),
         isActive: true,
+        isApproved: false, // User Requirement: Must be approved by Admin before login!
         dedicatedRepoPath: `user-data/${cleanUsername}`,
         permissions: { ...DEFAULT_STANDARD_PERMISSIONS }
       };
@@ -541,31 +543,27 @@ export function registerMultiUserRoutes(app: Express) {
       saveUsersRegistry();
       ensureUserStorage(newUser.username);
 
-      const token = generateToken();
-      activeSessions.set(token, {
-        user: newUser,
-        expiresAt: Date.now() + 30 * 24 * 3600 * 1000 // 30 days
-      });
-
       await logAuditEvent(
         newUser,
-        'USER_REGISTERED',
-        `New standard user account registered. Dedicated repo directory initialized: ${newUser.dedicatedRepoPath}`,
+        'USER_REGISTERED_PENDING_APPROVAL',
+        `New standard user account registered: @${newUser.username}. Pending Admin approval before login access is granted. Dedicated repo directory initialized: ${newUser.dedicatedRepoPath}`,
         newUser.dedicatedRepoPath,
         req.ip || '127.0.0.1'
       );
 
+      // Standard user cannot login until Admin approves their account
       res.status(201).json({
         ok: true,
-        token,
+        pendingApproval: true,
+        message: 'Account kamyabi se ban gaya hai! Admin ki approval ke baad aap login kar sakenge.',
         user: {
           id: newUser.id,
           username: newUser.username,
           displayName: newUser.displayName,
           email: newUser.email,
           role: newUser.role,
-          dedicatedRepoPath: newUser.dedicatedRepoPath,
-          permissions: newUser.permissions
+          isApproved: false,
+          dedicatedRepoPath: newUser.dedicatedRepoPath
         }
       });
     } catch (e: any) {
@@ -604,6 +602,22 @@ export function registerMultiUserRoutes(app: Express) {
         return res.status(403).json({ error: 'Aapka account disabled hai. Admin se rabta karein.' });
       }
 
+      // User Requirement: Check Admin approval for standard users!
+      if (user.role === 'standard' && user.isApproved === false) {
+        await logAuditEvent(
+          user,
+          'LOGIN_BLOCKED_PENDING_APPROVAL',
+          `Standard user @${user.username} login blocked: Account is awaiting Super Admin approval.`,
+          user.dedicatedRepoPath,
+          req.ip || '127.0.0.1'
+        );
+        return res.status(403).json({
+          error: 'Account Pending Admin Approval',
+          pendingApproval: true,
+          message: 'Aapka account abhi Admin ki approval ka muntazir hai. Super Admin (Waqar Majeed) ke approve karne ke baad aap login kar sakenge.'
+        });
+      }
+
       user.lastLogin = new Date().toISOString();
       saveUsersRegistry();
 
@@ -632,6 +646,7 @@ export function registerMultiUserRoutes(app: Express) {
           displayName: user.displayName,
           email: user.email,
           role: user.role,
+          isApproved: user.isApproved !== false,
           dedicatedRepoPath: user.dedicatedRepoPath,
           permissions: user.permissions || (user.role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)
         }
@@ -886,10 +901,44 @@ export function registerMultiUserRoutes(app: Express) {
       createdAt: u.createdAt,
       lastLogin: u.lastLogin,
       isActive: u.isActive,
+      isApproved: u.isApproved !== false,
       dedicatedRepoPath: u.dedicatedRepoPath,
       permissions: u.permissions || (u.role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)
     }));
     res.json({ ok: true, users: list });
+  });
+
+  // 7a. ADMIN ONLY: Approve or Reject Standard User Account
+  app.put('/api/admin/users/:username/approval', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const adminActor = (req as any).user as UserAccount;
+      const targetUsername = req.params.username.toLowerCase();
+      const user = usersRegistry.find((u) => u.username === targetUsername);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User nahi mila.' });
+      }
+
+      const { isApproved } = req.body;
+      user.isApproved = Boolean(isApproved);
+      saveUsersRegistry();
+
+      await logAuditEvent(
+        adminActor,
+        user.isApproved ? 'USER_APPROVED' : 'USER_UNAPPROVED',
+        `Super Admin Waqar Majeed set approval status to ${user.isApproved} for @${user.username}`,
+        user.dedicatedRepoPath,
+        req.ip || '127.0.0.1'
+      );
+
+      res.json({
+        ok: true,
+        message: `User @${user.username} ka status "${user.isApproved ? 'Approved (منظور شدہ)' : 'Pending Approval'}" ho gaya.`,
+        isApproved: user.isApproved
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: 'Approval update failed', details: e?.message });
+    }
   });
 
   // 7b. ADMIN ONLY: Create New User with Custom Role & Permissions
