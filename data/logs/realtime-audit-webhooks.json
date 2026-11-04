@@ -1,0 +1,98 @@
+[
+  {
+    "id": "audit-1793755965538-d7a6ef",
+    "timestamp": "2026-11-04T01:32:45.538Z",
+    "userId": "user-std-01",
+    "username": "noorwahid",
+    "role": "standard",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: standard",
+    "targetFile": "user-data/noorwahid",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793755960122-80bf6e",
+    "timestamp": "2026-11-04T01:32:40.122Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793755954926-ccd4f4",
+    "timestamp": "2026-11-04T01:32:34.926Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "PASSWORD_RESET_COMPLETED",
+    "details": "Password was successfully reset for user @waqarmajeedinfo",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793755949420-3d366d",
+    "timestamp": "2026-11-04T01:32:29.420Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "PASSWORD_RESET_REQUESTED",
+    "details": "Password reset requested for @waqarmajeedinfo (waqarmajeedinfo@itcafeteria.studio). Reset token: 2118B30B",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793755943223-5e517d",
+    "timestamp": "2026-11-04T01:32:23.223Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793755926646-b0ae28",
+    "timestamp": "2026-11-04T01:32:06.646Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793754573987-5e334a",
+    "timestamp": "2026-11-04T01:09:33.987Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "169.254.169.126",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1793754458738-8548a3",
+    "timestamp": "2026-11-04T01:07:38.738Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "169.254.169.126",
+    "status": "LOCAL_LOGGED"
+  }
+]

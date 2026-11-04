@@ -1,0 +1,71 @@
+[
+  {
+    "id": "user-admin-01",
+    "username": "waqarmajeed",
+    "displayName": "Waqar Majeed (Super Admin)",
+    "email": "admin@itcafeteria.studio",
+    "role": "admin",
+    "salt": "2d6296bfccb7afacd85061df6d2ab1a3",
+    "passwordHash": "e00d6c6b9746be5e416c648c3b0e091771e5419838bbac64fb584668496edc24fa616c788dcf096f4145956c335a686d7d56bc2a0bbbe919981c7b74b194d611",
+    "createdAt": "2026-11-04T01:06:46.533Z",
+    "lastLogin": "2026-11-04T01:06:46.533Z",
+    "isActive": true,
+    "dedicatedRepoPath": "user-data/waqarmajeed",
+    "permissions": {
+      "canUseAutopilot": true,
+      "canEditChannels": true,
+      "canUseThumbnailStudio": true,
+      "canPublishScheduledPosts": true,
+      "canExportData": true,
+      "canUseVoiceScriptGenerator": true,
+      "maxChannelsAllowed": 9999,
+      "dailyGenerationLimit": 9999
+    }
+  },
+  {
+    "id": "user-std-01",
+    "username": "noorwahid",
+    "displayName": "Noor Wahid (Standard)",
+    "email": "noorwahid1016@gmail.com",
+    "role": "standard",
+    "salt": "9d59b8c33078347cfdb737d1a5e29dc6",
+    "passwordHash": "78098d4a62b8025c296139359db74509e5ab1066e5eb72f79eebd03cc72aeec2216a6455d6c10db9d4da73cea1491e718a992ee103afde20e85d9b576432f47b",
+    "createdAt": "2026-11-04T01:06:46.534Z",
+    "lastLogin": "2026-11-04T01:32:45.537Z",
+    "isActive": true,
+    "dedicatedRepoPath": "user-data/noorwahid",
+    "permissions": {
+      "canUseAutopilot": true,
+      "canEditChannels": true,
+      "canUseThumbnailStudio": true,
+      "canPublishScheduledPosts": true,
+      "canExportData": false,
+      "canUseVoiceScriptGenerator": true,
+      "maxChannelsAllowed": 5,
+      "dailyGenerationLimit": 25
+    }
+  },
+  {
+    "id": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "displayName": "Waqar Majeed (Super Admin)",
+    "email": "waqarmajeedinfo@itcafeteria.studio",
+    "role": "admin",
+    "salt": "f86c9d7aa9533ee088f127e1b54a9362",
+    "passwordHash": "e8fed0cc4ddf1113e56e3e15954c46665da66b62d0b430f6f66c78a2358e0449838f79d27ddc4462f2c19932baaa86f74116964ffbc17ecb58a9be8ac6aff85e",
+    "createdAt": "2026-11-04T01:06:46.535Z",
+    "lastLogin": "2026-11-04T01:32:40.121Z",
+    "isActive": true,
+    "dedicatedRepoPath": "user-data/waqarmajeedinfo",
+    "permissions": {
+      "canUseAutopilot": true,
+      "canEditChannels": true,
+      "canUseThumbnailStudio": true,
+      "canPublishScheduledPosts": true,
+      "canExportData": true,
+      "canUseVoiceScriptGenerator": true,
+      "maxChannelsAllowed": 9999,
+      "dailyGenerationLimit": 9999
+    }
+  }
+]

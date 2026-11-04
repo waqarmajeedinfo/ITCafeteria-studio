@@ -28,20 +28,65 @@ const WEBHOOK_CONFIG_FILE = path.resolve(DATA_ROOT, 'webhook-config.json');
 export type UserRole = 'admin' | 'standard';
 
 export interface UserPermissions {
+  // Core Channel Modules (4)
+  canAccessDiagnostics: boolean;
+  canAccessLive: boolean;
+  canAccessSignals: boolean;
+  canAccessBenchmarking: boolean;
+
+  // Autopilot & Automation Modules (3)
   canUseAutopilot: boolean;
-  canEditChannels: boolean;
+  canAccessSimulator: boolean;
+  canAccessCommunity: boolean;
+
+  // Management & Queue Modules (5)
+  canAccessPending: boolean;
+  canAccessCalendar: boolean;
+  canAccessDuplicates: boolean;
+  canAccessMasterlist: boolean;
+  canAccessRoadmap: boolean;
+
+  // AI Studio Modules (7)
+  canAccessChat: boolean;
+  canAccessSearch: boolean;
+  canAccessVideo: boolean;
   canUseThumbnailStudio: boolean;
+  canAccessTranscribe: boolean;
+  canAccessMusic: boolean;
+  canAccess3D: boolean;
+
+  // Administrative Actions
+  canEditChannels: boolean;
   canPublishScheduledPosts: boolean;
   canExportData: boolean;
   canUseVoiceScriptGenerator: boolean;
+
+  // Quotas & Limits
   maxChannelsAllowed: number;
   dailyGenerationLimit: number;
 }
 
 export const DEFAULT_ADMIN_PERMISSIONS: UserPermissions = {
+  canAccessDiagnostics: true,
+  canAccessLive: true,
+  canAccessSignals: true,
+  canAccessBenchmarking: true,
   canUseAutopilot: true,
-  canEditChannels: true,
+  canAccessSimulator: true,
+  canAccessCommunity: true,
+  canAccessPending: true,
+  canAccessCalendar: true,
+  canAccessDuplicates: true,
+  canAccessMasterlist: true,
+  canAccessRoadmap: true,
+  canAccessChat: true,
+  canAccessSearch: true,
+  canAccessVideo: true,
   canUseThumbnailStudio: true,
+  canAccessTranscribe: true,
+  canAccessMusic: true,
+  canAccess3D: true,
+  canEditChannels: true,
   canPublishScheduledPosts: true,
   canExportData: true,
   canUseVoiceScriptGenerator: true,
@@ -50,9 +95,26 @@ export const DEFAULT_ADMIN_PERMISSIONS: UserPermissions = {
 };
 
 export const DEFAULT_STANDARD_PERMISSIONS: UserPermissions = {
+  canAccessDiagnostics: true,
+  canAccessLive: true,
+  canAccessSignals: true,
+  canAccessBenchmarking: true,
   canUseAutopilot: true,
-  canEditChannels: true,
+  canAccessSimulator: true,
+  canAccessCommunity: true,
+  canAccessPending: true,
+  canAccessCalendar: true,
+  canAccessDuplicates: true,
+  canAccessMasterlist: true,
+  canAccessRoadmap: true,
+  canAccessChat: true,
+  canAccessSearch: true,
+  canAccessVideo: true,
   canUseThumbnailStudio: true,
+  canAccessTranscribe: true,
+  canAccessMusic: true,
+  canAccess3D: true,
+  canEditChannels: true,
   canPublishScheduledPosts: true,
   canExportData: false,
   canUseVoiceScriptGenerator: true,
@@ -98,6 +160,9 @@ export interface AuditLogEntry {
 
 // In-Memory active token registry (token -> UserAccount)
 const activeSessions = new Map<string, { user: UserAccount; expiresAt: number }>();
+
+// Password reset tokens registry (token -> { token, expiresAt, username, email })
+const passwordResetTokens = new Map<string, { token: string; expiresAt: number; username: string; email: string }>();
 
 function hashPassword(password: string, salt: string): string {
   return crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
@@ -516,8 +581,8 @@ export function registerMultiUserRoutes(app: Express) {
         return res.status(400).json({ error: 'Username aur Password lazmi hain.' });
       }
 
-      const cleanUsername = username.trim().toLowerCase();
-      const user = usersRegistry.find((u) => u.username === cleanUsername);
+      const cleanInput = username.trim().toLowerCase();
+      const user = usersRegistry.find((u) => u.username.toLowerCase() === cleanInput || (u.email && u.email.toLowerCase() === cleanInput));
 
       if (!user) {
         return res.status(401).json({ error: 'Ghalat username ya password.' });
@@ -528,7 +593,7 @@ export function registerMultiUserRoutes(app: Express) {
         await logAuditEvent(
           null,
           'LOGIN_FAILED',
-          `Failed login attempt for username: ${cleanUsername}`,
+          `Failed login attempt for identifier: ${cleanInput}`,
           undefined,
           req.ip || '127.0.0.1'
         );
@@ -600,6 +665,131 @@ export function registerMultiUserRoutes(app: Express) {
       activeSessions.delete(tokenHeader);
     }
     res.json({ ok: true, message: 'Logged out successfully.' });
+  });
+
+  // 4a. Forgot Password (Generates on-screen & simulated email reset token)
+  app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
+    try {
+      const { identifier } = req.body;
+      if (!identifier || typeof identifier !== 'string') {
+        return res.status(400).json({ error: 'Username ya Email address lazmi hai.' });
+      }
+
+      const clean = identifier.trim().toLowerCase();
+      const user = usersRegistry.find((u) => u.username.toLowerCase() === clean || (u.email && u.email.toLowerCase() === clean));
+
+      if (!user) {
+        return res.status(404).json({ error: 'Is username ya email ka koi account mojood nahi hai.' });
+      }
+
+      // Generate a secure, user-friendly 8-character uppercase hex reset token
+      const resetToken = crypto.randomBytes(4).toString('hex').toUpperCase();
+      const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins validity
+
+      passwordResetTokens.set(resetToken, {
+        token: resetToken,
+        expiresAt,
+        username: user.username,
+        email: user.email
+      });
+
+      await logAuditEvent(
+        user,
+        'PASSWORD_RESET_REQUESTED',
+        `Password reset requested for @${user.username} (${user.email}). Reset token: ${resetToken}`,
+        user.dedicatedRepoPath,
+        req.ip || '127.0.0.1'
+      );
+
+      console.info(`[Auth] Password reset token for ${user.username} (${user.email}): ${resetToken}`);
+
+      res.json({
+        ok: true,
+        resetToken,
+        email: user.email,
+        username: user.username,
+        expiresInMinutes: 15,
+        message: `Password reset token generated successfully. Code: ${resetToken}`
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: 'Forgot password request failed', details: e?.message });
+    }
+  });
+
+  // 4b. Reset Password (Verifies token and sets new password)
+  app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
+    try {
+      const { identifier, resetToken, newPassword } = req.body;
+      if (!identifier || !resetToken || !newPassword) {
+        return res.status(400).json({ error: 'Username/Email, Reset Code, aur Naya Password sab lazmi hain.' });
+      }
+
+      if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'Naya password kam az kam 6 characters ka hona chahiye.' });
+      }
+
+      const tokenRecord = passwordResetTokens.get(resetToken.trim().toUpperCase());
+      if (!tokenRecord) {
+        return res.status(400).json({ error: 'Ghalat ya expired reset code. Baraye mehrbani naya code generate karein.' });
+      }
+
+      if (tokenRecord.expiresAt < Date.now()) {
+        passwordResetTokens.delete(resetToken.trim().toUpperCase());
+        return res.status(400).json({ error: 'Reset code expire ho chuka hai. Dobara generate karein.' });
+      }
+
+      const clean = identifier.trim().toLowerCase();
+      const user = usersRegistry.find((u) => 
+        (u.username.toLowerCase() === clean || (u.email && u.email.toLowerCase() === clean)) &&
+        u.username === tokenRecord.username
+      );
+
+      if (!user) {
+        return res.status(404).json({ error: 'User account match nahi hua.' });
+      }
+
+      // Generate new salt and update password hash
+      const newSalt = crypto.randomBytes(16).toString('hex');
+      user.salt = newSalt;
+      user.passwordHash = hashPassword(newPassword, newSalt);
+      user.lastLogin = new Date().toISOString();
+      saveUsersRegistry();
+
+      // Delete the used token
+      passwordResetTokens.delete(resetToken.trim().toUpperCase());
+
+      // Create new session
+      const token = generateToken();
+      activeSessions.set(token, {
+        user,
+        expiresAt: Date.now() + 30 * 24 * 3600 * 1000
+      });
+
+      await logAuditEvent(
+        user,
+        'PASSWORD_RESET_COMPLETED',
+        `Password was successfully reset for user @${user.username}`,
+        user.dedicatedRepoPath,
+        req.ip || '127.0.0.1'
+      );
+
+      res.json({
+        ok: true,
+        message: 'Password kamyabi se tabdeel ho gaya hai!',
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          displayName: user.displayName,
+          email: user.email,
+          role: user.role,
+          dedicatedRepoPath: user.dedicatedRepoPath,
+          permissions: user.permissions || (user.role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)
+        }
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: 'Password reset failed', details: e?.message });
+    }
   });
 
   // 5. User Isolated Storage: Get User's Own Files & Channels (Protected by strict RBAC)

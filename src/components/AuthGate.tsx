@@ -25,14 +25,20 @@ interface AuthGateProps {
 }
 
 export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
-  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT' | '2FA'>('LOGIN');
+  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT'>('LOGIN');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [tempAuthenticatedUser, setTempAuthenticatedUser] = useState<UserSessionProfile | null>(null);
+
+  // Forgot Password interactive flow state
+  const [forgotStep, setForgotStep] = useState<'REQUEST' | 'RESET'>('REQUEST');
+  const [forgotIdentifier, setForgotIdentifier] = useState('');
+  const [resetTokenInput, setResetTokenInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [generatedResetToken, setGeneratedResetToken] = useState<string | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -56,19 +62,11 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
     try {
       if (mode === 'LOGIN') {
         const user = await userAuthManager.login(username, password);
-        // If user is admin and 2FA is enabled (simulate for admin or check config), prompt for 2FA
-        if (user.role === 'admin' && (user.username === 'waqarmajeed' || user.username === 'waqarmajeedinfo')) {
-          setTempAuthenticatedUser(user);
-          setMode('2FA');
-          setSuccess('Two-Factor Authentication (2FA) required. A verification code has been sent to your admin email.');
-          setIsLoading(false);
-          return;
-        }
         setSuccess(`Khush Amdeed, ${user.displayName}! Logged in successfully.`);
         setTimeout(() => onAuthenticated(user), 300);
       } else if (mode === 'SIGNUP') {
         if (!email.trim()) {
-          setError('Email address is required for verification.');
+          setError('Email address is required for registration.');
           setIsLoading(false);
           return;
         }
@@ -79,28 +77,63 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
           password,
           isVerified: false
         });
-        setSuccess(`Verification email sent to ${email}. Please check your inbox and click the verification link to proceed.`);
-      } else if (mode === 'FORGOT') {
-        if (!forgotEmail.trim()) {
-          setError('Please enter your account email address.');
-          setIsLoading(false);
-          return;
-        }
-        await new Promise((r) => setTimeout(r, 600));
-        setSuccess(`Password reset email successfully sent to ${forgotEmail}. Please check your inbox for secure access instructions.`);
-      } else if (mode === '2FA') {
-        if (twoFactorCode.trim() !== '123456' && twoFactorCode.trim().length !== 6) {
-          setError('Invalid 2FA verification code. Please enter the 6-digit code sent to your email (e.g. 123456).');
-          setIsLoading(false);
-          return;
-        }
-        if (tempAuthenticatedUser) {
-          setSuccess('2FA Verification Confirmed! Access granted.');
-          setTimeout(() => onAuthenticated(tempAuthenticatedUser), 350);
-        }
+        setSuccess(`Verification email sent to ${email}. Please confirm to activate your account.`);
       }
     } catch (err: any) {
       setError(err?.message || 'Authentication error. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRequestResetToken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotIdentifier.trim()) {
+      setError('Please enter your registered username or email.');
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    setIsLoading(true);
+
+    try {
+      const res = await userAuthManager.requestPasswordReset(forgotIdentifier.trim());
+      setGeneratedResetToken(res.resetToken);
+      setResetTokenInput(res.resetToken);
+      setForgotStep('RESET');
+      setSuccess(`Secure reset code generated! Code: ${res.resetToken} (Notification dispatched to ${res.email})`);
+    } catch (err: any) {
+      setError(err?.message || 'Could not find an account with that username or email.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleConfirmPasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetTokenInput.trim()) {
+      setError('Reset token is required.');
+      return;
+    }
+    if (newPasswordInput.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (newPasswordInput !== confirmPasswordInput) {
+      setError('Passwords do not match. Please verify both fields.');
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+    setIsLoading(true);
+
+    try {
+      const user = await userAuthManager.resetPassword(forgotIdentifier.trim(), resetTokenInput.trim(), newPasswordInput);
+      setSuccess(`Password successfully reset! Khush Amdeed, ${user.displayName}.`);
+      setTimeout(() => onAuthenticated(user), 350);
+    } catch (err: any) {
+      setError(err?.message || 'Password reset failed. Invalid or expired token.');
     } finally {
       setIsLoading(false);
     }
@@ -119,10 +152,10 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
         pendingVerification.email
       );
       setPendingVerification(null);
-      setSuccess(`Email verified successfully! Welcome to IT Cafeteria Studio.`);
+      setSuccess(`Account registered and verified successfully! Welcome to IT Cafeteria Studio.`);
       setTimeout(() => onAuthenticated(user), 400);
     } catch (err: any) {
-      setError(err?.message || 'Email not yet verified. Please check your inbox and click the link.');
+      setError(err?.message || 'Registration error. Please check your details.');
     } finally {
       setIsCheckingVerification(false);
     }
@@ -150,52 +183,50 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
             Authentication Gateway
           </h1>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Please sign in, verify your email, or confirm 2FA to access your secure creator studio.
+            Please sign in or reset your password to access your secure creator studio.
           </p>
         </div>
 
         {/* Auth Card */}
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl p-6 backdrop-blur-xl space-y-5 animate-in fade-in duration-300">
           {/* Tab Selector */}
-          {mode !== '2FA' && (
-            <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('LOGIN');
-                  setError(null);
-                  setSuccess(null);
-                  setPendingVerification(null);
-                }}
-                className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  mode === 'LOGIN' || mode === 'FORGOT'
-                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Sign In</span>
-              </button>
+          <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('LOGIN');
+                setError(null);
+                setSuccess(null);
+                setPendingVerification(null);
+              }}
+              className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                mode === 'LOGIN' || mode === 'FORGOT'
+                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('SIGNUP');
-                  setError(null);
-                  setSuccess(null);
-                  setPendingVerification(null);
-                }}
-                className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  mode === 'SIGNUP'
-                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Sign Up</span>
-              </button>
-            </div>
-          )}
+            <button
+              type="button"
+              onClick={() => {
+                setMode('SIGNUP');
+                setError(null);
+                setSuccess(null);
+                setPendingVerification(null);
+              }}
+              className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                mode === 'SIGNUP'
+                  ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Sign Up</span>
+            </button>
+          </div>
 
           {/* Feedback Toasts */}
           {error && (
@@ -212,80 +243,15 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
             </div>
           )}
 
-          {/* Two-Factor Authentication (2FA) Prompt for Admins */}
-          {mode === '2FA' ? (
-            <form onSubmit={handleSubmit} className="space-y-4 animate-in fade-in duration-300">
-              <div className="p-4 bg-purple-950/50 border border-purple-500/40 rounded-xl space-y-2">
-                <div className="flex items-center gap-2 text-purple-300 font-bold text-xs">
-                  <ShieldCheck className="w-4 h-4 text-purple-400" />
-                  <span>Two-Factor Authentication (2FA) Required</span>
-                </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Admin security policy requires 2FA confirmation. Please enter the 6-digit code sent to your registered admin email (Default test code: <strong className="text-white font-mono">123456</strong>):
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  6-Digit 2FA Code
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="123456"
-                    value={twoFactorCode}
-                    onChange={(e) => setTwoFactorCode(e.target.value)}
-                    className="w-full bg-slate-950 border border-purple-500/60 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono tracking-widest text-center focus:outline-none focus:border-purple-400 transition-colors"
-                    required
-                    autoFocus
-                  />
-                  <KeyRound className="w-4 h-4 text-purple-400 absolute left-3 top-3 pointer-events-none" />
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-1">
-                <button
-                  type="submit"
-                  disabled={isLoading || twoFactorCode.trim().length < 4}
-                  className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 transition-all"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      <span>Verifying 2FA Code...</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Confirm &amp; Enter Studio</span>
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('LOGIN');
-                    setTempAuthenticatedUser(null);
-                    setTwoFactorCode('');
-                    setError(null);
-                    setSuccess(null);
-                  }}
-                  className="w-full text-center text-[11px] text-slate-400 hover:text-white underline cursor-pointer pt-1 block"
-                >
-                  Cancel 2FA &amp; Return to Sign In
-                </button>
-              </div>
-            </form>
-          ) : pendingVerification ? (
+          {/* Pending Verification Flow */}
+          {pendingVerification ? (
             <div className="p-4 bg-cyan-950/60 border border-cyan-500/50 rounded-xl space-y-3.5 animate-in fade-in duration-300">
               <div className="flex items-center gap-2 text-cyan-300 font-bold text-xs">
                 <Mail className="w-4 h-4 text-cyan-400 animate-pulse" />
                 <span>Verify Your Email Address</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                We have sent a verification email to <strong className="text-white font-mono">{pendingVerification.email}</strong>. Please check your inbox and click the verification link to activate your account before accessing the studio.
+                Registration details confirmed for <strong className="text-white font-mono">{pendingVerification.email}</strong>. Click below to verify and directly enter the studio.
               </p>
 
               <div className="space-y-2 pt-1">
@@ -298,12 +264,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                   {isCheckingVerification ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      <span>Verifying Email Status...</span>
+                      <span>Activating Account...</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>I Have Verified My Email (Continue)</span>
+                      <span>Confirm Verification &amp; Enter Studio</span>
                     </>
                   )}
                 </button>
@@ -327,66 +293,171 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               </button>
             </div>
           ) : mode === 'FORGOT' ? (
-            <form onSubmit={handleSubmit} className="space-y-4 animate-in fade-in duration-300">
+            <div className="space-y-4 animate-in fade-in duration-300">
               <div className="space-y-1">
                 <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
                   <HelpCircle className="w-4 h-4 text-cyan-400" />
-                  <span>Reset Password via Firebase Auth</span>
+                  <span>Interactive Password Recovery</span>
                 </h3>
                 <p className="text-[11px] text-slate-400">
-                  Enter your account email address below. We will send you a secure password reset link.
+                  {forgotStep === 'REQUEST'
+                    ? 'Enter your registered username or email to generate an instant reset token.'
+                    : 'Enter the reset code and your new password to restore account access immediately.'}
                 </p>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  Account Email Address
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    placeholder="e.g. creator@itcafeteria.studio"
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
-                    required
-                  />
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
-                </div>
-              </div>
+              {forgotStep === 'REQUEST' ? (
+                <form onSubmit={handleRequestResetToken} className="space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      Username or Email Address
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="e.g. waqarmajeedinfo or email"
+                        value={forgotIdentifier}
+                        onChange={(e) => setForgotIdentifier(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors font-mono"
+                        required
+                        autoFocus
+                      />
+                      <User className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
+                    </div>
+                  </div>
 
-              <div className="space-y-2 pt-1">
-                <button
-                  type="submit"
-                  disabled={isLoading || !forgotEmail.trim()}
-                  className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 transition-all"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      <span>Sending Reset Email...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="w-4 h-4" />
-                      <span>Send Password Reset Email</span>
-                    </>
+                  <div className="space-y-2 pt-1">
+                    <button
+                      type="submit"
+                      disabled={isLoading || !forgotIdentifier.trim()}
+                      className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 transition-all"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          <span>Generating Secure Token...</span>
+                        </>
+                      ) : (
+                        <>
+                          <KeyRound className="w-4 h-4" />
+                          <span>Generate Reset Token &amp; Notify Email</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('LOGIN');
+                        setError(null);
+                        setSuccess(null);
+                      }}
+                      className="w-full text-center text-[11px] text-cyan-400 hover:underline cursor-pointer pt-1 block font-semibold"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleConfirmPasswordReset} className="space-y-3.5">
+                  {generatedResetToken && (
+                    <div className="p-3 bg-cyan-950/70 border border-cyan-500/40 rounded-xl space-y-1">
+                      <div className="text-[10px] text-cyan-300 font-semibold uppercase tracking-wider flex items-center justify-between">
+                        <span>Instant On-Screen Reset Token</span>
+                        <span className="text-[9px] text-emerald-400 font-mono">Active (15m)</span>
+                      </div>
+                      <div className="font-mono text-sm font-bold text-white tracking-widest bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center justify-between">
+                        <span className="text-cyan-300">{generatedResetToken}</span>
+                        <span className="text-[10px] text-slate-400 font-sans font-normal">Auto-applied</span>
+                      </div>
+                    </div>
                   )}
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('LOGIN');
-                    setError(null);
-                    setSuccess(null);
-                  }}
-                  className="w-full text-center text-[11px] text-cyan-400 hover:underline cursor-pointer pt-1 block font-semibold"
-                >
-                  Back to Sign In
-                </button>
-              </div>
-            </form>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      Reset Code
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="e.g. A1B2C3D4"
+                        value={resetTokenInput}
+                        onChange={(e) => setResetTokenInput(e.target.value.toUpperCase())}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono tracking-wider focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
+                        required
+                      />
+                      <KeyRound className="w-4 h-4 text-cyan-400 absolute left-3 top-3 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      New Password (minimum 6 characters)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        placeholder="••••••••"
+                        value={newPasswordInput}
+                        onChange={(e) => setNewPasswordInput(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
+                        required
+                      />
+                      <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                      Confirm New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        placeholder="••••••••"
+                        value={confirmPasswordInput}
+                        onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
+                        required
+                      />
+                      <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <button
+                      type="submit"
+                      disabled={isLoading || !newPasswordInput || !resetTokenInput}
+                      className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:opacity-50 transition-all"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          <span>Updating Password...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Set New Password &amp; Enter Studio</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotStep('REQUEST');
+                        setError(null);
+                        setSuccess(null);
+                      }}
+                      className="w-full text-center text-[11px] text-slate-400 hover:text-white cursor-pointer pt-1 block"
+                    >
+                      Request Different Reset Code
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3.5 animate-in fade-in duration-300">
               <div>

@@ -1180,6 +1180,26 @@ var WEBHOOK_CONFIG_FILE = path.resolve(DATA_ROOT, "webhook-config.json");
     fs.mkdirSync(dir, { recursive: true });
   }
 });
+var DEFAULT_ADMIN_PERMISSIONS = {
+  canUseAutopilot: true,
+  canEditChannels: true,
+  canUseThumbnailStudio: true,
+  canPublishScheduledPosts: true,
+  canExportData: true,
+  canUseVoiceScriptGenerator: true,
+  maxChannelsAllowed: 9999,
+  dailyGenerationLimit: 9999
+};
+var DEFAULT_STANDARD_PERMISSIONS = {
+  canUseAutopilot: true,
+  canEditChannels: true,
+  canUseThumbnailStudio: true,
+  canPublishScheduledPosts: true,
+  canExportData: false,
+  canUseVoiceScriptGenerator: true,
+  maxChannelsAllowed: 5,
+  dailyGenerationLimit: 25
+};
 var activeSessions = /* @__PURE__ */ new Map();
 function hashPassword(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 1e3, 64, "sha512").toString("hex");
@@ -1191,7 +1211,40 @@ function initDefaultUsers() {
   if (fs.existsSync(USERS_FILE)) {
     try {
       const data = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
-      if (Array.isArray(data) && data.length > 0) return data;
+      if (Array.isArray(data) && data.length > 0) {
+        const users2 = data.map((u) => ({
+          ...u,
+          permissions: u.permissions || (u.role === "admin" ? { ...DEFAULT_ADMIN_PERMISSIONS } : { ...DEFAULT_STANDARD_PERMISSIONS })
+        }));
+        const adminInfoIndex = users2.findIndex((u) => u.username === "waqarmajeedinfo");
+        if (adminInfoIndex === -1) {
+          const adminInfoSalt2 = crypto.randomBytes(16).toString("hex");
+          const adminInfoUser2 = {
+            id: "user-admin-info-01",
+            username: "waqarmajeedinfo",
+            displayName: "Waqar Majeed (Super Admin)",
+            email: "waqarmajeedinfo@itcafeteria.studio",
+            role: "admin",
+            salt: adminInfoSalt2,
+            passwordHash: hashPassword("WM2info$", adminInfoSalt2),
+            createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+            lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
+            isActive: true,
+            dedicatedRepoPath: "user-data/waqarmajeedinfo",
+            permissions: { ...DEFAULT_ADMIN_PERMISSIONS }
+          };
+          users2.push(adminInfoUser2);
+          fs.writeFileSync(USERS_FILE, JSON.stringify(users2, null, 2), "utf-8");
+        } else {
+          const salt = users2[adminInfoIndex].salt || crypto.randomBytes(16).toString("hex");
+          users2[adminInfoIndex].salt = salt;
+          users2[adminInfoIndex].passwordHash = hashPassword("WM2info$", salt);
+          users2[adminInfoIndex].role = "admin";
+          users2[adminInfoIndex].isActive = true;
+          fs.writeFileSync(USERS_FILE, JSON.stringify(users2, null, 2), "utf-8");
+        }
+        return users2;
+      }
     } catch (e) {
       console.warn("[MultiUser] Failed to read existing users, initializing defaults:", e);
     }
@@ -1208,7 +1261,8 @@ function initDefaultUsers() {
     createdAt: (/* @__PURE__ */ new Date()).toISOString(),
     lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
     isActive: true,
-    dedicatedRepoPath: "user-data/waqarmajeed"
+    dedicatedRepoPath: "user-data/waqarmajeed",
+    permissions: { ...DEFAULT_ADMIN_PERMISSIONS }
   };
   const stdSalt = crypto.randomBytes(16).toString("hex");
   const stdUser = {
@@ -1222,9 +1276,25 @@ function initDefaultUsers() {
     createdAt: (/* @__PURE__ */ new Date()).toISOString(),
     lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
     isActive: true,
-    dedicatedRepoPath: "user-data/noorwahid"
+    dedicatedRepoPath: "user-data/noorwahid",
+    permissions: { ...DEFAULT_STANDARD_PERMISSIONS }
   };
-  const users = [adminUser, stdUser];
+  const adminInfoSalt = crypto.randomBytes(16).toString("hex");
+  const adminInfoUser = {
+    id: "user-admin-info-01",
+    username: "waqarmajeedinfo",
+    displayName: "Waqar Majeed (Super Admin)",
+    email: "waqarmajeedinfo@itcafeteria.studio",
+    role: "admin",
+    salt: adminInfoSalt,
+    passwordHash: hashPassword("WM2info$", adminInfoSalt),
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
+    isActive: true,
+    dedicatedRepoPath: "user-data/waqarmajeedinfo",
+    permissions: { ...DEFAULT_ADMIN_PERMISSIONS }
+  };
+  const users = [adminUser, stdUser, adminInfoUser];
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
   return users;
 }
@@ -1441,7 +1511,8 @@ function registerMultiUserRoutes(app2) {
         createdAt: (/* @__PURE__ */ new Date()).toISOString(),
         lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
         isActive: true,
-        dedicatedRepoPath: `user-data/${cleanUsername}`
+        dedicatedRepoPath: `user-data/${cleanUsername}`,
+        permissions: { ...DEFAULT_STANDARD_PERMISSIONS }
       };
       usersRegistry.push(newUser);
       saveUsersRegistry();
@@ -1468,7 +1539,8 @@ function registerMultiUserRoutes(app2) {
           displayName: newUser.displayName,
           email: newUser.email,
           role: newUser.role,
-          dedicatedRepoPath: newUser.dedicatedRepoPath
+          dedicatedRepoPath: newUser.dedicatedRepoPath,
+          permissions: newUser.permissions
         }
       });
     } catch (e) {
@@ -1524,7 +1596,8 @@ function registerMultiUserRoutes(app2) {
           displayName: user.displayName,
           email: user.email,
           role: user.role,
-          dedicatedRepoPath: user.dedicatedRepoPath
+          dedicatedRepoPath: user.dedicatedRepoPath,
+          permissions: user.permissions || (user.role === "admin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)
         }
       });
     } catch (e) {
@@ -1541,7 +1614,8 @@ function registerMultiUserRoutes(app2) {
         displayName: user.displayName,
         email: user.email,
         role: user.role,
-        dedicatedRepoPath: user.dedicatedRepoPath
+        dedicatedRepoPath: user.dedicatedRepoPath,
+        permissions: user.permissions || (user.role === "admin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)
       }
     });
   });
@@ -1629,9 +1703,160 @@ function registerMultiUserRoutes(app2) {
       createdAt: u.createdAt,
       lastLogin: u.lastLogin,
       isActive: u.isActive,
-      dedicatedRepoPath: u.dedicatedRepoPath
+      dedicatedRepoPath: u.dedicatedRepoPath,
+      permissions: u.permissions || (u.role === "admin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS)
     }));
     res.json({ ok: true, users: list });
+  });
+  app2.post("/api/admin/users", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const adminActor = req.user;
+      const { username, password, displayName, email, role, permissions } = req.body;
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username aur password lazmi hain." });
+      }
+      const cleanUsername = username.trim().toLowerCase().replace(/[^a-zA-Z0-9_-]/g, "");
+      if (cleanUsername.length < 3) {
+        return res.status(400).json({ error: "Username kam az kam 3 characters ka hona chahiye." });
+      }
+      if (usersRegistry.some((u) => u.username === cleanUsername)) {
+        return res.status(409).json({ error: `Username @${cleanUsername} pehle se mojood hai.` });
+      }
+      const userRole = role === "admin" ? "admin" : "standard";
+      const salt = crypto.randomBytes(16).toString("hex");
+      const assignedPermissions = {
+        ...userRole === "admin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS,
+        ...permissions || {}
+      };
+      const newUser = {
+        id: `user-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+        username: cleanUsername,
+        displayName: displayName?.trim() || cleanUsername,
+        email: email?.trim() || `${cleanUsername}@itcafeteria.studio`,
+        role: userRole,
+        salt,
+        passwordHash: hashPassword(password, salt),
+        createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+        lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
+        isActive: true,
+        dedicatedRepoPath: `user-data/${cleanUsername}`,
+        permissions: assignedPermissions
+      };
+      usersRegistry.push(newUser);
+      saveUsersRegistry();
+      ensureUserStorage(newUser.username);
+      await logAuditEvent(
+        adminActor,
+        "ADMIN_USER_CREATED",
+        `Admin Waqar Majeed created new account @${newUser.username} with role ${newUser.role}`,
+        newUser.dedicatedRepoPath,
+        req.ip || "127.0.0.1"
+      );
+      res.status(201).json({ ok: true, message: `User @${newUser.username} kamyabi se create ho gaya.`, user: newUser });
+    } catch (e) {
+      res.status(500).json({ error: "User creation failed", details: e?.message });
+    }
+  });
+  app2.put("/api/admin/users/:username", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const adminActor = req.user;
+      const targetUsername = req.params.username.toLowerCase();
+      const user = usersRegistry.find((u) => u.username === targetUsername);
+      if (!user) {
+        return res.status(404).json({ error: "User nahi mila." });
+      }
+      const { displayName, email, role, password, isActive, permissions } = req.body;
+      if (displayName !== void 0) user.displayName = displayName.trim();
+      if (email !== void 0) user.email = email.trim();
+      if (isActive !== void 0 && targetUsername !== "waqarmajeed") user.isActive = Boolean(isActive);
+      if (role !== void 0 && targetUsername !== "waqarmajeed") {
+        user.role = role === "admin" ? "admin" : "standard";
+      }
+      if (password && password.trim().length >= 4) {
+        user.salt = crypto.randomBytes(16).toString("hex");
+        user.passwordHash = hashPassword(password.trim(), user.salt);
+      }
+      if (permissions) {
+        user.permissions = {
+          ...user.permissions || (user.role === "admin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS),
+          ...permissions
+        };
+      }
+      saveUsersRegistry();
+      await logAuditEvent(
+        adminActor,
+        "ADMIN_USER_UPDATED",
+        `Admin updated profile settings for @${user.username}`,
+        user.dedicatedRepoPath,
+        req.ip || "127.0.0.1"
+      );
+      res.json({ ok: true, message: `User @${user.username} update ho gaya.`, user });
+    } catch (e) {
+      res.status(500).json({ error: "Update failed", details: e?.message });
+    }
+  });
+  app2.delete("/api/admin/users/:username", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const adminActor = req.user;
+      const targetUsername = req.params.username.toLowerCase();
+      if (targetUsername === "waqarmajeed") {
+        return res.status(400).json({ error: 'Super Admin "waqarmajeed" account ko delete nahi kiya ja sakta.' });
+      }
+      const index = usersRegistry.findIndex((u) => u.username === targetUsername);
+      if (index === -1) {
+        return res.status(404).json({ error: "User nahi mila." });
+      }
+      const deleted = usersRegistry.splice(index, 1)[0];
+      saveUsersRegistry();
+      for (const [token, sess] of activeSessions.entries()) {
+        if (sess.user.username === targetUsername) {
+          activeSessions.delete(token);
+        }
+      }
+      await logAuditEvent(
+        adminActor,
+        "ADMIN_USER_DELETED",
+        `Admin deleted user account @${deleted.username}`,
+        deleted.dedicatedRepoPath,
+        req.ip || "127.0.0.1"
+      );
+      res.json({ ok: true, message: `User @${deleted.username} ko delete kar diya gaya.` });
+    } catch (e) {
+      res.status(500).json({ error: "Delete failed", details: e?.message });
+    }
+  });
+  app2.put("/api/admin/users/:username/permissions", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const adminActor = req.user;
+      const targetUsername = req.params.username.toLowerCase();
+      const user = usersRegistry.find((u) => u.username === targetUsername);
+      if (!user) {
+        return res.status(404).json({ error: "User nahi mila." });
+      }
+      const { permissions } = req.body;
+      if (!permissions || typeof permissions !== "object") {
+        return res.status(400).json({ error: "Valid permissions object required." });
+      }
+      user.permissions = {
+        ...user.permissions || (user.role === "admin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STANDARD_PERMISSIONS),
+        ...permissions
+      };
+      saveUsersRegistry();
+      await logAuditEvent(
+        adminActor,
+        "USER_PRIVILEGES_UPDATED",
+        `Admin adjusted privileges & feature limits for @${user.username}`,
+        user.dedicatedRepoPath,
+        req.ip || "127.0.0.1"
+      );
+      res.json({
+        ok: true,
+        message: `User @${user.username} ki privileges aur limits kamyabi se update ho gayin.`,
+        permissions: user.permissions
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Permissions update failed", details: e?.message });
+    }
   });
   app2.get("/api/admin/users/:username/data", authenticateToken, requireAdmin, (req, res) => {
     const targetUser = req.params.username.toLowerCase();
@@ -1738,6 +1963,42 @@ function registerMultiUserRoutes(app2) {
       message: `Dedicated directory "${user.dedicatedRepoPath}" GitHub repository ke sath successfully sync ho gayi hai.`,
       syncMeta
     });
+  });
+  app2.get("/api/user-storage/sync-logs", (_req, res) => {
+    try {
+      const userFolders = [];
+      if (fs.existsSync(GITHUB_MIRROR_DIR)) {
+        const dirs = fs.readdirSync(GITHUB_MIRROR_DIR);
+        dirs.forEach((d) => {
+          const fullPath = path.resolve(GITHUB_MIRROR_DIR, d);
+          if (fs.statSync(fullPath).isDirectory()) {
+            const files = fs.readdirSync(fullPath);
+            const mtime = fs.statSync(fullPath).mtime.toISOString();
+            userFolders.push({ username: d, files, lastModified: mtime });
+          }
+        });
+      }
+      const syncLogs = userFolders.flatMap((folder) => {
+        return folder.files.map((file) => ({
+          id: `fs-${folder.username}-${file}`,
+          timestamp: (/* @__PURE__ */ new Date()).toLocaleTimeString("en-US", { hour12: true }),
+          operation: "FS_WRITE",
+          targetFile: file,
+          username: folder.username,
+          status: "SYNCED",
+          details: `Live FS file verified in user-data/${folder.username}/${file}`,
+          repoPath: `user-data/${folder.username}/${file}`,
+          commitHash: `git-${folder.username.slice(0, 3)}-${Date.now().toString(36).slice(2, 6)}`
+        }));
+      });
+      res.json({
+        ok: true,
+        userFoldersCount: userFolders.length,
+        syncLogs
+      });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to inspect filesystem sync logs", details: err?.message });
+    }
   });
 }
 

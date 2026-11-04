@@ -40,6 +40,8 @@ import {
   userAuthManager,
   USER_AUTH_UPDATED_EVENT,
   USER_ACTIVITY_UPDATED_EVENT,
+  ALL_ADMIN_PERMISSIONS,
+  ALL_STANDARD_PERMISSIONS,
   type UserSessionProfile,
   type AuditLogItem,
   type UserSessionActivity,
@@ -182,14 +184,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
 
   // Form state for Adjusting Permissions & Feature limits
   const [permissionToggles, setPermissionToggles] = useState<UserPermissions>({
-    canUseAutopilot: true,
-    canEditChannels: true,
-    canUseThumbnailStudio: true,
-    canPublishScheduledPosts: true,
-    canExportData: false,
-    canUseVoiceScriptGenerator: true,
-    maxChannelsAllowed: 5,
-    dailyGenerationLimit: 25
+    ...ALL_STANDARD_PERMISSIONS
   });
 
   useEffect(() => {
@@ -356,16 +351,69 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
 
   const openPermissionsModal = (u: any) => {
     setAdjustingUserPermissions(u);
-    setPermissionToggles(u.permissions || {
-      canUseAutopilot: true,
-      canEditChannels: true,
-      canUseThumbnailStudio: true,
-      canPublishScheduledPosts: true,
-      canExportData: false,
-      canUseVoiceScriptGenerator: true,
-      maxChannelsAllowed: 5,
-      dailyGenerationLimit: 25
+    const defaults = u.role === 'admin' ? ALL_ADMIN_PERMISSIONS : ALL_STANDARD_PERMISSIONS;
+    setPermissionToggles({
+      ...defaults,
+      ...(u.permissions || {})
     });
+  };
+
+  const handleSelectAllPermissions = () => {
+    setPermissionToggles((prev) => ({
+      ...prev,
+      canAccessDiagnostics: true,
+      canAccessLive: true,
+      canAccessSignals: true,
+      canAccessBenchmarking: true,
+      canUseAutopilot: true,
+      canAccessSimulator: true,
+      canAccessCommunity: true,
+      canAccessPending: true,
+      canAccessCalendar: true,
+      canAccessDuplicates: true,
+      canAccessMasterlist: true,
+      canAccessRoadmap: true,
+      canAccessChat: true,
+      canAccessSearch: true,
+      canAccessVideo: true,
+      canUseThumbnailStudio: true,
+      canAccessTranscribe: true,
+      canAccessMusic: true,
+      canAccess3D: true,
+      canEditChannels: true,
+      canPublishScheduledPosts: true,
+      canExportData: true,
+      canUseVoiceScriptGenerator: true
+    }));
+  };
+
+  const handleDeselectAllPermissions = () => {
+    setPermissionToggles((prev) => ({
+      ...prev,
+      canAccessDiagnostics: false,
+      canAccessLive: false,
+      canAccessSignals: false,
+      canAccessBenchmarking: false,
+      canUseAutopilot: false,
+      canAccessSimulator: false,
+      canAccessCommunity: false,
+      canAccessPending: false,
+      canAccessCalendar: false,
+      canAccessDuplicates: false,
+      canAccessMasterlist: false,
+      canAccessRoadmap: false,
+      canAccessChat: false,
+      canAccessSearch: false,
+      canAccessVideo: false,
+      canUseThumbnailStudio: false,
+      canAccessTranscribe: false,
+      canAccessMusic: false,
+      canAccess3D: false,
+      canEditChannels: false,
+      canPublishScheduledPosts: false,
+      canExportData: false,
+      canUseVoiceScriptGenerator: false
+    }));
   };
 
   const handleAdminCreateUser = async (e: React.FormEvent) => {
@@ -1427,13 +1475,13 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
               {/* PRIVILEGES & LIMITS MODAL OVERLAY */}
               {adjustingUserPermissions && (
                 <div className="fixed inset-0 z-[125] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                  <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl p-5 max-w-lg w-full shadow-2xl space-y-4">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl p-5 max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
                       <div className="flex items-center gap-2">
                         <SlidersHorizontal className="w-5 h-5 text-cyan-400" />
                         <div>
-                          <h4 className="font-bold text-white text-sm">Privileges &amp; Limits: @{adjustingUserPermissions.username}</h4>
-                          <span className="text-[11px] text-slate-400">Configure which features standard users can access</span>
+                          <h4 className="font-bold text-white text-sm">Superuser Privileges &amp; Limits: @{adjustingUserPermissions.username}</h4>
+                          <span className="text-[11px] text-slate-400">Configure comprehensive module access, operational limits &amp; features</span>
                         </div>
                       </div>
                       <button
@@ -1445,18 +1493,90 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                       </button>
                     </div>
 
-                    <form onSubmit={handleAdminSavePermissions} className="space-y-4">
-                      {/* Feature Toggles */}
-                      <div className="space-y-2">
-                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block">Feature Permissions:</span>
+                    {/* Bulk Selection Header */}
+                    <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800 shrink-0">
+                      <div className="text-xs text-slate-300 font-semibold">
+                        Bulk Controls (تمام آپشنز کے لیے):
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSelectAllPermissions}
+                          className="px-2.5 py-1 bg-cyan-600/20 border border-cyan-500/50 hover:bg-cyan-600/30 text-cyan-300 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                        >
+                          Select All (تمام منتخب کریں)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDeselectAllPermissions}
+                          className="px-2.5 py-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                        >
+                          Deselect All (تمام غیر منتخب کریں)
+                        </button>
+                      </div>
+                    </div>
 
+                    <form onSubmit={handleAdminSavePermissions} className="flex-1 overflow-y-auto space-y-4 pr-1">
+                      {/* Section 1: Core Channel Modules (4 Modules) */}
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block">
+                          📺 Core Channel Modules (4 Modules):
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessDiagnostics}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessDiagnostics: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Channel Diagnostics &amp; Audits</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessLive}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessLive: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Live Video &amp; Streaming Studio</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessSignals}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessSignals: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Trend Signals &amp; Viral Alerts</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessBenchmarking}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessBenchmarking: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Channel Benchmarking &amp; Metrics</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Section 2: Autopilot & Automation Modules (3 Modules) */}
+                      <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                        <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider block">
+                          🤖 Autopilot &amp; Automation Modules (3 Modules):
+                        </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                           <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
                             <input
                               type="checkbox"
                               checked={permissionToggles.canUseAutopilot}
                               onChange={(e) => setPermissionToggles({ ...permissionToggles, canUseAutopilot: e.target.checked })}
-                              className="accent-cyan-500 rounded"
+                              className="accent-purple-500 rounded"
                             />
                             <span className="text-slate-200">Autopilot Decision Engine</span>
                           </label>
@@ -1464,11 +1584,117 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                           <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
                             <input
                               type="checkbox"
-                              checked={permissionToggles.canEditChannels}
-                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canEditChannels: e.target.checked })}
-                              className="accent-cyan-500 rounded"
+                              checked={permissionToggles.canAccessSimulator}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessSimulator: e.target.checked })}
+                              className="accent-purple-500 rounded"
                             />
-                            <span className="text-slate-200">Channel Management</span>
+                            <span className="text-slate-200">Scenario Simulator &amp; Projections</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessCommunity}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessCommunity: e.target.checked })}
+                              className="accent-purple-500 rounded"
+                            />
+                            <span className="text-slate-200">Community &amp; Audience Hub</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Section 3: Management & Queue Modules (5 Modules) */}
+                      <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                        <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block">
+                          📋 Management &amp; Queue Modules (5 Modules):
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessPending}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessPending: e.target.checked })}
+                              className="accent-amber-500 rounded"
+                            />
+                            <span className="text-slate-200">Pending Production Queue</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessCalendar}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessCalendar: e.target.checked })}
+                              className="accent-amber-500 rounded"
+                            />
+                            <span className="text-slate-200">Scheduled Publishing Calendar</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessDuplicates}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessDuplicates: e.target.checked })}
+                              className="accent-amber-500 rounded"
+                            />
+                            <span className="text-slate-200">Duplicate &amp; Hygiene Detector</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessMasterlist}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessMasterlist: e.target.checked })}
+                              className="accent-amber-500 rounded"
+                            />
+                            <span className="text-slate-200">Channel Masterlist &amp; Directory</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessRoadmap}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessRoadmap: e.target.checked })}
+                              className="accent-amber-500 rounded"
+                            />
+                            <span className="text-slate-200">Production Roadmap &amp; Milestones</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Section 4: AI Creative Studios (7 Modules) */}
+                      <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                        <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider block">
+                          ✨ AI Creative Studio Modules (7 Modules):
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessChat}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessChat: e.target.checked })}
+                              className="accent-rose-500 rounded"
+                            />
+                            <span className="text-slate-200">AI Creative Assistant &amp; Hook Chat</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessSearch}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessSearch: e.target.checked })}
+                              className="accent-rose-500 rounded"
+                            />
+                            <span className="text-slate-200">Grounding Research &amp; Search</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessVideo}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessVideo: e.target.checked })}
+                              className="accent-rose-500 rounded"
+                            />
+                            <span className="text-slate-200">AI Video Render Studio</span>
                           </label>
 
                           <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
@@ -1476,9 +1702,77 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                               type="checkbox"
                               checked={permissionToggles.canUseThumbnailStudio}
                               onChange={(e) => setPermissionToggles({ ...permissionToggles, canUseThumbnailStudio: e.target.checked })}
-                              className="accent-cyan-500 rounded"
+                              className="accent-rose-500 rounded"
                             />
-                            <span className="text-slate-200">Thumbnail Studio AI</span>
+                            <span className="text-slate-200">AI Thumbnail Studio</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessTranscribe}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessTranscribe: e.target.checked })}
+                              className="accent-rose-500 rounded"
+                            />
+                            <span className="text-slate-200">Speech-to-Text &amp; Transcribe Studio</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessMusic}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessMusic: e.target.checked })}
+                              className="accent-rose-500 rounded"
+                            />
+                            <span className="text-slate-200">Lyria AI Music &amp; Audio Generation</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccess3D}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccess3D: e.target.checked })}
+                              className="accent-rose-500 rounded"
+                            />
+                            <span className="text-slate-200">Three.js 3D Spatial Visualizer</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Section 5: Operational Action Capabilities */}
+                      <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                        <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block">
+                          ⚡ Operational Feature Capabilities:
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canUseAutopilot}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canUseAutopilot: e.target.checked })}
+                              className="accent-emerald-500 rounded"
+                            />
+                            <span className="text-slate-200">Execute Autopilot Decisions</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canEditChannels}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canEditChannels: e.target.checked })}
+                              className="accent-emerald-500 rounded"
+                            />
+                            <span className="text-slate-200">Edit / Delete Channel Data</span>
+                          </label>
+
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canUseThumbnailStudio}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canUseThumbnailStudio: e.target.checked })}
+                              className="accent-emerald-500 rounded"
+                            />
+                            <span className="text-slate-200">Generate Thumbnails with AI</span>
                           </label>
 
                           <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
@@ -1486,9 +1780,9 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                               type="checkbox"
                               checked={permissionToggles.canPublishScheduledPosts}
                               onChange={(e) => setPermissionToggles({ ...permissionToggles, canPublishScheduledPosts: e.target.checked })}
-                              className="accent-cyan-500 rounded"
+                              className="accent-emerald-500 rounded"
                             />
-                            <span className="text-slate-200">Publish Scheduled Posts</span>
+                            <span className="text-slate-200">Direct Social Post Publishing</span>
                           </label>
 
                           <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
@@ -1496,9 +1790,9 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                               type="checkbox"
                               checked={permissionToggles.canExportData}
                               onChange={(e) => setPermissionToggles({ ...permissionToggles, canExportData: e.target.checked })}
-                              className="accent-cyan-500 rounded"
+                              className="accent-emerald-500 rounded"
                             />
-                            <span className="text-slate-200">Export System Data</span>
+                            <span className="text-slate-200">Export System &amp; Git Data</span>
                           </label>
 
                           <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
@@ -1506,16 +1800,18 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                               type="checkbox"
                               checked={permissionToggles.canUseVoiceScriptGenerator}
                               onChange={(e) => setPermissionToggles({ ...permissionToggles, canUseVoiceScriptGenerator: e.target.checked })}
-                              className="accent-cyan-500 rounded"
+                              className="accent-emerald-500 rounded"
                             />
-                            <span className="text-slate-200">Voice Script Generator</span>
+                            <span className="text-slate-200">Voice Script AI Generator</span>
                           </label>
                         </div>
                       </div>
 
-                      {/* Numeric Limits */}
-                      <div className="space-y-2 pt-2 border-t border-slate-800">
-                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider block">Standard User Limits:</span>
+                      {/* Section 6: Numeric Limits */}
+                      <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                        <span className="text-[11px] font-bold text-slate-200 uppercase tracking-wider block">
+                          Resource Quotas &amp; Limits:
+                        </span>
 
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div>
@@ -1550,7 +1846,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                         </div>
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                      <div className="flex justify-end gap-2 pt-3 border-t border-slate-800 shrink-0">
                         <button
                           type="button"
                           onClick={() => setAdjustingUserPermissions(null)}
@@ -1593,6 +1889,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                       <tr className="bg-slate-900 border-b border-slate-800 text-slate-400 uppercase font-mono text-[10px]">
                         <th className="p-3">User</th>
                         <th className="p-3">Role</th>
+                        <th className="p-3 text-center">Modules Allowed</th>
                         <th className="p-3 text-center">Autopilot</th>
                         <th className="p-3 text-center">Channels</th>
                         <th className="p-3 text-center">Thumbnails</th>
@@ -1601,20 +1898,37 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                         <th className="p-3 text-center">Voice Script</th>
                         <th className="p-3 text-center">Max Ch.</th>
                         <th className="p-3 text-center">Daily Limit</th>
+                        <th className="p-3 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/80">
                       {adminUsers.map((u) => {
-                        const p = u.permissions || {
-                          canUseAutopilot: true,
-                          canEditChannels: true,
-                          canUseThumbnailStudio: true,
-                          canPublishScheduledPosts: true,
-                          canExportData: false,
-                          canUseVoiceScriptGenerator: true,
-                          maxChannelsAllowed: 5,
-                          dailyGenerationLimit: 25
-                        };
+                        const defaults = u.role === 'admin' ? ALL_ADMIN_PERMISSIONS : ALL_STANDARD_PERMISSIONS;
+                        const p = { ...defaults, ...(u.permissions || {}) };
+
+                        const moduleKeys = [
+                          p.canAccessDiagnostics,
+                          p.canAccessLive,
+                          p.canAccessSignals,
+                          p.canAccessBenchmarking,
+                          p.canUseAutopilot,
+                          p.canAccessSimulator,
+                          p.canAccessCommunity,
+                          p.canAccessPending,
+                          p.canAccessCalendar,
+                          p.canAccessDuplicates,
+                          p.canAccessMasterlist,
+                          p.canAccessRoadmap,
+                          p.canAccessChat,
+                          p.canAccessSearch,
+                          p.canAccessVideo,
+                          p.canUseThumbnailStudio,
+                          p.canAccessTranscribe,
+                          p.canAccessMusic,
+                          p.canAccess3D
+                        ];
+                        const enabledCount = moduleKeys.filter(Boolean).length;
+
                         return (
                           <tr key={u.username} className="hover:bg-slate-900/60 transition-colors">
                             <td className="p-3">
@@ -1626,6 +1940,15 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                                 u.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
                               }`}>
                                 {u.role}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center font-mono">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                enabledCount === 19
+                                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                                  : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                              }`}>
+                                {enabledCount} / 19
                               </span>
                             </td>
                             <td className="p-3 text-center">
@@ -1663,6 +1986,15 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                             </td>
                             <td className="p-3 text-center font-mono text-white font-bold">
                               {p.dailyGenerationLimit ?? 25}
+                            </td>
+                            <td className="p-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => openPermissionsModal(u)}
+                                className="px-2 py-1 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/40 rounded text-[10px] font-bold cursor-pointer transition-colors"
+                              >
+                                Edit Access
+                              </button>
                             </td>
                           </tr>
                         );

@@ -5,15 +5,99 @@
 export type UserRole = 'admin' | 'standard';
 
 export interface UserPermissions {
+  // Core Channel Modules (4)
+  canAccessDiagnostics: boolean;
+  canAccessLive: boolean;
+  canAccessSignals: boolean;
+  canAccessBenchmarking: boolean;
+
+  // Autopilot & Automation Modules (3)
   canUseAutopilot: boolean;
-  canEditChannels: boolean;
+  canAccessSimulator: boolean;
+  canAccessCommunity: boolean;
+
+  // Management & Queue Modules (5)
+  canAccessPending: boolean;
+  canAccessCalendar: boolean;
+  canAccessDuplicates: boolean;
+  canAccessMasterlist: boolean;
+  canAccessRoadmap: boolean;
+
+  // AI Studio Modules (7)
+  canAccessChat: boolean;
+  canAccessSearch: boolean;
+  canAccessVideo: boolean;
   canUseThumbnailStudio: boolean;
+  canAccessTranscribe: boolean;
+  canAccessMusic: boolean;
+  canAccess3D: boolean;
+
+  // Administrative Actions
+  canEditChannels: boolean;
   canPublishScheduledPosts: boolean;
   canExportData: boolean;
   canUseVoiceScriptGenerator: boolean;
+
+  // Quotas & Limits
   maxChannelsAllowed: number;
   dailyGenerationLimit: number;
 }
+
+export const ALL_ADMIN_PERMISSIONS: UserPermissions = {
+  canAccessDiagnostics: true,
+  canAccessLive: true,
+  canAccessSignals: true,
+  canAccessBenchmarking: true,
+  canUseAutopilot: true,
+  canAccessSimulator: true,
+  canAccessCommunity: true,
+  canAccessPending: true,
+  canAccessCalendar: true,
+  canAccessDuplicates: true,
+  canAccessMasterlist: true,
+  canAccessRoadmap: true,
+  canAccessChat: true,
+  canAccessSearch: true,
+  canAccessVideo: true,
+  canUseThumbnailStudio: true,
+  canAccessTranscribe: true,
+  canAccessMusic: true,
+  canAccess3D: true,
+  canEditChannels: true,
+  canPublishScheduledPosts: true,
+  canExportData: true,
+  canUseVoiceScriptGenerator: true,
+  maxChannelsAllowed: 9999,
+  dailyGenerationLimit: 9999
+};
+
+export const ALL_STANDARD_PERMISSIONS: UserPermissions = {
+  canAccessDiagnostics: true,
+  canAccessLive: true,
+  canAccessSignals: true,
+  canAccessBenchmarking: true,
+  canUseAutopilot: true,
+  canAccessSimulator: true,
+  canAccessCommunity: true,
+  canAccessPending: true,
+  canAccessCalendar: true,
+  canAccessDuplicates: true,
+  canAccessMasterlist: true,
+  canAccessRoadmap: true,
+  canAccessChat: true,
+  canAccessSearch: true,
+  canAccessVideo: true,
+  canUseThumbnailStudio: true,
+  canAccessTranscribe: true,
+  canAccessMusic: true,
+  canAccess3D: true,
+  canEditChannels: true,
+  canPublishScheduledPosts: true,
+  canExportData: false,
+  canUseVoiceScriptGenerator: true,
+  maxChannelsAllowed: 5,
+  dailyGenerationLimit: 25
+};
 
 export interface UserSessionProfile {
   id: string;
@@ -445,6 +529,68 @@ class UserAuthManager {
     this.logSessionActivity('Privileges Adjusted', `Updated feature privileges & limits for @${targetUsername}`, 'AUTH', 'SUCCESS');
     return result;
   }
+
+  // Request password reset token via email or username
+  public async requestPasswordReset(identifier: string): Promise<{ ok: boolean; resetToken: string; email: string; message: string }> {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Password reset request failed');
+    this.logSessionActivity('Password Reset Requested', `Reset code generated for ${identifier}`, 'AUTH', 'SUCCESS');
+    return data;
+  }
+
+  // Confirm and set new password using resetToken
+  public async resetPassword(identifier: string, resetToken: string, newPassword: string): Promise<UserSessionProfile> {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, resetToken, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Password reset failed');
+    if (data.token && data.user) {
+      this.setSession(data.token, data.user);
+    }
+    this.logSessionActivity('Password Reset Confirmed', `Password successfully updated for ${identifier}`, 'AUTH', 'SUCCESS');
+    return data.user;
+  }
 }
 
 export const userAuthManager = new UserAuthManager();
+
+/**
+ * Global cleanup utility that purges stale persistent development logs
+ * and sync cache upon application initialization for cleaner debugging.
+ */
+export function initGlobalLogCleanup() {
+  if (typeof window === 'undefined') return;
+  try {
+    // 1. Cap session activity logs to last 15 entries
+    const rawActivity = localStorage.getItem('itcafeteria_user_session_activity');
+    if (rawActivity) {
+      try {
+        const parsed = JSON.parse(rawActivity);
+        if (Array.isArray(parsed) && parsed.length > 15) {
+          localStorage.setItem('itcafeteria_user_session_activity', JSON.stringify(parsed.slice(0, 15)));
+        }
+      } catch {}
+    }
+
+    // 2. Remove obsolete temporary log caches while preserving active auth token
+    const staleDebugKeys = [
+      'itcafeteria_debug_temp_logs',
+      'itcafeteria_temp_sync_buffer',
+      'itcafeteria_old_audit_cache'
+    ];
+    staleDebugKeys.forEach((key) => localStorage.removeItem(key));
+
+    // 3. Trigger session activity update event
+    console.info('[IT Cafeteria Studio] Global log cleanup initialized: persistent debug buffers purged.');
+  } catch (err) {
+    console.warn('[IT Cafeteria Studio] Global log cleanup warning:', err);
+  }
+}
