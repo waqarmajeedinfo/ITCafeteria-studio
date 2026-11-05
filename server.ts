@@ -9,7 +9,7 @@ import { applyPhoneticFixes } from './src/lib/phoneticDictionaryStore';
 import { INTEGRATION_PUBLIC_PATHS, registerIntegrationRoutes } from './integrations';
 import { registerMultiUserRoutes } from './server_multiuser';
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,11 +54,12 @@ if (accessKey && process.env.NODE_ENV === 'production' && !process.env.DEFAULT_A
 
 // Shared server-side AI client (supports AIHUBMIX_API_KEY and GEMINI_API_KEY)
 const getAiClient = () => {
-  const apiKey = process.env.AIHUBMIX_API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || process.env.AIHUBMIX_API_KEY || '').trim();
+  console.log('[getAiClient] chosen key prefix:', apiKey ? apiKey.slice(0, 8) + '...' + apiKey.slice(-6) : 'none');
   if (!apiKey) {
-    throw new Error('AI key is not configured in environment secrets (AIHUBMIX_API_KEY or GEMINI_API_KEY).');
+    throw new Error('AI key is not configured in environment secrets (GEMINI_API_KEY or AIHUBMIX_API_KEY).');
   }
-  const isAihubmix = Boolean(process.env.AIHUBMIX_API_KEY) && !process.env.GEMINI_API_KEY;
+  const isAihubmix = !process.env.GEMINI_API_KEY && Boolean(process.env.AIHUBMIX_API_KEY);
   return new GoogleGenAI({
     apiKey,
     httpOptions: {
@@ -90,6 +91,9 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string) =>
 
 const friendlyGeminiError = (err: any, fallback: string): string => {
   const raw = String(err?.message || '');
+  if (/insufficient authentication scopes|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(raw)) {
+    return 'Gemini API Token Issue: Jo key provide ki gayi hai woh OAuth access token hai jisme generative-language scope nahi hai. Barah-e-karam aistudio.google.com/app/apikey se "AIzaSy..." wali standard API key copy karke use karein.';
+  }
   if (/429|RESOURCE_EXHAUSTED|exceeded your current quota|quota|rate limit/i.test(raw)) {
     return 'Gemini ki free limit abhi khatam hai, is liye request poori nahi ho saki. Thori der baad ya quota reset hone par dobara try karein. Jaldi chahiye to Google AI Studio mein billing enable karni padegi.';
   }
@@ -97,7 +101,7 @@ const friendlyGeminiError = (err: any, fallback: string): string => {
     return 'Gemini model abhi busy hai. 1-2 minute baad dobara try karein.';
   }
   if (/401|403|PERMISSION_DENIED|API key not valid|invalid api key/i.test(raw)) {
-    return 'Gemini API key ka issue hai. Render Environment mein GEMINI_API_KEY check karein.';
+    return 'Gemini API key ka issue hai: Key invalid ya unauthorized hai. Barah-e-karam aistudio.google.com/app/apikey se "AIzaSy..." wali fresh key check karein.';
   }
   const trimmed = raw.trim();
   return trimmed && trimmed.length <= 240 ? trimmed : fallback;
@@ -158,6 +162,61 @@ app.get('/api/health', (_req, res) => {
     hasAccessKey: Boolean(process.env.APP_ACCESS_KEY),
     renderReady: true
   });
+});
+
+app.get('/api/ai/key-status', async (_req, res) => {
+  const apiKey = (process.env.GEMINI_API_KEY || process.env.AIHUBMIX_API_KEY || '').trim();
+  if (!apiKey) {
+    return res.json({
+      configured: false,
+      valid: false,
+      keyPrefix: null,
+      message: 'GEMINI_API_KEY environment mein set nahi hai.',
+      recommendation: 'https://aistudio.google.com/app/apikey se "AIzaSy..." wali key hasil karein.'
+    });
+  }
+
+  const keyPrefix = apiKey.length > 7 ? apiKey.slice(0, 7) + '...' : '***';
+  const isLikelyOAuth = apiKey.startsWith('AQ.') || apiKey.startsWith('ya29.');
+
+  try {
+    const ai = getAiClient();
+    const testResult = await withTimeout(
+      ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        contents: 'Ping',
+        config: { maxOutputTokens: 5, temperature: 0.1 }
+      }),
+      8000,
+      'KeyVerification'
+    );
+    return res.json({
+      configured: true,
+      valid: true,
+      isLikelyOAuth: false,
+      keyPrefix,
+      responseSample: testResult?.text?.trim() || 'OK',
+      message: 'Gemini API Key bilkul theek hai aur Google AI model se live response aa raha hai!'
+    });
+  } catch (err: any) {
+    const errMsg = String(err?.message || '');
+    const isScopeError = /insufficient authentication scopes|ACCESS_TOKEN_SCOPE_INSUFFICIENT|PERMISSION_DENIED|403/i.test(errMsg);
+    return res.json({
+      configured: true,
+      valid: false,
+      isLikelyOAuth,
+      keyPrefix,
+      keyLength: apiKey.length,
+      firstChars: apiKey.slice(0, 8),
+      lastChars: apiKey.slice(-6),
+      errorStatus: err?.status || 400,
+      errorDetails: errMsg,
+      reason: isScopeError
+        ? 'SCOPE_INSUFFICIENT: Yeh token Google OAuth / gcloud access token hai jisme generative-language scope shamil nahi hai.'
+        : 'INVALID_OR_QUOTA: API key reject ho gayi ya quota limit cross ho gayi hai.',
+      solutionRomanUrdu: 'Google AI Studio (https://aistudio.google.com/app/apikey) par ja kar "Create API key" par click karein. Wahan se "AIzaSy..." se shuru hone wali genuine API key copy karke GEMINI_API_KEY mein lagayein.'
+    });
+  }
 });
 
 // 1. AI Chatbot API (gemini-3.8-flash, gemini-4-argon, gemini-3.1-flash-lite)
@@ -625,7 +684,7 @@ Return an object with:
 Return ONLY valid JSON.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.1-flash-lite',
       contents: prompt,
       config: { responseMimeType: 'application/json' }
     });
@@ -694,7 +753,7 @@ Return an object with:
 Return ONLY valid JSON.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.1-flash-lite',
       contents: prompt,
       config: { responseMimeType: 'application/json' }
     });
