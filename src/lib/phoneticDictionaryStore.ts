@@ -27,41 +27,20 @@ export interface LearnedWordEdit {
   appliedCount: number;
 }
 
-const STORAGE_KEY = 'itcafeteria_phonetic_dictionary_v2';
+const STORAGE_KEY = 'itcafeteria_phonetic_dictionary_v3';
+const LEGACY_STORAGE_KEY = 'itcafeteria_phonetic_dictionary_v2';
 const LEARNED_EDITS_KEY = 'itcafeteria_phonetic_learned_edits_v1';
 export const PHONETIC_UPDATED_EVENT = 'itcafeteria_phonetic_dictionary_updated';
 
-// Default initial dictionary with Waqar Majeed's verified replacements (including bary, hal, etc.)
+// Clean initial rules dictionary derived directly from BASE_PHONETIC_DICTIONARY
 const INITIAL_RULES: PhoneticRule[] = [
-  ...BASE_PHONETIC_DICTIONARY.map((r) => ({ ...r, isCustom: false, source: 'base' as const })),
-  {
-    word: 'bade / badey / bary',
-    fix: 'barra / barri / barray',
-    reason: 'Flow reads "bary" as English berry or soft slur; use double "rr" (barra / barray) for crisp retroflex flap',
-    isCustom: true,
-    source: 'manual'
-  },
-  {
-    word: 'hal',
-    fix: 'tareeqa / solution / hal-l',
-    reason: 'Flow reads "hal" as "haal" (condition); use "tareeqa", "solution", or double consonant "hal-l"',
-    isCustom: true,
-    source: 'manual'
-  },
-  {
-    word: 'ghalati',
-    fix: 'ghalti',
-    reason: 'Flow pronounces ghalati with unnatural pause; ghalti sounds fluent',
-    isCustom: true,
-    source: 'manual'
-  },
-  {
-    word: 'fastly',
-    fix: 'tezi se / 2x fast',
-    reason: 'Proper Urdu cadence instead of broken English suffix',
-    isCustom: true,
-    source: 'manual'
-  }
+  ...BASE_PHONETIC_DICTIONARY.map((r) => ({
+    word: sanitizePhoneticText(r.word),
+    fix: sanitizePhoneticText(r.fix),
+    reason: r.reason,
+    isCustom: false,
+    source: 'base' as const
+  }))
 ];
 
 export function getPhoneticDictionary(): PhoneticRule[] {
@@ -69,12 +48,34 @@ export function getPhoneticDictionary(): PhoneticRule[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_RULES));
-      return INITIAL_RULES;
+      // Check legacy storage for user custom additions
+      const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      let rulesToUse = INITIAL_RULES;
+      if (legacyRaw) {
+        try {
+          const legacyParsed = JSON.parse(legacyRaw);
+          if (Array.isArray(legacyParsed)) {
+            const customOnly = legacyParsed
+              .filter((r) => r.isCustom || r.source === 'manual' || r.source === 'story_edit')
+              .map((r) => ({
+                ...r,
+                word: sanitizePhoneticText(r.word),
+                fix: sanitizePhoneticText(r.fix)
+              }));
+            rulesToUse = [...INITIAL_RULES, ...customOnly];
+          }
+        } catch {}
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(rulesToUse));
+      return rulesToUse;
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      return parsed.map((r) => ({
+        ...r,
+        word: sanitizePhoneticText(r.word),
+        fix: sanitizePhoneticText(r.fix)
+      }));
     }
   } catch (e) {
     console.error('Error loading phonetic dictionary', e);
@@ -242,37 +243,197 @@ export function recordDialogueEdit(
 }
 
 /**
+ * Cleans UI notes in parentheses like "(masc)", "(feminine)", "(manner)" so only spoken text remains.
+ */
+export function sanitizePhoneticText(text: string): string {
+  if (!text) return '';
+  return text.replace(/\s*\([^)]*\)/g, '').trim();
+}
+
+/**
+ * Preserves the casing of the original word onto the replacement fix.
+ */
+function preserveWordCase(original: string, replacement: string): string {
+  if (!original || !replacement) return replacement;
+  if (original === original.toUpperCase() && original.length > 1) {
+    return replacement.toUpperCase();
+  }
+  if (original[0] === original[0].toUpperCase()) {
+    return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+  }
+  return replacement;
+}
+
+/**
+ * Expands a rule into clean, individual word-to-fix pairs with pair-matching and bracket sanitization.
+ */
+function expandPhoneticRule(rule: PhoneticRule): Array<{ word: string; fix: string }> {
+  if (!rule.word || !rule.fix) return [];
+  const cleanWord = sanitizePhoneticText(rule.word);
+  const cleanFix = sanitizePhoneticText(rule.fix);
+  if (!cleanWord || !cleanFix) return [];
+
+  const wordParts = cleanWord.split(/\s*[\/,|]\s*/).map((p) => p.trim()).filter(Boolean);
+  const fixParts = cleanFix.split(/\s*[\/,|]\s*/).map((f) => f.trim()).filter(Boolean);
+
+  const results: Array<{ word: string; fix: string }> = [];
+  for (let i = 0; i < wordParts.length; i++) {
+    const w = wordParts[i];
+    // If pairwise fix exists for this index use it; otherwise use the first fix
+    const f = fixParts[i] || fixParts[0];
+    if (w && f) {
+      results.push({ word: w, fix: f });
+    }
+  }
+  return results;
+}
+
+/**
  * Apply phonetic rules directly to a text string, replacing mispronounced words
- * with prioritized longest-match ordering and slash-split support.
+ * with prioritized longest-match ordering, parenthesis stripping, and case preservation.
  */
 export function applyPhoneticFixes(text: string): string {
   if (!text) return text;
   const rules = getPhoneticDictionary();
   let result = text;
 
-  // Flatten slash rules (e.g. "bade / badey / bary" -> ["bade", "badey", "bary"])
-  const individualRules: { word: string; fix: string }[] = [];
+  // Flatten and expand all rules cleanly
+  const individualRules: Array<{ word: string; fix: string }> = [];
   for (const rule of rules) {
-    if (!rule.word || !rule.fix) continue;
-    const parts = rule.word.split(/\s*[\/,|]\s*/).map((p) => p.trim()).filter(Boolean);
-    const targetFix = rule.fix.split(/\s*[\/,|]\s*/)[0]?.trim() || rule.fix.trim();
-    for (const part of parts) {
-      if (part.length > 0) {
-        individualRules.push({ word: part, fix: targetFix });
-      }
-    }
+    individualRules.push(...expandPhoneticRule(rule));
   }
 
-  // Sort longest words first so compound words are matched before single words
+  // Sort longest words first so phrases and compound words are matched before single words
   individualRules.sort((a, b) => b.word.length - a.word.length);
 
   for (const item of individualRules) {
     try {
       const escaped = item.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`\\b${escaped}\\b`, 'gi');
-      result = result.replace(regex, item.fix);
+      let regex: RegExp;
+
+      // Special handling for "Chat": don't replace if it's already "ChatGPT", "Chat-G-P-T", or "Chatbot"
+      if (item.word.toLowerCase() === 'chat') {
+        regex = new RegExp(`\\b${escaped}\\b(?!\\s*[-]?\\s*(?:gpt|g-p-t|bot))`, 'gi');
+      } else {
+        regex = new RegExp(`\\b${escaped}\\b`, 'gi');
+      }
+
+      result = result.replace(regex, (match) => {
+        return preserveWordCase(match, item.fix);
+      });
     } catch {}
   }
 
   return result;
+}
+
+export interface PhoneticFixOccurrence {
+  sceneNum: number;
+  field: 'dialogue' | 'script' | 'hook' | 'title' | 'description';
+  originalText: string;
+  fixedText: string;
+}
+
+export interface StoryPhoneticVerificationResult {
+  story: any;
+  verified: boolean;
+  totalFixesApplied: number;
+  occurrences: PhoneticFixOccurrence[];
+  rulesCount: number;
+  summaryMessage: string;
+}
+
+/**
+ * Deep verification pass that audits every scene dialogue, script, hook, and title
+ * against the phonetic rules dictionary, replaces mispronounced words, resynchronizes
+ * script prompts, and recalculates exact word counts before the story is displayed.
+ */
+export function verifyAndCorrectStoryPhonetics(story: any): StoryPhoneticVerificationResult {
+  if (!story || !Array.isArray(story.scenes)) {
+    return {
+      story,
+      verified: true,
+      totalFixesApplied: 0,
+      occurrences: [],
+      rulesCount: getPhoneticDictionary().length,
+      summaryMessage: 'No scenes to verify'
+    };
+  }
+
+  const occurrences: PhoneticFixOccurrence[] = [];
+  const rules = getPhoneticDictionary();
+
+  // Audit and correct each scene
+  const updatedScenes = story.scenes.map((scene: any, idx: number) => {
+    const origDialogue = String(scene.dialogue || '').trim();
+    const fixedDialogue = applyPhoneticFixes(origDialogue);
+
+    if (origDialogue !== fixedDialogue) {
+      occurrences.push({
+        sceneNum: scene.num || idx + 1,
+        field: 'dialogue',
+        originalText: origDialogue,
+        fixedText: fixedDialogue
+      });
+    }
+
+    // Keep Flow prompt script 100% in sync with the corrected dialogue
+    let script = String(scene.script || '');
+    if (origDialogue && script.includes(origDialogue)) {
+      script = script.split(origDialogue).join(fixedDialogue);
+    } else {
+      script = applyPhoneticFixes(script);
+    }
+
+    const words = fixedDialogue ? fixedDialogue.split(/\s+/).filter(Boolean).length : (scene.words || 0);
+
+    return {
+      ...scene,
+      dialogue: fixedDialogue,
+      script,
+      words
+    };
+  });
+
+  const origHook = String(story.hook || '');
+  const fixedHook = applyPhoneticFixes(origHook);
+  if (origHook !== fixedHook) {
+    occurrences.push({
+      sceneNum: 1,
+      field: 'hook',
+      originalText: origHook,
+      fixedText: fixedHook
+    });
+  }
+
+  const origTitle = String(story.title || '');
+  const fixedTitle = applyPhoneticFixes(origTitle);
+
+  const origDesc = String(story.description || '');
+  const fixedDesc = applyPhoneticFixes(origDesc);
+
+  const totalFixesApplied = occurrences.length;
+  const verifiedStory = {
+    ...story,
+    title: fixedTitle,
+    hook: fixedHook,
+    description: fixedDesc,
+    scenes: updatedScenes,
+    phoneticVerified: true,
+    phoneticVerificationTimestamp: new Date().toISOString(),
+    phoneticFixesCount: totalFixesApplied
+  };
+
+  const summaryMessage = totalFixesApplied > 0
+    ? `Verified against ${rules.length} phonetic rules: ${totalFixesApplied} dialogue corrections applied.`
+    : `Verified against ${rules.length} phonetic rules: 100% compliant, zero mispronunciations detected.`;
+
+  return {
+    story: verifiedStory,
+    verified: true,
+    totalFixesApplied,
+    occurrences,
+    rulesCount: rules.length,
+    summaryMessage
+  };
 }

@@ -32,7 +32,7 @@ import { StoryPackageView, type GeneratedStory, type StoryIdea, type StoryScene 
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import type { SimulatorConfig } from './SimulatorConfigModal';
 import { checkDeletedStoryBlacklist, loadDeletedStoryBlacklist } from '../lib/deletedStoryRegistry';
-import { applyPhoneticFixes } from '../lib/phoneticDictionaryStore';
+import { applyPhoneticFixes, verifyAndCorrectStoryPhonetics, getPhoneticDictionary } from '../lib/phoneticDictionaryStore';
 
 export interface AgentTriggerSelection {
   channelId: ChannelProfile['id'];
@@ -738,19 +738,23 @@ Status: bani`;
         modelUsed: data.modelUsed
       };
 
+      // Mandatory Verification & Correction Pass:
+      // Audit all dialogues, compare against phonetic rules dictionary, replace mispronunciations, and sync scripts
+      const { story: verifiedStory } = verifyAndCorrectStoryPhonetics(generatedStory);
+
       if (!mountedRef.current) return;
-      setStory(generatedStory);
+      setStory(verifiedStory);
       setPhase('complete');
       onOutcomeRef.current({
         status: 'generated',
         selection,
-        title: generatedStory.title,
-        hook: generatedStory.hook,
+        title: verifiedStory.title,
+        hook: verifiedStory.hook,
         duplicates: [],
         topic: idea.title,
         discussionNotes: notes || undefined,
         matchContext: checkStage,
-        story: generatedStory,
+        story: verifiedStory,
         idea
       });
     } catch (error: any) {
@@ -902,6 +906,11 @@ Status: bani`;
       icon: <Layers className="w-4 h-4" />
     },
     {
+      title: 'Phonetic dictionary dialogue verification & correction',
+      detail: 'فنیٹک رولز ڈکشنری سے تمام ڈائیلاگز کا موازنہ اور مس پرناؤنسڈ الفاظ کی آٹو کریکشن',
+      icon: <Check className="w-4 h-4" />
+    },
+    {
       title: '5-item upload package',
       detail: 'Title + hashtags • description • tags • TikTok • thumbnail prompt',
       icon: <Sparkles className="w-4 h-4" />
@@ -1030,18 +1039,19 @@ Rules:
       discussionNotes.trim(),
       simulatorConfig
     );
-    setStory(offlineStory);
+    const { story: verifiedOfflineStory } = verifyAndCorrectStoryPhonetics(offlineStory);
+    setStory(verifiedOfflineStory);
     setPhase('complete');
     onOutcomeRef.current({
       status: 'generated',
       selection,
-      title: offlineStory.title,
-      hook: offlineStory.hook,
+      title: verifiedOfflineStory.title,
+      hook: verifiedOfflineStory.hook,
       duplicates: [],
       topic: targetIdea.title,
       discussionNotes: discussionNotes.trim() || undefined,
       matchContext: checkStage,
-      story: offlineStory,
+      story: verifiedOfflineStory,
       idea: targetIdea
     });
   };
@@ -1489,11 +1499,25 @@ Rules:
           )}
 
           {phase === 'complete' && story && (
-            <StoryPackageView
-              story={story}
-              onUpdateStory={(updated) => setStory(updated)}
-              onDeleteStory={() => setStory(null)}
-            />
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>
+                    <strong>Phonetic Rules Dictionary Verified:</strong> All {story.scenes?.length || 0} scene dialogues cross-verified against {getPhoneticDictionary().length} living rules.
+                    {(story as any).phoneticFixesCount ? ` (${(story as any).phoneticFixesCount} mispronunciations automatically corrected)` : ' (Zero mispronunciations detected)'}
+                  </span>
+                </div>
+                <span className="text-[10px] text-emerald-400/80 bg-emerald-900/40 px-2 py-0.5 rounded border border-emerald-500/20">
+                  Ready for TTS & Google Flow
+                </span>
+              </div>
+              <StoryPackageView
+                story={story}
+                onUpdateStory={(updated) => setStory(updated)}
+                onDeleteStory={() => setStory(null)}
+              />
+            </div>
           )}
 
           {phase === 'error' && (

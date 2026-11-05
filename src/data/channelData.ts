@@ -537,18 +537,24 @@ export const PUBLISHED_VIDEOS: PublishedVideo[] = [
 export const PHONETIC_DICTIONARY = [
   { word: "waqt", fix: "waq-t", reason: "Hyphen breaks consonant cluster preventing rushed slur" },
   { word: "aksar", fix: "ak-sr", reason: "aksar and ak-sar failed; ak-sr delivers natural Pakistani pronunciation" },
-  { word: "turant", fix: "usi waqt / isi waqt / for-rn", reason: "Hindi loanword; strict prohibition, use native Urdu equivalents" },
-  { word: "Aisi / aise", fix: "aesi (feminine) / aesy (manner)", reason: "Prevents English word confusion and vowel-stretching" },
-  { word: "zaya", fix: "zaya (action) / ze-ya (noun)", reason: "Choose by syntactic meaning to match native speech cadence" },
-  { word: "Fikar", fix: "Fikr", reason: "Prevents elongation into extra syllable 'fi-kar'" },
-  { word: "sahi", fix: "theek / durust", reason: "Always comes out stretched 'saaahi'; permanent replacement" },
-  { word: "Chat (alone)", fix: "Chat-G-P-T / baat-cheet", reason: "Comes out as 'cheet/chiet'; use hyphenated brand or phrase" },
-  { word: "bara", fix: "barra (masc) / barri (fem)", reason: "Double 'rr' forces crisp flap consonant instead of soft vowel" },
+  { word: "turant", fix: "usi waqt", reason: "Hindi loanword; strict prohibition, use native Urdu equivalent 'usi waqt'" },
+  { word: "Aisi / aisi", fix: "aesi", reason: "Prevents English word confusion and vowel-stretching" },
+  { word: "aise / Aise", fix: "aesy", reason: "Prevents English word confusion and vowel-stretching" },
+  { word: "zaya", fix: "ze-ya", reason: "Natural Urdu speech cadence without flat vowel" },
+  { word: "Fikar / fikar", fix: "Fikr", reason: "Prevents elongation into extra syllable 'fi-kar'" },
+  { word: "sahi", fix: "theek", reason: "Always comes out stretched 'saaahi'; permanent replacement" },
+  { word: "Chat", fix: "Chat-G-P-T", reason: "Standalone 'Chat' slurs as 'cheet'; use hyphenated brand" },
+  { word: "bara / bade", fix: "barra", reason: "Double 'rr' forces crisp flap consonant instead of soft vowel" },
+  { word: "bari / badi", fix: "barri", reason: "Double 'rr' forces crisp flap consonant instead of soft vowel" },
+  { word: "baray / badey / bary", fix: "barray", reason: "Double 'rr' forces crisp flap consonant instead of soft vowel" },
   { word: "qaid", fix: "limit", reason: "Permanent replacement: 'kisi experience ki limit nahi'" },
   { word: "ghaanton", fix: "ghanton", reason: "Single 'a' prevents over-drawn vowel sound" },
   { word: "hal", fix: "tareeqa", reason: "Flow reads 'hal' as 'haal' (condition); use 'tareeqa' (method)" },
-  { word: "pare", fix: "parre", reason: "Double 'rr' prevents soft retroflex slur" },
-  { word: "Gemini / dhoondna", fix: "Jemini / talaash karna", reason: "Repeat-prone words under test to stop stutter in first frame" }
+  { word: "pare / pade", fix: "parre", reason: "Double 'rr' prevents soft retroflex slur" },
+  { word: "Gemini", fix: "Jemini", reason: "Forces natural J sound preventing robotic stutter" },
+  { word: "dhoondna", fix: "talaash karna", reason: "Repeat-prone words under test to stop stutter in first frame" },
+  { word: "ghalati", fix: "ghalti", reason: "Flow pronounces ghalati with unnatural pause; ghalti sounds fluent" },
+  { word: "fastly", fix: "tezi se", reason: "Proper Urdu cadence instead of broken English suffix" }
 ];
 
 export const YT_AUTOMATION_ROADMAP = [

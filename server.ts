@@ -5,6 +5,7 @@ import { timingSafeEqual } from 'crypto';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { buildMasterThumbnailPrompt, splitHeadline } from './src/lib/thumbnailMaster';
+import { applyPhoneticFixes } from './src/lib/phoneticDictionaryStore';
 import { INTEGRATION_PUBLIC_PATHS, registerIntegrationRoutes } from './integrations';
 import { registerMultiUserRoutes } from './server_multiuser';
 
@@ -51,15 +52,17 @@ if (accessKey && process.env.NODE_ENV === 'production' && !process.env.DEFAULT_A
   });
 }
 
-// Shared server-side Gemini client
+// Shared server-side AI client (supports AIHUBMIX_API_KEY and GEMINI_API_KEY)
 const getAiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.AIHUBMIX_API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured in environment secrets.');
+    throw new Error('AI key is not configured in environment secrets (AIHUBMIX_API_KEY or GEMINI_API_KEY).');
   }
+  const isAihubmix = Boolean(process.env.AIHUBMIX_API_KEY) && !process.env.GEMINI_API_KEY;
   return new GoogleGenAI({
     apiKey,
     httpOptions: {
+      ...(isAihubmix ? { baseUrl: 'https://aihubmix.com' } : {}),
       headers: {
         'User-Agent': 'aistudio-build',
       },
@@ -1643,7 +1646,8 @@ Return STRICT valid JSON only, no markdown fences:
     const scenes = rawScenes
       .filter((scene: any) => scene && (scene.script || scene.dialogue))
       .map((scene: any, index: number) => {
-        const dialogue = safeString(scene.dialogue);
+        const rawDialogue = safeString(scene.dialogue);
+        const dialogue = applyPhoneticFixes(rawDialogue);
         const visual = safeString(scene.visual);
         let script = safeString(scene.script);
         if (!script.includes('[DIRECTOR') || !script.includes('DIALOGUE:')) {
@@ -1657,6 +1661,8 @@ Return STRICT valid JSON only, no markdown fences:
 [SCENE VISUAL & PROPS]: ${visual}
 [PRESENTER & ACTION]: ${tag} (${presenter}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence.
 DIALOGUE: "${dialogue}"`;
+        } else {
+          script = applyPhoneticFixes(script);
         }
         const computedWords = dialogue ? dialogue.split(/\s+/).filter(Boolean).length : 0;
         return {
@@ -1817,7 +1823,8 @@ Return STRICT valid JSON only with NO markdown fences:
     const safeString = (value: any) => String(value || '').trim();
     const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
     const refreshedScenes = rawScenes.map((scene: any, index: number) => {
-      const dialogue = safeString(scene.dialogue);
+      const rawDialogue = safeString(scene.dialogue);
+      const dialogue = applyPhoneticFixes(rawDialogue);
       const visual = safeString(scene.visual);
       let script = safeString(scene.script);
       if (!script.includes('[DIRECTOR') || !script.includes('DIALOGUE:')) {
@@ -1825,6 +1832,8 @@ Return STRICT valid JSON only with NO markdown fences:
 [SCENE VISUAL & PROPS]: ${visual}
 [PRESENTER & ACTION]: ${story.characterTag || '@WM25-1'} (${story.presenter || 'Waqar Majeed'}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence.
 DIALOGUE: "${dialogue}"`;
+      } else {
+        script = applyPhoneticFixes(script);
       }
       return {
         num: index + 1,

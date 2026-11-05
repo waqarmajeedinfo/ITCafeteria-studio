@@ -912,6 +912,7 @@ export function rewriteCompleteStoryPackage(currentStory: GeneratedStory, prefer
 
     const rawFreshDialogue = pick.dialogue;
     const freshDialogue = applyPhoneticFixes(rawFreshDialogue);
+    const freshVisual = pick.visual;
     const freshScript = `[PRESENTER & ACTION]: ${charTag} ${freshVisual.replace(charTag, '').trim()}.\n[CAMERA & LIGHTING]: Studio 4K, 60fps cinematic key light, cyan accents. Duration: 0-10s.\n[VOICEOVER / DIALOGUE]: "${freshDialogue}"`;
     const wordCount = freshDialogue.split(/\s+/).filter(Boolean).length;
 
