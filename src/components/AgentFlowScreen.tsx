@@ -224,7 +224,7 @@ export function findDuplicateMatches(
 
   // Check if candidate is explicitly a Sequel / Part 2 / Episode 2.
   // Approved sequels to previously published videos should NOT be blocked as duplicates.
-  const isCandidateSequel = /\b(part\s*[2-9]|sequel|episode\s*[2-9]|advanced|pro|phase\s*2|اگلا پارٹ)\b/i.test(combinedCandidate);
+  const isCandidateSequel = /\b(part\s*[2-9]|sequel|episode\s*[2-9]|advanced|pro|phase\s*2|next\s*part)\b/i.test(combinedCandidate);
 
   // 1. Gather all existing records: static catalog (58) + live published stories + pending queue + session memory
   const allPublished = getAllPublishedVideos();
@@ -560,7 +560,8 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
         category: `${category.id}. ${category.name}`,
         seedTopic: seed,
         excludeTitles: buildExcludedTitles([seed]),
-        count: mode === 'duplicate' ? 4 : 3
+        count: mode === 'duplicate' ? 4 : 3,
+        priorityResources: (selection as any)?.priorityResources || []
       }, abortRef.current?.signal);
 
       const rawIdeas: StoryIdea[] = (Array.isArray(data.ideas) ? data.ideas : [])
@@ -907,7 +908,7 @@ Status: bani`;
     },
     {
       title: 'Phonetic dictionary dialogue verification & correction',
-      detail: 'فنیٹک رولز ڈکشنری سے تمام ڈائیلاگز کا موازنہ اور مس پرناؤنسڈ الفاظ کی آٹو کریکشن',
+      detail: 'Phonetic dictionary matching and automatic correction of mispronounced terminology',
       icon: <Check className="w-4 h-4" />
     },
     {
@@ -1299,7 +1300,7 @@ Rules:
                     className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-cyan-500/25 flex items-center gap-1.5 cursor-pointer shrink-0"
                   >
                     <Film className="w-3.5 h-3.5" />
-                    <span>🎬 Part 2 Sequel Generate Karein (اگلا پارٹ بنائیں)</span>
+                    <span>🎬 Generate Part 2 Sequel</span>
                   </button>
                 </div>
               </div>

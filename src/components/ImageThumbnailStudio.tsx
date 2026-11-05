@@ -167,7 +167,7 @@ export const ImageThumbnailStudio: React.FC = () => {
               )}
             </div>
             <p className="text-[11px] text-slate-400">
-              Render.com یا GitHub Environment Variables mein <code>XIAOMI_API_KEY</code> save hai to automatically use hogi. Agar aap yahan local key lagana chahte hain to paste karein:
+              Render.com or GitHub Environment Variables mein <code>XIAOMI_API_KEY</code> save hai to automatically use hogi. Agar aap yahan local key lagana chahte hain to paste karein:
             </p>
             <div className="flex gap-2">
               <input

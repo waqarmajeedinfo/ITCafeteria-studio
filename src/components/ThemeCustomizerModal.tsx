@@ -148,14 +148,14 @@ export function ThemeCustomizerModal({
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                مکمل تھیم، کلر پیلٹ، آٹو ہولوگرام موڈ، ٹاپ بار اور بلاکس کی فزیکل سیٹنگز
+                Full theme, color palette, auto hologram mode, top bar and layout settings
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
-            title="بند کریں"
+            title="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -238,7 +238,7 @@ export function ThemeCustomizerModal({
                     <span>Global Accent Color Palette</span>
                   </h4>
                   <p className="text-xs text-slate-400 mt-1">
-                    سٹوڈیو کے بٹنز، ہائی لائٹس، اور ہولوگرافک گِلو کا مرکزی کلر منتخب کریں:
+                    Select primary color for buttons, highlights, and holographic glow:
                   </p>
 
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-3">
@@ -267,7 +267,7 @@ export function ThemeCustomizerModal({
                 {/* Base Dark Surface Tone */}
                 <div className="pt-4 border-t border-slate-800/80">
                   <h4 className="text-sm font-semibold text-white">Dark Base Tone (Surface Canvas)</h4>
-                  <p className="text-xs text-slate-400 mt-0.5">سٹوڈیو کی پس منظر گہرائی:</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Studio background depth:</p>
                   <div className="grid grid-cols-3 gap-2.5 mt-2.5">
                     {[
                       { id: 'obsidian', label: 'Obsidian Void', desc: 'Deep Pitch Black #020617' },
@@ -293,7 +293,7 @@ export function ThemeCustomizerModal({
                 {/* Glassmorphism & Card Glow Intensity */}
                 <div className="pt-4 border-t border-slate-800/80">
                   <h4 className="text-sm font-semibold text-white">Glassmorphism & Neon Glow</h4>
-                  <p className="text-xs text-slate-400 mt-0.5">شیشے اور بیک گراؤنڈ بلر کی انٹینسیٹی:</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Glass and background blur intensity:</p>
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     {(['low', 'medium', 'high'] as const).map((level) => (
                       <button
@@ -325,7 +325,7 @@ export function ThemeCustomizerModal({
                       <div>
                         <h4 className="text-sm font-semibold text-white">Auto-Theme Mode (Time of Day Engine)</h4>
                         <p className="text-xs text-slate-300 mt-0.5">
-                          صبح، دوپہر، شام اور رات کے مطابق ہولوگرافک تھیم خود بخود تبدیل ہوتا ہے
+                          Holographic theme adjusts automatically based on morning, noon, evening, and night
                         </p>
                       </div>
                     </div>
@@ -384,7 +384,7 @@ export function ThemeCustomizerModal({
                       <div>
                         <h4 className="text-sm font-semibold text-white">User Activity Level Reactive Opacity</h4>
                         <p className="text-xs text-slate-300 mt-0.5">
-                          جب آپ سٹوڈیو استعمال کرتے ہیں تو ہولوگرام زندہ ہو جاتا ہے، اور خاموشی پر ایمبیئنٹ موڈ میں چلا جاتا ہے
+                          Hologram stays responsive and vibrant during activity, smoothly dimming to ambient mode when idle
                         </p>
                       </div>
                     </div>
@@ -472,10 +472,10 @@ export function ThemeCustomizerModal({
                 <div>
                   <h4 className="text-sm font-semibold text-white flex items-center gap-2">
                     <Layout className="w-4 h-4 text-amber-400" />
-                    <span>Top Bar Space Modules (اوپری خالی جگہ کو کور کرنے والے ماڈیولز)</span>
+                    <span>Top Bar Space Modules</span>
                   </h4>
                   <p className="text-xs text-slate-400 mt-1">
-                    جیسا کہ آپ نے بتایا کہ اوپر صرف ہولوگرام اور ایڈٹ بینر کا بٹن آتا ہے اور باقی جگہ خالی رہتی ہے، یہاں سے آپ لائیو اسٹیٹس، بریکنگ نیوز، یا شارٹ کٹس لگا کر اس جگہ کو خوبصورت اور کارآمد بنا سکتے ہیں:
+                    Configure live status badges, breaking news tickers, or fast shortcuts to make the top bar productive and balanced:
                   </p>
                 </div>
 
@@ -507,7 +507,7 @@ export function ThemeCustomizerModal({
                       </div>
                       <div>
                         <p className="text-xs font-semibold text-white">Live Breaking Announcement Ticker</p>
-                        <p className="text-[11px] text-slate-400">اوپر والے ہیڈر میں بریکنگ نیوز یا نئی ویڈیو کا میسج چلائیں</p>
+                        <p className="text-[11px] text-slate-400">Display breaking news ticker or new video release alert in top header</p>
                       </div>
                     </div>
                     <input
@@ -520,7 +520,7 @@ export function ThemeCustomizerModal({
 
                   {config.showTopBarTicker && (
                     <div className="pt-2 border-t border-slate-800">
-                      <label className="text-[11px] text-slate-300 font-medium">میسج تبدیل کریں:</label>
+                      <label className="text-[11px] text-slate-300 font-medium">Custom Ticker Message:</label>
                       <input
                         type="text"
                         value={config.topAnnouncementText}
@@ -540,7 +540,7 @@ export function ThemeCustomizerModal({
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-white">Quick Action Shortcuts Hub</p>
-                      <p className="text-[11px] text-slate-400">اوپر ہیڈر میں فاسٹ پینل شارٹ کٹس (AI Script, Voice, Duplicate Checker)</p>
+                      <p className="text-[11px] text-slate-400">Quick access panel shortcuts (AI Script, Voice, Duplicate Checker) in header</p>
                     </div>
                   </div>
                   <input
@@ -559,7 +559,7 @@ export function ThemeCustomizerModal({
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-white">Streaming Live Badge in Top Header</p>
-                      <p className="text-[11px] text-slate-400">بائیں طرف لائیو ریڈیو بیج ڈسپلے کریں</p>
+                      <p className="text-[11px] text-slate-400">Display live radio status badge in top header</p>
                     </div>
                   </div>
                   <input
@@ -581,13 +581,13 @@ export function ThemeCustomizerModal({
                     <span>Block Structure, Density & Corner Radii</span>
                   </h4>
                   <p className="text-xs text-slate-400 mt-1">
-                    سٹوڈیو کے تمام کارڈز اور پورشنز کی گولائی اور فاصلہ سیٹ کریں:
+                    Adjust corner radius, density, and spacing across studio cards:
                   </p>
                 </div>
 
                 {/* Corner Radius Controls */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-300">Card Corner Style (گولائی):</label>
+                  <label className="text-xs font-semibold text-slate-300">Card Corner Style:</label>
                   <div className="grid grid-cols-3 gap-3 mt-2">
                     {[
                       { id: 'sharp', label: 'Cyber Crisp', desc: 'Sharper 6px borders' },
@@ -614,7 +614,7 @@ export function ThemeCustomizerModal({
 
                 {/* Layout Density */}
                 <div className="pt-4 border-t border-slate-800">
-                  <label className="text-xs font-semibold text-slate-300">UI Spacing & Density (فاصلہ اور پھیلاؤ):</label>
+                  <label className="text-xs font-semibold text-slate-300">UI Spacing & Density:</label>
                   <div className="grid grid-cols-3 gap-3 mt-2">
                     {[
                       { id: 'compact', label: 'Compact Studio', desc: 'More data on screen' },
@@ -648,7 +648,7 @@ export function ThemeCustomizerModal({
                     <span>Channel Identity & Tagline Handling</span>
                   </h4>
                   <p className="text-xs text-slate-400 mt-1">
-                    چینل کی ٹیگ لائن اور بیجز کی کسٹمائزیشن:
+                    Channel tagline, verified badges, and header customization:
                   </p>
                 </div>
 
@@ -666,7 +666,7 @@ export function ThemeCustomizerModal({
                   <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
                     <div>
                       <p className="text-xs font-semibold text-white">Show Tagline in Top Bar</p>
-                      <p className="text-[10px] text-slate-400">ہیڈر پر ٹیگ لائن دکھائی دے</p>
+                      <p className="text-[10px] text-slate-400">Show channel tagline below banner</p>
                     </div>
                     <input
                       type="checkbox"
@@ -679,7 +679,7 @@ export function ThemeCustomizerModal({
                   <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
                     <div>
                       <p className="text-xs font-semibold text-white">Official Studio Verification Badge</p>
-                      <p className="text-[10px] text-slate-400">ویریفائیڈ کریئٹر بیج شو کریں</p>
+                      <p className="text-[10px] text-slate-400">Show verified creator badge in header</p>
                     </div>
                     <input
                       type="checkbox"

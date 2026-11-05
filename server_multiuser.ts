@@ -28,7 +28,8 @@ const WEBHOOK_CONFIG_FILE = path.resolve(DATA_ROOT, 'webhook-config.json');
 export type UserRole = 'admin' | 'standard';
 
 export interface UserPermissions {
-  // Core Channel Modules (4)
+  // Core Channel Modules (5)
+  canAccessAnalytics: boolean;
   canAccessDiagnostics: boolean;
   canAccessLive: boolean;
   canAccessSignals: boolean;
@@ -67,6 +68,7 @@ export interface UserPermissions {
 }
 
 export const DEFAULT_ADMIN_PERMISSIONS: UserPermissions = {
+  canAccessAnalytics: true,
   canAccessDiagnostics: true,
   canAccessLive: true,
   canAccessSignals: true,
@@ -95,6 +97,7 @@ export const DEFAULT_ADMIN_PERMISSIONS: UserPermissions = {
 };
 
 export const DEFAULT_STANDARD_PERMISSIONS: UserPermissions = {
+  canAccessAnalytics: true,
   canAccessDiagnostics: true,
   canAccessLive: true,
   canAccessSignals: true,
@@ -398,18 +401,39 @@ export async function logAuditEvent(
   // 1. Dispatch Webhook if configured
   if (cfg.enabled && cfg.webhookUrl) {
     try {
+      const auditSnapshot = {
+        id: entry.id,
+        timestamp: entry.timestamp,
+        userId: entry.userId,
+        username: entry.username,
+        role: entry.role,
+        action: entry.action,
+        details: entry.details,
+        targetFile: entry.targetFile,
+        ip: entry.ip,
+        status: entry.status
+      };
+
       const payload = {
         event: 'audit.action_logged',
-        auditRecord: entry,
+        auditRecord: auditSnapshot,
         metadata: {
           app: 'IT Cafeteria Studio',
           environment: process.env.NODE_ENV || 'production'
         }
       };
-      entry.webhookPayloadPreview = payload;
+
+      // Store preview without circular reference back to entry
+      entry.webhookPayloadPreview = {
+        event: payload.event,
+        metadata: payload.metadata,
+        dispatchedAt: new Date().toISOString()
+      };
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 4000);
+
+      const serializedPayload = JSON.stringify(payload);
 
       const resp = await fetch(cfg.webhookUrl, {
         method: 'POST',
@@ -417,10 +441,10 @@ export async function logAuditEvent(
           'Content-Type': 'application/json',
           'X-Studio-Signature': crypto
             .createHmac('sha256', cfg.secretKey)
-            .update(JSON.stringify(payload))
+            .update(serializedPayload)
             .digest('hex')
         },
-        body: JSON.stringify(payload),
+        body: serializedPayload,
         signal: controller.signal
       });
       clearTimeout(timeout);
@@ -440,10 +464,30 @@ export async function logAuditEvent(
   try {
     let existingLogs: AuditLogEntry[] = [];
     if (fs.existsSync(AUDIT_LOG_FILE)) {
-      const raw = fs.readFileSync(AUDIT_LOG_FILE, 'utf-8');
-      existingLogs = JSON.parse(raw);
+      try {
+        const raw = fs.readFileSync(AUDIT_LOG_FILE, 'utf-8');
+        existingLogs = JSON.parse(raw);
+        if (!Array.isArray(existingLogs)) existingLogs = [];
+      } catch {
+        existingLogs = [];
+      }
     }
-    existingLogs.unshift(entry);
+
+    const cleanEntry: AuditLogEntry = {
+      id: entry.id,
+      timestamp: entry.timestamp,
+      userId: entry.userId,
+      username: entry.username,
+      role: entry.role,
+      action: entry.action,
+      details: entry.details,
+      targetFile: entry.targetFile,
+      ip: entry.ip,
+      status: entry.status,
+      webhookPayloadPreview: entry.webhookPayloadPreview ? { ...entry.webhookPayloadPreview } : undefined
+    };
+
+    existingLogs.unshift(cleanEntry);
     // Keep last 500 audit log entries
     fs.writeFileSync(AUDIT_LOG_FILE, JSON.stringify(existingLogs.slice(0, 500), null, 2), 'utf-8');
   } catch (err) {

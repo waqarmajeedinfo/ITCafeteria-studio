@@ -371,7 +371,7 @@ export const DuplicateChecker: React.FC = () => {
                           title="Is topic ka agla part / sequel Agent Simulator mein trigger karein"
                         >
                           <Sparkles className="w-3 h-3 text-cyan-400" />
-                          <span>Sequel (اگلا پارٹ)</span>
+                          <span>Sequel (Part 2)</span>
                         </button>
 
                         <button
@@ -451,7 +451,7 @@ export const DuplicateChecker: React.FC = () => {
                       className="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-lg cursor-pointer transition-colors"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Create Sequel (اگلا پارٹ بنائیں)</span>
+                      <span>Create Sequel (Next Episode)</span>
                     </button>
                   </div>
                   <StoryPackageView
@@ -503,7 +503,7 @@ export const DuplicateChecker: React.FC = () => {
                       className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 shadow-lg cursor-pointer"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Create Sequel (اگلا پارٹ بنائیں)</span>
+                      <span>Create Sequel (Next Episode)</span>
                     </button>
                   </div>
                 </div>

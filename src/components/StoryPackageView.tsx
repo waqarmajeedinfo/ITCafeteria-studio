@@ -656,7 +656,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
               title="Poori story naye dialogues aur fresh Roman Urdu style mein rewrite karein"
             >
               <RotateCcw className="w-3.5 h-3.5 text-purple-200" />
-              <span>Rewrite Story (نئے انداز میں ریفریش)</span>
+              <span>Rewrite Story (Fresh Style)</span>
             </button>
 
             <button
@@ -740,7 +740,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
                     title="Is specific scene ko naye dialogues aur visual cue ke sath rewrite karein"
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-purple-300" />
-                    <span>Refresh Scene (سین ریفریش)</span>
+                    <span>Refresh Scene</span>
                   </button>
 
                   <button
@@ -1184,7 +1184,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
             <p className="text-slate-200 text-[13px] whitespace-pre-wrap leading-relaxed">{story.description}</p>
           )}
 
-          {/* Reusable AI Demo Prompt (کاپی پیسٹ پرامپٹ) */}
+          {/* Reusable AI Demo Prompt */}
           {(() => {
             const promptText = story.demoPrompt || `Create a detailed step-by-step tutorial script and prompt template for: "${story.title}". Focus on practical execution, key commands, and zero fluff.`;
             return (
@@ -1192,7 +1192,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-cyan-300 font-bold text-xs">
                     <Terminal className="w-4 h-4 text-cyan-400" />
-                    <span>Reusable AI Demo Prompt (کاپی پیسٹ پرامپٹ)</span>
+                    <span>Reusable AI Demo Prompt</span>
                   </div>
                   <button
                     type="button"
@@ -1228,12 +1228,12 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
             );
           })()}
 
-          {/* Outsourced Links & Tools (ضروری لنکس اور ٹولز) */}
+          {/* Outsourced Links & Tools */}
           <div className="mt-2 p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
             <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
               <span className="flex items-center gap-1.5">
                 <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Outsourced Links & Tools (ضروری لنکس اور ٹولز)</span>
+                <span>Outsourced Links & Tools</span>
               </span>
               <span className="text-[10px] text-slate-500 font-mono">Verified Resources</span>
             </div>
@@ -1289,7 +1289,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
               <div className="font-bold text-xs uppercase tracking-wider flex items-center gap-2">
                 <span className="text-slate-300">CURRENT STATUS:</span>
                 <span className={currentStatus === 'published' ? 'text-emerald-300 font-bold' : 'text-amber-300 font-bold'}>
-                  {currentStatus === 'published' ? '✅ PUBLISHED (پبلش ہو چکی ہے)' : '⏳ PENDING (پینڈنگ میں محفوظ ہے)'}
+                  {currentStatus === 'published' ? '✅ PUBLISHED' : '⏳ PENDING'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
@@ -1316,7 +1316,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
               {savedFeedback ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-300 font-bold">✓ Saved in Pending! (محفوظ ہو گیا)</span>
+                  <span className="text-emerald-300 font-bold">✓ Saved in Pending!</span>
                 </>
               ) : (
                 <>
@@ -1338,7 +1338,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
               title={currentStatus === 'published' ? 'Wapas Pending haalat mein move karein' : 'Story ko foran Published Library mein move karein'}
             >
               <Check className="w-3.5 h-3.5" />
-              <span>{currentStatus === 'published' ? 'Wapas Pending Karein' : 'Publish (پبلش کریں)'}</span>
+              <span>{currentStatus === 'published' ? 'Return to Pending' : 'Publish'}</span>
             </button>
 
             {/* Control 3: Delete Story */}

@@ -140,6 +140,16 @@ export const AgentSimulator: React.FC = () => {
     return CHANNEL_PROFILES.itcafeteria.categoryRules?.[4]?.defaultRatio || '9:16';
   });
   const [searchStrategy, setSearchStrategy] = useState<'deep' | 'fast' | 'strict' | 'custom_links'>('deep');
+  const [focusLinkItems, setFocusLinkItems] = useState<Array<{
+    id: string;
+    url: string;
+    title: string;
+    category?: string;
+    dateAdded: string;
+    timestamp: string;
+    notes?: string;
+    timesQueried?: number;
+  }>>([]);
   const [priorityResources, setPriorityResources] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem('itcafeteria_priority_resources');
@@ -151,6 +161,30 @@ export const AgentSimulator: React.FC = () => {
   const [showSearchStrategyMenu, setShowSearchStrategyMenu] = useState(false);
   const [showPriorityModal, setShowPriorityModal] = useState(false);
   const [newResourceInput, setNewResourceInput] = useState('');
+  const [newResourceTitle, setNewResourceTitle] = useState('');
+  const [newResourceCategory, setNewResourceCategory] = useState('');
+  const [newResourceNotes, setNewResourceNotes] = useState('');
+  const [isSyncingLinks, setIsSyncingLinks] = useState(false);
+
+  // Load persistent focus links from backend repository on mount
+  useEffect(() => {
+    fetch('/api/agent/focus-links')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok && Array.isArray(data.links)) {
+          setFocusLinkItems(data.links);
+          const urls = data.links.map((l: any) => l.url).filter(Boolean);
+          if (urls.length > 0) {
+            setPriorityResources(urls);
+            try {
+              localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(urls));
+            } catch {}
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const [customRules, setCustomRules] = useState<{ id: string; title: string; instructions: string }[]>(() => {
     try {
       const raw = localStorage.getItem('itcafeteria_custom_rules');
@@ -939,74 +973,189 @@ export const AgentSimulator: React.FC = () => {
         }}
       />
 
-      {/* Priority Resources Management Modal */}
+      {/* Priority Resources Management Modal (Backend Repository Synced) */}
       {showPriorityModal && (
         <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 space-y-4 text-slate-100 shadow-2xl">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl p-5 space-y-4 text-slate-100 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-bold text-base flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-cyan-400" /> Prioritized Resources & Focus Links
-              </h3>
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2 text-white">
+                  <Sliders className="w-4 h-4 text-cyan-400" /> Prioritized Resources &amp; Focus Links
+                </h3>
+                <span className="text-[11px] text-slate-400">
+                  Day-by-day persistent source repository synced with GitHub storage
+                </span>
+              </div>
               <button onClick={() => setShowPriorityModal(false)} className="text-slate-400 hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
+
             <p className="text-xs text-slate-400">
-              Input specific external links or focus points to be prioritized during the autonomous search and research grounding phase.
+              Enter specific external links, articles, or tools. The Agent will prioritize scanning and citing these links first when discovering topics and writing stories.
             </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="https://example.com/tech-article or focus keyword"
-                value={newResourceInput}
-                onChange={(e) => setNewResourceInput(e.target.value)}
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (!newResourceInput.trim()) return;
-                  const updated = [...priorityResources, newResourceInput.trim()];
-                  setPriorityResources(updated);
-                  setNewResourceInput('');
-                  try {
-                    localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
-                  } catch {}
-                }}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold cursor-pointer"
-              >
-                Add
-              </button>
-            </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {priorityResources.map((res, idx) => (
-                <div key={idx} className="flex items-center justify-between bg-slate-800/80 border border-slate-700 rounded-lg p-2.5 text-xs">
-                  <span className="font-mono text-cyan-300 truncate mr-2">{res}</span>
-                  <button
-                    onClick={() => {
-                      const updated = priorityResources.filter((_, i) => i !== idx);
+
+            {/* Link Input Form */}
+            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="https://example.com/topic-source"
+                  value={newResourceInput}
+                  onChange={(e) => setNewResourceInput(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 font-mono"
+                />
+                <input
+                  type="text"
+                  placeholder="Source Title / Topic Name (Optional)"
+                  value={newResourceTitle}
+                  onChange={(e) => setNewResourceTitle(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Category (e.g., PC & Windows, AI Tools, Android)"
+                  value={newResourceCategory}
+                  onChange={(e) => setNewResourceCategory(e.target.value)}
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+                />
+                <button
+                  type="button"
+                  disabled={isSyncingLinks}
+                  onClick={async () => {
+                    const url = newResourceInput.trim();
+                    if (!url) return;
+                    setIsSyncingLinks(true);
+                    try {
+                      const res = await fetch('/api/agent/focus-links', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          url,
+                          title: newResourceTitle.trim() || url,
+                          category: newResourceCategory.trim() || draftCategoryMeta.name || 'General'
+                        })
+                      });
+                      const data = await res.json();
+                      if (data.ok && Array.isArray(data.links)) {
+                        setFocusLinkItems(data.links);
+                        const urls = data.links.map((l: any) => l.url).filter(Boolean);
+                        setPriorityResources(urls);
+                        try {
+                          localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(urls));
+                        } catch {}
+                      }
+                      setNewResourceInput('');
+                      setNewResourceTitle('');
+                      setNewResourceCategory('');
+                    } catch (e) {
+                      // Local fallback
+                      const updated = [...priorityResources, url];
                       setPriorityResources(updated);
                       try {
                         localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
                       } catch {}
-                    }}
-                    className="text-rose-400 hover:text-rose-300 text-xs font-semibold cursor-pointer shrink-0"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              {priorityResources.length === 0 && (
-                <p className="text-center text-xs text-slate-500 py-4">No priority resources added yet.</p>
+                    } finally {
+                      setIsSyncingLinks(false);
+                    }
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-all shrink-0"
+                >
+                  {isSyncingLinks ? 'Saving...' : '+ Save Link'}
+                </button>
+              </div>
+            </div>
+
+            {/* List of Synced Priority Links */}
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {focusLinkItems.length > 0 ? (
+                focusLinkItems.map((item) => (
+                  <div key={item.id} className="p-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl flex items-center justify-between gap-3 text-xs hover:border-slate-600 transition-colors">
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-white text-xs truncate max-w-xs">{item.title || item.url}</span>
+                        {item.category && (
+                          <span className="px-1.5 py-0.5 bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 rounded text-[10px] font-mono">
+                            {item.category}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          📅 Added: {item.dateAdded || '2026-11-05'}
+                        </span>
+                      </div>
+                      <p className="font-mono text-cyan-400 text-[11px] truncate">{item.url}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`/api/agent/focus-links/${encodeURIComponent(item.id)}`, {
+                            method: 'DELETE'
+                          });
+                          const data = await res.json();
+                          if (data.ok && Array.isArray(data.links)) {
+                            setFocusLinkItems(data.links);
+                            const urls = data.links.map((l: any) => l.url).filter(Boolean);
+                            setPriorityResources(urls);
+                            try {
+                              localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(urls));
+                            } catch {}
+                          }
+                        } catch {
+                          const remainingItems = focusLinkItems.filter((l) => l.id !== item.id);
+                          setFocusLinkItems(remainingItems);
+                          const urls = remainingItems.map((l) => l.url);
+                          setPriorityResources(urls);
+                          try {
+                            localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(urls));
+                          } catch {}
+                        }
+                      }}
+                      className="text-rose-400 hover:text-rose-300 text-xs font-semibold cursor-pointer shrink-0 px-2 py-1 bg-rose-950/30 border border-rose-800/40 rounded-lg hover:bg-rose-900/40 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))
+              ) : priorityResources.length > 0 ? (
+                priorityResources.map((res, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-slate-800/80 border border-slate-700 rounded-lg p-2.5 text-xs">
+                    <span className="font-mono text-cyan-300 truncate mr-2">{res}</span>
+                    <button
+                      onClick={() => {
+                        const updated = priorityResources.filter((_, i) => i !== idx);
+                        setPriorityResources(updated);
+                        try {
+                          localStorage.setItem('itcafeteria_priority_resources', JSON.stringify(updated));
+                        } catch {}
+                      }}
+                      className="text-rose-400 hover:text-rose-300 text-xs font-semibold cursor-pointer shrink-0"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center text-xs text-slate-500 py-6">
+                  No priority links registered yet. Enter a link above to guide the agent.
+                </p>
               )}
             </div>
-            <div className="flex justify-end pt-2 border-t border-slate-800">
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+              <span className="text-slate-400 text-[11px]">
+                {focusLinkItems.length || priorityResources.length} Priority Links active in agent memory
+              </span>
               <button
                 type="button"
                 onClick={() => setShowPriorityModal(false)}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold cursor-pointer"
               >
-                Done
+                Close &amp; Apply
               </button>
             </div>
           </div>

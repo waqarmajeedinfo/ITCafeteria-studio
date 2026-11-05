@@ -1,5 +1,16 @@
 [
   {
+    "id": "audit-1793904648008-ddedf4",
+    "timestamp": "2026-11-05T18:50:48.008Z",
+    "userId": "u1",
+    "username": "testuser",
+    "role": "standard",
+    "action": "TEST_ACTION",
+    "details": "Testing circular structure fix",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
     "id": "audit-1793813696535-18fab4",
     "timestamp": "2026-11-04T17:34:56.535Z",
     "userId": "user-1793813683810-2767e6",

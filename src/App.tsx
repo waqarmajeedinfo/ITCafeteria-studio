@@ -707,32 +707,74 @@ export default function App() {
     ai: <Sparkles className="w-4 h-4 text-amber-400" />
   };
 
-  // Dynamically generated tabs and groups from Menu Customizer Configuration
-  const tabs = menuConfig.items.map((item) => {
-    let label = item.label;
-    if (item.id === 'duplicates') {
-      label = `Duplicate Checker (${publishedCount})`;
+  // Permission Gate: Standard users only see tabs that are granted in their permissions!
+  const isTabPermitted = (tabId: TabType): boolean => {
+    // Admins have access to everything
+    if (!currentUserProfile || currentUserProfile.role === 'admin') return true;
+    const perms = currentUserProfile.permissions;
+    if (!perms) return true;
+
+    switch (tabId) {
+      case 'analytics': return perms.canAccessAnalytics !== false;
+      case 'live': return Boolean(perms.canAccessLive);
+      case 'signals': return Boolean(perms.canAccessSignals);
+      case 'benchmarking': return Boolean(perms.canAccessBenchmarking);
+      case 'autopilot': return Boolean(perms.canUseAutopilot);
+      case 'simulator': return Boolean(perms.canAccessSimulator);
+      case 'community': return Boolean(perms.canAccessCommunity);
+      case 'pending': return Boolean(perms.canAccessPending);
+      case 'calendar': return Boolean(perms.canAccessCalendar);
+      case 'duplicates': return Boolean(perms.canAccessDuplicates);
+      case 'masterlist': return Boolean(perms.canAccessMasterlist);
+      case 'roadmap': return Boolean(perms.canAccessRoadmap);
+      case 'chat': return Boolean(perms.canAccessChat);
+      case 'search': return Boolean(perms.canAccessSearch);
+      case 'video': return Boolean(perms.canAccessVideo);
+      case 'image': return Boolean(perms.canUseThumbnailStudio);
+      case 'transcribe': return Boolean(perms.canAccessTranscribe);
+      case 'music': return Boolean(perms.canAccessMusic);
+      case '3d': return Boolean(perms.canAccess3D);
+      default: return true;
     }
-    return {
-      id: item.id,
-      label,
-      icon: TAB_ICONS[item.id] || <Sparkles className="w-4 h-4" />,
-      group: item.groupId
-    };
-  });
+  };
 
-  const groups = menuConfig.groups.map((g) => {
-    const count = tabs.filter((t) => t.group === g.id).length;
-    return {
-      id: g.id,
-      label: g.label,
-      icon: GROUP_ICONS[g.id] || <Layers className="w-4 h-4 text-cyan-400" />,
-      count
-    };
-  });
+  // Dynamically generated tabs and groups filtered by user permissions
+  const tabs = menuConfig.items
+    .filter((item) => isTabPermitted(item.id))
+    .map((item) => {
+      let label = item.label;
+      if (item.id === 'duplicates') {
+        label = `Duplicate Checker (${publishedCount})`;
+      }
+      return {
+        id: item.id,
+        label,
+        icon: TAB_ICONS[item.id] || <Sparkles className="w-4 h-4" />,
+        group: item.groupId
+      };
+    });
 
-  const activeGroup = tabs.find((t) => t.id === activeTab)?.group || 'core';
-  const activeTabMeta = tabs.find((t) => t.id === activeTab);
+  const groups = menuConfig.groups
+    .map((g) => {
+      const count = tabs.filter((t) => t.group === g.id).length;
+      return {
+        id: g.id,
+        label: g.label,
+        icon: GROUP_ICONS[g.id] || <Layers className="w-4 h-4 text-cyan-400" />,
+        count
+      };
+    })
+    .filter((g) => g.count > 0);
+
+  const activeGroup = tabs.find((t) => t.id === activeTab)?.group || groups[0]?.id || 'core';
+  const activeTabMeta = tabs.find((t) => t.id === activeTab) || tabs[0];
+
+  // Auto-switch to first allowed tab if activeTab is revoked for standard user
+  useEffect(() => {
+    if (!isTabPermitted(activeTab) && tabs.length > 0) {
+      setActiveTab(tabs[0].id);
+    }
+  }, [currentUserProfile, activeTab]);
 
   const selectTab = (id: TabType) => {
     if (id === activeTab) {
@@ -1492,7 +1534,7 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-base">Banner & Design Overlay Editor</h3>
-                  <p className="text-xs text-slate-400">بینر کی تصویر، ہائٹ اور ڈیزائن اوورلے اپنی مرضی سے سیٹ کریں</p>
+                  <p className="text-xs text-slate-400">Customize banner image, height, and visual overlay settings</p>
                 </div>
               </div>
               <button 
@@ -1692,7 +1734,7 @@ export default function App() {
                       <span>Animated Holographic Background (6 Themes)</span>
                     </label>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      فل پیج کے بیک گراؤنڈ پر اینیمیٹڈ ہولوگرافک موومنٹ جو بلاکس کے درمیان مستقل دکھائی دیتی ہے
+                      Dynamic holographic animation rendering behind blocks across the viewport
                     </p>
                   </div>
                 </div>

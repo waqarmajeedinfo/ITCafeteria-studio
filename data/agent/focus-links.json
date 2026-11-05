@@ -1,0 +1,26 @@
+[
+  {
+    "id": "link-1793905000001-init1",
+    "url": "https://blog.google/technology/ai/",
+    "title": "Google AI Updates & Breakthroughs",
+    "category": "Artificial Intelligence & Tools",
+    "dateAdded": "2026-11-05",
+    "timestamp": "2026-11-05T12:00:00.000Z",
+    "notes": "Official Google AI releases, Flow prompting, Gemini 3 models",
+    "timesQueried": 3,
+    "lastUsedAt": "2026-11-05T12:00:00.000Z",
+    "addedBy": "waqarmajeedinfo"
+  },
+  {
+    "id": "link-1793905000002-init2",
+    "url": "https://support.microsoft.com/en-us/windows",
+    "title": "Windows 11 Power Utilities & Speed Secrets",
+    "category": "PC & Windows Hacks",
+    "dateAdded": "2026-11-05",
+    "timestamp": "2026-11-05T12:05:00.000Z",
+    "notes": "Verified Windows 11 performance shortcuts and clean-up commands",
+    "timesQueried": 2,
+    "lastUsedAt": "2026-11-05T12:05:00.000Z",
+    "addedBy": "waqarmajeedinfo"
+  }
+]

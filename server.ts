@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { timingSafeEqual } from 'crypto';
@@ -1382,7 +1383,100 @@ Return STRICT valid JSON only with NO markdown fences, matching this structure:
   }
 });
 
-// 8. Agent Trigger — fresh story ideas (duplicate-aware)
+// 7b. Agent Simulator — Day-by-Day Persistent Priority Focus Links
+const FOCUS_LINKS_FILE = path.resolve(__dirname, 'data', 'agent', 'focus-links.json');
+
+function getFocusLinks(): any[] {
+  try {
+    if (fs.existsSync(FOCUS_LINKS_FILE)) {
+      const raw = fs.readFileSync(FOCUS_LINKS_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+function saveFocusLinks(links: any[], username?: string) {
+  try {
+    const dir = path.dirname(FOCUS_LINKS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(FOCUS_LINKS_FILE, JSON.stringify(links, null, 2), 'utf-8');
+
+    // Also mirror into user repository mirror directory
+    const targetUser = username || 'waqarmajeedinfo';
+    const userRepoDir = path.resolve(__dirname, 'user-data', targetUser);
+    if (!fs.existsSync(userRepoDir)) fs.mkdirSync(userRepoDir, { recursive: true });
+    fs.writeFileSync(path.resolve(userRepoDir, 'focus-links.json'), JSON.stringify(links, null, 2), 'utf-8');
+
+    const userStorageDir = path.resolve(__dirname, 'data', 'user-storage', targetUser);
+    if (!fs.existsSync(userStorageDir)) fs.mkdirSync(userStorageDir, { recursive: true });
+    fs.writeFileSync(path.resolve(userStorageDir, 'focus-links.json'), JSON.stringify(links, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[FocusLinks] Failed to save focus links:', err);
+  }
+}
+
+app.get('/api/agent/focus-links', (_req, res) => {
+  const links = getFocusLinks();
+  res.json({ ok: true, count: links.length, links });
+});
+
+app.post('/api/agent/focus-links', (req, res) => {
+  const { url, title, category, notes, username } = req.body || {};
+  if (!url || typeof url !== 'string' || !url.trim()) {
+    return res.status(400).json({ error: 'Valid URL is required' });
+  }
+
+  const links = getFocusLinks();
+  const now = new Date();
+  const dateFormatted = now.toISOString().split('T')[0];
+  const normalizedUrl = url.trim();
+
+  const existingIdx = links.findIndex((l) => (l.url || '').toLowerCase() === normalizedUrl.toLowerCase());
+  let item: any;
+
+  if (existingIdx !== -1) {
+    item = {
+      ...links[existingIdx],
+      title: title?.trim() || links[existingIdx].title || normalizedUrl,
+      category: category?.trim() || links[existingIdx].category || 'General',
+      notes: notes?.trim() || links[existingIdx].notes || '',
+      lastUsedAt: now.toISOString(),
+      timesQueried: (links[existingIdx].timesQueried || 0) + 1,
+    };
+    links[existingIdx] = item;
+  } else {
+    item = {
+      id: `link-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      url: normalizedUrl,
+      title: title?.trim() || normalizedUrl,
+      category: category?.trim() || 'General',
+      dateAdded: dateFormatted,
+      timestamp: now.toISOString(),
+      notes: notes?.trim() || '',
+      timesQueried: 1,
+      lastUsedAt: now.toISOString(),
+      addedBy: username || 'waqarmajeedinfo',
+      status: 'ACTIVE',
+    };
+    links.unshift(item);
+  }
+
+  saveFocusLinks(links, username || 'waqarmajeedinfo');
+  res.json({ ok: true, item, links });
+});
+
+app.delete('/api/agent/focus-links/:id', (req, res) => {
+  const { id } = req.params;
+  const username = (req.query.username as string) || 'waqarmajeedinfo';
+  let links = getFocusLinks();
+  links = links.filter((l) => l.id !== id && l.url !== id);
+  saveFocusLinks(links, username);
+  res.json({ ok: true, remaining: links.length, links });
+});
+
+// 8. Agent Trigger — fresh story ideas (duplicate-aware & priority-links aware)
 app.post('/api/ai/story-ideas', async (req, res) => {
   try {
     const {
@@ -1393,6 +1487,7 @@ app.post('/api/ai/story-ideas', async (req, res) => {
       seedTopic = '',
       excludeTitles = [],
       count = 3,
+      priorityResources = [],
     } = req.body || {};
 
     const ai = getAiClient();
@@ -1403,10 +1498,28 @@ app.post('/api/ai/story-ideas', async (req, res) => {
       .slice(0, 80)
       .join(' | ');
 
+    // Load persistent focus links from backend repository
+    const storedFocusLinks = getFocusLinks();
+    const allPriorityUrls: string[] = Array.from(
+      new Set([
+        ...(Array.isArray(priorityResources) ? priorityResources : []),
+        ...storedFocusLinks.map((l) => `${l.url}${l.title ? ' (' + l.title + ')' : ''}`),
+      ])
+    ).filter(Boolean);
+
+    let priorityInstructions = '';
+    if (allPriorityUrls.length > 0) {
+      priorityInstructions = `
+PRIORITIZED FOCUS LINKS & SOURCE RESOURCES (CRITICAL: Prioritize extracting breakthrough angles, tools, and topics from these URLs first):
+${allPriorityUrls.slice(0, 10).map((u) => `- ${u}`).join('\n')}
+Make sure at least 1-2 generated story ideas are directly inspired by or reference insights from these prioritized resources.
+`;
+    }
+
     const prompt = `You are the story discovery agent for "${channelName}" (${niche}), presenter "${presenter}".
 Category: "${category}".
 Creator ka idea / topic: "${seedTopic || 'koi specific topic nahi — is category ke andar fresh angle chunein'}"
-
+${priorityInstructions}
 Task: ${safeCount} FRESH YouTube Shorts (vertical 9:16) story ideas generate karein jo is channel par pehle cover nahi hue.
 Rules:
 - Title clickable aur short ho, maximum 65 characters. Roman Urdu + English tech keywords mix.

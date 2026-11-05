@@ -700,17 +700,17 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                           {selectedRecord.status === 'published' ? (
                             <>
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>PUBLISHED (پبلش ہو چکی ہے)</span>
+                              <span>PUBLISHED</span>
                             </>
                           ) : selectedRecord.status === 'overdue' ? (
                             <>
                               <AlertTriangle className="w-3.5 h-3.5" />
-                              <span>OVERDUE / MISSED (اپلوڈ نہیں ہوئی)</span>
+                              <span>OVERDUE / MISSED</span>
                             </>
                           ) : (
                             <>
                               <Clock className="w-3.5 h-3.5" />
-                              <span>PENDING PUBLICATION (ابھی تک پبلش نہیں ہوئی)</span>
+                              <span>PENDING PUBLICATION</span>
                             </>
                           )}
                         </span>

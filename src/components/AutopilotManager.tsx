@@ -1179,7 +1179,7 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
     setPendingStoriesCount(loadPendingQueue().filter((i) => i.status === 'pending').length);
     addLog('SUCCESS', '✅ All studio states, pending queue & phonetic dictionary resynchronized.');
 
-    setSyncToast('✅ تمام اسٹوڈیوز، پینڈنگ کیو اور فونیٹک ڈکشنری سنک (Synced) ہو گئے!');
+    setSyncToast('✅ All studio states, pending queue & phonetic dictionary synchronized!');
     setTimeout(() => {
       setSyncToast(null);
       setIsSyncingAll(false);
@@ -1299,7 +1299,7 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
           localStorage.setItem('itcafeteria_autopilot_last_daily_check', JSON.stringify(checkResult));
         } catch {}
         if (manual) {
-          setSyncToast(`ℹ️ پینڈنگ کیو میں پہلے ہی ${count} کہانیاں موجود ہیں (3 یا زیادہ)، اس لیے نیا ٹاسک جنریٹ کرنے کی ضرورت نہیں!`);
+          setSyncToast(`ℹ️ Pending Queue already has ${count} stories (3 or more) — standby threshold satisfied!`);
           setTimeout(() => setSyncToast(null), 4000);
         }
         return;
@@ -1328,8 +1328,8 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
 
       setSyncToast(
         sprintCount === 3
-          ? `⚡ پینڈنگ لسٹ میں صرف ${count} کہانیاں تھیں! 3 روزہ آٹونومس اسپرنٹ خودکار طور پر کیو میں شامل کر دیا گیا۔`
-          : `⚡ پینڈنگ لسٹ میں 2 کہانیاں تھیں! 1 نئی کہانی شامل کی گئی تاکہ 3 کا ٹارگٹ پورا ہو۔`
+          ? `⚡ Pending queue had only ${count} stories! 3-day autonomous sprint automatically enqueued.`
+          : `⚡ Pending queue had 2 stories! 1 new story queued to reach 3-story target.`
       );
       setTimeout(() => setSyncToast(null), 5000);
     } catch (e: any) {
@@ -1575,12 +1575,12 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
             </div>
 
             <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-              <span>صبح 6:00 بجے کا خودکار ریپلینشمنٹ ٹرگر (Daily 6:00 AM PKT Autonomous Trigger)</span>
+              <span>Daily 6:00 AM PKT Autonomous Replenishment Trigger</span>
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed max-w-4xl">
-              یہ ٹرگر روزانہ صبح 6:00 بجے پاکستانی وقت کے مطابق چلتا ہے۔ یہ مینجمنٹ میں پینڈنگ کہانیاں چیک کرتا ہے:
-              اگر پینڈنگ کہانیاں <strong>3 کے برابر یا اس سے زیادہ</strong> ہوں تو یہ کوئی کام نہیں کرتا (اسٹینڈ بائی رہتا ہے)۔
-              اگر <strong>3 سے کم</strong> ہوں تو خودکار نئی کہانیاں تلاش کر کے کیو میں لگاتا ہے اور تیار شدہ پیکج پینڈنگ کیو میں منتقل کر دیتا ہے۔
+              This autonomous trigger runs daily at 6:00 AM PKT to verify Pending Production Queue depth:
+              If pending stories are <strong>3 or more</strong>, it remains in standby.
+              If pending stories drop <strong>below 3</strong>, it automatically discovers fresh zero-duplicate topics, generates full 10-scene packages, and replenishes the queue.
             </p>
 
             {lastDailyCheckResult && (
@@ -3375,7 +3375,7 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                       : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                   }`}>
-                    {selectedTask.status === 'completed' ? '✅ Published (پبلش ہو چکی ہے)' : '⏳ Pending (ابھی پینڈنگ ہے)'}
+                    {selectedTask.status === 'completed' ? '✅ Published' : '⏳ Pending'}
                   </span>
                   <span className="text-[11px] text-slate-400 font-mono">
                     Slot: {selectedTask.scheduledSlot} ({selectedTask.scheduledDate})

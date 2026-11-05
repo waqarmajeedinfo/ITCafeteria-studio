@@ -5,7 +5,8 @@
 export type UserRole = 'admin' | 'standard';
 
 export interface UserPermissions {
-  // Core Channel Modules (4)
+  // Core Channel Modules (5)
+  canAccessAnalytics: boolean;
   canAccessDiagnostics: boolean;
   canAccessLive: boolean;
   canAccessSignals: boolean;
@@ -44,6 +45,7 @@ export interface UserPermissions {
 }
 
 export const ALL_ADMIN_PERMISSIONS: UserPermissions = {
+  canAccessAnalytics: true,
   canAccessDiagnostics: true,
   canAccessLive: true,
   canAccessSignals: true,
@@ -72,6 +74,7 @@ export const ALL_ADMIN_PERMISSIONS: UserPermissions = {
 };
 
 export const ALL_STANDARD_PERMISSIONS: UserPermissions = {
+  canAccessAnalytics: true,
   canAccessDiagnostics: true,
   canAccessLive: true,
   canAccessSignals: true,

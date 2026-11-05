@@ -118,8 +118,8 @@ export function verifyPostStoryStatus(post: ScheduledPost): VerificationInfo {
       catalogVideo: catalogMatch,
       isPublished: true,
       message: catalogMatch
-        ? `✓ تصدیق شدہ: یہ ویڈیو پہلے ہی IT Cafeteria کیٹلاگ میں بطور Video #${catalogMatch.id} (${catalogMatch.published || 'Published'}) پبلش ہو چکی ہے!`
-        : `✓ تصدیق شدہ: یہ ویڈیو IT Cafeteria پبلشڈ لائبریری میں مارک ہو چکی ہے۔`
+        ? `✓ Verified: This video is already published in IT Cafeteria catalog as Video #${catalogMatch.id} (${catalogMatch.published || 'Published'})!`
+        : `✓ Verified: This video is marked in IT Cafeteria published library.`
     };
   }
 
@@ -135,15 +135,15 @@ export function verifyPostStoryStatus(post: ScheduledPost): VerificationInfo {
       queueRecord: queueMatch,
       isPublished: isPub,
       message: isPub
-        ? `✓ تصدیق شدہ: پینڈنگ کیو میں پبلش ہو چکی ہے اور لائبریری میں سنک ہے۔`
-        : `⏰ تصدیق شدہ: ایکٹو پینڈنگ کیو میں موجود ہے، ٹارگٹ ٹائم: ${queueMatch.scheduledTime} (${queueMatch.scheduledDate})`
+        ? `✓ Verified: Published in pending queue and synchronized with library.`
+        : `⏰ Verified: Active in pending queue, target slot: ${queueMatch.scheduledTime} (${queueMatch.scheduledDate})`
     };
   }
 
   return {
     status: 'draft_ready',
     isPublished: false,
-    message: `📝 تصدیق شدہ: ڈرافٹ / شیڈول پوسٹ۔ مکمل 10 سینز پر مشتمل اسکرپٹ تصدیق اور پبلشنگ کے لیے تیار ہے۔`
+    message: `📝 Verified: Draft / Scheduled post. Complete 10-scene package ready for review and publishing.`
   };
 }
 
@@ -1134,7 +1134,7 @@ export const ContentCalendar: React.FC = () => {
                 }`}
               >
                 <Film className="w-4 h-4 text-cyan-400" />
-                <span>Story Script (تمام 10 سینز)</span>
+                <span>Story Script (All 10 Scenes)</span>
               </button>
 
               <button
@@ -1520,8 +1520,8 @@ export const ContentCalendar: React.FC = () => {
                   <CheckCircle2 className="w-4 h-4 text-white" />
                   <span>
                     {activeStoryPost.status === 'published'
-                      ? 'Wapas Scheduled Queue Mein Dalein'
-                      : 'Publish Story Now (پبلش کریں)'}
+                      ? 'Return to Scheduled Queue'
+                      : 'Publish Story Now'}
                   </span>
                 </button>
 

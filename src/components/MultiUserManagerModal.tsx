@@ -362,6 +362,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
   const handleSelectAllPermissions = () => {
     setPermissionToggles((prev) => ({
       ...prev,
+      canAccessAnalytics: true,
       canAccessDiagnostics: true,
       canAccessLive: true,
       canAccessSignals: true,
@@ -391,6 +392,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
   const handleDeselectAllPermissions = () => {
     setPermissionToggles((prev) => ({
       ...prev,
+      canAccessAnalytics: false,
       canAccessDiagnostics: false,
       canAccessLive: false,
       canAccessSignals: false,
@@ -524,7 +526,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
     setAuthError(null);
     try {
       await userAuthManager.toggleUserApproval(targetUsername, !currentStatus);
-      setAuthSuccess(`@${targetUsername} ka approval status ${!currentStatus ? 'Approved (منظور)' : 'Pending'} ho gaya!`);
+      setAuthSuccess(`@${targetUsername} approval status set to ${!currentStatus ? 'Approved' : 'Pending'}!`);
       const res = await userAuthManager.fetchAdminUsers();
       if (res?.users) setAdminUsers(res.users);
     } catch (err: any) {
@@ -713,34 +715,36 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                     </p>
                   </div>
 
-                  {/* 1-Click Role Switcher Demo */}
-                  <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
-                    <span className="text-[10px] text-slate-400 font-bold px-1.5">Quick Switch:</span>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickSwitch('admin')}
-                      disabled={isLoading || currentUser?.username === 'waqarmajeed'}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        currentUser?.username === 'waqarmajeed'
-                          ? 'bg-purple-600 text-white shadow-sm'
-                          : 'bg-slate-800 text-purple-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      👑 Super Admin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickSwitch('standard')}
-                      disabled={isLoading || currentUser?.username === 'noorwahid'}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        currentUser?.username === 'noorwahid'
-                          ? 'bg-cyan-600 text-white shadow-sm'
-                          : 'bg-slate-800 text-cyan-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      👤 Standard (Noor)
-                    </button>
-                  </div>
+                  {/* 1-Click Role Switcher Demo (Super Admin Only) */}
+                  {currentUser?.role === 'admin' && (
+                    <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+                      <span className="text-[10px] text-slate-400 font-bold px-1.5">Quick Switch:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickSwitch('admin')}
+                        disabled={isLoading || currentUser?.username === 'waqarmajeed'}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          currentUser?.username === 'waqarmajeed'
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'bg-slate-800 text-purple-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        👑 Super Admin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleQuickSwitch('standard')}
+                        disabled={isLoading || currentUser?.username === 'noorwahid'}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          currentUser?.username === 'noorwahid'
+                            ? 'bg-cyan-600 text-white shadow-sm'
+                            : 'bg-slate-800 text-cyan-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        👤 Standard (Noor)
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-2 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
@@ -854,7 +858,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                       Dedicated Repository Directory: <span className="font-mono text-emerald-300">{currentUser?.dedicatedRepoPath}</span>
                     </h4>
                     <p className="text-slate-400 text-xs mt-0.5">
-                      Standard user ka تمام created data (channels, stories, prompts) is directory mein automatically save hota hai aur kisi doosre standard user ko visible nahi hota.
+                      Standard user's created data (channels, stories, prompts) is automatically saved to this dedicated directory and completely isolated from other users.
                     </p>
                   </div>
 
@@ -1214,7 +1218,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                                 title={u.isApproved !== false ? 'Account ko pending status par set karein' : 'Naye user ko approve karein taake woh login kar sake'}
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>{u.isApproved !== false ? 'Revoke Approval' : 'Approve User (منظور کریں)'}</span>
+                                <span>{u.isApproved !== false ? 'Revoke Approval' : 'Approve User'}</span>
                               </button>
                             )}
 
@@ -1266,33 +1270,124 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                         </div>
 
                         {/* Privileges & Limits Badges */}
-                        <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="mt-2.5 pt-2 border-t border-slate-800/80 space-y-2">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-cyan-400 font-mono">
+                                Allowed Menus &amp; Modules:
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                                {[
+                                  perms.canAccessAnalytics !== false,
+                                  perms.canAccessDiagnostics !== false,
+                                  perms.canAccessLive !== false,
+                                  perms.canAccessSignals !== false,
+                                  perms.canAccessBenchmarking !== false,
+                                  perms.canUseAutopilot !== false,
+                                  perms.canAccessSimulator !== false,
+                                  perms.canAccessCommunity !== false,
+                                  perms.canAccessPending !== false,
+                                  perms.canAccessCalendar !== false,
+                                  perms.canAccessDuplicates !== false,
+                                  perms.canAccessMasterlist !== false,
+                                  perms.canAccessRoadmap !== false,
+                                  perms.canAccessChat !== false,
+                                  perms.canAccessSearch !== false,
+                                  perms.canAccessVideo !== false,
+                                  perms.canUseThumbnailStudio !== false,
+                                  perms.canAccessTranscribe !== false,
+                                  perms.canAccessMusic !== false,
+                                  perms.canAccess3D !== false
+                                ].filter(Boolean).length} / 20 Menus Active
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => openPermissionsModal(u)}
+                              className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
+                            >
+                              <SlidersHorizontal className="w-3 h-3" />
+                              <span>Configure All Checkboxes &rarr;</span>
+                            </button>
+                          </div>
+
                           <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
-                            <span className="text-slate-500 uppercase font-mono">Privileges:</span>
-                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canUseAutopilot ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
+                            {/* Core Channels */}
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessAnalytics !== false ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Analytics
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessDiagnostics ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Diagnostics
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessLive ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Live Studio
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessSignals ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Trend Signals
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessBenchmarking ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Benchmarking
+                            </span>
+
+                            {/* Automation */}
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canUseAutopilot ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
                               Autopilot
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canEditChannels ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
-                              Channels
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessSimulator ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Simulator
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canUseThumbnailStudio ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessCommunity ? 'bg-purple-500/10 text-purple-300 border border-purple-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Community
+                            </span>
+
+                            {/* Management & Queue */}
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessPending ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Pending Queue
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessCalendar ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Calendar
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessDuplicates ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Duplicates
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessMasterlist ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Masterlist
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessRoadmap ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Roadmap
+                            </span>
+
+                            {/* Creative Studios */}
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessChat ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              AI Chat
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessSearch ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Research
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessVideo ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Video Studio
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canUseThumbnailStudio ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
                               Thumbnails
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canPublishScheduledPosts ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
-                              Publish
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessTranscribe ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Transcribe
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canExportData ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
-                              Export
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccessMusic ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              Lyria Music
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canUseVoiceScriptGenerator ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20' : 'bg-slate-800 text-slate-500 line-through'}`}>
-                              Voice Script
+                            <span className={`px-1.5 py-0.5 rounded font-mono ${perms.canAccess3D ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' : 'bg-slate-800/60 text-slate-500 line-through'}`}>
+                              3D Studio
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                          <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono pt-1">
                             <span>Max Channels: <strong className="text-white">{perms.maxChannelsAllowed ?? 5}</strong></span>
                             <span>•</span>
                             <span>Daily Limit: <strong className="text-white">{perms.dailyGenerationLimit ?? 25}</strong></span>
+                            <span>•</span>
+                            <span>Voice Script: <strong className={perms.canUseVoiceScriptGenerator ? 'text-emerald-300' : 'text-slate-500'}>{perms.canUseVoiceScriptGenerator ? 'Active' : 'Disabled'}</strong></span>
                           </div>
                         </div>
                       </div>
@@ -1554,7 +1649,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                     {/* Bulk Selection Header */}
                     <div className="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800 shrink-0">
                       <div className="text-xs text-slate-300 font-semibold">
-                        Bulk Controls (تمام آپشنز کے لیے):
+                        Bulk Controls:
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -1562,25 +1657,35 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                           onClick={handleSelectAllPermissions}
                           className="px-2.5 py-1 bg-cyan-600/20 border border-cyan-500/50 hover:bg-cyan-600/30 text-cyan-300 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
                         >
-                          Select All (تمام منتخب کریں)
+                          Select All
                         </button>
                         <button
                           type="button"
                           onClick={handleDeselectAllPermissions}
                           className="px-2.5 py-1 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
                         >
-                          Deselect All (تمام غیر منتخب کریں)
+                          Deselect All
                         </button>
                       </div>
                     </div>
 
                     <form onSubmit={handleAdminSavePermissions} className="flex-1 overflow-y-auto space-y-4 pr-1">
-                      {/* Section 1: Core Channel Modules (4 Modules) */}
+                      {/* Section 1: Core Channel Modules (5 Modules) */}
                       <div className="space-y-2">
                         <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block">
-                          📺 Core Channel Modules (4 Modules):
+                          📺 Core Channel Modules (5 Modules):
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={permissionToggles.canAccessAnalytics !== false}
+                              onChange={(e) => setPermissionToggles({ ...permissionToggles, canAccessAnalytics: e.target.checked })}
+                              className="accent-cyan-500 rounded"
+                            />
+                            <span className="text-slate-200">Channel Analytics &amp; Overview</span>
+                          </label>
+
                           <label className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
                             <input
                               type="checkbox"
