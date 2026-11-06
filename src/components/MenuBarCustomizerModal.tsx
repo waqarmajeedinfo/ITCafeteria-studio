@@ -17,6 +17,8 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   ArrowUpDown,
   CheckCircle2,
   Shield
@@ -279,6 +281,59 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
       ...localConfig,
       items: localConfig.items.map((i) => (i.id === itemId ? { ...i, groupId: targetGroupId } : i))
     };
+    setLocalConfig(next);
+    markDirty(next);
+  };
+
+  // Move a submenu item up or down within its current menu group
+  const handleMoveItemOrder = (itemId: TabType, direction: 'up' | 'down') => {
+    const currentItem = localConfig.items.find((i) => i.id === itemId);
+    if (!currentItem) return;
+
+    const groupItems = localConfig.items.filter((i) => i.groupId === currentItem.groupId);
+    const indexInGroup = groupItems.findIndex((i) => i.id === itemId);
+    const targetIndexInGroup = direction === 'up' ? indexInGroup - 1 : indexInGroup + 1;
+    if (targetIndexInGroup < 0 || targetIndexInGroup >= groupItems.length) return;
+
+    const targetItem = groupItems[targetIndexInGroup];
+    const idxCurrent = localConfig.items.findIndex((i) => i.id === itemId);
+    const idxTarget = localConfig.items.findIndex((i) => i.id === targetItem.id);
+    if (idxCurrent === -1 || idxTarget === -1) return;
+
+    setLockWarning(null);
+    const nextItems = [...localConfig.items];
+    const temp = nextItems[idxCurrent];
+    nextItems[idxCurrent] = nextItems[idxTarget];
+    nextItems[idxTarget] = temp;
+
+    const next = { ...localConfig, items: nextItems };
+    setLocalConfig(next);
+    markDirty(next);
+  };
+
+  // Jump a submenu item directly to a slot number within its current menu group
+  const handleSetItemPosition = (itemId: TabType, newIndexInGroup: number) => {
+    const currentItem = localConfig.items.find((i) => i.id === itemId);
+    if (!currentItem) return;
+
+    const groupItems = localConfig.items.filter((i) => i.groupId === currentItem.groupId);
+    const currentIndexInGroup = groupItems.findIndex((i) => i.id === itemId);
+    if (newIndexInGroup === currentIndexInGroup || newIndexInGroup < 0 || newIndexInGroup >= groupItems.length) return;
+
+    setLockWarning(null);
+    const reorderedGroup = [...groupItems];
+    const [moved] = reorderedGroup.splice(currentIndexInGroup, 1);
+    reorderedGroup.splice(newIndexInGroup, 0, moved);
+
+    let cursor = 0;
+    const nextItems = localConfig.items.map((it) => {
+      if (it.groupId === currentItem.groupId) {
+        return reorderedGroup[cursor++];
+      }
+      return it;
+    });
+
+    const next = { ...localConfig, items: nextItems };
     setLocalConfig(next);
     markDirty(next);
   };
@@ -580,7 +635,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                         Is menu mein koi item nahi hai.
                       </div>
                     ) : (
-                      groupItems.map((item) => {
+                      groupItems.map((item, itemIndexInGroup) => {
                         const isSelected = selectedItemId === item.id;
                         const roleVis = item.roleVisibility || 'all';
 
@@ -638,6 +693,38 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
                               </div>
 
                               <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                {/* Submenu Up & Down Reordering Controls */}
+                                <div className="flex items-center gap-0.5 bg-slate-950 p-0.5 rounded-lg border border-slate-800" title="Submenu Order in Menu">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveItemOrder(item.id, 'up')}
+                                    disabled={itemIndexInGroup === 0}
+                                    className="p-1 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 disabled:opacity-25 transition-colors cursor-pointer"
+                                    title="Move Submenu Up (Upar Karein)"
+                                  >
+                                    <ChevronUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <select
+                                    value={itemIndexInGroup}
+                                    onChange={(e) => handleSetItemPosition(item.id, Number(e.target.value))}
+                                    className="bg-slate-900 border-none text-[10px] text-cyan-300 font-mono font-bold focus:outline-none px-1 py-0.5 cursor-pointer rounded"
+                                    title="Submenu Position Number"
+                                  >
+                                    {groupItems.map((_, idx) => (
+                                      <option key={idx} value={idx}>#{idx + 1}</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveItemOrder(item.id, 'down')}
+                                    disabled={itemIndexInGroup === groupItems.length - 1}
+                                    className="p-1 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 disabled:opacity-25 transition-colors cursor-pointer"
+                                    title="Move Submenu Down (Neechay Karein)"
+                                  >
+                                    <ChevronDown className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
                                 <button
                                   onClick={() => toggleItemLock(item.id)}
                                   className={`p-1 rounded-lg border text-xs cursor-pointer transition-colors ${

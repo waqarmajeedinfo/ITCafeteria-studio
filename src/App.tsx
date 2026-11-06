@@ -43,7 +43,8 @@ import {
   FolderTree,
   Plus,
   Trash2,
-  Search
+  Search,
+  Globe
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -83,6 +84,7 @@ import {
   DEFAULT_THEME_CONFIG,
   ACCENT_COLORS
 } from './components/ThemeCustomizerModal';
+import { GroundLevelSearchDashboard } from './components/GroundLevelSearchDashboard';
 import {
   MenuBarCustomizerModal,
   loadMenuConfig,
@@ -319,6 +321,7 @@ export default function App() {
   // Menu Bar Customizer Configuration State (WordPress Style Menu Manager)
   const [menuConfig, setMenuConfig] = useState<MenuCustomizerState>(loadMenuConfig);
   const [showMenuCustomizer, setShowMenuCustomizer] = useState(false);
+  const [showGroundCriteriaModal, setShowGroundCriteriaModal] = useState(false);
 
   // Dirty State Management: Tab-Switch Unsaved Changes Guard
   const [pendingTab, setPendingTab] = useState<TabType | null>(null);
@@ -1122,6 +1125,16 @@ export default function App() {
                 <span className="hidden sm:inline text-xs font-semibold text-slate-200">Settings</span>
               </button>
 
+              {/* 48-Hour Ground Search Criteria Dashboard Quick Button */}
+              <button
+                onClick={() => setShowGroundCriteriaModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-950/80 to-blue-950/80 hover:from-cyan-900/80 hover:to-blue-900/80 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 hover:text-white text-xs font-semibold cursor-pointer transition-all shadow-md group shrink-0"
+                title="48-Hour Ground-Level Search Criteria & Sources Dashboard"
+              >
+                <Globe className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform" />
+                <span className="hidden sm:inline text-xs font-semibold text-cyan-200">48h Search</span>
+              </button>
+
               {/* Scroll To Top Jump Button when Scrolled */}
               {isScrolled && (
                 <button
@@ -1851,6 +1864,12 @@ export default function App() {
           setMenuConfig(DEFAULT_MENU_STATE);
           localStorage.removeItem('itcafeteria_menu_customizer_config');
         }}
+      />
+
+      {/* 48-Hour Ground-Level Search Criteria & Sources Dashboard Modal */}
+      <GroundLevelSearchDashboard
+        isOpen={showGroundCriteriaModal}
+        onClose={() => setShowGroundCriteriaModal(false)}
       />
 
       {/* Multi-Channel MCN Manager Modal */}

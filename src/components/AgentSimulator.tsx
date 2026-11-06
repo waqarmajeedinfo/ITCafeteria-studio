@@ -11,8 +11,11 @@ import {
   Sliders,
   Plus,
   Settings,
-  X
+  X,
+  Globe,
+  Radio
 } from 'lucide-react';
+import { GroundLevelSearchDashboard } from './GroundLevelSearchDashboard';
 import { CHANNEL_PROFILES, type ChannelProfile } from '../data/channelData';
 import {
   AgentFlowScreen,
@@ -160,6 +163,7 @@ export const AgentSimulator: React.FC = () => {
   });
   const [showSearchStrategyMenu, setShowSearchStrategyMenu] = useState(false);
   const [showPriorityModal, setShowPriorityModal] = useState(false);
+  const [showGroundCriteriaModal, setShowGroundCriteriaModal] = useState(false);
   const [newResourceInput, setNewResourceInput] = useState('');
   const [newResourceTitle, setNewResourceTitle] = useState('');
   const [newResourceCategory, setNewResourceCategory] = useState('');
@@ -715,8 +719,8 @@ export const AgentSimulator: React.FC = () => {
           </div>
         </div>
 
-        {/* Category-Specific Script Rule & Automatic Bind + Priority Links Section */}
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* Category-Specific Script Rule & Automatic Bind + Priority Links Section + 48h Ground Search */}
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="md:col-span-2 rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3 text-xs space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="font-bold text-cyan-300 flex items-center gap-1.5">
@@ -765,6 +769,31 @@ export const AgentSimulator: React.FC = () => {
               className="mt-2 w-full py-1 px-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/40 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1"
             >
               <Sliders className="w-3 h-3 text-blue-300" /> Manage Priority Links
+            </button>
+          </div>
+
+          {/* 48-Hour Ground-Level Search Scenario (10+ Websites) */}
+          <div className="rounded-xl border border-cyan-500/40 bg-gradient-to-br from-cyan-950/40 via-slate-900 to-indigo-950/30 p-3 text-xs flex flex-col justify-between shadow-md">
+            <div>
+              <div className="font-bold text-cyan-300 flex items-center justify-between mb-1">
+                <span className="flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                  48h Ground Search
+                </span>
+                <span className="text-[10px] font-mono bg-cyan-900/50 px-1.5 py-0.5 rounded text-cyan-200 border border-cyan-500/30">
+                  48h • 10+ Sites
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 line-clamp-2">
+                Agent search strictly limited to the last 48 hours across at least 10 authoritative ground websites.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowGroundCriteriaModal(true)}
+              className="mt-2 w-full py-1.5 px-2 bg-gradient-to-r from-cyan-600/40 to-blue-600/40 hover:from-cyan-600/60 hover:to-blue-600/60 text-cyan-200 border border-cyan-500/50 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <Radio className="w-3 h-3 text-cyan-300 animate-pulse" /> Check 48h Scenario
             </button>
           </div>
         </div>
@@ -1227,6 +1256,14 @@ export const AgentSimulator: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 48-Hour Ground-Level Search Criteria & Sources Dashboard Modal */}
+      {showGroundCriteriaModal && (
+        <GroundLevelSearchDashboard
+          isOpen={showGroundCriteriaModal}
+          onClose={() => setShowGroundCriteriaModal(false)}
+        />
       )}
     </div>
   );

@@ -1,0 +1,144 @@
+{
+  "timeWindowHours": 48,
+  "minGroundSources": 10,
+  "lastUpdated": "2026-11-06T08:25:01Z",
+  "updatedBy": "waqarmajeedinfo",
+  "customKeywords": [
+    "Google AI Studio",
+    "Gemini",
+    "Cursor AI",
+    "Agentic Workflows",
+    "Open-Source LLMs",
+    "Local AI Tools",
+    "Developer Automation",
+    "Hugging Face Papers"
+  ],
+  "negativeFilters": [
+    "crypto trading speculation",
+    "non-tech gossip",
+    "rumors without proof",
+    "stock price fluctuations"
+  ],
+  "sources": [
+    {
+      "id": "src-techcrunch-ai",
+      "name": "TechCrunch AI",
+      "url": "https://techcrunch.com/category/artificial-intelligence/",
+      "domain": "techcrunch.com",
+      "category": "AI News & Startup Launches",
+      "priority": "high",
+      "enabled": true,
+      "notes": "Covers daily artificial intelligence breakthroughs, startup launches, and tool announcements."
+    },
+    {
+      "id": "src-theverge-ai",
+      "name": "The Verge AI",
+      "url": "https://www.theverge.com/ai-artificial-intelligence",
+      "domain": "theverge.com",
+      "category": "Consumer Tech & Big AI",
+      "priority": "high",
+      "enabled": true,
+      "notes": "Hands-on analysis of major tech and generative AI releases within 24-48 hours."
+    },
+    {
+      "id": "src-hackernews",
+      "name": "Hacker News Trending",
+      "url": "https://news.ycombinator.com/",
+      "domain": "news.ycombinator.com",
+      "category": "Developer Community & Show HN",
+      "priority": "high",
+      "enabled": true,
+      "notes": "Fastest ground-level indicators of developer-loved open-source projects and AI tools."
+    },
+    {
+      "id": "src-github-trending",
+      "name": "GitHub Trending AI Repos",
+      "url": "https://github.com/trending",
+      "domain": "github.com",
+      "category": "Open-Source Code & Models",
+      "priority": "high",
+      "enabled": true,
+      "notes": "Daily code releases, autonomous agent frameworks, and self-hosted AI models."
+    },
+    {
+      "id": "src-huggingface-papers",
+      "name": "Hugging Face Daily Papers",
+      "url": "https://huggingface.co/papers",
+      "domain": "huggingface.co",
+      "category": "AI Research Papers & Weights",
+      "priority": "high",
+      "enabled": true,
+      "notes": "Fresh scientific breakthroughs, fine-tunes, and open weight LLM releases."
+    },
+    {
+      "id": "src-producthunt-ai",
+      "name": "Product Hunt AI",
+      "url": "https://www.producthunt.com/topics/artificial-intelligence",
+      "domain": "producthunt.com",
+      "category": "New Product Launches",
+      "priority": "medium",
+      "enabled": true,
+      "notes": "Daily launched AI productivity apps, creator software, and browser extensions."
+    },
+    {
+      "id": "src-openai-news",
+      "name": "OpenAI Official News & Research",
+      "url": "https://openai.com/news/",
+      "domain": "openai.com",
+      "category": "Frontier Models & API Releases",
+      "priority": "high",
+      "enabled": true,
+      "notes": "Direct official announcements for GPT models, Sora, voice engine, and developer tools."
+    },
+    {
+      "id": "src-google-ai-blog",
+      "name": "Google DeepMind & AI Studio Blog",
+      "url": "https://blog.google/technology/ai/",
+      "domain": "blog.google",
+      "category": "Google AI & Gemini Releases",
+      "priority": "high",
+      "enabled": true,
+      "notes": "First-party updates on Gemini models, Google AI Studio capabilities, and research."
+    },
+    {
+      "id": "src-venturebeat-ai",
+      "name": "VentureBeat AI",
+      "url": "https://venturebeat.com/category/ai/",
+      "domain": "venturebeat.com",
+      "category": "Enterprise AI & Models",
+      "priority": "medium",
+      "enabled": true,
+      "notes": "Detailed reporting on AI infrastructure, model benchmarks, and enterprise tech."
+    },
+    {
+      "id": "src-arstechnica-it",
+      "name": "Ars Technica Tech & AI",
+      "url": "https://arstechnica.com/information-technology/",
+      "domain": "arstechnica.com",
+      "category": "Deep Tech & Computing",
+      "priority": "medium",
+      "enabled": true,
+      "notes": "Deep technical journalism on computing, open source, and AI safety developments."
+    },
+    {
+      "id": "src-mit-techreview",
+      "name": "MIT Technology Review AI",
+      "url": "https://www.technologyreview.com/topic/artificial-intelligence/",
+      "domain": "technologyreview.com",
+      "category": "Emerging Tech Analysis",
+      "priority": "medium",
+      "enabled": true,
+      "notes": "High-credibility analysis on where AI systems and robotics are heading."
+    },
+    {
+      "id": "src-decrypt-ai",
+      "name": "Decrypt AI & Automation",
+      "url": "https://decrypt.co/news/ai",
+      "domain": "decrypt.co",
+      "category": "Emerging Tech & Automation",
+      "priority": "normal",
+      "enabled": true,
+      "notes": "Emerging creator workflows, agent tools, and practical automation guides."
+    }
+  ]
+}
