@@ -128,7 +128,8 @@ export function ThemeCustomizerModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md overscroll-contain overflow-hidden animate-in fade-in duration-200">
       <div 
-        className="w-full max-w-4xl max-h-[85vh] h-full sm:h-auto bg-slate-950 border border-cyan-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden overscroll-contain text-slate-100 ring-1 ring-cyan-500/20"
+        className="w-full max-w-4xl max-h-[80vh] h-full sm:h-auto bg-slate-950 border border-cyan-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100 ring-1 ring-cyan-500/20"
+        style={{ maxHeight: '80vh', overscrollBehavior: 'contain' }}
         onClick={(e) => e.stopPropagation()}
       >
 

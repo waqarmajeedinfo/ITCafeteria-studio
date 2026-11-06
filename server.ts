@@ -222,6 +222,7 @@ app.get('/api/ai/key-status', async (_req, res) => {
 
 // 1. AI Chatbot API (gemini-3.8-flash, gemini-4-argon, gemini-3.1-flash-lite)
 // 1. AI Chatbot API (gemini-3.1-flash-lite, gemini-3.8-flash, gemini-flash-latest)
+// 1. AI Chatbot API & Companion Long-Term Memory Engine
 const CHAT_MODELS = [
   'gemini-3.1-flash-lite',
   'gemini-3.8-flash',
@@ -234,8 +235,92 @@ const CHAT_FALLBACK_ORDER = [
   'gemini-flash-latest',
 ];
 
+const COMPANION_MEMORY_FILE = path.resolve(__dirname, 'data', 'agent', 'companion-memory.json');
+
+function getCompanionMemory(): any {
+  try {
+    if (fs.existsSync(COMPANION_MEMORY_FILE)) {
+      const raw = fs.readFileSync(COMPANION_MEMORY_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.activeDirectives)) return parsed;
+    }
+  } catch (err) {
+    console.error('[CompanionMemory] Read error:', err);
+  }
+  return {
+    companionName: 'IT Cafeteria AI Companion & Studio Memory',
+    owner: 'Waqar Majeed (@waqarmajeedinfo)',
+    studioTitle: 'IT Cafeteria Studio',
+    lastUpdated: new Date().toISOString(),
+    pricingAndTrainingInfo: {
+      isFree: true,
+      cost: '$0.00 (100% Free)',
+      noSubscriptionNeeded: true,
+      apiKeyTier: 'Google AI Studio Gemini API Free Tier (15 RPM / 1,500 RPD free forever)',
+      howLearningWorks: 'Persistent JSON storage on disk & GitHub synced with Gemini systemInstruction grounding.'
+    },
+    activeDirectives: [],
+    customMemories: []
+  };
+}
+
+function saveCompanionMemory(data: any, username: string = 'waqarmajeedinfo') {
+  try {
+    const dir = path.dirname(COMPANION_MEMORY_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(COMPANION_MEMORY_FILE, JSON.stringify(data, null, 2), 'utf-8');
+
+    const targetUser = username || 'waqarmajeedinfo';
+    const userRepoDir = path.resolve(__dirname, 'user-data', targetUser);
+    if (!fs.existsSync(userRepoDir)) fs.mkdirSync(userRepoDir, { recursive: true });
+    fs.writeFileSync(path.resolve(userRepoDir, 'companion-memory.json'), JSON.stringify(data, null, 2), 'utf-8');
+
+    const userStorageDir = path.resolve(__dirname, 'data', 'user-storage', targetUser);
+    if (!fs.existsSync(userStorageDir)) fs.mkdirSync(userStorageDir, { recursive: true });
+    fs.writeFileSync(path.resolve(userStorageDir, 'companion-memory.json'), JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[CompanionMemory] Save error:', err);
+  }
+}
+
+function getCompanionSystemInstruction(override?: string): string {
+  const mem = getCompanionMemory();
+  const directives = (mem.activeDirectives || [])
+    .map((d: any) => `• [${d.category}] ${d.title}: ${d.formula || d.description}`)
+    .join('\n');
+  const memories = (mem.customMemories || [])
+    .map((m: any) => `• [Memory] ${m.title}: ${m.content}`)
+    .join('\n');
+
+  return `You are Waqar Majeed's dedicated AI Companion & Senior Lead Engineer for IT Cafeteria Studio (@waqarmajeedinfo).
+CRITICAL COMMUNICATION DIRECTIVE:
+Aap ne Waqar Majeed se hamesha sirf aur sirf ROMAN URDU me baat karni hai, jab tak ke wo khud English me code ya documentation na maangein.
+PERMANENT ARCHITECTURAL LAWS LOCKED IN YOUR MEMORY:
+${directives}
+ADDITIONAL LEARNED MEMORIES & THOUGHT PATTERNS:
+${memories}
+STRICT SCROLLING FORMULA ENFORCEMENT:
+- Har popup, modal, menu, submenu aur scrollable container par formula apply hai: "max-height: 80vh; overflow-y: auto; overscroll-behavior: contain;".
+- UI elements mein ZERO Urdu/Arabic script font - clean English / Roman Urdu labels only.
+- 48 hours ground-level search across at least 10 high-authority tech sources.
+- Quick switch is for Super Admin only; standard users get strict privilege checkboxes.
+${override ? `\nADDITIONAL CONTEXT:\n${override}` : ''}`;
+}
+
 function generateIntelligentChatFallback(userQuery: string): string {
   const q = (userQuery || '').toLowerCase();
+
+  if (q.includes('scroll') || q.includes('80vh') || q.includes('overscroll') || q.includes('overflow')) {
+    return 'Waqar Bhai! Scrolling formula "max-height: 80vh; overflow-y: auto; overscroll-behavior: contain;" hamari application aur AI Companion Memory me permanently lock ho chuka hai. Ab tamam modals, popups aur aane wale submenus isi formula ke tehat automatically chalenge.';
+  }
+
+  if (q.includes('free') || q.includes('khareed') || q.includes('paid') || q.includes('plugin') || q.includes('price') || q.includes('cost')) {
+    return 'Waqar Bhai! Yeh bilkul 100% FREE hai! Iske liye aapko koi paid subscription ya plugin khareedne ki zaroorat nahi hai. Google AI Studio ka Gemini API Free Tier 15 RPM aur 1,500 daily requests muft deta hai, aur hamara Persistent Companion Memory engine data files me save hota hai jo $0 cost karta hai.';
+  }
+
+  if (q.includes('memory') || q.includes('train') || q.includes('learn') || q.includes('yaad')) {
+    return 'Waqar Bhai! AI Companion Memory active hai. Aapke tamaam rules (80vh scrolling, 48-hour ground search, 10+ sources, Super Admin quick switch, aur zero Urdu script) ab JSON storage aur Gemini system prompts me permanently save hain. Chat refresh ho ya naya feature banayen, yeh kabi nahi bhoolega!';
+  }
 
   if (q.includes('short') || q.includes('video') || q.includes('script') || q.includes('autopilot')) {
     return 'Waqar Bhai! Main ne aapki request note kar li hai. Autopilot Coordinator active hai: yeh 58 catalog videos se 0-duplicate verify karke 10-scene short package (Google Flow prompts aur voice dialogue ke sath) foran tayar kar sakta hai. Aap "Aaj ka short bana do" keh kar foran trigger kar sakte hain!';
@@ -249,12 +334,53 @@ function generateIntelligentChatFallback(userQuery: string): string {
     return 'Windows 11 speedup ke liye Win + R dabayein aur "cleanmgr" ya "temp" clean karne ka 20-second shortcut record karein. Is topic ka surge Pakistani tech audience mein +155% chal raha hai!';
   }
 
-  if (q.includes('train') || q.includes('naya user') || q.includes('kaise')) {
-    return 'Waqar Bhai! Naye trainee ya student ke liye workflow nihayat aasan hai: 1) Mic par bolein "Aaj ka short bana do". 2) Card se Google Flow Prompts copy karein. 3) Calendar mein shaam 6:00 PM slot par video auto-schedule ho chuki hogi!';
-  }
-
   return 'Waqar Bhai! Main aapke sath live co-pilot mode mein connect hoon. Aap mujhe Google Flow video prompts, YouTube tags, ya Content Calendar ke bare mein bataiye, main foran tayar kar deta hoon.';
 }
+
+app.get('/api/agent/companion-memory', (_req, res) => {
+  const memory = getCompanionMemory();
+  res.json({ ok: true, memory });
+});
+
+app.post('/api/agent/companion-memory', (req, res) => {
+  const { memory, username = 'waqarmajeedinfo' } = req.body || {};
+  if (!memory || !Array.isArray(memory.activeDirectives)) {
+    return res.status(400).json({ error: 'Valid memory object with activeDirectives is required' });
+  }
+
+  const updated = {
+    ...memory,
+    lastUpdated: new Date().toISOString(),
+    owner: 'Waqar Majeed (@waqarmajeedinfo)',
+  };
+
+  saveCompanionMemory(updated, username);
+  res.json({ ok: true, memory: updated });
+});
+
+app.post('/api/agent/companion-memory/add-rule', (req, res) => {
+  const { title, formula, description, category = 'Custom Learned Rule', username = 'waqarmajeedinfo' } = req.body || {};
+  if (!title || !description) {
+    return res.status(400).json({ error: 'Title and description are required' });
+  }
+
+  const current = getCompanionMemory();
+  const newDirective = {
+    id: `dir-${Date.now()}`,
+    category,
+    title,
+    formula: formula || '',
+    enforced: true,
+    dateAdded: new Date().toISOString().split('T')[0],
+    description
+  };
+
+  current.activeDirectives = [newDirective, ...(current.activeDirectives || [])];
+  current.lastUpdated = new Date().toISOString();
+
+  saveCompanionMemory(current, username);
+  res.json({ ok: true, added: newDirective, memory: current });
+});
 
 app.post('/api/ai/chat', async (req, res) => {
   try {
@@ -281,6 +407,8 @@ app.post('/api/ai/chat', async (req, res) => {
     let lastError: any = null;
     let modelUsed = selectedModel;
 
+    const dynamicSystemInstruction = getCompanionSystemInstruction(systemInstruction);
+
     if (ai && contents.length > 0) {
       for (const candidate of modelsToTry) {
         try {
@@ -289,9 +417,7 @@ app.post('/api/ai/chat', async (req, res) => {
               model: candidate,
               contents,
               config: {
-                systemInstruction:
-                  systemInstruction ||
-                  "You are an expert AI Production Assistant and Script Doctor for IT Cafeteria, run by Waqar Majeed. You communicate warmly in Roman Urdu or English as requested, assisting with Google Flow prompts, YouTube Shorts hooks, and viral retention. Keep answers concise, natural, and under 90 words.",
+                systemInstruction: dynamicSystemInstruction,
                 temperature: 0.7,
               },
             }),

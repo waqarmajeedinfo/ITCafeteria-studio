@@ -44,7 +44,8 @@ import {
   Plus,
   Trash2,
   Search,
-  Globe
+  Globe,
+  Brain
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -85,6 +86,7 @@ import {
   ACCENT_COLORS
 } from './components/ThemeCustomizerModal';
 import { GroundLevelSearchDashboard } from './components/GroundLevelSearchDashboard';
+import { CompanionMemoryModal } from './components/CompanionMemoryModal';
 import {
   MenuBarCustomizerModal,
   loadMenuConfig,
@@ -322,6 +324,7 @@ export default function App() {
   const [menuConfig, setMenuConfig] = useState<MenuCustomizerState>(loadMenuConfig);
   const [showMenuCustomizer, setShowMenuCustomizer] = useState(false);
   const [showGroundCriteriaModal, setShowGroundCriteriaModal] = useState(false);
+  const [showCompanionMemoryModal, setShowCompanionMemoryModal] = useState(false);
 
   // Dirty State Management: Tab-Switch Unsaved Changes Guard
   const [pendingTab, setPendingTab] = useState<TabType | null>(null);
@@ -1135,6 +1138,16 @@ export default function App() {
                 <span className="hidden sm:inline text-xs font-semibold text-cyan-200">48h Search</span>
               </button>
 
+              {/* AI Companion Permanent Memory & Directives Button (100% Free) */}
+              <button
+                onClick={() => setShowCompanionMemoryModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-950/80 to-slate-900/90 hover:from-purple-900/80 hover:to-slate-800 border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white text-xs font-semibold cursor-pointer transition-all shadow-md group shrink-0"
+                title="AI Companion Permanent Memory & Rules Engine (100% Free - 80vh Scroll Law)"
+              >
+                <Brain className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
+                <span className="hidden sm:inline text-xs font-semibold text-purple-200">AI Memory</span>
+              </button>
+
               {/* Scroll To Top Jump Button when Scrolled */}
               {isScrolled && (
                 <button
@@ -1870,6 +1883,12 @@ export default function App() {
       <GroundLevelSearchDashboard
         isOpen={showGroundCriteriaModal}
         onClose={() => setShowGroundCriteriaModal(false)}
+      />
+
+      {/* AI Companion Persistent Memory Engine Modal */}
+      <CompanionMemoryModal
+        isOpen={showCompanionMemoryModal}
+        onClose={() => setShowCompanionMemoryModal(false)}
       />
 
       {/* Multi-Channel MCN Manager Modal */}

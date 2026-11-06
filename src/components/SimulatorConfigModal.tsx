@@ -677,7 +677,10 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl shadow-blue-950/80 overflow-hidden overscroll-contain text-slate-100 my-auto">
+      <div
+        className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl shadow-blue-950/80 overflow-hidden text-slate-100 my-auto"
+        style={{ maxHeight: '80vh', overscrollBehavior: 'contain' }}
+      >
         {/* Modal Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">

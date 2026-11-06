@@ -1084,6 +1084,18 @@ Always adhere to IT Cafeteria rules:
               📊 Sheets Smart Fill Script
             </button>
             <button
+              onClick={() => handleSend("Waqar Bhai ke active architectural rules aur 80vh scrolling law kya hain?")}
+              className="px-2.5 py-1 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 rounded-lg text-purple-200 shrink-0 transition-colors cursor-pointer"
+            >
+              🧠 AI Memory Rules
+            </button>
+            <button
+              onClick={() => handleSend("Kya AI Studio aur yeh memory feature free hai ya mujhe koi paid subscription leni paregi?")}
+              className="px-2.5 py-1 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 rounded-lg text-emerald-200 shrink-0 transition-colors cursor-pointer"
+            >
+              🎁 Free vs Paid Info
+            </button>
+            <button
               onClick={() => handleSend("Roman Urdu dialogue likhte waqt konsi 5 ahem ghaltiyan Flow voice ko kharab karti hain?")}
               className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 shrink-0 transition-colors cursor-pointer"
             >

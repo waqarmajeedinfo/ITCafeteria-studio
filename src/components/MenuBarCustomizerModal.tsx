@@ -456,7 +456,10 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-4xl max-h-[85vh] h-full sm:h-auto flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden overscroll-contain text-slate-100">
+      <div
+        className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-4xl max-h-[80vh] h-full sm:h-auto flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden text-slate-100"
+        style={{ maxHeight: '80vh', overscrollBehavior: 'contain' }}
+      >
 
         {/* Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
@@ -516,7 +519,10 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
         )}
 
         {/* Content Body — Interactive Grid of Menu Categories */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll p-4 sm:p-5 space-y-4">
+        <div
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll p-4 sm:p-5 space-y-4"
+          style={{ overscrollBehavior: 'contain' }}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {localConfig.groups.map((group, groupIndex) => {
               const groupItems = localConfig.items.filter((i) => i.groupId === group.id);

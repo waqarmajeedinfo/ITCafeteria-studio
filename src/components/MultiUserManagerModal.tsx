@@ -559,7 +559,10 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
 
   const modalContent = (
     <div className="fixed inset-0 z-[115] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden overscroll-contain text-slate-100 my-auto">
+      <div
+        className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden overscroll-contain text-slate-100 my-auto"
+        style={{ maxHeight: '80vh', overscrollBehavior: 'contain' }}
+      >
         {/* Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
@@ -1628,7 +1631,10 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
               {/* PRIVILEGES & LIMITS MODAL OVERLAY */}
               {adjustingUserPermissions && (
                 <div className="fixed inset-0 z-[125] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                  <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl p-5 max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl space-y-4">
+                  <div
+                    className="bg-slate-900 border border-cyan-500/40 rounded-2xl p-5 max-w-2xl w-full max-h-[80vh] flex flex-col shadow-2xl space-y-4"
+                    style={{ maxHeight: '80vh', overscrollBehavior: 'contain' }}
+                  >
                     <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
                       <div className="flex items-center gap-2">
                         <SlidersHorizontal className="w-5 h-5 text-cyan-400" />

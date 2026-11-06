@@ -369,7 +369,10 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-hidden animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl w-full max-w-3xl max-h-[85vh] h-full sm:h-auto flex flex-col shadow-2xl shadow-emerald-950/80 overflow-hidden overscroll-contain text-slate-100">
+      <div
+        className="bg-slate-900 border border-emerald-500/40 rounded-2xl w-full max-w-3xl max-h-[80vh] h-full sm:h-auto flex flex-col shadow-2xl shadow-emerald-950/80 overflow-hidden text-slate-100"
+        style={{ maxHeight: '80vh', overscrollBehavior: 'contain' }}
+      >
         {/* Header */}
         <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">

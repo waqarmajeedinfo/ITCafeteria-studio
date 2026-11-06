@@ -428,7 +428,10 @@ export const GroundLevelSearchDashboard: React.FC<GroundLevelSearchDashboardProp
   if (isModal && !isOpen) return null;
 
   const content = (
-    <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-5xl max-h-[88vh] flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden text-slate-100">
+    <div
+      className="bg-slate-900 border border-cyan-500/40 rounded-2xl w-full max-w-5xl max-h-[80vh] flex flex-col shadow-2xl shadow-cyan-950/80 overflow-hidden text-slate-100"
+      style={{ maxHeight: '80vh', overscrollBehavior: 'contain' }}
+    >
       {/* Header */}
       <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -539,7 +542,10 @@ export const GroundLevelSearchDashboard: React.FC<GroundLevelSearchDashboardProp
       </div>
 
       {/* Main Body */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain custom-modal-scroll p-4 sm:p-5 space-y-4"
+        style={{ overscrollBehavior: 'contain' }}
+      >
         {/* TAB 1: LIVE 48-HOUR SCENARIO PREVIEW */}
         {activeTab === 'scenario' && (
           <div className="space-y-4 animate-in fade-in duration-150">
