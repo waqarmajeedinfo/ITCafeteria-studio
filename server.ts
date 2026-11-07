@@ -629,6 +629,59 @@ app.post('/api/agent/competitors/generate-strategy', async (req, res) => {
   }
 });
 
+// 1c. Persistent Phonetic Rules Dictionary Storage Engine
+const PHONETIC_DICT_FILE = path.resolve(__dirname, 'data', 'agent', 'phonetic-dictionary.json');
+
+function getStoredPhoneticRules(): any[] {
+  try {
+    if (fs.existsSync(PHONETIC_DICT_FILE)) {
+      const raw = fs.readFileSync(PHONETIC_DICT_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (err) {
+    console.error('[PhoneticDictionary] Read error:', err);
+  }
+  return [];
+}
+
+function saveStoredPhoneticRules(rules: any[], username: string = 'waqarmajeedinfo') {
+  try {
+    const dir = path.dirname(PHONETIC_DICT_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(PHONETIC_DICT_FILE, JSON.stringify(rules, null, 2), 'utf-8');
+
+    const targetUser = username || 'waqarmajeedinfo';
+    const userStorageDir = path.resolve(__dirname, 'data', 'user-storage', targetUser);
+    if (!fs.existsSync(userStorageDir)) fs.mkdirSync(userStorageDir, { recursive: true });
+    fs.writeFileSync(path.resolve(userStorageDir, 'phonetic-dictionary.json'), JSON.stringify(rules, null, 2), 'utf-8');
+
+    const userRepoDir = path.resolve(__dirname, 'user-data', targetUser);
+    if (!fs.existsSync(userRepoDir)) fs.mkdirSync(userRepoDir, { recursive: true });
+    fs.writeFileSync(path.resolve(userRepoDir, 'phonetic-dictionary.json'), JSON.stringify(rules, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[PhoneticDictionary] Save error:', err);
+  }
+}
+
+app.get('/api/phonetic-dictionary', (_req, res) => {
+  const rules = getStoredPhoneticRules();
+  res.json({ ok: true, rules });
+});
+
+app.post('/api/phonetic-dictionary', (req, res) => {
+  try {
+    const { rules, username = 'waqarmajeedinfo' } = req.body || {};
+    if (Array.isArray(rules)) {
+      saveStoredPhoneticRules(rules, username);
+      return res.json({ ok: true, count: rules.length, message: 'Phonetic dictionary permanently saved to disk' });
+    }
+    res.status(400).json({ error: 'rules array required' });
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || 'Failed to save phonetic dictionary' });
+  }
+});
+
 app.post('/api/ai/chat', async (req, res) => {
   try {
     const { messages, model = 'gemini-3.1-flash-lite', systemInstruction, fallback = true } = req.body;
@@ -2249,6 +2302,11 @@ app.post('/api/ai/generate-story', async (req, res) => {
 
     const primaryHashtag = channelName.toLowerCase().includes('beauty') ? '#BeautyHub' : '#ITCafeteria';
 
+    const storedRules = getStoredPhoneticRules();
+    const phoneticDirectives = storedRules.length > 0
+      ? storedRules.slice(0, 35).map((r) => `"${r.word}" ➔ "${r.fix}"`).join(', ')
+      : '"waqt" ➔ "waq-t", "aksar" ➔ "ak-sr", "turant" ➔ "usi waqt", "baray" ➔ "barray", "hal" ➔ "tareeqa", "Gemini" ➔ "Jemini"';
+
     const prompt = `You are the lead story architect for "${channelName}" (${niche}), presenter "${presenter}".
 Create a complete ${totalScenes}-scene vertical video story package in Roman Urdu (Pakistani Urdu in Latin script), with English tech/beauty keywords where natural. Total duration: ${totalScenes * 10} seconds (${Math.floor((totalScenes * 10) / 60)}m ${(totalScenes * 10) % 60}s).
 
@@ -2266,6 +2324,7 @@ ${transcript || '(none)'}
 - Primary hashtag: ${primaryHashtag}
 - Dialect & Tone Cadence: ${dialectGuide}
 - Visual Direction for Flow Prompts: ${flowGuide}
+- LIVING PHONETIC RULES DICTIONARY (MANDATORY): You MUST pick and use the exact phonetic pronunciations from our living library when writing dialogues (e.g. ${phoneticDirectives}). Never use forbidden words or mispronounced slurs.
 ${customInstructions ? `- Custom Creator Directives & Pattern Rules:\n${customInstructions}` : ''}
 
 YOUTUBE CHANNEL ANALYTICS & 4-PILLAR GROWTH OPTIMIZATION (STRICT MANDATORY RULES):

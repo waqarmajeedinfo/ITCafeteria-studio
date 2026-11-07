@@ -14,6 +14,7 @@ export interface PhoneticRule {
   reason: string;
   isCustom?: boolean;
   createdAt?: string;
+  updatedAt?: string;
   source?: 'base' | 'manual' | 'story_edit';
 }
 
@@ -89,6 +90,13 @@ export function savePhoneticDictionary(rules: PhoneticRule[]): void {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(rules));
       window.dispatchEvent(new CustomEvent(PHONETIC_UPDATED_EVENT, { detail: rules }));
       window.dispatchEvent(new CustomEvent('storage'));
+
+      // Persistent server-side synchronization to disk so custom words are permanently preserved
+      fetch('/api/phonetic-dictionary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rules })
+      }).catch((e) => console.warn('[PhoneticStore] Server sync warning:', e));
     }
   } catch (e) {
     console.error('Error saving phonetic dictionary', e);
@@ -131,6 +139,51 @@ export function addPhoneticRule(rule: {
   return updated;
 }
 
+export function editPhoneticRule(
+  originalWord: string,
+  updatedData: {
+    word: string;
+    fix: string;
+    reason?: string;
+  }
+): PhoneticRule[] {
+  const current = getPhoneticDictionary();
+  const cleanWord = updatedData.word.trim();
+  const cleanFix = updatedData.fix.trim();
+  if (!cleanWord || !cleanFix) return current;
+
+  const targetIdx = current.findIndex(
+    (r) => r.word.toLowerCase() === originalWord.toLowerCase()
+  );
+
+  let updated: PhoneticRule[];
+  if (targetIdx >= 0) {
+    updated = [...current];
+    updated[targetIdx] = {
+      ...updated[targetIdx],
+      word: cleanWord,
+      fix: cleanFix,
+      reason: updatedData.reason?.trim() || updated[targetIdx].reason || 'Updated pronunciation rule',
+      isCustom: true,
+      updatedAt: new Date().toISOString()
+    };
+  } else {
+    const newRule: PhoneticRule = {
+      word: cleanWord,
+      fix: cleanFix,
+      reason: updatedData.reason?.trim() || 'Custom pronunciation rule',
+      isCustom: true,
+      source: 'manual',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    updated = [newRule, ...current];
+  }
+
+  savePhoneticDictionary(updated);
+  return updated;
+}
+
 export function deletePhoneticRule(word: string): PhoneticRule[] {
   const current = getPhoneticDictionary();
   const updated = current.filter((r) => r.word.toLowerCase() !== word.toLowerCase());
@@ -139,8 +192,36 @@ export function deletePhoneticRule(word: string): PhoneticRule[] {
 }
 
 export function resetPhoneticDictionaryToDefault(): PhoneticRule[] {
-  savePhoneticDictionary(INITIAL_RULES);
-  return INITIAL_RULES;
+  // Safe implementation: Never wipe user custom or learned words!
+  const current = getPhoneticDictionary();
+  const customOnly = current.filter((r) => r.isCustom || r.source === 'manual' || r.source === 'story_edit');
+  const safeMerged = [...customOnly, ...INITIAL_RULES.filter(ir => !customOnly.some(cr => cr.word.toLowerCase() === ir.word.toLowerCase()))];
+  savePhoneticDictionary(safeMerged);
+  return safeMerged;
+}
+
+export async function syncPhoneticDictionaryFromServer(): Promise<PhoneticRule[]> {
+  try {
+    if (typeof window === 'undefined') return INITIAL_RULES;
+    const res = await fetch('/api/phonetic-dictionary');
+    const data = await res.json();
+    if (data?.ok && Array.isArray(data.rules) && data.rules.length > 0) {
+      const current = getPhoneticDictionary();
+      const customOnly = current.filter((r) => r.isCustom || r.source === 'manual' || r.source === 'story_edit');
+
+      const mergedMap = new Map<string, PhoneticRule>();
+      data.rules.forEach((r: PhoneticRule) => mergedMap.set(r.word.toLowerCase(), r));
+      customOnly.forEach((r: PhoneticRule) => mergedMap.set(r.word.toLowerCase(), r));
+
+      const merged = Array.from(mergedMap.values());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent(PHONETIC_UPDATED_EVENT, { detail: merged }));
+      return merged;
+    }
+  } catch (e) {
+    console.warn('[PhoneticStore] Server sync warning:', e);
+  }
+  return getPhoneticDictionary();
 }
 
 export function getLearnedEdits(): LearnedWordEdit[] {

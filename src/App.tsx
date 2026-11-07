@@ -45,7 +45,8 @@ import {
   Trash2,
   Search,
   Globe,
-  Brain
+  Brain,
+  Edit3
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -74,8 +75,9 @@ import { PendingQueueTracker } from './components/PendingQueueTracker';
 import {
   getPhoneticDictionary,
   addPhoneticRule,
+  editPhoneticRule,
   deletePhoneticRule,
-  resetPhoneticDictionaryToDefault,
+  syncPhoneticDictionaryFromServer,
   PHONETIC_UPDATED_EVENT,
   type PhoneticRule
 } from './lib/phoneticDictionaryStore';
@@ -242,6 +244,13 @@ export default function App() {
     };
     window.addEventListener(PHONETIC_UPDATED_EVENT, handlePhoneticUpdate);
 
+    // Initial server-side phonetic dictionary sync so user custom words are always restored
+    syncPhoneticDictionaryFromServer().then((rules) => {
+      if (Array.isArray(rules) && rules.length > 0) {
+        setPhoneticRules(rules);
+      }
+    });
+
     const handleOpenTopic = (e: any) => {
       setActiveTab('simulator');
       if (e.detail?.tool || e.detail?.title) {
@@ -274,6 +283,12 @@ export default function App() {
   const [ruleSearch, setRuleSearch] = useState('');
   const [showAddRuleForm, setShowAddRuleForm] = useState(false);
   const [ruleSaveMessage, setRuleSaveMessage] = useState<string | null>(null);
+
+  // Phonetic Rule Edit State
+  const [editingRuleWord, setEditingRuleWord] = useState<string | null>(null);
+  const [editWord, setEditWord] = useState('');
+  const [editFix, setEditFix] = useState('');
+  const [editReason, setEditReason] = useState('');
 
   const [diagnosticGuidance, setDiagnosticGuidance] = useState<{
     tab?: TabType;
@@ -1390,25 +1405,14 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddRuleForm(!showAddRuleForm)}
+                  onClick={() => {
+                    setShowAddRuleForm(!showAddRuleForm);
+                    setEditingRuleWord(null);
+                  }}
                   className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{showAddRuleForm ? 'Cancel' : '+ Add Word Rule'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const reset = resetPhoneticDictionaryToDefault();
-                    setPhoneticRules(reset);
-                    setRuleSaveMessage('Defaults restore ho gaye.');
-                    setTimeout(() => setRuleSaveMessage(null), 2500);
-                  }}
-                  className="p-1.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition-colors cursor-pointer"
-                  title="Reset to default verified rules"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -1524,49 +1528,145 @@ export default function App() {
                   );
                 }
 
-                return filtered.map((item, idx) => (
-                  <div key={idx} className="pt-2.5 first:pt-0 flex flex-col gap-1.5 group">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-white font-semibold text-xs">{item.word}</span>
-                        {item.source === 'story_edit' ? (
-                          <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold uppercase flex items-center gap-1">
-                            ⚡ Auto-Learned (Story Edit)
-                          </span>
-                        ) : item.isCustom ? (
-                          <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[9px] font-bold uppercase">
-                            Custom
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[9px] font-bold uppercase">
-                            Verified Standard
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-cyan-300 font-bold bg-cyan-950/70 px-2 py-0.5 rounded border border-cyan-800/40 text-xs">
-                          Write: {item.fix}
-                        </span>
-                        {(item.isCustom || item.source === 'story_edit') && (
+                return filtered.map((item, idx) => {
+                  const isEditing = editingRuleWord === item.word;
+                  if (isEditing) {
+                    return (
+                      <div key={idx} className="p-3.5 bg-slate-950 border border-cyan-500/60 rounded-xl space-y-2.5 my-1 shadow-lg shadow-cyan-950/20">
+                        <div className="flex items-center justify-between text-xs font-bold text-cyan-300">
+                          <span>Phonetic Rule Edit Karein</span>
+                          <span className="text-[10px] text-slate-400 font-mono">Original: "{item.word}"</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Target Word</label>
+                            <input
+                              type="text"
+                              value={editWord}
+                              onChange={(e) => setEditWord(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Flow Phonetic Fix (Write As)</label>
+                            <input
+                              type="text"
+                              value={editFix}
+                              onChange={(e) => setEditFix(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-cyan-200 font-mono text-xs focus:outline-none focus:border-cyan-400"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Pronunciation Reason / Audio Logic</label>
+                          <input
+                            type="text"
+                            value={editReason}
+                            onChange={(e) => setEditReason(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200 text-xs focus:outline-none focus:border-cyan-400"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setEditingRuleWord(null)}
+                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                          >
+                            Cancel
+                          </button>
                           <button
                             type="button"
                             onClick={() => {
-                              const updated = deletePhoneticRule(item.word);
+                              if (!editWord.trim() || !editFix.trim()) {
+                                setRuleSaveMessage('Word aur Fix dono fields lazmi hain.');
+                                return;
+                              }
+                              const updated = editPhoneticRule(editingRuleWord, {
+                                word: editWord.trim(),
+                                fix: editFix.trim(),
+                                reason: editReason.trim()
+                              });
                               setPhoneticRules(updated);
-                              setRuleSaveMessage(`Rule "${item.word}" delete ho gaya.`);
-                              setTimeout(() => setRuleSaveMessage(null), 2500);
+                              setEditingRuleWord(null);
+                              setRuleSaveMessage(`Rule "${editWord.trim()}" kamyabi se update aur save ho gaya!`);
+                              setTimeout(() => setRuleSaveMessage(null), 3000);
                             }}
-                            className="p-1 rounded hover:bg-rose-950/60 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
-                            title="Rule delete karein"
+                            className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow-md cursor-pointer"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Save Changes</span>
                           </button>
-                        )}
+                        </div>
                       </div>
+                    );
+                  }
+
+                  return (
+                    <div key={idx} className="pt-2.5 first:pt-0 flex flex-col gap-1.5 group">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-white font-semibold text-xs">{item.word}</span>
+                          {item.source === 'story_edit' ? (
+                            <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-bold uppercase flex items-center gap-1">
+                              ⚡ Auto-Learned (Story Edit)
+                            </span>
+                          ) : item.isCustom ? (
+                            <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[9px] font-bold uppercase">
+                              Custom
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[9px] font-bold uppercase">
+                              Verified Standard
+                            </span>
+                          )}
+                          {item.updatedAt && (
+                            <span className="px-1.5 py-0.2 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[9px] font-mono">
+                              Edited
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-cyan-300 font-bold bg-cyan-950/70 px-2 py-0.5 rounded border border-cyan-800/40 text-xs">
+                            Write: {item.fix}
+                          </span>
+
+                          {/* Edit Rule Button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingRuleWord(item.word);
+                              setEditWord(item.word);
+                              setEditFix(item.fix);
+                              setEditReason(item.reason);
+                              setShowAddRuleForm(false);
+                            }}
+                            className="p-1 rounded hover:bg-cyan-950/60 text-slate-400 hover:text-cyan-300 transition-colors cursor-pointer"
+                            title="Rule edit karein"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {(item.isCustom || item.source === 'story_edit') && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = deletePhoneticRule(item.word);
+                                setPhoneticRules(updated);
+                                setRuleSaveMessage(`Rule "${item.word}" delete ho gaya.`);
+                                setTimeout(() => setRuleSaveMessage(null), 2500);
+                              }}
+                              className="p-1 rounded hover:bg-rose-950/60 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                              title="Rule delete karein"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-slate-400 text-[11px] leading-relaxed">{item.reason}</span>
                     </div>
-                    <span className="text-slate-400 text-[11px] leading-relaxed">{item.reason}</span>
-                  </div>
-                ));
+                  );
+                });
               })()}
             </div>
 
