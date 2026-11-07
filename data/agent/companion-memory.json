@@ -93,6 +93,22 @@
   ],
   "interactionHistory": [
     {
+      "id": "dialogue-1794068530355",
+      "timestamp": "2026-11-07T16:22:10.355Z",
+      "type": "live_voice_dialogue",
+      "summary": "Host: \"Doosra test, ab batao kya karna hai?\" -> Co-Pilot Response provided",
+      "learnedTakeaway": "Host queried during live broadcast. Maintained continuous interactive dialogue in Roman Urdu.",
+      "category": "Continuous Live Dialogue"
+    },
+    {
+      "id": "dialogue-1794068530281",
+      "timestamp": "2026-11-07T16:22:10.281Z",
+      "type": "live_voice_dialogue",
+      "summary": "Host: \"Salam Co-pilot, pehla test\" -> Co-Pilot Response provided",
+      "learnedTakeaway": "Host queried during live broadcast. Maintained continuous interactive dialogue in Roman Urdu.",
+      "category": "Continuous Live Dialogue"
+    },
+    {
       "id": "dialogue-1794066075965",
       "timestamp": "2026-11-07T15:41:15.965Z",
       "type": "live_voice_dialogue",

@@ -36,7 +36,8 @@ import {
   ChevronUp,
   Maximize2,
   Minimize2,
-  Repeat
+  Repeat,
+  RotateCcw
 } from 'lucide-react';
 
 interface LiveCoPilotModalProps {
@@ -171,9 +172,12 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
   const [memoryData, setMemoryData] = useState<any>(null);
   const [historyList, setHistoryList] = useState<any[]>([]);
 
-  // Speech Recognition Ref
+  // Speech Recognition & Turn-Taking Loop Refs
   const recognitionRef = useRef<any>(null);
   const shouldListenRef = useRef(false);
+  const isBusyRef = useRef(false);
+  const restartTimeoutRef = useRef<any>(null);
+  const safetyTimeoutRef = useRef<any>(null);
   const dialogueEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -182,11 +186,10 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
     } else {
       stopVoiceRecognition();
     }
+    return () => {
+      stopVoiceRecognition();
+    };
   }, [isOpen]);
-
-  useEffect(() => {
-    shouldListenRef.current = isVoiceListening;
-  }, [isVoiceListening]);
 
   useEffect(() => {
     if (dialogueEndRef.current) {
@@ -260,99 +263,163 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
     });
   };
 
-  // Text-To-Speech Output for Co-Pilot
-  const speakText = (text: string) => {
-    if (isVoiceMuted || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'hi-IN'; // Closest native accent cadence to Roman Urdu / Hindi
-      utterance.rate = 1.05;
-      utterance.pitch = 1.0;
-      utterance.onstart = () => setSpeechStatus('speaking');
-      utterance.onend = () => {
-        if (shouldListenRef.current) {
-          setSpeechStatus('listening');
-        } else {
-          setSpeechStatus('idle');
-        }
-      };
-      window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.error('Speech synthesis error:', e);
+  // Text-To-Speech Output for Co-Pilot with reliable onFinished callback
+  const speakText = (text: string, onFinished?: () => void) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      onFinished?.();
+      return;
     }
-  };
 
-  // Continuous Hands-Free Speech Recognition Loop
-  const startVoiceRecognition = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('Aapka browser Speech Recognition support nahi karta. Chrome ya Edge use karein.');
+    if (isVoiceMuted) {
+      onFinished?.();
       return;
     }
 
     try {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      window.speechSynthesis.cancel();
+      if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
 
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'hi-IN'; // Closest native accent cadence to Roman Urdu / Hindi
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
 
-      recognition.onstart = () => {
+      let hasCompleted = false;
+      const handleComplete = () => {
+        if (hasCompleted) return;
+        hasCompleted = true;
+        if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
+        onFinished?.();
+      };
+
+      utterance.onstart = () => {
+        setSpeechStatus('speaking');
+      };
+
+      utterance.onend = () => {
+        handleComplete();
+      };
+
+      utterance.onerror = () => {
+        handleComplete();
+      };
+
+      // Safety watchdog: In case browser synthesis hangs or fails to fire onend
+      safetyTimeoutRef.current = setTimeout(() => {
+        handleComplete();
+      }, 12000);
+
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.error('Speech synthesis error:', e);
+      onFinished?.();
+    }
+  };
+
+  // Continuous Hands-Free Speech Recognition Loop (Fresh Instance Pattern on Every Turn)
+  const launchFreshRecognition = () => {
+    if (!shouldListenRef.current || isBusyRef.current) {
+      return;
+    }
+
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionClass) {
+      alert('Aapka browser Speech Recognition support nahi karta. Chrome ya Edge use karein.');
+      return;
+    }
+
+    // Safely cleanup old recognition instance
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onstart = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.abort();
+      } catch (e) {}
+      recognitionRef.current = null;
+    }
+
+    try {
+      const rec = new SpeechRecognitionClass();
+      rec.continuous = false; // Turn-taking single utterance is 100x more stable across browsers!
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      rec.lang = 'en-US';
+
+      rec.onstart = () => {
         setIsVoiceListening(true);
-        shouldListenRef.current = true;
         setSpeechStatus('listening');
       };
 
-      recognition.onresult = async (event: any) => {
-        const lastIndex = event.results.length - 1;
-        const transcript = event.results[lastIndex][0].transcript.trim();
-        if (transcript) {
-          await handleSendHostPrompt(transcript, 'mic_voice');
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition status:', event.error);
-        if (event.error === 'not-allowed') {
-          setIsVoiceListening(false);
-          shouldListenRef.current = false;
-          setSpeechStatus('idle');
-        }
-      };
-
-      recognition.onend = () => {
-        // Auto-reconnect voice loop if still marked active (stateful, no reset)
-        if (shouldListenRef.current) {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.warn('Recognition restart caught:', e);
+      rec.onresult = async (event: any) => {
+        let recognized = '';
+        for (let i = 0; i < event.results.length; i++) {
+          if (event.results[i][0]?.transcript) {
+            recognized += event.results[i][0].transcript;
           }
-        } else {
+        }
+        const cleanText = recognized.trim();
+        if (cleanText) {
+          console.log('[Live Co-Pilot Spoken Input]:', cleanText);
+          // Immediately abort this recognition cycle so mic is freed during TTS
+          try { rec.abort(); } catch (e) {}
+          await handleSendHostPrompt(cleanText, 'mic_voice');
+        }
+      };
+
+      rec.onerror = (event: any) => {
+        console.warn('[Live Co-Pilot Speech Error]:', event.error);
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          shouldListenRef.current = false;
           setIsVoiceListening(false);
           setSpeechStatus('idle');
         }
       };
 
-      recognition.start();
-      recognitionRef.current = recognition;
+      rec.onend = () => {
+        // When speech recognition ends its turn, if still supposed to listen and not busy speaking:
+        if (shouldListenRef.current && !isBusyRef.current) {
+          if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
+          restartTimeoutRef.current = setTimeout(() => {
+            launchFreshRecognition();
+          }, 250);
+        }
+      };
+
+      rec.start();
+      recognitionRef.current = rec;
     } catch (err) {
-      console.error('Failed to start speech recognition:', err);
+      console.error('[Failed to launch fresh speech recognition]:', err);
+      if (shouldListenRef.current && !isBusyRef.current) {
+        if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = setTimeout(() => {
+          launchFreshRecognition();
+        }, 500);
+      }
     }
+  };
+
+  const startVoiceRecognition = () => {
+    shouldListenRef.current = true;
+    isBusyRef.current = false;
+    setIsVoiceListening(true);
+    setSpeechStatus('listening');
+    launchFreshRecognition();
   };
 
   const stopVoiceRecognition = () => {
     shouldListenRef.current = false;
+    isBusyRef.current = false;
     setIsVoiceListening(false);
     setSpeechStatus('idle');
+    if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
+    if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
       } catch (e) {}
+      recognitionRef.current = null;
     }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -367,6 +434,17 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
     }
   };
 
+  // Force reset or interrupt to speak immediately
+  const handleForceSpeakNow = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    isBusyRef.current = false;
+    shouldListenRef.current = true;
+    setSpeechStatus('listening');
+    launchFreshRecognition();
+  };
+
   // Immediate Execution of Host Prompt (Live Query to Chief Competitor Intelligence Agent)
   const handleSendHostPrompt = async (
     promptToSend?: string,
@@ -374,6 +452,17 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
   ) => {
     const query = (promptToSend || liveHostInput).trim();
     if (!query) return;
+
+    // 1. Mark as busy so recognition does not collide while processing or speaking
+    isBusyRef.current = true;
+    if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
+
+    // 2. Abort current mic listener instance
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {}
+    }
 
     const userMsg: DialogueMessage = {
       id: `usr-${Date.now()}`,
@@ -409,19 +498,38 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
           timestamp: new Date().toLocaleTimeString()
         };
         setDialogueHistory(prev => [...prev, copilotMsg]);
-        speakText(data.advice);
 
         // Record in the real-time Voice Action Feed overlay (Strict last 5 commands)
         recordVoiceAction(query, data.advice, source);
+
+        // 3. Speak response out loud, and ONLY when finished speaking, cleanly resume mic!
+        speakText(data.advice, () => {
+          // On TTS completion:
+          isBusyRef.current = false;
+          if (shouldListenRef.current) {
+            setSpeechStatus('listening');
+            setTimeout(() => {
+              launchFreshRecognition();
+            }, 300);
+          } else {
+            setSpeechStatus('idle');
+          }
+        });
+      } else {
+        isBusyRef.current = false;
+        if (shouldListenRef.current) {
+          launchFreshRecognition();
+        }
       }
       loadCompanionMemory();
     } catch (e) {
       console.error('Failed to dispatch host prompt:', e);
+      isBusyRef.current = false;
+      if (shouldListenRef.current) {
+        launchFreshRecognition();
+      }
     } finally {
       setLoadingAdvice(false);
-      if (shouldListenRef.current && speechStatus !== 'speaking') {
-        setSpeechStatus('listening');
-      }
     }
   };
 
@@ -467,7 +575,11 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
       const data = await res.json();
       if (data?.ok && data.advice) {
         setLiveAdvice(data.advice);
-        speakText(data.advice);
+        speakText(data.advice, () => {
+          if (shouldListenRef.current) {
+            launchFreshRecognition();
+          }
+        });
         recordVoiceAction(`Request Next Live Point for "${topic}"`, data.advice, 'quick_action');
       }
     } catch (e) {
@@ -532,9 +644,17 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
                   </span>
                 )}
                 {isVoiceListening && (
-                  <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 animate-pulse">
+                  <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase font-mono border flex items-center gap-1.5 ${
+                    speechStatus === 'listening'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 animate-pulse'
+                      : speechStatus === 'speaking'
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/50'
+                      : speechStatus === 'processing'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 animate-pulse'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}>
                     <Mic className="w-3 h-3 text-emerald-400" />
-                    Voice Loop Active
+                    {speechStatus === 'listening' ? 'Host Bolein (Listening Live)' : speechStatus === 'speaking' ? 'Co-Pilot Bol Raha Hai' : speechStatus === 'processing' ? 'Processing...' : 'Voice Loop Ready'}
                   </span>
                 )}
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
@@ -792,7 +912,7 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
                   </div>
 
                   {/* Primary Start / Stop Button & Hands-Free Mic Toggle */}
-                  <div className="flex items-center gap-2 sm:self-end">
+                  <div className="flex items-center gap-2 sm:self-end flex-wrap">
                     <button
                       onClick={toggleVoiceDialogue}
                       className={`px-4 py-2.5 font-bold rounded-xl text-xs flex items-center gap-2 border transition cursor-pointer ${
@@ -805,7 +925,7 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
                       {isVoiceListening ? (
                         <>
                           <Mic className="w-4 h-4 text-emerald-400 animate-spin" />
-                          <span>Listening Live...</span>
+                          <span>Voice Loop Active</span>
                         </>
                       ) : (
                         <>
@@ -814,6 +934,18 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
                         </>
                       )}
                     </button>
+
+                    {/* Quick interrupt / force re-listen button */}
+                    {isVoiceListening && (
+                      <button
+                        onClick={handleForceSpeakNow}
+                        className="px-3 py-2.5 bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/50 font-semibold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                        title="Interrupt / Unblock Mic to speak immediately"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Force Speak Next</span>
+                      </button>
+                    )}
 
                     {isLiveActive ? (
                       <button
@@ -835,11 +967,31 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-900">
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-900 flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <Clock className="w-3.5 h-3.5 text-cyan-400" />
                     <span>Session Timer: <strong className="text-white font-mono">{formatTimer(elapsedSeconds)}</strong></span>
                   </div>
+                  
+                  {/* Dynamic Turn-Taking Status Indicator */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400">Mic State:</span>
+                    <span className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] border flex items-center gap-1 ${
+                      speechStatus === 'listening'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse'
+                        : speechStatus === 'speaking'
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                        : speechStatus === 'processing'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        speechStatus === 'listening' ? 'bg-emerald-400 animate-ping' : speechStatus === 'speaking' ? 'bg-purple-400' : 'bg-slate-400'
+                      }`} />
+                      {speechStatus.toUpperCase()}
+                    </span>
+                  </div>
+
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -964,7 +1116,7 @@ export const GoLiveCoPilotModal: React.FC<LiveCoPilotModalProps> = ({
             <div className="space-y-3">
               <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-emerald-200 text-xs flex items-center justify-between">
                 <div>
-                  <strong>Continuous Interactive Voice Loop:</strong> Host aur Co-Pilot ke darmiyan live interactive conversation active hai. Har sawal aur jawab persistent memory me bina state reset ke store ho raha hai.
+                  <strong>Continuous Interactive Voice Loop:</strong> Host aur Co-Pilot ke darmiyan turn-taking voice conversation active hai. Har sawal aur jawab persistent memory me bina state reset ke store ho raha hai.
                 </div>
                 <div className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
                   Status: {speechStatus}
