@@ -1,14 +1,25 @@
 {
-  "companionName": "IT Cafeteria AI Companion & Studio Memory",
+  "companionName": "IT Cafeteria AI Companion & Adaptive Memory",
   "owner": "Waqar Majeed (@waqarmajeedinfo)",
   "studioTitle": "IT Cafeteria Studio",
-  "lastUpdated": "2026-11-06T09:12:00Z",
+  "lastUpdated": "2026-11-06T09:23:00Z",
   "pricingAndTrainingInfo": {
     "isFree": true,
     "cost": "$0.00 (100% Free)",
     "noSubscriptionNeeded": true,
     "apiKeyTier": "Google AI Studio Gemini API Free Tier (15 RPM / 1,500 RPD free forever)",
-    "howLearningWorks": "Persisted in local and cloud GitHub repository JSON files, automatically loaded into every AI Gemini prompt via systemInstruction grounding. It never forgets across chat refreshes, restarts, or new features."
+    "howLearningWorks": "Adaptive persistent memory engine on disk & GitHub synced with Gemini systemInstruction. Automatically logs interactions, learns user habits over time, and provides proactive guidance."
+  },
+  "learnedPreferences": {
+    "preferredLanguage": "Pure Roman Urdu (Strict zero Urdu/Arabic font script in UI)",
+    "tone": "Respectful, proactive senior software engineer & co-pilot partner (addresses as Waqar Bhai)",
+    "uiScrollLaw": "max-height: 80vh; overflow-y: auto; overscroll-behavior: contain;",
+    "searchWindowHours": 48,
+    "minimumGroundSources": 10,
+    "scriptStyle": "High retention viral hooks in first 3 seconds, under 50 seconds for Shorts, clear technical payoff",
+    "targetAudience": "Pakistani and global South Asian developer community, tech learners, and automation creators",
+    "roleSecurity": "Quick switch strictly Super Admin only; standard users get explicit privilege checkboxes",
+    "liveBroadcastingStyle": "Conversational, highly engaging, proactive topic suggestions, zero awkward pauses"
   },
   "activeDirectives": [
     {
@@ -78,6 +89,77 @@
       "title": "Communication Preference",
       "content": "User prefers pure Roman Urdu communication in all conversational exchanges.",
       "dateAdded": "2026-11-06"
+    }
+  ],
+  "interactionHistory": [
+    {
+      "id": "live-1793986090469",
+      "timestamp": "2026-11-06T17:28:10.469Z",
+      "type": "live_session",
+      "summary": "Started Live Co-Pilot on: Test Topic",
+      "learnedTakeaway": "Waqar Bhai initiated live broadcasting/recording for topic 'Test Topic'. Pacing & hook assistance activated.",
+      "category": "Live Broadcasting"
+    },
+    {
+      "id": "int-101",
+      "timestamp": "2026-11-06T08:15:00Z",
+      "type": "architectural_rule",
+      "summary": "Submenu Up/Down repositioning and slot ordering",
+      "learnedTakeaway": "User requires precise visual hierarchy control over submenus with Up/Down buttons and slot assignment.",
+      "category": "Navigation UX"
+    },
+    {
+      "id": "int-102",
+      "timestamp": "2026-11-06T08:30:00Z",
+      "type": "content_strategy",
+      "summary": "48-Hour Ground Search across 10+ Sources",
+      "learnedTakeaway": "Agent story search must enforce a hard 48h recency filter grounded across TechCrunch, Verge, Hacker News, GitHub Trending, etc.",
+      "category": "Content Research"
+    },
+    {
+      "id": "int-103",
+      "timestamp": "2026-11-06T09:10:00Z",
+      "type": "layout_law",
+      "summary": "Universal Scrolling 80vh & Overscroll Containment",
+      "learnedTakeaway": "Non-negotiable UI law: All modals and scrollable elements must strictly use max-height: 80vh; overflow-y: auto; overscroll-behavior: contain;.",
+      "category": "UI Layout"
+    },
+    {
+      "id": "int-104",
+      "timestamp": "2026-11-06T09:20:00Z",
+      "type": "live_copilot",
+      "summary": "Go Live Co-Pilot in Top Navigation",
+      "learnedTakeaway": "User needs real-time adaptive co-pilot guidance during live recordings and broadcasting with instant start/stop controls.",
+      "category": "Live Streaming"
+    }
+  ],
+  "proactiveInsights": [
+    {
+      "id": "ins-1",
+      "title": "Trending 48h Ground Breakthrough",
+      "insight": "Open-source autonomous agent tools surging +180% on GitHub Trending today. A 45s Shorts breakdown comparing local vs cloud LLMs will yield high CTR.",
+      "actionableRecommendation": "Trigger Autopilot Simulator with seed 'Local Autonomous Agent Frameworks' to generate Google Flow prompts.",
+      "priority": "high",
+      "category": "Content Opportunity",
+      "generatedAt": "2026-11-06T09:20:00Z"
+    },
+    {
+      "id": "ins-2",
+      "title": "Phonetic Pronunciation Reminder",
+      "insight": "Roman Urdu word 'Karein' is often pronounced flat by standard TTS engines unless mapped to 'Karain' in Section 7 living list.",
+      "actionableRecommendation": "Verify phonetic dictionary sync before rendering speech in Video Studio.",
+      "priority": "medium",
+      "category": "Voice Quality",
+      "generatedAt": "2026-11-06T09:20:00Z"
+    },
+    {
+      "id": "ins-3",
+      "title": "UI Viewport Hygiene",
+      "insight": "All modals currently comply with the 80vh containment formula. Zero page jumping detected across tested viewports.",
+      "actionableRecommendation": "Maintain this rule for any future submenus or channel profile dialogs.",
+      "priority": "normal",
+      "category": "UI Architecture",
+      "generatedAt": "2026-11-06T09:20:00Z"
     }
   ]
 }

@@ -19,7 +19,8 @@ import {
   Trash2,
   HelpCircle,
   FileCheck2,
-  Info
+  Info,
+  History
 } from 'lucide-react';
 
 interface Directive {
@@ -401,6 +402,53 @@ export const CompanionMemoryModal: React.FC<CompanionMemoryModalProps> = ({
                   <div className="text-[10px] text-slate-500 font-mono">
                     Locked on: {dir.dateAdded}
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Proactive Guidance & Recommendations */}
+          <div className="space-y-3">
+            <h4 className="font-bold text-white text-xs flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              Proactive Guidance &amp; Insights ({((memoryData as any)?.proactiveInsights || []).length})
+            </h4>
+            <div className="space-y-2.5">
+              {((memoryData as any)?.proactiveInsights || []).map((ins: any) => (
+                <div key={ins.id} className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-white text-xs">{ins.title}</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                      {ins.priority || 'Normal'}
+                    </span>
+                  </div>
+                  <p className="text-slate-300 text-xs leading-relaxed">{ins.insight}</p>
+                  <div className="p-2 bg-slate-900 border border-slate-800 rounded-lg text-cyan-300 text-[11px]">
+                    <strong>Action:</strong> {ins.actionableRecommendation}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Interaction History & Learned Preferences */}
+          <div className="space-y-3">
+            <h4 className="font-bold text-white text-xs flex items-center gap-2">
+              <History className="w-4 h-4 text-purple-400" />
+              Interaction History &amp; Adaptive Learning ({((memoryData as any)?.interactionHistory || []).length})
+            </h4>
+            <div className="space-y-2">
+              {((memoryData as any)?.interactionHistory || []).map((h: any) => (
+                <div key={h.id} className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-200 text-xs">{h.summary}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {h.timestamp ? new Date(h.timestamp).toLocaleTimeString() : ''}
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-[11px]">
+                    <strong className="text-purple-300">Learned Preference:</strong> {h.learnedTakeaway}
+                  </p>
                 </div>
               ))}
             </div>

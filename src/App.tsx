@@ -87,6 +87,7 @@ import {
 } from './components/ThemeCustomizerModal';
 import { GroundLevelSearchDashboard } from './components/GroundLevelSearchDashboard';
 import { CompanionMemoryModal } from './components/CompanionMemoryModal';
+import { GoLiveCoPilotModal } from './components/GoLiveCoPilotModal';
 import {
   MenuBarCustomizerModal,
   loadMenuConfig,
@@ -325,6 +326,23 @@ export default function App() {
   const [showMenuCustomizer, setShowMenuCustomizer] = useState(false);
   const [showGroundCriteriaModal, setShowGroundCriteriaModal] = useState(false);
   const [showCompanionMemoryModal, setShowCompanionMemoryModal] = useState(false);
+  const [showLiveCoPilotModal, setShowLiveCoPilotModal] = useState(false);
+  const [liveElapsedSeconds, setLiveElapsedSeconds] = useState(0);
+
+  // Live Co-Pilot Session Timer Effect
+  useEffect(() => {
+    let interval: any = null;
+    if (isLiveActive) {
+      interval = setInterval(() => {
+        setLiveElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setLiveElapsedSeconds(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLiveActive]);
 
   // Dirty State Management: Tab-Switch Unsaved Changes Guard
   const [pendingTab, setPendingTab] = useState<TabType | null>(null);
@@ -1032,6 +1050,25 @@ export default function App() {
               >
                 <Plus className="w-4 h-4 text-cyan-400" />
                 <span>Manage Channels</span>
+              </button>
+
+              {/* 4. Go Live Co-Pilot Button alongside Phonetic Dictionary & Manage Channels */}
+              <button
+                onClick={() => setShowLiveCoPilotModal(true)}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer backdrop-blur-md shadow-md ${
+                  isLiveActive
+                    ? 'bg-gradient-to-r from-rose-950/90 via-slate-900 to-rose-950/90 border border-rose-500/70 text-rose-300 shadow-rose-950/50 animate-pulse'
+                    : 'bg-slate-900/85 hover:bg-slate-800/90 border border-rose-500/40 hover:border-rose-400 text-slate-200 hover:text-white'
+                }`}
+                title="Go Live Co-Pilot with Real-Time Adaptive Guidance"
+              >
+                <Radio className={`w-4 h-4 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
+                <span>{isLiveActive ? '🔴 On Air (Live)' : 'Go Live'}</span>
+                {isLiveActive && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 bg-rose-600 text-white rounded font-bold">
+                    {Math.floor(liveElapsedSeconds / 60)}:{(liveElapsedSeconds % 60).toString().padStart(2, '0')}
+                  </span>
+                )}
               </button>
             </div>
 
@@ -1889,6 +1926,15 @@ export default function App() {
       <CompanionMemoryModal
         isOpen={showCompanionMemoryModal}
         onClose={() => setShowCompanionMemoryModal(false)}
+      />
+
+      {/* Go Live Co-Pilot & Streaming Companion Modal */}
+      <GoLiveCoPilotModal
+        isOpen={showLiveCoPilotModal}
+        onClose={() => setShowLiveCoPilotModal(false)}
+        isLiveActive={isLiveActive}
+        onToggleLive={setIsLiveActive}
+        elapsedSeconds={liveElapsedSeconds}
       />
 
       {/* Multi-Channel MCN Manager Modal */}

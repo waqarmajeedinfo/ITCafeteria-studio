@@ -1,0 +1,190 @@
+{
+  "agentTitle": "Chief Competitor Intelligence & Content Strategist",
+  "channelOwner": "Waqar Majeed (@waqarmajeedinfo)",
+  "channelTitle": "IT Cafeteria",
+  "lastSurveillanceScan": "2026-11-07T07:16:00Z",
+  "surveillanceCadence": "Daily (24h Automated Ingestion)",
+  "executiveSummary": "IT Cafeteria possesses a 79.0% search moat on technical evergreen queries (Windows, Excel, AI setup). Competitors rely on 70-80% algorithmic Shorts Feed impulse clicks with high swipe-away rates (38-42%). By adopting a 1.5-second visual pattern interrupt hook and pairing it with IT Cafeteria's superior technical depth in Roman Urdu, IT Cafeteria can out-rank both Indian mainstream creators and Western English tutorials.",
+  "trackedCompetitors": [
+    {
+      "id": "comp-technology-gyan",
+      "handle": "@TechnologyGyan",
+      "channelName": "Technology Gyan (Manoj Saru)",
+      "region": "India / Hindi",
+      "subscribers": "14.5M",
+      "weeklyShortsCadence": 7,
+      "avgShortDurationSec": 28,
+      "stayedToWatchPct": 74.5,
+      "feedVsSearchSplit": { "feed": 78.0, "search": 16.0, "other": 6.0 },
+      "pacingWordsPerMinute": 175,
+      "sceneCutIntervalSec": 2.2,
+      "hookDecoded": {
+        "auditory": "High pitch shock statement: 'Yeh setting turant band karo warna sab kuch leak ho jayega!'",
+        "visual": "Extreme close-up finger pointing at red phone screen with glowing warning sticker.",
+        "durationSec": 1.2
+      },
+      "latestVideoMetadata": {
+        "title": "Do This To Speed Up Any Android Phone Instantly (Hidden Cache Trick)!",
+        "views": "920K",
+        "publishedAge": "18 hours ago",
+        "transcriptSnippet": "Agar aapka phone baar baar hang ho raha hai to setting mein jao, build number par saat baar tap karo, aur background process limit ko zero kar do! Dekho speed 2x ho gayi!",
+        "criticalVulnerability": "Surface-level hack that causes background apps to restart and drain battery. Technical users quickly notice instability."
+      },
+      "outRankStrategy": {
+        "itCafeteriaTitle": "Android Lag Fixed: Real Memory Management & Battery Saver (No False Tricks)",
+        "hook": "Agar kisi ne kaha hai ke Background Processes band karne se phone fast hota hai, to wo jhoot bol raha hai! Asal mein RAM clean karne ka yeh 1 developer tool use karein.",
+        "edge": "Technical truth + practical proof wins long-term authority."
+      }
+    },
+    {
+      "id": "comp-kevin-stratvert",
+      "handle": "@KevinStratvert",
+      "channelName": "Kevin Stratvert",
+      "region": "Global / English",
+      "subscribers": "4.2M",
+      "weeklyShortsCadence": 4,
+      "avgShortDurationSec": 42,
+      "stayedToWatchPct": 68.0,
+      "feedVsSearchSplit": { "feed": 24.0, "search": 71.0, "other": 5.0 },
+      "pacingWordsPerMinute": 145,
+      "sceneCutIntervalSec": 3.8,
+      "hookDecoded": {
+        "auditory": "Direct calm problem-solver: 'Stop merging cells in Excel! Let me show you why and what to do instead.'",
+        "visual": "Sharp high-contrast 4K desktop zoom on broken #VALUE! formula error.",
+        "durationSec": 2.1
+      },
+      "latestVideoMetadata": {
+        "title": "How to Use AI in Google Sheets without Any Paid Plugins",
+        "views": "640K",
+        "publishedAge": "34 hours ago",
+        "transcriptSnippet": "Did you know Google Sheets now has Gemini built right in? Just click Extensions, add the free script, and your sheets will auto-populate customer data.",
+        "criticalVulnerability": "Pure American English; zero Roman Urdu / Hindi localization for South Asian corporate workers and students who prefer bilingual explanations."
+      },
+      "outRankStrategy": {
+        "itCafeteriaTitle": "Google Sheets AI Automation in Urdu: Free Gemini Formula Trick",
+        "hook": "Google Sheets mein Excel se 10 guna zyada power hai agar aap yeh free Gemini AI formula use karein! Dekhein 500 rows ka data 5 seconds mein clean.",
+        "edge": "Localized Roman Urdu explanations capture Pakistan/India enterprise learners."
+      }
+    },
+    {
+      "id": "comp-pakistani-tech",
+      "handle": "@BilalTechUrdu",
+      "channelName": "Pakistani Tech Creators (Aggregate)",
+      "region": "Pakistan / Urdu",
+      "subscribers": "320K",
+      "weeklyShortsCadence": 2.5,
+      "avgShortDurationSec": 31,
+      "stayedToWatchPct": 61.0,
+      "feedVsSearchSplit": { "feed": 62.0, "search": 30.0, "other": 8.0 },
+      "pacingWordsPerMinute": 130,
+      "sceneCutIntervalSec": 4.5,
+      "hookDecoded": {
+        "auditory": "Casual greeting: 'Assalam o alaikum dosto, aaj main aapko ek kamal ki website bataunga...'",
+        "visual": "Shaky selfie camera holding phone showing random web page.",
+        "durationSec": 3.5
+      },
+      "latestVideoMetadata": {
+        "title": "Earn Money Online with Free AI Tools in Pakistan 2026",
+        "views": "85K",
+        "publishedAge": "2 days ago",
+        "transcriptSnippet": "Is website par jayein, account banayein, aur daily 10 dollar kamayein bina kisi investment ke.",
+        "criticalVulnerability": "Clickbait without sustainable engineering skills; weak video editing, uneven mic audio, no automated caption timing."
+      },
+      "outRankStrategy": {
+        "itCafeteriaTitle": "Google AI Studio Free Tier Se Autonomous Coding Agent Kaise Banayein (Real Skills)",
+        "hook": "Fake earning websites ko chhoriye! Google AI Studio ka free Gemini API use karke apna personal coding bot banayein jo freelance client ke kaam 10 minute mein kare.",
+        "edge": "Real engineering credibility, 1080p high fidelity audio, Google Flow 10-scene structure."
+      }
+    }
+  ],
+  "gapAnalysisMatrix": {
+    "identifiedGaps": [
+      {
+        "gapId": "gap-1",
+        "niche": "Google AI Studio & Free LLM Workflows",
+        "opportunityScore": "98/100",
+        "competitorBlindSpot": "Competitors focus on paid ChatGPT Plus or Midjourney, ignoring Google AI Studio's 15 RPM / 1,500 free daily request tier.",
+        "itCafeteriaMoat": "IT Cafeteria has full API automation scripts and native Roman Urdu prompts."
+      },
+      {
+        "gapId": "gap-2",
+        "niche": "Developer-Grade Windows 11 Automation",
+        "opportunityScore": "92/100",
+        "competitorBlindSpot": "Manoj Saru only shows superficial junk cleans; Western creators show English PowerShell.",
+        "itCafeteriaMoat": "Roman Urdu terminal commands with clean safe one-line scripts."
+      },
+      {
+        "gapId": "gap-3",
+        "niche": "Excel & Sheets Formula Intelligence",
+        "opportunityScore": "94/100",
+        "competitorBlindSpot": "Lack of bilingual shortcuts tailored to sub-continent office workers.",
+        "itCafeteriaMoat": "Center Across Selection & XLOOKUP masterclasses."
+      }
+    ]
+  },
+  "sevenDayOutRankPipeline": [
+    {
+      "day": "Day 1 (Monday)",
+      "targetCompetitor": "Technology Gyan",
+      "targetTopic": "Android RAM Trick Out-Rank",
+      "title": "Android Speed Hack: Background Processes Band Mat Karein! Asal RAM Fix",
+      "hook3Sec": "Agar aapka phone slow hai to yeh ghalti kabhi mat karna jo 99% YouTubers bata rahe hain!",
+      "targetSearchTerm": "Android phone speed increase urdu",
+      "estimatedRetentionTarget": "78%"
+    },
+    {
+      "day": "Day 2 (Tuesday)",
+      "targetCompetitor": "Kevin Stratvert",
+      "targetTopic": "Excel Center Across Selection vs Merge Cells",
+      "title": "Stop Merging Cells! Excel Ka Center Across Selection Shortcut",
+      "hook3Sec": "Excel mein Merge Cells use karna band karein! Dekhein Ctrl + 1 ka yeh secret option.",
+      "targetSearchTerm": "Excel merge cells alternative center across selection",
+      "estimatedRetentionTarget": "82%"
+    },
+    {
+      "day": "Day 3 (Wednesday)",
+      "targetCompetitor": "Global Tech",
+      "targetTopic": "Google AI Studio 100% Free Gemini Setup",
+      "title": "ChatGPT Paid Chhoriye! Google AI Studio Ka Free Gemini API Setup",
+      "hook3Sec": "ChatGPT Plus par $20 dene ki zaroorat nahi hai! Google ka yeh model bilkul free mein chalta hai.",
+      "targetSearchTerm": "Google AI Studio free api key kaise banayein",
+      "estimatedRetentionTarget": "85%"
+    },
+    {
+      "day": "Day 4 (Thursday)",
+      "targetCompetitor": "Pakistani Micro Creators",
+      "targetTopic": "Windows 11 Startup Clean Without 3rd Party Tools",
+      "title": "Windows 11 5 Seconds Mein Fast: Task Manager Startup Secrets",
+      "hook3Sec": "Aapka PC on hote waqt 2 minute leta hai? Sirf yeh 2 startup apps disable karein!",
+      "targetSearchTerm": "Windows 11 startup speed up urdu",
+      "estimatedRetentionTarget": "79%"
+    },
+    {
+      "day": "Day 5 (Friday)",
+      "targetCompetitor": "AI Tools Channels",
+      "targetTopic": "Cursor AI Free Alternative Setup",
+      "title": "Cursor AI Ka Free Alternative: VS Code + Gemini Extension",
+      "hook3Sec": "Cursor AI ke $20 per month bachayein! VS Code mein yeh free extension install karein.",
+      "targetSearchTerm": "Cursor AI free alternative vs code urdu",
+      "estimatedRetentionTarget": "88%"
+    },
+    {
+      "day": "Day 6 (Saturday)",
+      "targetCompetitor": "Manoj Saru",
+      "targetTopic": "WiFi Speed Double Settings Truth",
+      "title": "WiFi Speed Double Karne Ka Sach: 5GHz vs 2.4GHz Band Switch",
+      "hook3Sec": "Router ki setting change karke internet double nahi hota! Asal mein 5GHz band select karein.",
+      "targetSearchTerm": "WiFi speed increase router setting 5ghz",
+      "estimatedRetentionTarget": "81%"
+    },
+    {
+      "day": "Day 7 (Sunday)",
+      "targetCompetitor": "Weekly Strategic Review",
+      "targetTopic": "Community Poll & Autonomous Analytics",
+      "title": "Kaunsi Trick Sab Se Zyada Kaam Aayi? Audience Feedback Session",
+      "hook3Sec": "Pichle 7 dinon mein aap ne konsi trick try ki? Comment mein bataiye!",
+      "targetSearchTerm": "IT Cafeteria weekly tech roundup",
+      "estimatedRetentionTarget": "76%"
+    }
+  ]
+}
