@@ -438,7 +438,7 @@ app.get('/api/agent/companion-memory/proactive-guidance', (_req, res) => {
 
 app.post('/api/agent/copilot/live-session', async (req, res) => {
   try {
-    const { action = 'insight', currentTopic = 'AI Tools & Automation', elapsedTime = 0, username = 'waqarmajeedinfo' } = req.body || {};
+    const { action = 'insight', currentTopic = 'AI Tools & Automation', elapsedTime = 0, username = 'waqarmajeedinfo', userPrompt = '' } = req.body || {};
     const current = getCompanionMemory();
     const ai = getAiClient();
 
@@ -448,7 +448,7 @@ app.post('/api/agent/copilot/live-session', async (req, res) => {
         timestamp: new Date().toISOString(),
         type: 'live_session',
         summary: `Started Live Co-Pilot on: ${currentTopic}`,
-        learnedTakeaway: `Waqar Bhai initiated live broadcasting/recording for topic '${currentTopic}'. Pacing & hook assistance activated.`,
+        learnedTakeaway: `Waqar Bhai initiated live broadcasting/recording for topic '${currentTopic}'. Continuous voice dialogue and pacing assistance activated.`,
         category: 'Live Broadcasting'
       };
       current.interactionHistory = [startLog, ...(current.interactionHistory || [])].slice(0, 50);
@@ -470,17 +470,19 @@ app.post('/api/agent/copilot/live-session', async (req, res) => {
       return res.json({ ok: true, status: 'stopped', message: 'Live session recorded to persistent memory.', log: stopLog });
     }
 
-    // Dynamic next talking point / insight via Gemini
+    // Dynamic continuous dialogue: if host spoke a prompt or asked a question
     let liveAdvice = `Waqar Bhai! Agla point ye rakhein: "${currentTopic}" me sab se bara common masla user ko kya aata hai? Is par 30 seconds bol kar audience ko comment karne ka bolein!`;
+    const promptText = userPrompt?.trim()
+      ? `Host (Waqar Majeed) asked live: "${userPrompt.trim()}". As Chief Competitor Intelligence and Content Strategist Agent for IT Cafeteria, provide an immediate, authoritative, and actionable response in Roman Urdu (under 60 words).`
+      : `Current Live Topic: "${currentTopic}". Elapsed Time: ${elapsedTime}s. Give 1 punchy, high-engagement talking point or hook in Roman Urdu (under 35 words) for Waqar Majeed to say right now to keep audience hooked.`;
+
     if (ai) {
       try {
         const resp = await ai.models.generateContent({
           model: 'gemini-3.1-flash-lite',
           contents: [{
             role: 'user',
-            parts: [{
-              text: `Current Live Topic: "${currentTopic}". Elapsed Time: ${elapsedTime}s. Give 1 punchy, high-engagement talking point or hook in Roman Urdu (under 35 words) for Waqar Majeed to say right now to keep audience hooked.`
-            }]
+            parts: [{ text: promptText }]
           }],
           config: {
             systemInstruction: getCompanionSystemInstruction(),
@@ -491,6 +493,19 @@ app.post('/api/agent/copilot/live-session', async (req, res) => {
       } catch (e) {
         console.warn('Live Co-Pilot advice fallback:', e);
       }
+    }
+
+    if (userPrompt?.trim()) {
+      const chatLog = {
+        id: `dialogue-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: 'live_voice_dialogue',
+        summary: `Host: "${userPrompt.trim()}" -> Co-Pilot Response provided`,
+        learnedTakeaway: `Host queried during live broadcast. Maintained continuous interactive dialogue in Roman Urdu.`,
+        category: 'Continuous Live Dialogue'
+      };
+      current.interactionHistory = [chatLog, ...(current.interactionHistory || [])].slice(0, 50);
+      saveCompanionMemory(current, username);
     }
 
     res.json({ ok: true, advice: liveAdvice, timestamp: new Date().toISOString() });

@@ -93,6 +93,14 @@
   ],
   "interactionHistory": [
     {
+      "id": "dialogue-1794066075965",
+      "timestamp": "2026-11-07T15:41:15.965Z",
+      "type": "live_voice_dialogue",
+      "summary": "Host: \"Kevin Stratvert ka Windows 11 secret features video ka hook aur pacing kya hai?\" -> Co-Pilot Response provided",
+      "learnedTakeaway": "Host queried during live broadcast. Maintained continuous interactive dialogue in Roman Urdu.",
+      "category": "Continuous Live Dialogue"
+    },
+    {
       "id": "live-1793986090469",
       "timestamp": "2026-11-06T17:28:10.469Z",
       "type": "live_session",
