@@ -63,8 +63,20 @@ function saveRotationForChannel(channelId: ChannelProfile['id'], tag: string, ca
   }
 }
 
-function resolveSavedTag(profile: ChannelProfile, tag?: string) {
+export const IT_CAFETERIA_LONG_FORM_TAGS = ['@WM25-6', '@WM25-8', '@WM25-9'];
+export const IT_CAFETERIA_SHORT_FORM_TAGS = ['@WM25-1', '@WM25-2', '@WM25-3', '@WM25-4', '@WM25-5', '@WM25-7'];
+
+function resolveSavedTag(profile: ChannelProfile, tag?: string, aspectRatio?: '9:16' | '16:9') {
   if (!profile || !Array.isArray(profile.tags) || profile.tags.length === 0) return '@WM25-1';
+  if (profile.id === 'itcafeteria') {
+    if (aspectRatio === '16:9') {
+      if (tag && IT_CAFETERIA_LONG_FORM_TAGS.includes(tag)) return tag;
+      return IT_CAFETERIA_LONG_FORM_TAGS[0];
+    } else {
+      if (tag && IT_CAFETERIA_SHORT_FORM_TAGS.includes(tag)) return tag;
+      return IT_CAFETERIA_SHORT_FORM_TAGS[0];
+    }
+  }
   return tag && profile.tags.some((item) => item.value === tag) ? tag : profile.defaultTag;
 }
 
@@ -75,8 +87,24 @@ function resolveSavedCategory(profile: ChannelProfile, categoryId?: number) {
     : (profile.defaultCategoryId || 1);
 }
 
-function getNextTag(profile: ChannelProfile, currentTag: string) {
+function getNextTag(profile: ChannelProfile, currentTag: string, aspectRatio?: '9:16' | '16:9') {
   if (!profile || !Array.isArray(profile.tags) || profile.tags.length === 0) return '@WM25-1';
+
+  // For IT Cafeteria: Aspect-Ratio synced rotation
+  if (profile.id === 'itcafeteria') {
+    if (aspectRatio === '16:9') {
+      const pool = IT_CAFETERIA_LONG_FORM_TAGS;
+      const index = pool.indexOf(currentTag);
+      if (index === -1) return pool[0];
+      return pool[(index + 1) % pool.length];
+    } else {
+      const pool = IT_CAFETERIA_SHORT_FORM_TAGS;
+      const index = pool.indexOf(currentTag);
+      if (index === -1) return pool[0];
+      return pool[(index + 1) % pool.length];
+    }
+  }
+
   const index = profile.tags.findIndex((item) => item.value === currentTag);
   if (index === -1) return profile.tags[0]?.value ?? profile.defaultTag;
   return profile.tags[(index + 1) % profile.tags.length].value;
@@ -134,18 +162,21 @@ export const AgentSimulator: React.FC = () => {
 
   const [initialRotation] = useState<SavedRotation>(loadRotationState);
   const [draftChannel, setDraftChannel] = useState<ChannelProfile['id']>('itcafeteria');
-  const [draftTag, setDraftTag] = useState<string>(() =>
-    resolveSavedTag(CHANNEL_PROFILES.itcafeteria, initialRotation.itcafeteria?.tag)
-  );
   const [draftCategory, setDraftCategory] = useState<number>(() =>
     resolveSavedCategory(CHANNEL_PROFILES.itcafeteria, initialRotation.itcafeteria?.categoryId)
   );
+  const [draftAspectRatio, setDraftAspectRatio] = useState<'9:16' | '16:9'>(() => {
+    const initCat = resolveSavedCategory(CHANNEL_PROFILES.itcafeteria, initialRotation.itcafeteria?.categoryId);
+    return CHANNEL_PROFILES.itcafeteria.categoryRules?.[initCat]?.defaultRatio || (initCat === 9 ? '16:9' : '9:16');
+  });
+  const [draftTag, setDraftTag] = useState<string>(() => {
+    const initCat = resolveSavedCategory(CHANNEL_PROFILES.itcafeteria, initialRotation.itcafeteria?.categoryId);
+    const initRatio = CHANNEL_PROFILES.itcafeteria.categoryRules?.[initCat]?.defaultRatio || (initCat === 9 ? '16:9' : '9:16');
+    return resolveSavedTag(CHANNEL_PROFILES.itcafeteria, initialRotation.itcafeteria?.tag, initRatio);
+  });
   const [draftSceneCount, setDraftSceneCount] = useState<number>(
     () => simulatorConfig.defaultSceneCount || CHANNEL_PROFILES.itcafeteria.defaultSceneCount
   );
-  const [draftAspectRatio, setDraftAspectRatio] = useState<'9:16' | '16:9'>(() => {
-    return CHANNEL_PROFILES.itcafeteria.categoryRules?.[4]?.defaultRatio || '9:16';
-  });
   const [searchStrategy, setSearchStrategy] = useState<'deep' | 'fast' | 'strict' | 'custom_links'>('deep');
   const [focusLinkItems, setFocusLinkItems] = useState<Array<{
     id: string;
@@ -349,22 +380,56 @@ export const AgentSimulator: React.FC = () => {
     };
   }, [draftChannel, draftTag, draftSceneCount]);
 
-  useEffect(() => {
-    const rules = draftProfile.categoryRules;
-    const defRatio = rules?.[draftCategory]?.defaultRatio || (draftCategory === 9 ? '16:9' : '9:16');
-    setDraftAspectRatio(defRatio);
-  }, [draftChannel, draftCategory]);
+  const handleCategoryChange = (newCatId: number) => {
+    setDraftCategory(newCatId);
+    const targetRatio = draftProfile.categoryRules?.[newCatId]?.defaultRatio || (newCatId === 9 ? '16:9' : '9:16');
+    setDraftAspectRatio(targetRatio as any);
+
+    // Sync tag rotation pool based on ratio for IT Cafeteria
+    if (draftChannel === 'itcafeteria') {
+      if (targetRatio === '16:9') {
+        if (!IT_CAFETERIA_LONG_FORM_TAGS.includes(draftTag)) {
+          setDraftTag(IT_CAFETERIA_LONG_FORM_TAGS[0]);
+        }
+      } else {
+        if (IT_CAFETERIA_LONG_FORM_TAGS.includes(draftTag)) {
+          setDraftTag(IT_CAFETERIA_SHORT_FORM_TAGS[0]);
+        }
+      }
+    }
+  };
+
+  const handleAspectRatioChange = (newRatio: '9:16' | '16:9') => {
+    setDraftAspectRatio(newRatio);
+
+    // Sync tag rotation pool based on ratio for IT Cafeteria
+    if (draftChannel === 'itcafeteria') {
+      if (newRatio === '16:9') {
+        if (!IT_CAFETERIA_LONG_FORM_TAGS.includes(draftTag)) {
+          setDraftTag(IT_CAFETERIA_LONG_FORM_TAGS[0]);
+        }
+      } else {
+        if (IT_CAFETERIA_LONG_FORM_TAGS.includes(draftTag)) {
+          setDraftTag(IT_CAFETERIA_SHORT_FORM_TAGS[0]);
+        }
+      }
+    }
+  };
 
   const handleDraftChannelChange = (channelId: string) => {
     const nextProfile = (channels[channelId] || profilesMap[channelId] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile;
     const saved = loadRotationState()[channelId as ChannelProfile['id']];
     const newCat = resolveSavedCategory(nextProfile, saved?.categoryId);
+    const eng = getEngineConfigForChannel(channelId);
+    const defRatio = eng.aspectRatio || nextProfile.categoryRules?.[newCat]?.defaultRatio || (newCat === 9 ? '16:9' : '9:16');
+    const newTag = resolveSavedTag(nextProfile, saved?.tag, defRatio as any);
+
     setDraftChannel(channelId);
-    setDraftTag(resolveSavedTag(nextProfile, saved?.tag));
     setDraftCategory(newCat);
+    setDraftAspectRatio(defRatio as any);
+    setDraftTag(newTag);
 
     // Load and apply channel's dedicated Engine Configuration
-    const eng = getEngineConfigForChannel(channelId);
     setSimulatorConfig((prev) => ({
       ...prev,
       baselineTag: eng.baselineTag || '@Active',
@@ -376,8 +441,6 @@ export const AgentSimulator: React.FC = () => {
     }));
 
     setDraftSceneCount(eng.defaultSceneCount || nextProfile.defaultSceneCount || 10);
-    const defRatio = eng.aspectRatio || nextProfile.categoryRules?.[newCat]?.defaultRatio || (newCat === 9 ? '16:9' : '9:16');
-    setDraftAspectRatio(defRatio as any);
   };
 
   const handleTrigger = () => {
@@ -452,11 +515,16 @@ export const AgentSimulator: React.FC = () => {
       }].slice(-80);
     });
 
-    const nextTag = getNextTag(outcomeProfile, outcome.selection.tag);
+    // Advance Agent Simulator rotation with aspect ratio syncing
     const nextCategoryId = getNextCategoryId(outcomeProfile, outcome.selection.categoryId);
+    const nextRatio = outcomeProfile.categoryRules?.[nextCategoryId]?.defaultRatio || (nextCategoryId === 9 ? '16:9' : '9:16');
+    const nextTag = getNextTag(outcomeProfile, outcome.selection.tag, nextRatio as any);
+
     if (draftChannel === outcome.selection.channelId) {
-      setDraftTag(nextTag);
       setDraftCategory(nextCategoryId);
+      setDraftAspectRatio(nextRatio as any);
+      setDraftTag(nextTag);
+      saveRotationForChannel(outcome.selection.channelId, nextTag, nextCategoryId);
     } else {
       saveRotationForChannel(outcome.selection.channelId, nextTag, nextCategoryId);
     }
@@ -569,12 +637,15 @@ export const AgentSimulator: React.FC = () => {
           </div>
         </div>
 
-        {/* Startup Parameters Bar */}
+        {/* Startup Parameters Bar — Strict 5-Tier Dropdown Hierarchy */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-800 text-xs items-end">
-          {/* Channel */}
+          {/* 1st: Channel Selection (Default: IT Cafeteria) */}
           <div>
             <div className="min-h-[24px] flex items-center justify-between mb-1.5">
-              <label className="text-slate-400 block font-medium">Active Channel (Q1)</label>
+              <label className="text-slate-400 block font-medium flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-300 font-bold flex items-center justify-center text-[10px]">1</span>
+                <span>Active Channel</span>
+              </label>
               <button
                 type="button"
                 onClick={() => setShowChannelManager(true)}
@@ -588,7 +659,7 @@ export const AgentSimulator: React.FC = () => {
             <select
               value={draftChannel}
               onChange={(e) => handleDraftChannelChange(e.target.value)}
-              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
+              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-cyan-400 font-medium"
             >
               {Object.values(channels).map((ch, idx) => (
                 <option key={ch.id} value={ch.id}>
@@ -598,26 +669,88 @@ export const AgentSimulator: React.FC = () => {
             </select>
           </div>
 
-          {/* Character Tag */}
+          {/* 2nd: Category & Playlist Selection */}
           <div>
             <div className="min-h-[24px] flex items-center justify-between mb-1.5">
-              <label className="flex items-center gap-1.5 text-slate-400">
-                Character Tag (Q3)
+              <label className="text-slate-400 block font-medium flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-300 font-bold flex items-center justify-center text-[10px]">2</span>
+                <span>Category &amp; Playlist</span>
+              </label>
+              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[9px] font-semibold tracking-wide">
+                AUTO-ROTATE
+              </span>
+            </div>
+            <select
+              value={draftCategory}
+              onChange={(e) => handleCategoryChange(Number(e.target.value))}
+              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-cyan-400"
+            >
+              {draftProfile.categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.id}. {cat.name} {cat.id === 9 ? '• [16:9 Long]' : '• [9:16 Short]'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3rd: Aspect Ratio Selection (e.g., 9:16 for Shorts, 16:9 for Long Videos) */}
+          <div>
+            <div className="min-h-[24px] flex items-center justify-between mb-1.5">
+              <label className="text-slate-400 block font-medium flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-300 font-bold flex items-center justify-center text-[10px]">3</span>
+                <span>Aspect Ratio</span>
+              </label>
+              <span className="text-[10px] text-cyan-400 font-mono font-semibold">
+                {draftAspectRatio === '16:9' ? '16:9 Long' : '9:16 Shorts'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg p-1 h-[36px]">
+              <button
+                type="button"
+                onClick={() => handleAspectRatioChange('9:16')}
+                className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                  draftAspectRatio === '9:16'
+                    ? 'bg-cyan-500 text-slate-950 shadow font-bold'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="9:16 Vertical for Shorts & Reels (Rotates through Standard Tags #1-#5, #7)"
+              >
+                <span>9:16 Shorts</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAspectRatioChange('16:9')}
+                className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1 ${
+                  draftAspectRatio === '16:9'
+                    ? 'bg-cyan-500 text-slate-950 shadow font-bold'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+                title="16:9 Widescreen for Long Videos (Rotates strictly through Studio Tags #6, #8, #9)"
+              >
+                <span>16:9 Long</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 4th: Character Tag Selection */}
+          <div>
+            <div className="min-h-[24px] flex items-center justify-between mb-1.5">
+              <label className="flex items-center gap-1.5 text-slate-400 font-medium">
+                <span className="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-300 font-bold flex items-center justify-center text-[10px]">4</span>
+                <span>Character Tag</span>
                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wide border ${
-                  draftProfile.tags?.[0]?.value === 'No-Character' || draftProfile.defaultTag === 'No-Character'
-                    ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                  draftAspectRatio === '16:9'
+                    ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
                     : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
                 }`}>
-                  {draftProfile.tags?.[0]?.value === 'No-Character' || draftProfile.defaultTag === 'No-Character'
-                    ? 'FACELESS'
-                    : 'AUTO'}
+                  {draftAspectRatio === '16:9' ? '16:9 SYNC' : '9:16 SYNC'}
                 </span>
               </label>
               <button
                 type="button"
                 onClick={() => setShowTagManager(true)}
                 className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold hover:underline cursor-pointer bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-500/30"
-                title="Register new character tag or upload photo"
+                title="Register new character tag or view avatars"
               >
                 <Plus className="w-3 h-3" />
                 <span>+ Tag</span>
@@ -626,78 +759,32 @@ export const AgentSimulator: React.FC = () => {
             <select
               value={draftTag}
               onChange={(e) => setDraftTag(e.target.value)}
-              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono"
+              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-cyan-400 font-mono text-xs"
             >
-              {draftProfile.tags.map((tag) => (
-                <option key={tag.value} value={tag.value}>{tag.label}</option>
-              ))}
+              {draftProfile.tags.map((tag) => {
+                const isLongTag = IT_CAFETERIA_LONG_FORM_TAGS.includes(tag.value);
+                const isRecommended = draftAspectRatio === '16:9' ? isLongTag : !isLongTag;
+                return (
+                  <option key={tag.value} value={tag.value}>
+                    {tag.label} {isLongTag ? '• [16:9 Studio]' : '• [9:16 Short]'} {isRecommended ? '★' : ''}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
-          {/* Category */}
+          {/* 5th: Scene Selection */}
           <div>
             <div className="min-h-[24px] flex items-center justify-between mb-1.5">
-              <label className="flex items-center gap-1.5 text-slate-400">
-                Category & Playlist
-                <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[9px] font-semibold tracking-wide">
-                  AUTO-BIND
-                </span>
+              <label className="text-slate-400 block font-medium flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-300 font-bold flex items-center justify-center text-[10px]">5</span>
+                <span>Scene Selection</span>
               </label>
-            </div>
-            <select
-              value={draftCategory}
-              onChange={(e) => setDraftCategory(Number(e.target.value))}
-              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
-            >
-              {draftProfile.categories.map(cat => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.id}. {cat.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Video Aspect Ratio & Binding */}
-          <div>
-            <div className="min-h-[24px] flex items-center justify-between mb-1.5">
-              <label className="text-slate-400 block font-medium">Aspect Ratio</label>
-              <span className="text-[10px] text-cyan-400 font-mono">Bound/Override</span>
-            </div>
-            <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg p-1 h-[36px]">
-              <button
-                type="button"
-                onClick={() => setDraftAspectRatio('9:16')}
-                className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-0.5 ${
-                  draftAspectRatio === '9:16'
-                    ? 'bg-cyan-500 text-slate-950 shadow'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                9:16 Shorts
-              </button>
-              <button
-                type="button"
-                onClick={() => setDraftAspectRatio('16:9')}
-                className={`flex-1 py-1 px-1.5 rounded text-[10px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-0.5 ${
-                  draftAspectRatio === '16:9'
-                    ? 'bg-cyan-500 text-slate-950 shadow'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                16:9 Long
-              </button>
-            </div>
-          </div>
-
-          {/* Scene Count */}
-          <div>
-            <div className="min-h-[24px] flex items-center justify-between mb-1.5">
-              <label className="text-slate-400 block">Duration & Scenes</label>
               <button
                 type="button"
                 onClick={() => setShowSimulatorConfig(true)}
                 className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
-                title="Configure scene presets"
+                title="Configure scene presets and durations"
               >
                 Config ({draftSceneCount}s)
               </button>
@@ -705,15 +792,15 @@ export const AgentSimulator: React.FC = () => {
             <select
               value={draftSceneCount}
               onChange={(e) => setDraftSceneCount(Number(e.target.value))}
-              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500 font-mono text-xs"
+              className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-cyan-400 font-mono text-xs"
             >
               {(simulatorConfig.scenePresets || [
-                { id: '1', count: 7, label: '7 Scenes (70s)' },
-                { id: '2', count: 10, label: '10 Scenes (100s)' },
-                { id: '3', count: 12, label: '12 Scenes (120s)' },
-                { id: '4', count: 15, label: '15 Scenes (150s)' },
-                { id: '5', count: 20, label: '20 Scenes (200s)' },
-                { id: '6', count: 30, label: '30 Scenes (300s)' }
+                { id: '1', count: 7, label: '7 Scenes (70s — 1m 10s)' },
+                { id: '2', count: 10, label: '10 Scenes (100s — Standard Short)' },
+                { id: '3', count: 12, label: '12 Scenes (120s — 2m 00s Video)' },
+                { id: '4', count: 15, label: '15 Scenes (150s — 2m 30s Video)' },
+                { id: '5', count: 20, label: '20 Scenes (200s — 3m 20s Video)' },
+                { id: '6', count: 30, label: '30 Scenes (300s — 5m 00s Deep Dive)' }
               ]).map((sp) => (
                 <option key={sp.id || sp.count} value={sp.count}>
                   {sp.label}

@@ -58,6 +58,7 @@ import { updatePendingStoryStatus, upsertPendingStoryRecord, loadPendingQueue } 
 import { getAllPublishedVideos } from '../lib/publishedLibraryStore';
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import { loadSimulatorConfig } from './SimulatorConfigModal';
+import { IT_CAFETERIA_LONG_FORM_TAGS, IT_CAFETERIA_SHORT_FORM_TAGS } from './AgentSimulator';
 import { generateTopicAccurateStoryPackage } from '../lib/storyTopicGenerator';
 import { PHONETIC_UPDATED_EVENT } from '../lib/phoneticDictionaryStore';
 import {
@@ -965,12 +966,25 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
         };
         localStorage.setItem(STORAGE_KEYS.MEMORY_RECORDS, JSON.stringify([newMemory, ...currentMemory.slice(0, 50)]));
 
-        // Advance Agent Simulator rotation to the next tag and category!
+        // Advance Agent Simulator rotation to the next category & aspect-ratio synced tag!
         const profile = CHANNEL_PROFILES.itcafeteria;
-        const nextTagIndex = (profile.tags.findIndex((t) => t.value === task.characterTag) + 1) % profile.tags.length;
-        const nextTag = profile.tags[nextTagIndex]?.value || profile.defaultTag;
         const nextCatIndex = (profile.rotationCategoryIds.indexOf(task.categoryId) + 1) % profile.rotationCategoryIds.length;
         const nextCatId = profile.rotationCategoryIds[nextCatIndex] || profile.defaultCategoryId;
+
+        // Resolve ratio for next category (Cat 9 is default 16:9, others 9:16)
+        const nextCatObj = profile.categories.find((c) => c.id === nextCatId);
+        const nextRatio: '9:16' | '16:9' = (nextCatObj?.defaultRatio === '16:9' || nextCatId === 9) ? '16:9' : '9:16';
+
+        let nextTag = '@WM25-1';
+        if (nextRatio === '16:9') {
+          const pool = IT_CAFETERIA_LONG_FORM_TAGS;
+          const currIdx = pool.indexOf(task.characterTag);
+          nextTag = currIdx === -1 ? pool[0] : pool[(currIdx + 1) % pool.length];
+        } else {
+          const pool = IT_CAFETERIA_SHORT_FORM_TAGS;
+          const currIdx = pool.indexOf(task.characterTag);
+          nextTag = currIdx === -1 ? pool[0] : pool[(currIdx + 1) % pool.length];
+        }
 
         const currentRotation = JSON.parse(localStorage.getItem(STORAGE_KEYS.ROTATION_STATE) || '{}');
         currentRotation['itcafeteria'] = { tag: nextTag, categoryId: nextCatId };
@@ -1074,6 +1088,13 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
               const rotationState = JSON.parse(localStorage.getItem(STORAGE_KEYS.ROTATION_STATE) || '{}');
               const activeRot = rotationState['itcafeteria'] || { tag: '@WM25-1', categoryId: 4 };
               const category = profile.categories.find((c) => c.id === activeRot.categoryId) || profile.categories[0];
+              const isLongForm = category.defaultRatio === '16:9' || category.id === 9;
+              let resolvedTag = activeRot.tag || (isLongForm ? '@WM25-6' : '@WM25-1');
+              if (isLongForm && !IT_CAFETERIA_LONG_FORM_TAGS.includes(resolvedTag)) {
+                resolvedTag = IT_CAFETERIA_LONG_FORM_TAGS[0];
+              } else if (!isLongForm && !IT_CAFETERIA_SHORT_FORM_TAGS.includes(resolvedTag)) {
+                resolvedTag = IT_CAFETERIA_SHORT_FORM_TAGS[0];
+              }
 
               const newTask: AutopilotTask = {
                 id: `task-ap-${Date.now()}`,
@@ -1081,7 +1102,7 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
                 title: `${category.name}: Top Secret Speedup & Automation Trick`,
                 category: category.name,
                 categoryId: category.id,
-                characterTag: activeRot.tag || '@WM25-1',
+                characterTag: resolvedTag,
                 priority: 'HIGH',
                 status: 'queued',
                 progress: 0,
@@ -1220,7 +1241,10 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
       const catIdx = (startCatIdx + i) % rotCatIds.length;
       const catId = rotCatIds[catIdx];
       const cat = profile.categories.find((c) => c.id === catId) || profile.categories[0];
-      const tag = profile.tags[(startTagIdx + i) % profile.tags.length]?.value || '@WM25-1';
+      const isLong = cat.defaultRatio === '16:9' || catId === 9;
+      const tag = isLong
+        ? IT_CAFETERIA_LONG_FORM_TAGS[i % IT_CAFETERIA_LONG_FORM_TAGS.length]
+        : IT_CAFETERIA_SHORT_FORM_TAGS[(startTagIdx + i) % IT_CAFETERIA_SHORT_FORM_TAGS.length];
 
       // Pick authentic title from CATEGORY_TOPIC_BANK
       const bank = CATEGORY_TOPIC_BANK[catId] || [];
@@ -3268,7 +3292,7 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
                   <Bot className="w-4 h-4 text-cyan-400" /> 1. Agent Simulator Sync
                 </div>
                 <p className="text-slate-400 leading-relaxed">
-                  Autopilot har task ke baad agle category aur character tag (<code className="text-cyan-300">@WM25-1</code> ta <code className="text-cyan-300">@WM25-5</code>) par auto-rotate karta hai aur session memory mein register karta hai taake repetition 0% rahe.
+                  Autopilot har task ke baad agle category aur aspect-ratio synced character tag (16:9 Long Videos ke liye <code className="text-cyan-300">@WM25-6, 8, 9</code> aur Vertical Shorts ke liye <code className="text-cyan-300">@WM25-1 to 5, 7</code>) par auto-rotate karta hai aur session memory mein register karta hai taake repetition 0% rahe.
                 </p>
                 <div className="text-[11px] text-slate-400 font-mono bg-slate-900 p-2 rounded">
                   Active Rotation: <strong>{syncHealth.activeRotationCategory}</strong> ({syncHealth.activeRotationTag})

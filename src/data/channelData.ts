@@ -656,6 +656,7 @@ export interface ChannelCategory {
   playlist: string;
   details?: string;
   special?: string;
+  defaultRatio?: '9:16' | '16:9';
 }
 
 export interface ChannelTagVariant {

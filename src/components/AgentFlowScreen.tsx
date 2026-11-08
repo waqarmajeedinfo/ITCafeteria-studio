@@ -42,6 +42,9 @@ export interface AgentTriggerSelection {
   tag: string;
   categoryId: number;
   sceneCount: number;
+  aspectRatio?: '9:16' | '16:9';
+  searchStrategy?: string;
+  priorityResources?: string[];
 }
 
 export interface AgentMemoryRecord {
@@ -105,7 +108,7 @@ const STOP_WORDS = new Set([
 ]);
 
 function normalizeDuplicateText(text: string) {
-  return text.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function stemWord(word: string) {
@@ -1125,15 +1128,23 @@ Rules:
         </div>
 
         <div className="px-4 py-2.5 bg-slate-950/70 border-b border-slate-800/80 flex flex-wrap gap-2 text-[10px]">
+          {/* 1st: Channel */}
           <span className="px-2 py-1 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300">
             Channel: <strong className="text-white">{profile.name}</strong>
           </span>
-          <span className="px-2 py-1 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 font-mono">
-            Tag: <strong className="text-cyan-300">{selection.tag}</strong>
-          </span>
+          {/* 2nd: Category & Playlist */}
           <span className="px-2 py-1 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300">
             Category: <strong className="text-white">{category.id}. {category.name}</strong>
           </span>
+          {/* 3rd: Aspect Ratio */}
+          <span className="px-2 py-1 rounded-lg bg-slate-800/80 border border-cyan-500/30 text-cyan-300 font-mono font-bold">
+            Ratio: <strong className="text-white">{selection.aspectRatio || '9:16'}</strong>
+          </span>
+          {/* 4th: Character Tag */}
+          <span className="px-2 py-1 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 font-mono">
+            Tag: <strong className="text-cyan-300">{selection.tag}</strong>
+          </span>
+          {/* 5th: Duration & Scenes */}
           <span className="px-2 py-1 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300">
             Duration: <strong className="text-white">{selection.sceneCount * 10}s</strong> ({selection.sceneCount} scenes)
           </span>
