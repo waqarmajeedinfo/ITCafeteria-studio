@@ -739,52 +739,52 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
     categoryRules: {
       1: {
         title: "AI & Smart Technology Rule",
-        instructions: "Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.",
+        instructions: "IT Cafeteria Script Rule (Cat 1 — AI & Smart Tech): Explain latest AI/smart-tech breakthrough for ordinary Pakistani viewers in spoken Roman Urdu. Structure: 1) Disruptive capability hook (0-10s), 2) Simple 1-line definition, 3) Real-world daily impact, 4) Relatable analogy, 5) Practical use-case 1, 6) Practical use-case 2, 7) Live proof/benchmark, 8) Honest limitation/warning, 9) Clear takeaway, 10) Subscriber CTA with viewer question. Presenter Waqar Majeed (@WM25-1) on Hook & CTA; concept UI & screen proof in middle. Spoken Roman Urdu, acronyms hyphenated (A-I, G-P-U).",
         defaultRatio: "9:16"
       },
       2: {
         title: "AI Chatbots, Workflows & AI Tools Rule",
-        instructions: "ChatGPT, Claude, Gemini, Google AI tools, Google Flow, Nano, workflows, new features/tools. Deep productivity and automation tutorial format: Business problem, Architecture and trigger breakdown, Step-by-step logic nodes, Live testing.",
+        instructions: "IT Cafeteria Script Rule (Cat 2 — AI Chatbots & Workflows): Step-by-step practical workflow tutorial using ChatGPT, Claude, Gemini, Google Flow, or Nano. Structure: 1) Time-saving bottleneck hook (0-10s), 2) Everyday workplace/study problem, 3) Free tool introduction, 4) Step 1 exact UI action, 5) Step 2 key parameter tweak, 6) Step 3 magic prompt/setting, 7) Live result & speedup proof, 8) Common beginner pitfall, 9) Rapid recap, 10) Engagement question in comments CTA. Full-screen screencast demonstration mode with presenter reaction on intro/outro. Instructor-friendly Roman Urdu, zero fluff.",
         defaultRatio: "9:16"
       },
       3: {
         title: "AI Prompt Hacks & Shortcuts Rule",
-        instructions: "prompt techniques, image+prompt workflows, practical AI tricks. Slash commands, prompt formulas for realistic images, reverse prompt engineering, and workflow productivity shortcuts.",
+        instructions: "IT Cafeteria Script Rule (Cat 3 — AI Prompt Hacks): Visual before/after prompt comparison demonstrating exact syntax difference. Structure: 1) Same AI, 2 completely different results hook (0-10s), 2) Weak amateur prompt & bad output, 3) Named hack in 1 punchy line (reverse role, slash commands, tokens), 4) Step-by-step prompt formula breakdown, 5) Ultra-realistic/accurate output proof, 6) Second variation/shortcut, 7) Copy-paste template for viewers, 8) Common prompt mistake to avoid, 9) 3-second recap, 10) Bookmark & comment CTA. Split screen: prompt text on left, live AI output on right.",
         defaultRatio: "9:16"
       },
       4: {
         title: "PC & Windows Hacks Rule",
-        instructions: "Windows, PC optimization, troubleshooting, shortcuts, productivity, hidden features, plus Windows hidden tools/settings/CMD/PowerShell tricks to fix PC issues (slow PC, temp files, hidden settings, command-line and PowerShell tools, and any other method found via research); an ongoing, never-ending part-by-part series (Part 1, Part 2, Part 3...) that runs under its own extended-length test format (10-15 scenes, 7-beat, 0.3s anchor).",
+        instructions: "IT Cafeteria Script Rule (Cat 4 — Windows & PC Hacks): Ongoing part-by-part series (Part 1, Part 2...) for Windows optimization, troubleshooting & command-line tricks. Structure: 1) Shocking PC lag/error hook with Part number (0-10s), 2) Root cause of why Windows slows down/breaks, 3) Hidden tool/setting or PowerShell/CMD trick reveal, 4) Step 1 exact command or hotkey (Win+R, Win+V, CMD), 5) Step 2 verification, 6) Instant benchmark test & RAM/CPU drop proof, 7) Safety disclaimer & restore point tip, 8) Advanced power-user tweak, 9) Part summary & next episode teaser, 10) Subscribe for daily PC hacks CTA. 9:16 high-contrast desktop screencast with zoomed cursor keys and Waqar Majeed cutaways.",
         defaultRatio: "9:16"
       },
       5: {
         title: "New Technology & Product Tutorials Rule",
-        instructions: "new launches, new features, new products. Step-by-step UI walkthrough, zero prior coding knowledge needed, practical product review.",
+        instructions: "IT Cafeteria Script Rule (Cat 5 — New Tech & Products): First-look practical breakdown of newly released gadgets, OS features, or software platforms. Structure: 1) Exciting new product launch hook (0-10s), 2) Who this tool is built for, 3) Price & free tier availability check, 4) Key breakthrough feature test, 5) Hands-on UI walkthrough, 6) Comparison vs previous generation or competitor, 7) Benchmark results, 8) Real-world usability verdict for Pakistani users, 9) Worth upgrading or skip?, 10) Ask viewers their opinion in comments CTA. Sleek gadget shots, official product interface capture, authoritative tech presenter pacing.",
         defaultRatio: "9:16"
       },
       6: {
         title: "Future Tech & Positive Breakthroughs Rule",
-        instructions: "useful upcoming technology, major beneficial developments. Visionary tech breakthroughs, autonomous smart home agents, and positive future outlook.",
+        instructions: "IT Cafeteria Script Rule (Cat 6 — Future Tech): Inspiring, scientifically grounded look at upcoming beneficial technology (robotics, medicine, energy, autonomous agents). Structure: 1) Mind-blowing future capability hook (0-10s), 2) Global problem being solved, 3) Breakthrough discovery explained simply, 4) How it actually works without sci-fi hype, 5) When it will reach consumers, 6) Impact on jobs and daily life, 7) Credible lab/university test data, 8) Ethical consideration or safety guardrail, 9) Inspiring positive outlook, 10) What excites you most? comment CTA. Clean futuristic lab visuals, high-quality B-Roll concept animations, visionary Roman Urdu presentation.",
         defaultRatio: "9:16"
       },
       7: {
         title: "Secrets Rule",
-        instructions: "Secrets (WhatsApp, Google, Google Chrome, Google Maps, Gmail, Google Drive, Google Play Store, YouTube, Instagram, Facebook, TikTok, Telegram, Windows, ChatGPT, Google Gemini, CapCut) — an ongoing, never-ending part-by-part series covering hidden settings/features in major daily-used apps and tools that normal users don't know about. Show actual tool in title/topic, hidden shortcuts, date-wise search, biometric lock.",
+        instructions: "IT Cafeteria Script Rule (Cat 7 — Secrets Series): Ongoing part-by-part series covering hidden, unadvertised settings in 16 daily-used apps (WhatsApp, Chrome, Maps, Gmail, Drive, Play Store, YouTube, Instagram, Facebook, TikTok, Telegram, Windows, ChatGPT, Gemini, CapCut). Structure: 1) \"99% log yeh feature nahi jantey\" teaser hook with app name (0-10s), 2) Screen proof of hidden button/gesture, 3) Secret Hack #1 step-by-step activation, 4) Instant privacy or productivity benefit, 5) Secret Hack #2 / bonus setting, 6) Live before/after demo, 7) Common mistake when using this app, 8) Practical privacy/security tip, 9) Recap in 5 seconds, 10) Comment which app secret you want next CTA. Macro phone/app screen capture with highlighted touches and arrows.",
         defaultRatio: "9:16"
       },
       8: {
         title: "Income & Skills: Tools That Earn Rule",
-        instructions: "an ideas-only category about how viewers could build income with tools, skills and platforms. Passive income ideas, store management, freelance skills, with strict reminder of ideas only, no income guarantees.",
+        instructions: "IT Cafeteria Script Rule (Cat 8 — Income & Skills): Purely ideas-based roadmap of how modern AI tools and digital platforms can be leveraged for skills and freelance services (strictly ideas only, zero financial guarantees). Structure: 1) High-demand modern digital skill hook (0-10s), 2) Traditional barrier vs modern AI tool solution, 3) Free software/tools needed to start, 4) Workflow Step 1: Learning the tool, 5) Workflow Step 2: Creating portfolio samples, 6) Workflow Step 3: Finding international or local clients, 7) Realistic time and effort needed, 8) Mandatory disclaimer (ideas only, no get-rich-quick guarantees), 9) Practical roadmap recap, 10) Share your skill goal in comments CTA. Clean professional workspace, freelancing platform dashboard concept, realistic encouraging tone.",
         defaultRatio: "9:16"
       },
       9: {
         title: "YT Automation Rule",
-        instructions: "a lecture-style course about YouTube automation, made chapter by chapter in 16:9 under the Lecture Series Format. 16:9 format mandatory, multi-agent AI script systems, retention optimization, high-CTR storytelling.",
+        instructions: "IT Cafeteria Script Rule (Cat 9 — YT Automation): Mandatory 16:9 widescreen format, structured chapter-by-chapter course for channel growth and multi-agent AI systems. Structure: 1) Lecture chapter title & strategic objective (0-10s), 2) Why faceless channels fail with stock photos, 3) AI architecture & tool stack, 4) Step-by-step workflow setup, 5) Flow prompt engineering & retention triggers, 6) Audio & Living Phonetic Dictionary alignment, 7) Duplicate prevention & thumbnail psychology, 8) Common policy/monetization pitfalls, 9) Chapter summary & action assignment, 10) Next chapter teaser & subscribe CTA. 16:9 widescreen studio presentation, comprehensive slides, architectural diagram cutaways.",
         defaultRatio: "16:9"
       },
       10: {
         title: "Custom Search Rule",
-        instructions: "a topic supplied directly, always treated as a separate, additional item outside the regular rotation. User-driven search query and research grounding with prioritized external links and web insights.",
+        instructions: "IT Cafeteria Script Rule (Cat 10 — Custom Search): Dynamic topic supplied directly by user or real-time 48h search grounding, outside regular rotation. Structure: 1) Urgent breaking topic hook (0-10s), 2) Source-grounded fact check, 3) Core controversy or technical question answered, 4) Step-by-step verified instructions, 5) Official source citation (Google, Microsoft, OpenAI), 6) Live test proof, 7) Important caveats or regional restrictions, 8) Practical user takeaway, 9) Rapid summary, 10) Discussion question CTA. Grounded search snippets, verified source highlights, flexible dynamic camera setup.",
         defaultRatio: "9:16"
       }
     }

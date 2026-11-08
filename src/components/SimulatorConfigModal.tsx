@@ -274,61 +274,61 @@ export const IT_CAFETERIA_10_CATEGORY_RULES: CategoryRuleItem[] = [
   {
     id: 1,
     name: '1. AI & Smart Technology',
-    instructions: 'Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.',
+    instructions: 'IT Cafeteria Script Rule (Cat 1 — AI & Smart Tech): Explain latest AI/smart-tech breakthrough for ordinary Pakistani viewers in spoken Roman Urdu. Structure: 1) Disruptive capability hook (0-10s), 2) Simple 1-line definition, 3) Real-world daily impact, 4) Relatable analogy, 5) Practical use-case 1, 6) Practical use-case 2, 7) Live proof/benchmark, 8) Honest limitation/warning, 9) Clear takeaway, 10) Subscriber CTA with viewer question. Visuals: Presenter Waqar Majeed (@WM25-1) on Hook & CTA; concept UI & screen proof in middle. Spoken Roman Urdu, acronyms hyphenated (A-I, G-P-U).',
     boundCategoryIds: [1]
   },
   {
     id: 2,
     name: '2. AI Chatbots, Workflows & AI Tools',
-    instructions: 'ChatGPT, Claude, Gemini, Google AI tools, Google Flow, Nano, workflows, new features/tools. Deep productivity and automation tutorial format.',
+    instructions: 'IT Cafeteria Script Rule (Cat 2 — AI Chatbots & Workflows): Step-by-step practical workflow tutorial using ChatGPT, Claude, Gemini, Google Flow, or Nano. Structure: 1) Time-saving bottleneck hook (0-10s), 2) Everyday workplace/study problem, 3) Free tool introduction, 4) Step 1 exact UI action, 5) Step 2 key parameter tweak, 6) Step 3 magic prompt/setting, 7) Live result & speedup proof, 8) Common beginner pitfall, 9) Rapid recap, 10) Engagement question in comments CTA. Full-screen screencast demonstration mode with presenter reaction on intro/outro. Instructor-friendly Roman Urdu, zero fluff.',
     boundCategoryIds: [2]
   },
   {
     id: 3,
     name: '3. AI Prompt Hacks & Shortcuts',
-    instructions: 'prompt techniques, image+prompt workflows, practical AI tricks. Slash commands, prompt formulas for realistic images, reverse prompt engineering.',
+    instructions: 'IT Cafeteria Script Rule (Cat 3 — AI Prompt Hacks): Visual before/after prompt comparison demonstrating exact syntax difference. Structure: 1) Same AI, 2 completely different results hook (0-10s), 2) Weak amateur prompt & bad output, 3) Named hack in 1 punchy line (reverse role, slash commands, tokens), 4) Step-by-step prompt formula breakdown, 5) Ultra-realistic/accurate output proof, 6) Second variation/shortcut, 7) Copy-paste template for viewers, 8) Common prompt mistake to avoid, 9) 3-second recap, 10) Bookmark & comment CTA. Split screen: prompt text on left, live AI output on right.',
     boundCategoryIds: [3]
   },
   {
     id: 4,
     name: '4. PC & Windows Hacks',
-    instructions: 'Windows, PC optimization, troubleshooting, shortcuts, productivity, hidden features, plus Windows hidden tools/settings/CMD/PowerShell tricks to fix PC issues (slow PC, temp files, hidden settings, command-line and PowerShell tools, and any other method found via research); an ongoing, never-ending part-by-part series (Part 1, Part 2, Part 3...) that runs under its own extended-length test format.',
+    instructions: 'IT Cafeteria Script Rule (Cat 4 — Windows & PC Hacks): Ongoing part-by-part series (Part 1, Part 2...) for Windows optimization, troubleshooting & command-line tricks. Structure: 1) Shocking PC lag/error hook with Part number (0-10s), 2) Root cause of why Windows slows down/breaks, 3) Hidden tool/setting or PowerShell/CMD trick reveal, 4) Step 1 exact command or hotkey (Win+R, Win+V, CMD), 5) Step 2 verification, 6) Instant benchmark test & RAM/CPU drop proof, 7) Safety disclaimer & restore point tip, 8) Advanced power-user tweak, 9) Part summary & next episode teaser, 10) Subscribe for daily PC hacks CTA. 9:16 high-contrast desktop screencast with zoomed cursor keys and Waqar Majeed cutaways.',
     boundCategoryIds: [4]
   },
   {
     id: 5,
     name: '5. New Technology & Product Tutorials',
-    instructions: 'new launches, new features, new products. Step-by-step UI walkthrough, zero prior coding knowledge needed, practical product review.',
+    instructions: 'IT Cafeteria Script Rule (Cat 5 — New Tech & Products): First-look practical breakdown of newly released gadgets, OS features, or software platforms. Structure: 1) Exciting new product launch hook (0-10s), 2) Who this tool is built for, 3) Price & free tier availability check, 4) Key breakthrough feature test, 5) Hands-on UI walkthrough, 6) Comparison vs previous generation or competitor, 7) Benchmark results, 8) Real-world usability verdict for Pakistani users, 9) Worth upgrading or skip?, 10) Ask viewers their opinion in comments CTA. Sleek gadget shots, official product interface capture, authoritative tech presenter pacing.',
     boundCategoryIds: [5]
   },
   {
     id: 6,
     name: '6. Future Tech & Positive Breakthroughs',
-    instructions: 'useful upcoming technology, major beneficial developments. Visionary tech breakthroughs, autonomous smart home agents, and positive future outlook.',
+    instructions: 'IT Cafeteria Script Rule (Cat 6 — Future Tech): Inspiring, scientifically grounded look at upcoming beneficial technology (robotics, medicine, energy, autonomous agents). Structure: 1) Mind-blowing future capability hook (0-10s), 2) Global problem being solved, 3) Breakthrough discovery explained simply, 4) How it actually works without sci-fi hype, 5) When it will reach consumers, 6) Impact on jobs and daily life, 7) Credible lab/university test data, 8) Ethical consideration or safety guardrail, 9) Inspiring positive outlook, 10) What excites you most? comment CTA. Clean futuristic lab visuals, high-quality B-Roll concept animations, visionary Roman Urdu presentation.',
     boundCategoryIds: [6]
   },
   {
     id: 7,
     name: '7. Secrets (WhatsApp, Google, Windows, ChatGPT, etc.)',
-    instructions: 'Secrets (WhatsApp, Google, Google Chrome, Google Maps, Gmail, Google Drive, Google Play Store, YouTube, Instagram, Facebook, TikTok, Telegram, Windows, ChatGPT, Google Gemini, CapCut) — an ongoing, never-ending part-by-part series covering hidden settings/features in major daily-used apps and tools that normal users don\'t know about.',
+    instructions: 'IT Cafeteria Script Rule (Cat 7 — Secrets Series): Ongoing part-by-part series covering hidden, unadvertised settings in 16 daily-used apps (WhatsApp, Chrome, Maps, Gmail, Drive, Play Store, YouTube, Instagram, Facebook, TikTok, Telegram, Windows, ChatGPT, Gemini, CapCut). Structure: 1) "99% log yeh feature nahi jantey" teaser hook with app name (0-10s), 2) Screen proof of hidden button/gesture, 3) Secret Hack #1 step-by-step activation, 4) Instant privacy or productivity benefit, 5) Secret Hack #2 / bonus setting, 6) Live before/after demo, 7) Common mistake when using this app, 8) Practical privacy/security tip, 9) Recap in 5 seconds, 10) Comment which app secret you want next CTA. Macro phone/app screen capture with highlighted touches and arrows.',
     boundCategoryIds: [7]
   },
   {
     id: 8,
     name: '8. Income & Skills: Tools That Earn',
-    instructions: 'an ideas-only category about how viewers could build income with tools, skills and platforms. Passive income ideas, store management, freelance skills, with strict reminder of ideas only, no income guarantees.',
+    instructions: 'IT Cafeteria Script Rule (Cat 8 — Income & Skills): Purely ideas-based roadmap of how modern AI tools and digital platforms can be leveraged for skills and freelance services (strictly ideas only, zero financial guarantees). Structure: 1) High-demand modern digital skill hook (0-10s), 2) Traditional barrier vs modern AI tool solution, 3) Free software/tools needed to start, 4) Workflow Step 1: Learning the tool, 5) Workflow Step 2: Creating portfolio samples, 6) Workflow Step 3: Finding international or local clients, 7) Realistic time and effort needed, 8) Mandatory disclaimer (ideas only, no get-rich-quick guarantees), 9) Practical roadmap recap, 10) Share your skill goal in comments CTA. Clean professional workspace, freelancing platform dashboard concept, realistic encouraging tone.',
     boundCategoryIds: [8]
   },
   {
     id: 9,
     name: '9. YT Automation',
-    instructions: 'a lecture-style course about YouTube automation, made chapter by chapter in 16:9 under the Lecture Series Format. 16:9 format mandatory, multi-agent AI script systems, retention optimization.',
+    instructions: 'IT Cafeteria Script Rule (Cat 9 — YT Automation): Mandatory 16:9 widescreen format, structured chapter-by-chapter course for channel growth and multi-agent AI systems. Structure: 1) Lecture chapter title & strategic objective (0-10s), 2) Why faceless channels fail with stock photos, 3) AI architecture & tool stack, 4) Step-by-step workflow setup, 5) Flow prompt engineering & retention triggers, 6) Audio & Living Phonetic Dictionary alignment, 7) Duplicate prevention & thumbnail psychology, 8) Common policy/monetization pitfalls, 9) Chapter summary & action assignment, 10) Next chapter teaser & subscribe CTA. 16:9 widescreen studio presentation, comprehensive slides, architectural diagram cutaways.',
     boundCategoryIds: [9]
   },
   {
     id: 10,
     name: '10. Custom Search',
-    instructions: 'a topic supplied directly, always treated as a separate, additional item outside the regular rotation. User-driven search query and research grounding with prioritized external links and web insights.',
+    instructions: 'IT Cafeteria Script Rule (Cat 10 — Custom Search): Dynamic topic supplied directly by user or real-time 48h search grounding, outside regular rotation. Structure: 1) Urgent breaking topic hook (0-10s), 2) Source-grounded fact check, 3) Core controversy or technical question answered, 4) Step-by-step verified instructions, 5) Official source citation (Google, Microsoft, OpenAI), 6) Live test proof, 7) Important caveats or regional restrictions, 8) Practical user takeaway, 9) Rapid summary, 10) Discussion question CTA. Grounded search snippets, verified source highlights, flexible dynamic camera setup.',
     boundCategoryIds: [10]
   }
 ];
@@ -512,8 +512,20 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
     });
 
     const prof = loadedChannels[targetChannel] || loadedChannels['itcafeteria'];
-    setScriptPresets(loadCustomScriptPresets(targetChannel, prof));
-    setCategoryRules(loadCustomCategoryRules(targetChannel, prof));
+    const loadedPresets = loadCustomScriptPresets(targetChannel, prof);
+    const loadedRules = loadCustomCategoryRules(targetChannel, prof);
+    setScriptPresets(loadedPresets);
+    setCategoryRules(loadedRules);
+
+    if (targetChannel === 'itcafeteria') {
+      const currentInst = eng.customInstructions || config.customInstructions || '';
+      const match = loadedRules.find(r => r.instructions === currentInst || (r.name && currentInst.includes(r.name)));
+      if (match) {
+        setActiveRulePattern(String(match.id));
+      } else {
+        setActiveRulePattern('1');
+      }
+    }
   }, [activeChannelId, isOpen]);
 
   const handleChannelSelect = (chId: string) => {
@@ -521,23 +533,26 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
     if (onChannelChange) onChannelChange(chId);
     const eng = getEngineConfigForChannel(chId);
     const prof = channels[chId] || (CHANNEL_PROFILES as any)[chId];
+    const isItCaf = chId === 'itcafeteria';
     const isBeauty = chId.includes('beauty') || (prof?.niche || '').toLowerCase().includes('beauty');
     const defaultBeautyInstruction = BEAUTY_HUB_SCRIPT_PRESETS[0].instructions;
-    const defaultTechInstruction = IT_CAFETERIA_SCRIPT_RULE_PRESETS[0].instructions;
+    const defaultTechInstruction = IT_CAFETERIA_10_CATEGORY_RULES[0].instructions;
 
     setLocal((prev) => ({
       ...prev,
-      baselineTag: eng.baselineTag || (isBeauty ? '@MZ22-1' : '@Active'),
+      baselineTag: eng.baselineTag || (isBeauty ? '@MZ22-1' : '@WM25-1'),
       defaultSceneCount: eng.defaultSceneCount || 10,
       duplicateStrictness: eng.duplicateStrictness || 'deep',
       dialectTone: eng.dialectTone || (isBeauty ? 'beauty_friendly' : 'workshop'),
       flowPromptFormat: eng.flowPromptFormat || (isBeauty ? 'aesthetic_soft_glam' : 'split_screen'),
       customInstructions: eng.customInstructions || (isBeauty ? defaultBeautyInstruction : defaultTechInstruction)
     }));
-    setActiveRulePattern(isBeauty ? 'beauty_10_scene' : '10_scene_short');
+    setActiveRulePattern(isItCaf ? '1' : isBeauty ? 'beauty_10_scene' : '10_scene_short');
 
-    setScriptPresets(loadCustomScriptPresets(chId, prof));
-    setCategoryRules(loadCustomCategoryRules(chId, prof));
+    const loadedPresets = loadCustomScriptPresets(chId, prof);
+    const loadedRules = loadCustomCategoryRules(chId, prof);
+    setScriptPresets(loadedPresets);
+    setCategoryRules(loadedRules);
   };
 
   // Lock scroll
@@ -594,12 +609,20 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
     onReset();
     saveSimulatorConfig(DEFAULT_SIMULATOR_CONFIG);
 
-    const defaultPresets = getScriptRulePresetsForProfile(currentProfile);
-    const defaultRules = getCategoryRulesForProfile(currentProfile);
-    setScriptPresets(defaultPresets);
-    setCategoryRules(defaultRules);
-    saveCustomScriptPresets(selectedChannelId, defaultPresets);
-    saveCustomCategoryRules(selectedChannelId, defaultRules);
+    if (selectedChannelId === 'itcafeteria') {
+      const defaultRules = IT_CAFETERIA_10_CATEGORY_RULES;
+      setCategoryRules(defaultRules);
+      saveCustomCategoryRules('itcafeteria', defaultRules);
+      setActiveRulePattern('1');
+      updateField('customInstructions', defaultRules[0].instructions);
+    } else {
+      const defaultPresets = getScriptRulePresetsForProfile(currentProfile);
+      const defaultRules = getCategoryRulesForProfile(currentProfile);
+      setScriptPresets(defaultPresets);
+      setCategoryRules(defaultRules);
+      saveCustomScriptPresets(selectedChannelId, defaultPresets);
+      saveCustomCategoryRules(selectedChannelId, defaultRules);
+    }
     setSavedToast('Reset to system defaults!');
     setTimeout(() => setSavedToast(null), 2500);
   };
@@ -676,9 +699,14 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
     setCategoryRules(updated);
     saveCustomCategoryRules(selectedChannelId, updated);
 
+    // If currently active rule was edited, sync customInstructions immediately!
+    if (activeRulePattern === String(editingCategoryRule.id) || local.customInstructions === editingCategoryRule.instructions) {
+      updateField('customInstructions', editCatRuleInstructions.trim() || editingCategoryRule.instructions);
+    }
+
     setEditingCategoryRule(null);
     setSavedToast(`Category rule & bindings saved for ${editCatRuleBoundIds.length} categories!`);
-    setTimeout(() => setSavedToast(null), 3000);
+    setTimeout(() => setSavedToast(null), 2500);
   };
 
   // Save New Custom Category Rule
@@ -707,6 +735,8 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
   const charCount = local.customInstructions.length;
   const wordCount = local.customInstructions.trim() ? local.customInstructions.trim().split(/\s+/).length : 0;
   const currentTolerance = DUPLICATE_TOLERANCE_OPTIONS.find((o) => o.id === local.duplicateStrictness) || DUPLICATE_TOLERANCE_OPTIONS[0];
+  const isItCafeteria = selectedChannelId === 'itcafeteria';
+  const activeCategoryRule = categoryRules.find((r) => String(r.id) === activeRulePattern || local.customInstructions === r.instructions) || categoryRules[0];
 
   // Available categories list for binding
   const availableCategories: Array<{ id: number; name: string }> =
@@ -926,71 +956,20 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
             </div>
           </div>
 
-          {/* Agent Script Rules & Prompt Instructions */}
-          <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-cyan-400" />
-                <h4 className="font-bold text-white text-xs uppercase tracking-wider">
-                  Agent Script Rules &amp; Prompt Instructions
-                </h4>
-              </div>
-              <span className="text-[10px] text-cyan-400 font-mono">
-                Click any preset to apply, or click Edit to modify prompts:
-              </span>
-            </div>
-
-            {/* Row 1: 4 Script Presets with Individual Edit Buttons */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-400 text-[11px] font-semibold">
-                  Script Presets (Click card to load • Click ✏️ Edit to modify):
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-                {scriptPresets.map((preset) => {
-                  const isActive = activeRulePattern === preset.id;
-                  return (
-                    <div
-                      key={preset.id}
-                      onClick={() => selectRulePattern(preset)}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer relative group ${
-                        isActive
-                          ? 'bg-slate-900 border-cyan-400 ring-1 ring-cyan-400/50 shadow-md shadow-cyan-950'
-                          : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-1 mb-1">
-                        <div className="font-bold text-white text-xs line-clamp-1 pr-1">{preset.title}</div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {isActive && (
-                            <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400" />
-                          )}
-                          <button
-                            type="button"
-                            onClick={(e) => startEditPreset(preset, e)}
-                            className="p-1 rounded-md bg-slate-800/80 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition-colors cursor-pointer"
-                            title={`Edit "${preset.title}" Preset`}
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">{preset.subtitle}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Row 2 & 3: Category-Specific Script Rules & Multi-Category Binding */}
-            <div className="pt-3 border-t border-slate-800 space-y-2.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>
-                    {categoryRules.length} Category-Specific Script Rules &amp; Multi-Category Binds ({currentProfile?.name || 'Channel'}):
-                  </span>
+          {/* Agent Script Rules & Prompt Instructions (Combined with 10 Category-Specific Rules & Multi-Category Bind for IT Cafeteria) */}
+          {isItCafeteria ? (
+            <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-cyan-400" />
+                  <div>
+                    <h4 className="font-bold text-white text-xs uppercase tracking-wider flex items-center gap-2">
+                      <span>Agent Script Rules &amp; Prompt Instructions</span>
+                      <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 normal-case">
+                        10 Category-Specific Rules &amp; Multi-Category Bind
+                      </span>
+                    </h4>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1009,28 +988,33 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      const defaults = getCategoryRulesForProfile(currentProfile);
+                      const defaults = IT_CAFETERIA_10_CATEGORY_RULES;
                       setCategoryRules(defaults);
-                      saveCustomCategoryRules(selectedChannelId, defaults);
-                      setSavedToast('Category rules reset to default mappings.');
+                      saveCustomCategoryRules('itcafeteria', defaults);
+                      const defaultRule = defaults[0];
+                      setActiveRulePattern(String(defaultRule.id));
+                      updateField('customInstructions', defaultRule.instructions);
+                      setSavedToast('IT Cafeteria کی تمام 10 کیٹیگریز کے اسکرپٹ رولز ڈیفالٹ پر ری سیٹ ہو گئے۔');
                       setTimeout(() => setSavedToast(null), 2500);
                     }}
                     className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                    title="Reset category rules and bindings to defaults"
+                    title="Reset all 10 category rules and prompt instructions to defaults"
                   >
                     <RotateCcw className="w-2.5 h-2.5" />
-                    <span>Reset Binds</span>
+                    <span>Reset 10 Categories</span>
                   </button>
                 </div>
               </div>
 
-              <p className="text-[10px] text-slate-400 leading-relaxed">
-                Click any card to apply prompt instructions. Click <strong>Edit &amp; Bind</strong> to modify the rule or bind 1 rule to multiple categories (e.g. 2, 3 or more categories ek sath bind karein).
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                IT Cafeteria کے لیے <strong>Agent Script Rules &amp; Prompt Instructions</strong> اور <strong>10 Category-Specific Rules &amp; Multi-Category Bind</strong> کو کمبائن کر دیا گیا ہے۔ تمام 10 کیٹیگریز کا اپنا الگ اور مکمل اسکرپٹ رائٹنگ کرائٹیریا ہے۔ کسی بھی کیٹیگری کارڈ پر کلک کر کے اس کے مکمل رولز لوڈ کریں، یا <strong>✏️ Edit &amp; Bind</strong> کے ذریعے پرامپٹس اور ملٹی کیٹیگری بائنڈنگ کو کسٹمائز کریں۔
               </p>
 
-              {/* Grid of Category Rules */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
+              {/* Grid of the 10 Combined Category Script Rules */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5">
                 {categoryRules.map((catRule) => {
+                  const catIdNum = Number(catRule.id);
+                  const isActive = activeRulePattern === String(catRule.id) || local.customInstructions === catRule.instructions;
                   const boundCount = catRule.boundCategoryIds?.length || 0;
                   const boundLabels = (catRule.boundCategoryIds || []).map((id) => `Cat ${id}`).join(', ');
 
@@ -1038,57 +1022,254 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
                     <div
                       key={catRule.id}
                       onClick={() => {
+                        setActiveRulePattern(String(catRule.id));
                         updateField('customInstructions', catRule.instructions);
-                        setSavedToast(`Applied rule: "${catRule.name}" (Bound to: ${boundLabels || 'Category ' + catRule.id})`);
+                        setSavedToast(`Category ${catRule.id} Script Rules & Prompt Instructions لاگو ہو گئیں!`);
                         setTimeout(() => setSavedToast(null), 2500);
                       }}
-                      className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-cyan-500/60 hover:bg-slate-900 transition-all cursor-pointer text-left relative group flex flex-col justify-between"
-                      title={`Click to apply rule: ${catRule.name}`}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer text-left relative group flex flex-col justify-between ${
+                        isActive
+                          ? 'bg-gradient-to-b from-cyan-950/70 to-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg shadow-cyan-950/80'
+                          : 'bg-slate-900/80 border-slate-800 hover:border-cyan-500/50 hover:bg-slate-900'
+                      }`}
                     >
                       <div>
-                        <div className="flex items-start justify-between gap-1 mb-1">
-                          <div className="font-bold text-cyan-200 text-[11px] truncate">{catRule.name}</div>
-                          <button
-                            type="button"
-                            onClick={(e) => startEditCategoryRule(catRule, e)}
-                            className="p-1 rounded bg-slate-800/90 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/50 transition-colors shrink-0 cursor-pointer"
-                            title={`Edit rule and bind categories: ${catRule.name}`}
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
+                        <div className="flex items-start justify-between gap-1 mb-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black shrink-0 ${
+                              isActive ? 'bg-cyan-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+                            }`}>
+                              {catIdNum || '•'}
+                            </span>
+                            <div className="font-bold text-white text-xs truncate">
+                              {catRule.name.replace(/^\d+\.\s*/, '')}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {isActive && (
+                              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-sm shadow-cyan-400" />
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => startEditCategoryRule(catRule, e)}
+                              className="p-1 rounded-md bg-slate-800/90 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/50 transition-colors shrink-0 cursor-pointer"
+                              title={`Edit Script Rules & Multi-Category Binds for ${catRule.name}`}
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-[10px] text-slate-400 line-clamp-2 leading-snug">{catRule.instructions}</p>
+
+                        <p className="text-[10px] text-slate-400 line-clamp-3 leading-snug">
+                          {catRule.instructions}
+                        </p>
                       </div>
 
-                      {/* Bound Categories Strip */}
-                      <div className="mt-2 pt-1.5 border-t border-slate-800 flex items-center justify-between text-[9px]">
-                        <span className="font-mono text-indigo-300 truncate" title={`Bound: ${boundLabels}`}>
+                      <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[9px]">
+                        <span className="font-mono text-indigo-300 truncate font-semibold" title={`Bound: ${boundLabels}`}>
                           🔗 {boundCount > 1 ? `${boundCount} Binds (${boundLabels})` : boundLabels || `Cat ${catRule.id}`}
                         </span>
-                        <span className="text-slate-500 group-hover:text-cyan-400 transition-colors font-semibold">
-                          Apply
+                        <span className={`font-semibold px-1.5 py-0.5 rounded text-[9px] ${
+                          isActive ? 'bg-cyan-400/20 text-cyan-300' : 'text-slate-500 group-hover:text-cyan-400'
+                        }`}>
+                          {isActive ? 'Active Rule' : 'Select'}
                         </span>
                       </div>
                     </div>
                   );
                 })}
               </div>
-            </div>
 
-            {/* Active Instructions Textarea */}
-            <div>
-              <div className="flex justify-between items-center mb-1 text-[11px] text-slate-400 font-mono">
-                <span>Active Prompt Instructions for AI Story Engine:</span>
-                <span>{charCount} chars • {wordCount} words</span>
+              {/* Active Instructions Textarea with Clear Attribution */}
+              <div className="pt-2 border-t border-slate-800/80">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-1 text-[11px] text-slate-300 gap-1 font-mono">
+                  <div className="flex items-center gap-2">
+                    <span className="text-cyan-300 font-bold">Active Category Script Rules &amp; Prompt Instructions:</span>
+                    {activeCategoryRule && (
+                      <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px]">
+                        {activeCategoryRule.name}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-slate-400">{charCount} chars • {wordCount} words</span>
+                </div>
+                <textarea
+                  value={local.customInstructions}
+                  onChange={(e) => updateField('customInstructions', e.target.value)}
+                  rows={5}
+                  className="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-cyan-400 resize-none shadow-inner"
+                  placeholder="Enter category script rules and prompt instructions..."
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Yeh prompt instructions IT Cafeteria ke AI Script Generator, Agent Simulator aur Target Queue mein script banate waqt har scene par direct enforce hongi.
+                </p>
               </div>
-              <textarea
-                value={local.customInstructions}
-                onChange={(e) => updateField('customInstructions', e.target.value)}
-                rows={4}
-                className="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-cyan-400 resize-none shadow-inner"
-              />
             </div>
-          </div>
+          ) : (
+            /* Standard 2-Tier view for other channels like Beauty Hub */
+            <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-cyan-400" />
+                  <h4 className="font-bold text-white text-xs uppercase tracking-wider">
+                    Agent Script Rules &amp; Prompt Instructions
+                  </h4>
+                </div>
+                <span className="text-[10px] text-cyan-400 font-mono">
+                  Click any preset to apply, or click Edit to modify prompts:
+                </span>
+              </div>
+
+              {/* Row 1: 4 Script Presets with Individual Edit Buttons */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-400 text-[11px] font-semibold">
+                    Script Presets (Click card to load • Click ✏️ Edit to modify):
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+                  {scriptPresets.map((preset) => {
+                    const isActive = activeRulePattern === preset.id;
+                    return (
+                      <div
+                        key={preset.id}
+                        onClick={() => selectRulePattern(preset)}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer relative group ${
+                          isActive
+                            ? 'bg-slate-900 border-cyan-400 ring-1 ring-cyan-400/50 shadow-md shadow-cyan-950'
+                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-1 mb-1">
+                          <div className="font-bold text-white text-xs line-clamp-1 pr-1">{preset.title}</div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {isActive && (
+                              <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400" />
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => startEditPreset(preset, e)}
+                              className="p-1 rounded-md bg-slate-800/80 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition-colors cursor-pointer"
+                              title={`Edit "${preset.title}" Preset`}
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">{preset.subtitle}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Row 2 & 3: Category-Specific Script Rules & Multi-Category Binding */}
+              <div className="pt-3 border-t border-slate-800 space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>
+                      {categoryRules.length} Category-Specific Script Rules &amp; Multi-Category Binds ({currentProfile?.name || 'Channel'}):
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewRuleName('');
+                        setNewRuleInstructions('');
+                        setNewRuleBoundIds([1]);
+                        setShowAddRuleModal(true);
+                      }}
+                      className="px-2.5 py-1 bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-200 border border-cyan-500/40 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Add Custom Rule</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const defaults = getCategoryRulesForProfile(currentProfile);
+                        setCategoryRules(defaults);
+                        saveCustomCategoryRules(selectedChannelId, defaults);
+                        setSavedToast('Category rules reset to default mappings.');
+                        setTimeout(() => setSavedToast(null), 2500);
+                      }}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-lg text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Reset category rules and bindings to defaults"
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" />
+                      <span>Reset Binds</span>
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-slate-400 leading-relaxed">
+                  Click any card to apply prompt instructions. Click <strong>Edit &amp; Bind</strong> to modify the rule or bind 1 rule to multiple categories.
+                </p>
+
+                {/* Grid of Category Rules */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
+                  {categoryRules.map((catRule) => {
+                    const boundCount = catRule.boundCategoryIds?.length || 0;
+                    const boundLabels = (catRule.boundCategoryIds || []).map((id) => `Cat ${id}`).join(', ');
+
+                    return (
+                      <div
+                        key={catRule.id}
+                        onClick={() => {
+                          updateField('customInstructions', catRule.instructions);
+                          setSavedToast(`Applied rule: "${catRule.name}" (Bound to: ${boundLabels || 'Category ' + catRule.id})`);
+                          setTimeout(() => setSavedToast(null), 2500);
+                        }}
+                        className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-cyan-500/60 hover:bg-slate-900 transition-all cursor-pointer text-left relative group flex flex-col justify-between"
+                        title={`Click to apply rule: ${catRule.name}`}
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-1 mb-1">
+                            <div className="font-bold text-cyan-200 text-[11px] truncate">{catRule.name}</div>
+                            <button
+                              type="button"
+                              onClick={(e) => startEditCategoryRule(catRule, e)}
+                              className="p-1 rounded bg-slate-800/90 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/50 transition-colors shrink-0 cursor-pointer"
+                              title={`Edit rule and bind categories: ${catRule.name}`}
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-slate-400 line-clamp-2 leading-snug">{catRule.instructions}</p>
+                        </div>
+
+                        {/* Bound Categories Strip */}
+                        <div className="mt-2 pt-1.5 border-t border-slate-800 flex items-center justify-between text-[9px]">
+                          <span className="font-mono text-indigo-300 truncate" title={`Bound: ${boundLabels}`}>
+                            🔗 {boundCount > 1 ? `${boundCount} Binds (${boundLabels})` : boundLabels || `Cat ${catRule.id}`}
+                          </span>
+                          <span className="text-slate-500 group-hover:text-cyan-400 transition-colors font-semibold">
+                            Apply
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Instructions Textarea */}
+              <div>
+                <div className="flex justify-between items-center mb-1 text-[11px] text-slate-400 font-mono">
+                  <span>Active Prompt Instructions for AI Story Engine:</span>
+                  <span>{charCount} chars • {wordCount} words</span>
+                </div>
+                <textarea
+                  value={local.customInstructions}
+                  onChange={(e) => updateField('customInstructions', e.target.value)}
+                  rows={4}
+                  className="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono leading-relaxed focus:outline-none focus:border-cyan-400 resize-none shadow-inner"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer Controls */}
