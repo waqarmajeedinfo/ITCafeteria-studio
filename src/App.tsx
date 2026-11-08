@@ -46,7 +46,8 @@ import {
   Search,
   Globe,
   Brain,
-  Edit3
+  Edit3,
+  Database
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -58,6 +59,7 @@ import { DiagnosticMessageBox } from './components/DiagnosticMessageBox';
 import { DuplicateChecker } from './components/DuplicateChecker';
 import { UpscalingRoadmap } from './components/UpscalingRoadmap';
 import { MasterListTracker } from './components/MasterListTracker';
+import { TopicBankModal } from './components/TopicBankModal';
 import { AiChatbot } from './components/AiChatbot';
 import { SearchGroundingStudio } from './components/SearchGroundingStudio';
 import { VideoStudio } from './components/VideoStudio';
@@ -342,6 +344,7 @@ export default function App() {
   const [showGroundCriteriaModal, setShowGroundCriteriaModal] = useState(false);
   const [showCompanionMemoryModal, setShowCompanionMemoryModal] = useState(false);
   const [showLiveCoPilotModal, setShowLiveCoPilotModal] = useState(false);
+  const [showTopicBankModal, setShowTopicBankModal] = useState(false);
   const [liveElapsedSeconds, setLiveElapsedSeconds] = useState(0);
 
   // Live Co-Pilot Session Timer Effect
@@ -1024,6 +1027,16 @@ export default function App() {
                 <span>Manage Channels</span>
               </button>
 
+              {/* 3b. Topic Bank Hub */}
+              <button
+                onClick={() => setShowTopicBankModal(true)}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-950/80 to-teal-950/80 hover:from-emerald-900/80 hover:to-teal-900/80 border border-emerald-500/40 hover:border-emerald-400 text-xs sm:text-sm font-semibold text-emerald-200 hover:text-white transition-all cursor-pointer backdrop-blur-md shadow-md"
+                title="Profile Topic Bank, Backfill Covered Points, & Smarter Duplicate Check"
+              >
+                <Database className="w-4 h-4 text-emerald-400" />
+                <span>Topic Bank</span>
+              </button>
+
               {/* 4. Go Live Co-Pilot Button alongside Phonetic Dictionary & Manage Channels */}
               <button
                 onClick={() => setShowLiveCoPilotModal(true)}
@@ -1155,6 +1168,16 @@ export default function App() {
               >
                 <Brain className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
                 <span className="hidden sm:inline text-xs font-semibold text-purple-200">AI Memory</span>
+              </button>
+
+              {/* Topic Bank Hub Quick Access */}
+              <button
+                onClick={() => setShowTopicBankModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-950/80 to-slate-900/90 hover:from-emerald-900/80 hover:to-slate-800 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 hover:text-white text-xs font-semibold cursor-pointer transition-all shadow-md group shrink-0"
+                title="Topic Bank & Smarter Duplicate Radar"
+              >
+                <Database className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                <span className="hidden sm:inline text-xs font-semibold text-emerald-200">Topic Bank</span>
               </button>
 
               {/* Scroll To Top Jump Button when Scrolled */}
@@ -2027,6 +2050,26 @@ export default function App() {
       <MultiUserManagerModal
         isOpen={showMultiUserModal}
         onClose={() => setShowMultiUserModal(false)}
+      />
+
+      {/* Topic Bank Hub Modal */}
+      <TopicBankModal
+        isOpen={showTopicBankModal}
+        onClose={() => setShowTopicBankModal(false)}
+        channelId={activeChannelId}
+        channelName={channels[activeChannelId]?.name || 'IT Cafeteria'}
+        onProduceTopic={(topic) => {
+          setActiveTab('simulator');
+          try {
+            localStorage.setItem('itcafeteria_prefill_topic', JSON.stringify({
+              title: topic.title,
+              tool: topic.title.split(' ')[0],
+              points: (topic.keyPoints || []).join('\n'),
+              hookAngle: topic.angle || topic.hook
+            }));
+          } catch {}
+          setShowTopicBankModal(false);
+        }}
       />
 
 

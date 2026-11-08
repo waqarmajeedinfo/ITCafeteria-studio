@@ -35,6 +35,8 @@ import {
 import { ChannelManagerModal } from './ChannelManagerModal';
 import { TagManagerModal } from './TagManagerModal';
 import { loadAllChannels, getEngineConfigForChannel, type ExtendedChannelProfile } from '../lib/channelStore';
+import { TopicResearchPanel } from './TopicResearchPanel';
+import { loadProfileTopicBank, type TopicCard } from '../lib/profileStore';
 
 const LATEST_STORY_KEY = 'itcafeteria_latest_story';
 const MEMORY_RECORDS_KEY = 'itcafeteria_memory_records';
@@ -199,6 +201,7 @@ export const AgentSimulator: React.FC = () => {
   const [showSearchStrategyMenu, setShowSearchStrategyMenu] = useState(false);
   const [showPriorityModal, setShowPriorityModal] = useState(false);
   const [showGroundCriteriaModal, setShowGroundCriteriaModal] = useState(false);
+  const [savedTopicOffers, setSavedTopicOffers] = useState<TopicCard[] | null>(null);
   const [newResourceInput, setNewResourceInput] = useState('');
   const [newResourceTitle, setNewResourceTitle] = useState('');
   const [newResourceCategory, setNewResourceCategory] = useState('');
@@ -443,8 +446,11 @@ export const AgentSimulator: React.FC = () => {
     setDraftSceneCount(eng.defaultSceneCount || nextProfile.defaultSceneCount || 10);
   };
 
-  const handleTrigger = () => {
+  const proceedWithTrigger = (overrideTopic?: { title: string; tool?: string }) => {
     try {
+      if (overrideTopic) {
+        setFlowInitialTopic(overrideTopic);
+      }
       setAppliedSelection({
         channelId: draftChannel,
         tag: draftTag,
@@ -458,6 +464,22 @@ export const AgentSimulator: React.FC = () => {
       setFlowOpen(true);
     } catch (err) {
       console.error('Trigger execution error:', err);
+    }
+  };
+
+  const handleTrigger = () => {
+    try {
+      // First check if Topic Bank has saved topics for this category before running fresh search
+      const bank = loadProfileTopicBank(draftChannel);
+      const matchingSaved = bank.filter(t => t.status === 'saved' && (t.categoryId === draftCategory || bank.length <= 3));
+      if (matchingSaved.length > 0 && !flowInitialTopic) {
+        setSavedTopicOffers(matchingSaved.slice(0, 3));
+        return;
+      }
+      proceedWithTrigger();
+    } catch (err) {
+      console.error('Trigger execution error:', err);
+      proceedWithTrigger();
     }
   };
 
@@ -810,13 +832,13 @@ export const AgentSimulator: React.FC = () => {
           </div>
         </div>
 
-        {/* Category-Specific Script Rule & Automatic Bind + Priority Links Section + 48h Ground Search */}
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div className="md:col-span-2 rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3 text-xs space-y-1.5">
+        {/* Category-Specific Script Rule & Automatic Bind */}
+        <div className="mt-3 space-y-3">
+          <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3 text-xs space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="font-bold text-cyan-300 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                Category-Specific Script Rule & Automatic Bind:
+                Category-Specific Script Rule &amp; Automatic Bind:
               </span>
               <button
                 type="button"
@@ -842,51 +864,30 @@ export const AgentSimulator: React.FC = () => {
             )}
           </div>
 
-          <div className="rounded-xl border border-blue-500/30 bg-blue-950/20 p-3 text-xs flex flex-col justify-between">
-            <div>
-              <div className="font-bold text-blue-300 flex items-center justify-between mb-1">
-                <span>Prioritized Focus Links</span>
-                <span className="text-[10px] font-mono bg-blue-900/50 px-1.5 py-0.5 rounded text-blue-200">
-                  {priorityResources.length} Active
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300 line-clamp-2">
-                {priorityResources.length > 0 ? priorityResources[0] : 'No priority URLs added yet. Click manage to prioritize external sources.'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowPriorityModal(true)}
-              className="mt-2 w-full py-1 px-2 bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/40 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1"
-            >
-              <Sliders className="w-3 h-3 text-blue-300" /> Manage Priority Links
-            </button>
-          </div>
-
-          {/* 48-Hour Ground-Level Search Scenario (10+ Websites) */}
-          <div className="rounded-xl border border-cyan-500/40 bg-gradient-to-br from-cyan-950/40 via-slate-900 to-indigo-950/30 p-3 text-xs flex flex-col justify-between shadow-md">
-            <div>
-              <div className="font-bold text-cyan-300 flex items-center justify-between mb-1">
-                <span className="flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
-                  48h Ground Search
-                </span>
-                <span className="text-[10px] font-mono bg-cyan-900/50 px-1.5 py-0.5 rounded text-cyan-200 border border-cyan-500/30">
-                  48h • 10+ Sites
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300 line-clamp-2">
-                Agent search strictly limited to the last 48 hours across at least 10 authoritative ground websites.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowGroundCriteriaModal(true)}
-              className="mt-2 w-full py-1.5 px-2 bg-gradient-to-r from-cyan-600/40 to-blue-600/40 hover:from-cyan-600/60 hover:to-blue-600/60 text-cyan-200 border border-cyan-500/50 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
-            >
-              <Radio className="w-3 h-3 text-cyan-300 animate-pulse" /> Check 48h Scenario
-            </button>
-          </div>
+          {/* Integrated 4-Lens Topic Research & Topic Bank Panel */}
+          <TopicResearchPanel
+            channelId={draftChannel}
+            channelName={draftProfile.name}
+            categoryId={draftCategory}
+            aspectRatio={draftAspectRatio}
+            onProduceTopic={(topic) => {
+              setFlowInitialTopic({
+                title: topic.title,
+                tool: topic.keyPoints.join(', ')
+              });
+              setAppliedSelection({
+                channelId: draftChannel,
+                tag: draftTag,
+                categoryId: topic.categoryId,
+                sceneCount: draftSceneCount,
+                aspectRatio: topic.aspectRatio,
+                searchStrategy,
+                priorityResources
+              } as any);
+              setTriggerOutcome(null);
+              setFlowOpen(true);
+            }}
+          />
         </div>
 
         <div className="mt-3 rounded-lg border border-emerald-500/25 bg-emerald-950/20 px-3 py-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
@@ -1355,6 +1356,88 @@ export const AgentSimulator: React.FC = () => {
           isOpen={showGroundCriteriaModal}
           onClose={() => setShowGroundCriteriaModal(false)}
         />
+      )}
+
+      {/* Trigger Saved Topics Offer Modal */}
+      {savedTopicOffers && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overscroll-contain animate-in fade-in">
+          <div className="bg-slate-950 border border-cyan-500/40 w-full max-w-xl rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h4 className="text-base font-bold text-white flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  Topic Bank: Saved Topics Available!
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Topic Bank mein is category ke {savedTopicOffers.length} saved topics pehle se maujood hain. Naya search chalane ke bajaye in mein se select karein ya naya 4-lens search karein:
+                </p>
+              </div>
+              <button onClick={() => setSavedTopicOffers(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {savedTopicOffers.map((offer) => (
+                <div
+                  key={offer.id}
+                  className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 hover:border-cyan-500/50 transition-all flex items-center justify-between gap-3 text-xs"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 font-mono text-[9px] font-bold">
+                        Score: {offer.score}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        {offer.lens}
+                      </span>
+                    </div>
+                    <strong className="text-white text-xs block">{offer.title}</strong>
+                    <span className="text-cyan-300/80 font-mono text-[11px] block italic line-clamp-1">
+                      "{offer.hook}"
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSavedTopicOffers(null);
+                      proceedWithTrigger({
+                        title: offer.title,
+                        tool: offer.keyPoints.join(', ')
+                      });
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs flex items-center gap-1 shrink-0 cursor-pointer shadow-md"
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Produce This</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setSavedTopicOffers(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSavedTopicOffers(null);
+                  proceedWithTrigger();
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-cyan-200 border border-cyan-500/40 text-xs font-bold cursor-pointer flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Naya 4-Lens Search Chalayein</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

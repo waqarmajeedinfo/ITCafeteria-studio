@@ -9,6 +9,7 @@ import { buildMasterThumbnailPrompt, splitHeadline } from './src/lib/thumbnailMa
 import { applyPhoneticFixes } from './src/lib/phoneticDictionaryStore';
 import { INTEGRATION_PUBLIC_PATHS, registerIntegrationRoutes } from './integrations';
 import { registerMultiUserRoutes } from './server_multiuser';
+import { registerTopicResearchRoutes } from './server_topic_research';
 
 dotenv.config({ override: true });
 
@@ -2494,6 +2495,7 @@ app.post('/api/autopilot/trigger-daily', async (req, res) => {
 
 registerIntegrationRoutes(app);
 registerMultiUserRoutes(app);
+registerTopicResearchRoutes(app);
 
 // Setup Vite middleware in dev or static files in prod
 async function startServer() {

@@ -36,6 +36,7 @@ import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import type { SimulatorConfig } from './SimulatorConfigModal';
 import { checkDeletedStoryBlacklist, loadDeletedStoryBlacklist } from '../lib/deletedStoryRegistry';
 import { applyPhoneticFixes, verifyAndCorrectStoryPhonetics, getPhoneticDictionary } from '../lib/phoneticDictionaryStore';
+import { checkSmarterDuplicate } from '../lib/profileStore';
 
 export interface AgentTriggerSelection {
   channelId: ChannelProfile['id'];
@@ -209,10 +210,6 @@ export function findDuplicateMatches(
   channelId: ChannelProfile['id'],
   memoryRecords: AgentMemoryRecord[] = []
 ): DuplicateMatch[] {
-  const combinedCandidate = `${title} ${points}`.toLowerCase();
-  const candidateTokens = tokenizeForMatch(combinedCandidate);
-  if (!candidateTokens.length && !combinedCandidate.trim()) return [];
-
   // 0. Permanent Blacklist Check: If story was deleted by user, immediately flag as duplicate
   const deletedCheck = checkDeletedStoryBlacklist(title, points);
   if (deletedCheck) {
@@ -228,105 +225,30 @@ export function findDuplicateMatches(
     ];
   }
 
-  // Check if candidate is explicitly a Sequel / Part 2 / Episode 2.
-  // Approved sequels to previously published videos should NOT be blocked as duplicates.
-  const isCandidateSequel = /\b(part\s*[2-9]|sequel|episode\s*[2-9]|advanced|pro|phase\s*2|next\s*part)\b/i.test(combinedCandidate);
+  // 1. Smarter Hierarchical Duplicate Check (Level 1 App Screen + Level 2 Deep Sub-Points)
+  const result = checkSmarterDuplicate({
+    title,
+    rawPointsText: points,
+    channelId
+  });
 
-  // 1. Gather all existing records: static catalog (58) + live published stories + pending queue + session memory
-  const allPublished = getAllPublishedVideos();
-  const pendingQueue = loadPendingQueue();
-
-  const libraryRecords: DuplicateMatch[] = (channelId === 'itcafeteria' ? allPublished : []).map((video) => ({
-    source: 'Catalog',
-    id: `#${video.id}`,
-    title: video.title,
-    tool: video.tool,
-    points: video.points,
-    matchedKeywords: []
-  }));
-
-  const pendingRecords: DuplicateMatch[] = (channelId === 'itcafeteria' ? pendingQueue : []).map((p) => ({
-    source: 'Session Memory',
-    id: `Pending #${p.id.slice(0, 8)}`,
-    title: p.title,
-    tool: p.storyPackage?.idea?.title || p.category || 'Pending Queue',
-    points: p.storyPackage?.idea?.points || p.hook || '',
-    matchedKeywords: []
-  }));
-
-  const sessionRecords: DuplicateMatch[] = memoryRecords
-    .filter((record) => record.channelId === channelId)
-    .map((record) => ({
-      source: 'Session Memory',
-      id: record.id,
-      title: record.title,
-      tool: record.tool,
-      points: record.points,
-      matchedKeywords: []
-    }));
-
-  const allRecords = [...libraryRecords, ...pendingRecords, ...sessionRecords];
-  const results: DuplicateMatch[] = [];
-  const seenIds = new Set<string>();
-
-  // 2. Deep Concept Analysis: Check if candidate matches any CORE_TOPIC_CONCEPTS
-  const matchedConcepts = CORE_TOPIC_CONCEPTS.filter((concept) =>
-    concept.aliases.some((alias) => combinedCandidate.includes(alias))
-  );
-
-  for (const record of allRecords) {
-    if (seenIds.has(record.id)) continue;
-    const recordCombined = `${record.title} ${record.tool} ${record.points}`.toLowerCase();
-
-    // If candidate is an approved sequel of this record, don't flag as duplicate
-    if (isCandidateSequel) {
-      const isRecordSequel = /\b(part\s*[2-9]|sequel|episode\s*[2-9])\b/i.test(recordCombined);
-      // Only flag if the record is ALREADY a sequel of the same number!
-      if (!isRecordSequel) {
-        continue;
+  // EXACT DUPLICATE = BLOCK! Return matched story and covered point
+  if (result.verdict === 'exact') {
+    return [
+      {
+        source: 'Catalog',
+        id: `#${result.matchedStoryId || 'EXACT-DUP'}`,
+        title: result.matchedStoryTitle || title,
+        tool: result.level1AppDetected ? result.level1AppDetected.toUpperCase() : 'Tool',
+        points: `Exact Sub-Point Match: "${result.matchedPoint}". ${result.reason}`,
+        matchedKeywords: [result.matchedPoint || 'Exact Point Duplicate']
       }
-    }
-
-    let isMatch = false;
-    let matchedKeywords: string[] = [];
-
-    // Check concept match
-    for (const concept of matchedConcepts) {
-      const recordMatchesConcept = concept.aliases.some((alias) => recordCombined.includes(alias));
-      if (recordMatchesConcept) {
-        isMatch = true;
-        matchedKeywords.push(`Concept: ${concept.name}`);
-        break;
-      }
-    }
-
-    // Token and phrase match
-    const recordTokens = new Set(tokenizeForMatch(recordCombined));
-    const tokenOverlap = candidateTokens.filter((token) => recordTokens.has(token));
-    const normalizedCandidate = normalizeDuplicateText(title);
-    const exactPhrase =
-      normalizedCandidate.length >= 10 &&
-      normalizeDuplicateText(recordCombined).includes(normalizedCandidate);
-
-    const density = candidateTokens.length > 0 ? tokenOverlap.length / candidateTokens.length : 0;
-
-    if (exactPhrase || tokenOverlap.length >= 3 || (tokenOverlap.length === 2 && density >= 0.34)) {
-      isMatch = true;
-      matchedKeywords.push(...tokenOverlap);
-    }
-
-    if (isMatch) {
-      seenIds.add(record.id);
-      results.push({
-        ...record,
-        matchedKeywords: Array.from(new Set(matchedKeywords))
-      });
-    }
+    ];
   }
 
-  return results
-    .sort((a, b) => b.matchedKeywords.length - a.matchedKeywords.length)
-    .slice(0, 5);
+  // PARTIAL (Same app but different trick/feature) OR NEW (Completely new topic) = ALLOW!
+  // Never block simply because the app name (e.g. WhatsApp, Windows) is mentioned!
+  return [];
 }
 
 async function postJson(url: string, body: unknown, signal?: AbortSignal) {

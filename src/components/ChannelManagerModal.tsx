@@ -33,6 +33,13 @@ import {
 } from '../lib/channelStore';
 import { CATEGORIES_IT_CAFETERIA } from '../data/channelData';
 import { dirtyManager } from '../lib/dirtyStore';
+import {
+  saveProfileResearchSettings,
+  saveProfileCompetitors,
+  saveProfileTopicBank,
+  saveProfileLibrary,
+  type CompetitorItem
+} from '../lib/profileStore';
 
 function parseCategoriesInput(input: string): Array<{ id: number; name: string; playlist: string; details?: string; special?: string }> {
   let rawList: string[] = [];
@@ -154,10 +161,25 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
   const [suggestedNiches, setSuggestedNiches] = useState<string[]>([]);
   const [suggestedCategories, setSuggestedCategories] = useState<string[]>([]);
 
+  // Wizard Proposal State (New Channel Setup Wizard)
+  const [loadingWizard, setLoadingWizard] = useState(false);
+  const [wizardProposal, setWizardProposal] = useState<{
+    niche: string;
+    categories: Array<{ id: number; name: string; playlist?: string; details?: string }>;
+    sourcesByLens: {
+      lens1: Array<{ name: string; url?: string; category?: string }>;
+      lens2: Array<{ name: string; url?: string; category?: string }>;
+      lens3: Array<{ name: string; url?: string; category?: string }>;
+      lens4: Array<{ name: string; focus?: string; category?: string }>;
+    };
+    competitors: Array<{ id?: string; name: string; channelIdOrUrl: string; group: 'local' | 'global' | 'aspirational'; notes?: string }>;
+  } | null>(null);
+
   // Centralized useEffect hook monitoring editingChannelId / active channel context to clear local niche, category, and tag state arrays upon change, preventing cross-channel data pollution.
   useEffect(() => {
     setSuggestedNiches([]);
     setSuggestedCategories([]);
+    setWizardProposal(null);
     if (!editingChannelId) {
       setNiche('');
       setTag('');
@@ -203,6 +225,7 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     setCategoriesText('');
     setSuggestedNiches([]);
     setSuggestedCategories([]);
+    setWizardProposal(null);
     setAspectRatio('9:16');
     setDialectTone('formal');
     setFlowPromptFormat('cinematic_3d');
@@ -214,6 +237,166 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     setCustomInstructions('');
     setEditingChannelId(null);
     setShowForm(false);
+  };
+
+  const handleRunWizard = async () => {
+    if (!name.trim()) {
+      showStatus('Channel ka naam darj karein taake wizard shuru ho sake.');
+      return;
+    }
+    setLoadingWizard(true);
+    setWizardProposal(null);
+    try {
+      const res = await fetch('/api/profile/wizard-propose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          presenter: presenter.trim() || 'Presenter',
+          tags: hasCharacterTag ? (tag.trim() || '@Custom-Tag') : 'No-Character',
+          niche: niche.trim() || name.trim()
+        })
+      });
+      const data = await res.json();
+      if (data && data.ok) {
+        setWizardProposal(data);
+        if (data.categories && Array.isArray(data.categories)) {
+          setCategoriesText(data.categories.map((c: any, i: number) => `${i + 1}. ${c.name}`).join('\n'));
+        }
+        showStatus(`✨ Wizard ne "${data.niche || niche}" ke mutabiq 7-10 categories, 4 lenses aur competitors propose kar diye hain!`);
+      } else {
+        showStatus('Wizard proposal generate nahi ho saki: ' + (data?.error || 'Unknown error'));
+      }
+    } catch (err: any) {
+      showStatus('Wizard server request failed.');
+    } finally {
+      setLoadingWizard(false);
+    }
+  };
+
+  const handleApproveWizardProposal = () => {
+    if (!wizardProposal || !name.trim()) return;
+
+    const channelId = editingChannelId || name.toLowerCase().replace(/[^a-z0-9]/g, '') || `channel_${Date.now()}`;
+    const cleanTag = hasCharacterTag ? (tag.trim() || '@Custom-Tag') : 'No-Character';
+
+    // 1. Initialize safe categories
+    const safeCats = wizardProposal.categories.map((c, i) => ({
+      id: i + 1,
+      name: c.name,
+      playlist: c.playlist || c.name,
+      details: c.details
+    }));
+
+    // 2. Save isolated profile research settings (Zero tech bleed)
+    saveProfileResearchSettings(channelId, {
+      lens1WindowHours: 48,
+      lens2WindowDays: 90,
+      lens3WindowDays: 7,
+      lens4WindowDays: 30,
+      warnCrossChannelDuplicate: false,
+      sourcesByLens: {
+        lens1: (wizardProposal.sourcesByLens.lens1 || []).map((s, idx) => ({
+          id: `lens1-${channelId}-${idx}`,
+          name: s.name,
+          url: s.url || '',
+          enabled: true,
+          category: s.category || 'Updates'
+        })),
+        lens2: (wizardProposal.sourcesByLens.lens2 || []).map((s, idx) => ({
+          id: `lens2-${channelId}-${idx}`,
+          name: s.name,
+          url: s.url || '',
+          enabled: true,
+          category: s.category || 'Questions'
+        })),
+        lens3: (wizardProposal.sourcesByLens.lens3 || []).map((s, idx) => ({
+          id: `lens3-${channelId}-${idx}`,
+          name: s.name,
+          url: s.url || '',
+          enabled: true,
+          category: s.category || 'Competitors'
+        })),
+        lens4: (wizardProposal.sourcesByLens.lens4 || []).map((s, idx) => ({
+          id: `lens4-${channelId}-${idx}`,
+          name: s.name,
+          url: '',
+          enabled: true,
+          category: s.focus || s.category || 'Technique'
+        }))
+      }
+    });
+
+    // 3. Save isolated competitor groups
+    const competitorList: CompetitorItem[] = (wizardProposal.competitors || []).map((c, idx) => ({
+      id: `comp-${channelId}-${idx + 1}`,
+      channelId,
+      name: c.name,
+      channelIdOrUrl: c.channelIdOrUrl || '',
+      group: c.group || 'local',
+      notes: c.notes || ''
+    }));
+    saveProfileCompetitors(channelId, competitorList);
+
+    // 4. Initialize empty isolated Topic Bank and Library for this profile
+    saveProfileTopicBank(channelId, []);
+    saveProfileLibrary(channelId, []);
+
+    // 5. Build and save engine config
+    const engineConfigToSave: ChannelEngineConfig = {
+      channelId,
+      baselineTag: cleanTag,
+      defaultSceneCount: sceneCount,
+      duplicateStrictness,
+      dialectTone: dialectTone || (niche.toLowerCase().includes('beauty') ? 'beauty_friendly' : 'lahori_conversational'),
+      lockPersonaAcrossScenes: true,
+      autoQueueSync: true,
+      flowPromptFormat: flowPromptFormat || (niche.toLowerCase().includes('beauty') ? 'aesthetic_soft_glam' : 'cinematic_3d'),
+      customInstructions: `Channel rules for ${name.trim()} (${niche.trim()}) in Roman Urdu. Structure: High-impact hook (0-10s), problem/topic breakdown, practical step-by-step points, clear takeaways, audience question in comment CTA, subscribe outro.`,
+      presenterPersonaPrompt: presenterPersona.trim() || `${presenter.trim() || 'Presenter'} (${name.trim()})`,
+      targetAudience: targetAudience.trim() || `Audience interested in ${niche.trim()}`,
+      nicheKeywords: nicheKeywordsText ? nicheKeywordsText.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean) : [niche.toLowerCase()],
+      autonomousPriority,
+      aspectRatio,
+      searchGroundingRules: `Prioritize latest trends, viral hooks, and verified practices in ${niche.trim()}.`
+    };
+    saveEngineConfigForChannel(channelId, engineConfigToSave);
+
+    // 6. Save channel profile
+    const channelProfileToSave: ExtendedChannelProfile = {
+      id: channelId as any,
+      name: name.trim(),
+      presenter: presenter.trim() || 'Anchor Presenter',
+      niche: niche.trim() || wizardProposal.niche || 'Content',
+      platform,
+      hasCharacterTag,
+      aspectRatio,
+      engineConfig: engineConfigToSave,
+      tags: hasCharacterTag
+        ? [{ value: cleanTag, label: `${cleanTag} (Character Tag)` }]
+        : [{ value: 'No-Character', label: 'Faceless / AI Storyboard (No Character)' }],
+      categories: safeCats,
+      rotationCategoryIds: safeCats.map((c) => c.id),
+      defaultTag: cleanTag,
+      defaultCategoryId: safeCats[0]?.id || 1,
+      durations: [
+        { value: 10, label: '10 Scenes (100s — Standard Short)' },
+        { value: 12, label: '12 Scenes (120s — Extended)' },
+        { value: 7, label: '7 Scenes (70s — Minimal Threshold)' }
+      ],
+      defaultSceneCount: sceneCount,
+      sampleNotes: {
+        1: { title: `${name} Episode 1`, hook: 'Story Reveal' }
+      },
+      isCustom: true
+    };
+
+    const updated = saveOrUpdateChannel(channelProfileToSave);
+    setChannels(updated);
+    onChannelsUpdated(updated);
+    dirtyManager.clearDirty('channel_manager');
+    showStatus(`✅ Naya Channel Profile "${name}" apni isolated categories, 4-lens sources aur competitors ke sath save ho gaya!`);
+    resetFormFields();
   };
 
   const handleOpenAddForm = () => {
@@ -887,6 +1070,102 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
                       ))}
                     </div>
                   </div>
+                </div>
+
+                {/* --- New Channel Setup Wizard Section --- */}
+                <div className="p-3.5 bg-gradient-to-r from-emerald-950/60 via-slate-900 to-cyan-950/60 border border-emerald-500/40 rounded-xl space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-emerald-400" />
+                        <h5 className="font-bold text-white text-xs">New Channel Setup Wizard (One-Click Isolated Configuration)</h5>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Channel name aur niche ke mutabiq 7-10 categories, 4-lens sources (Zero tech bleed), aur competitor groups propose karein.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleRunWizard}
+                      disabled={loadingWizard || !name.trim()}
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-950 shrink-0 self-start sm:self-center"
+                    >
+                      {loadingWizard ? <Sparkles className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-emerald-200" />}
+                      <span>✨ Run Setup Wizard</span>
+                    </button>
+                  </div>
+
+                  {/* Display Wizard Proposal when loaded */}
+                  {wizardProposal && (
+                    <div className="p-3 bg-slate-950/90 border border-emerald-500/50 rounded-xl space-y-3 animate-in fade-in">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                          <span className="font-bold text-emerald-300 text-xs">Proposed Architecture for "{wizardProposal.niche || niche}"</span>
+                        </div>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-mono">
+                          Zero Tech Bleed Guaranteed
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px]">
+                        {/* Proposed Categories */}
+                        <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                          <div className="font-semibold text-cyan-300 mb-1 flex items-center gap-1">
+                            <Layers className="w-3 h-3 text-cyan-400" />
+                            <span>Categories ({wizardProposal.categories.length})</span>
+                          </div>
+                          <ul className="space-y-1 text-slate-300 max-h-36 overflow-y-auto pr-1">
+                            {wizardProposal.categories.map((c, i) => (
+                              <li key={i} className="truncate">• {c.name}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        {/* Proposed 4-Lens Sources */}
+                        <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                          <div className="font-semibold text-emerald-300 mb-1 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-emerald-400" />
+                            <span>4-Lens Sources (Isolated)</span>
+                          </div>
+                          <div className="space-y-1 text-slate-300 text-[10px] max-h-36 overflow-y-auto pr-1">
+                            <div><span className="text-slate-400 font-mono">L1 (48h):</span> {(wizardProposal.sourcesByLens.lens1 || []).map(s => s.name).slice(0, 2).join(', ')}</div>
+                            <div><span className="text-slate-400 font-mono">L2 (90d):</span> {(wizardProposal.sourcesByLens.lens2 || []).map(s => s.name).slice(0, 2).join(', ')}</div>
+                            <div><span className="text-slate-400 font-mono">L3 (7d):</span> {(wizardProposal.sourcesByLens.lens3 || []).map(s => s.name).slice(0, 2).join(', ')}</div>
+                            <div><span className="text-slate-400 font-mono">L4 (30d):</span> {(wizardProposal.sourcesByLens.lens4 || []).map(s => s.name).slice(0, 2).join(', ')}</div>
+                          </div>
+                        </div>
+
+                        {/* Proposed Competitors */}
+                        <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
+                          <div className="font-semibold text-purple-300 mb-1 flex items-center gap-1">
+                            <User className="w-3 h-3 text-purple-400" />
+                            <span>Competitor Radar ({wizardProposal.competitors.length})</span>
+                          </div>
+                          <ul className="space-y-1 text-slate-300 max-h-36 overflow-y-auto pr-1">
+                            {wizardProposal.competitors.map((c, i) => (
+                              <li key={i} className="truncate">• {c.name} <span className="text-[9px] text-slate-500 font-mono">({c.group})</span></li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800 flex-wrap gap-2">
+                        <span className="text-[11px] text-slate-400">
+                          Ek click mein in categories, sources aur competitors ko is profile ke configuration ke tor par save karein.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleApproveWizardProposal}
+                          className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-950 flex items-center gap-1.5 cursor-pointer shrink-0"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>✅ Approve & Initialize Profile</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
