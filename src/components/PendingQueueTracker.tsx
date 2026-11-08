@@ -52,9 +52,7 @@ import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
 import { CATEGORIES_IT_CAFETERIA } from '../data/channelData';
 import {
   applyCinematicDirecting,
-  enforceCinematicStoryPackage,
-  CINEMATIC_PRESETS,
-  CINEMATIC_STAGE_DIRECTIONS
+  enforceCinematicStoryPackage
 } from '../lib/cinematicDirector';
 import {
   generateTopicAccurateStoryPackage,
@@ -82,7 +80,6 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
   // Refresh Story & Cinematic Directing Modal State
   const [refreshTargetStory, setRefreshTargetStory] = useState<PendingStoryRecord | null>(null);
   const [refreshCustomDirection, setRefreshCustomDirection] = useState<string>('');
-  const [refreshPreset, setRefreshPreset] = useState<string>('cyber_hologram');
   const [isReanalyzing, setIsReanalyzing] = useState<boolean>(false);
 
   // New Story Form state
@@ -210,14 +207,12 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
   const handleOpenRefreshModal = (item: PendingStoryRecord) => {
     setRefreshTargetStory(item);
     setRefreshCustomDirection(item.storyPackage.customCinematicDirection || '');
-    setRefreshPreset('cyber_hologram');
   };
 
   const handleApplyCinematicRefresh = () => {
     if (!refreshTargetStory) return;
     const todayLabel = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const presetObj = CINEMATIC_PRESETS.find((p) => p.id === refreshPreset);
-    const chosenDirection = refreshCustomDirection.trim() || presetObj?.prefix;
+    const chosenDirection = refreshCustomDirection.trim();
 
     // Creatively rewrite the story with brand new Roman Urdu dialogue and new angles
     const rewritten = rewriteCompleteStoryPackage(refreshTargetStory.storyPackage);
@@ -227,7 +222,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
         ...rewritten,
         dateLabel: todayLabel
       },
-      chosenDirection
+      chosenDirection || undefined
     );
 
     const updatedQueue = queue.map((item) => {
@@ -244,7 +239,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     setQueue(updatedQueue);
     savePendingQueue(updatedQueue);
     setRefreshTargetStory(null);
-    showToast(`"${refreshTargetStory.title.slice(0, 30)}..." naye dialogues, visual scenes aur fresh cinematic direction ke sath mukammal rewrite ho gayi!`);
+    showToast(`"${refreshTargetStory.title.slice(0, 30)}..." naye dialogues, visual scenes aur category-driven cinematic direction ke sath mukammal rewrite ho gayi!`);
   };
 
   const handleFullAiReanalyze = async () => {
@@ -252,8 +247,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     setIsReanalyzing(true);
 
     const todayLabel = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    const presetObj = CINEMATIC_PRESETS.find((p) => p.id === refreshPreset);
-    const chosenDirection = refreshCustomDirection.trim() || presetObj?.prefix;
+    const chosenDirection = refreshCustomDirection.trim();
 
     await new Promise((r) => setTimeout(r, 900));
 
@@ -266,7 +260,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
         dateLabel: todayLabel,
         description: `Verified for current date requirements (${todayLabel}).\n\n${rewritten.description}`
       },
-      chosenDirection
+      chosenDirection || undefined
     );
 
     const updatedQueue = queue.map((item) => {
@@ -284,7 +278,7 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
     savePendingQueue(updatedQueue);
     setIsReanalyzing(false);
     setRefreshTargetStory(null);
-    showToast(`AI Re-analysis Mukammal! Story ka har scene aur dialogue naye style mein rewrite ho gaya!`);
+    showToast(`AI Re-analysis Mukammal! Story ka har scene aur dialogue category-driven cinematic format mein rewrite ho gaya!`);
   };
 
   const handleCreateDraft = (e: React.FormEvent) => {
@@ -1179,56 +1173,46 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                   </p>
                 </div>
 
-                {/* 2. Mandatory Cinematic Directing Layer Selection */}
+                {/* 2. Category-Driven Cinematic Directing Layer */}
                 <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="font-bold text-slate-200 flex items-center gap-1.5">
+                    <label className="font-bold text-slate-200 flex items-center gap-1.5 text-xs">
                       <Camera className="w-3.5 h-3.5 text-cyan-400" />
-                      Cinematic Directing Preset
+                      Category-Driven Cinematic Directing (Google Flow Ready)
                     </label>
-                    <span className="text-[10px] text-cyan-400 font-mono">Google Flow Pre-pended</span>
+                    <span className="text-[10px] text-emerald-400 font-mono bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                      Zero Boilerplate
+                    </span>
                   </div>
 
-                  <select
-                    value={refreshPreset}
-                    onChange={(e) => {
-                      setRefreshPreset(e.target.value);
-                      const p = CINEMATIC_PRESETS.find(x => x.id === e.target.value);
-                      if (p) setRefreshCustomDirection(p.prefix);
-                    }}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-400 text-xs"
-                  >
-                    {CINEMATIC_PRESETS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    IT Cafeteria category rules ke mutabiq authentic camera, lighting aur visuals automatically inject hote hain bina kisi redundant "As a cinematic director" boilerplate ke.
+                  </p>
 
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[11px] font-semibold text-slate-300">
-                        Custom Visual Directing Prompt (Prepends Every Scene):
+                        Optional Custom Visual Directing / Camera Notes:
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRefreshCustomDirection('As a cinematic director, visualize this scene with a dynamic zoom-in and glowing right-angle hologram effect:');
-                        }}
-                        className="text-[10px] text-cyan-400 hover:underline"
-                      >
-                        Reset Prompt
-                      </button>
+                      {refreshCustomDirection && (
+                        <button
+                          type="button"
+                          onClick={() => setRefreshCustomDirection('')}
+                          className="text-[10px] text-cyan-400 hover:underline cursor-pointer"
+                        >
+                          Clear Custom Override
+                        </button>
+                      )}
                     </div>
                     <textarea
-                      rows={3}
-                      value={refreshCustomDirection || CINEMATIC_PRESETS.find(p => p.id === refreshPreset)?.prefix || ''}
+                      rows={2}
+                      value={refreshCustomDirection}
                       onChange={(e) => setRefreshCustomDirection(e.target.value)}
-                      placeholder="e.g. As a cinematic director, visualize this scene with a [zoom-in/right-angle/hologram] effect..."
+                      placeholder="Optional: e.g. Anamorphic 35mm lens, high-contrast cyan rim lights, dynamic whip pan to monitor..."
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-white font-mono text-[11px] focus:outline-none focus:border-cyan-400"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">
-                      Yeh visual direction instruction scene ke script se pehle pre-pend ho kar Google Flow engine mein copy hogi.
+                      Khali chorne par category ka authentic visual script direct apply hoga. Custom text dene par visual section enhance hoga.
                     </p>
                   </div>
                 </div>
@@ -1246,7 +1230,8 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
                     {applyCinematicDirecting(
                       1,
                       refreshTargetStory.storyPackage.scenes[0]?.script || refreshTargetStory.title,
-                      refreshCustomDirection || CINEMATIC_PRESETS.find(p => p.id === refreshPreset)?.prefix
+                      refreshCustomDirection.trim() || undefined,
+                      refreshTargetStory.storyPackage.scenes[0]?.purpose
                     )}
                   </p>
                 </div>

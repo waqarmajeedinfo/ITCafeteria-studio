@@ -60,6 +60,7 @@ export interface GeneratedStory {
   channelName: string;
   presenter: string;
   categoryName: string;
+  categoryId?: number;
   playlist: string;
   characterTag: string;
   dateLabel: string;

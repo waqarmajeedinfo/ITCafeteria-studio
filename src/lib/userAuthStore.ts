@@ -622,8 +622,12 @@ export function initGlobalLogCleanup() {
           const list = JSON.parse(raw);
           if (Array.isArray(list)) {
             const cleaned = list.filter((item: any) => {
-              const text = `${item.title || ''} ${item.summary || ''} ${item.message || ''} ${item.technicalDetails || ''}`.toLowerCase();
-              return !text.includes('websocket') && !text.includes('web socket');
+              const text = `${item.title || ''} ${item.summary || ''} ${item.message || ''} ${item.technicalDetails || ''} ${item.stack || ''}`.toLowerCase();
+              return !text.includes('websocket') &&
+                     !text.includes('web socket') &&
+                     !text.includes('cinematic_presets') &&
+                     !text.includes('cinematic_stage_directions') &&
+                     !text.includes('cannot set property fetch');
             });
             localStorage.setItem(key, JSON.stringify(cleaned));
           }
