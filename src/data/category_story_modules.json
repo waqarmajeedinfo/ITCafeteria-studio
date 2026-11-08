@@ -1,0 +1,389 @@
+{
+  "_meta": {
+    "channel": "IT Cafeteria (Waqar Majeed)",
+    "status": "DRAFT for approval - proposed per-category story modules",
+    "purpose": "Replace the single global story/Flow template with one module per category. Backend must load the module by category id (1-10). Never parse categories from free text; use this table.",
+    "how_backend_should_use_it": [
+      "1. Read selected category id.",
+      "2. Load that category's module from 'categories'.",
+      "3. Merge with 'global_rules' (language, scene timing, dialogue rules).",
+      "4. Build the scene-by-scene story using story_beats in order (one beat per scene).",
+      "5. Build each Flow script using that category's flow_script_rules, NOT a shared boilerplate.",
+      "6. Run 'anti_repetition' check against the last stories before showing output."
+    ]
+  },
+
+  "global_rules": {
+    "language": "Roman Urdu only for dialogue and all agent replies",
+    "scene_duration_seconds": 10,
+    "default_scenes": 10,
+    "dialogue_words_per_scene": "22-25 words (about 2.7 words per second)",
+    "dialogue_style": [
+      "Sentence case, simple spoken Roman Urdu",
+      "Acronyms hyphenated for pronunciation (A-I, Chat-G-P-T)",
+      "Prefer 'theek' or 'durust' instead of 'sahi'",
+      "Use 'limit' instead of 'qaid'; 'tareeqa' instead of 'hal'",
+      "Do not use the word 'turant'; use 'usi waqt' or 'isi waqt'"
+    ],
+    "no_invented_numbers": "Never invent statistics, results or prices. Use only what research actually found.",
+    "free_first": "Prefer free or open-source tools; mention paid tools only with a trial or alternative.",
+    "ai_disclosure": "Always mandatory",
+    "upload_package_after_final_scene": [
+      "Title + 3 hashtags",
+      "Description with PRACTICAL STEPS",
+      "Tags (about 500 characters)",
+      "TikTok title + hashtags",
+      "Thumbnail prompt as text"
+    ]
+  },
+
+  "anti_repetition": {
+    "visual_signature_fields": [
+      "camera movement type",
+      "lighting colour scheme",
+      "background / set",
+      "hologram used (yes/no)",
+      "presenter pose pattern",
+      "opening line of the Flow script"
+    ],
+    "rule": "Store the visual signature of the last 5 stories. A new story must differ from each of the last 3 in at least 3 of the 6 fields. If not, regenerate the Flow blocks (not the dialogue).",
+    "forbidden": "Do not start every Flow script with the same sentence. Do not reuse the same camera/lighting/presenter block word-for-word across videos."
+  },
+
+  "module_types": {
+    "standard_tutorial": "One topic, one video, 10 scenes, self-contained.",
+    "ongoing_series": "Never-ending part-by-part series (Part 1, 2, 3...). Each part links to the previous one. Runs under its own extended-length test format already defined in the agent file.",
+    "ideas_only": "Only ideas and possibilities, no hands-on step-by-step.",
+    "lecture_series": "Course style, chapter by chapter, 16:9, Lecture Series Format.",
+    "custom": "Topic supplied directly by the user, outside the regular rotation."
+  },
+
+  "categories": [
+    {
+      "id": 1,
+      "name": "AI & Smart Technology",
+      "type": "standard_tutorial",
+      "in_daily_rotation": true,
+      "aspect_ratio": "9:16",
+      "story_angle": "Explain what a new AI or smart-tech development means for an ordinary Pakistani viewer and what they can do with it today.",
+      "topic_sources": ["last 48h news", "official product blogs", "reputable tech sites"],
+      "story_beats": [
+        "Hook: surprising claim about the AI/smart tech",
+        "What it is in one simple sentence",
+        "Why it matters to a normal viewer",
+        "How it works (simple analogy)",
+        "First practical use",
+        "Second practical use",
+        "Quick live proof / result",
+        "Limitation or honest warning",
+        "Practical takeaway",
+        "CTA with comment question"
+      ],
+      "visual_mode": "Presenter on Hook and CTA; middle scenes mix concept visuals and short screen proof.",
+      "flow_script_rules": {
+        "camera": "Smooth gliding or orbiting shots; vary between medium and close; avoid repeating the same push-in every video.",
+        "lighting_and_set": "Modern smart-lab or clean studio; colour scheme chosen per story (not always navy + cyan/amber).",
+        "presenter_action": "Explaining gestures, pointing at concept visuals.",
+        "hologram": "Allowed, used once or twice at most, only when explaining the core concept."
+      },
+      "dialogue_tone": "Curious, clear, slightly excited; explain jargon in one line.",
+      "hook_style": "Surprising capability statement.",
+      "cta_style": "Ask which use viewers would try first.",
+      "thumbnail_style": "Strong concept visual; wow factor from background, minimal text.",
+      "duplicate_check_scope": "Same tool/feature already covered."
+    },
+    {
+      "id": 2,
+      "name": "AI Chatbots, Workflows & AI Tools",
+      "type": "standard_tutorial",
+      "in_daily_rotation": true,
+      "aspect_ratio": "9:16",
+      "story_angle": "Show one concrete task done with a chatbot or AI tool (ChatGPT, Claude, Gemini, Google AI tools, Google Flow, Nano) or a small workflow built from them.",
+      "topic_sources": ["official feature announcements", "tool docs", "last 48h news"],
+      "story_beats": [
+        "Hook: task that normally takes long, done fast",
+        "The everyday problem",
+        "Tool introduced (free option first)",
+        "Step 1 on screen",
+        "Step 2 on screen",
+        "Step 3 / the key setting",
+        "Final result shown",
+        "Common mistake",
+        "Quick recap of steps",
+        "CTA"
+      ],
+      "visual_mode": "Demonstration mode: presenter only on Hook and CTA; middle scenes are full-screen screen recording of the tool with voiceover.",
+      "flow_script_rules": {
+        "camera": "Screen-recording framing with cursor focus and zoom-ins on the exact button or setting; presenter scenes use a stable medium shot.",
+        "lighting_and_set": "Clean desk setup with monitor glow; keep it practical, not cinematic sci-fi.",
+        "presenter_action": "Pointing toward the screen, nodding, short explanation gestures.",
+        "hologram": "Not used in middle scenes; optional tiny accent in Hook only."
+      },
+      "dialogue_tone": "Instructor-friendly, step by step, no hype.",
+      "hook_style": "Before/after time saving.",
+      "cta_style": "Ask which tool or task to cover next.",
+      "thumbnail_style": "Tool logo area + result preview, short headline.",
+      "duplicate_check_scope": "Same tool + same task."
+    },
+    {
+      "id": 3,
+      "name": "AI Prompt Hacks & Shortcuts",
+      "type": "standard_tutorial",
+      "in_daily_rotation": true,
+      "aspect_ratio": "9:16",
+      "story_angle": "One prompt technique or image+prompt workflow, shown with a weak prompt vs strong prompt and the visible difference in output.",
+      "topic_sources": ["official prompting guides", "tested techniques", "last 48h news"],
+      "story_beats": [
+        "Hook: same AI, two very different results",
+        "The weak prompt and its poor result",
+        "The hack named in one line",
+        "How to write the improved prompt",
+        "Improved result shown",
+        "Second variation or shortcut",
+        "Template viewers can copy",
+        "Common prompt mistake",
+        "Quick recap",
+        "CTA"
+      ],
+      "visual_mode": "Presenter on Hook and CTA; middle scenes are split view of prompt text and generated output.",
+      "flow_script_rules": {
+        "camera": "Static or slow lateral movement over prompt and output panels; cut quickly between before and after.",
+        "lighting_and_set": "Bright, minimal creator desk; prompt text legible on screen.",
+        "presenter_action": "Typing, comparing two outputs, thumbs-up gesture.",
+        "hologram": "Not used."
+      },
+      "dialogue_tone": "Playful, smart, 'trick' feeling, short punchy sentences.",
+      "hook_style": "Weak vs strong prompt contrast.",
+      "cta_style": "Ask viewers to comment their prompt.",
+      "thumbnail_style": "Before/after outputs side by side.",
+      "duplicate_check_scope": "Same prompt technique."
+    },
+    {
+      "id": 4,
+      "name": "PC & Windows Hacks",
+      "type": "ongoing_series",
+      "in_daily_rotation": true,
+      "aspect_ratio": "9:16",
+      "series": {
+        "part_numbering": true,
+        "format_note": "Ongoing, never-ending part-by-part series (Part 1, Part 2, Part 3...) running under its own extended-length test format as defined in the agent file. Length test result pending."
+      },
+      "story_angle": "Windows hidden tools, settings, CMD and PowerShell tricks to fix real PC problems (slow PC, temp files, hidden settings, command-line tools) or any other method found via research.",
+      "topic_sources": ["Microsoft official docs", "tested methods", "last 48h news"],
+      "story_beats": [
+        "Hook: PC problem everyone has (with part number)",
+        "Recap of previous part in one line",
+        "Where to find the tool/setting",
+        "Step 1 on screen",
+        "Step 2 on screen (or command)",
+        "Result before/after",
+        "Safety note or what not to do",
+        "Bonus tip",
+        "Quick recap",
+        "CTA + next part teaser"
+      ],
+      "visual_mode": "Demonstration mode: presenter on Hook and CTA; middle scenes full-screen Windows screen recording, with CMD or PowerShell close-ups when commands are used.",
+      "flow_script_rules": {
+        "camera": "Screen recording with zoom on menus, terminal text and click targets; slow zoom-out when showing results.",
+        "lighting_and_set": "Practical PC desk or laptop setup for presenter scenes.",
+        "presenter_action": "Pointing at screen, cautious 'be careful' gesture for safety note.",
+        "hologram": "Not used."
+      },
+      "dialogue_tone": "Helpful repair-guy tone, calm, safety-aware.",
+      "hook_style": "Relatable PC annoyance.",
+      "cta_style": "Next part teaser plus ask for next problem.",
+      "thumbnail_style": "Windows screen with highlighted fix and part number.",
+      "duplicate_check_scope": "Same fix; new part must add something new."
+    },
+    {
+      "id": 5,
+      "name": "New Technology & Product Tutorials",
+      "type": "standard_tutorial",
+      "in_daily_rotation": true,
+      "aspect_ratio": "9:16",
+      "story_angle": "New launch, new feature or new product: what is new, who it is for, and how to try or use it.",
+      "topic_sources": ["official launch posts", "reputable reviews", "last 48h news"],
+      "story_beats": [
+        "Hook: what just launched",
+        "What is new compared to before",
+        "Who should care",
+        "Key feature 1 shown",
+        "Key feature 2 shown",
+        "How to try or access it",
+        "Honest limitation or price/availability note",
+        "Worth it or not (balanced)",
+        "Quick recap",
+        "CTA"
+      ],
+      "visual_mode": "Presenter on Hook, verdict and CTA; middle scenes show product visuals or the interface.",
+      "flow_script_rules": {
+        "camera": "News-desk style medium shots; product close-ups and interface walk-throughs.",
+        "lighting_and_set": "Tech news studio, neutral cool tones with one accent colour that changes per story.",
+        "presenter_action": "Holding or presenting the product concept, confident news-anchor posture.",
+        "hologram": "Optional once for product concept; not default."
+      },
+      "dialogue_tone": "Informative and balanced; no overhype.",
+      "hook_style": "Breaking launch statement.",
+      "cta_style": "Ask if viewers will try it.",
+      "thumbnail_style": "Product name headline over product visual.",
+      "duplicate_check_scope": "Same product/feature."
+    },
+    {
+      "id": 6,
+      "name": "Future Tech & Positive Breakthroughs",
+      "type": "standard_tutorial",
+      "in_daily_rotation": true,
+      "aspect_ratio": "9:16",
+      "story_angle": "Useful upcoming technology or major beneficial developments; optimistic but honest about timelines.",
+      "topic_sources": ["research announcements", "reputable science/tech news", "last 48h news"],
+      "story_beats": [
+        "Hook: breakthrough in one sentence",
+        "The problem it solves",
+        "How it works (simple)",
+        "Who benefits",
+        "Where it stands today",
+        "Realistic timeline",
+        "Challenge still remaining",
+        "Why this is good news",
+        "Quick recap",
+        "CTA"
+      ],
+      "visual_mode": "Concept visuals dominate; presenter on Hook and CTA only.",
+      "flow_script_rules": {
+        "camera": "Cinematic wide shots and slow reveals of concept visuals.",
+        "lighting_and_set": "Hopeful bright or warm futuristic tones; avoid dark cyber look.",
+        "presenter_action": "Calm storyteller posture.",
+        "hologram": "Allowed for concept visualisation."
+      },
+      "dialogue_tone": "Hopeful, storytelling, grounded.",
+      "hook_style": "Wow-but-true statement.",
+      "cta_style": "Ask what future tech viewers want in Pakistan.",
+      "thumbnail_style": "Large concept visual, minimal text.",
+      "duplicate_check_scope": "Same breakthrough."
+    },
+    {
+      "id": 7,
+      "name": "Secrets (WhatsApp, Google, Google Chrome, Google Maps, Gmail, Google Drive, Google Play Store, YouTube, Instagram, Facebook, TikTok, Telegram, Windows, ChatGPT, Google Gemini, CapCut)",
+      "short_name": "Secrets",
+      "type": "ongoing_series",
+      "in_daily_rotation": true,
+      "aspect_ratio": "9:16",
+      "series": {
+        "part_numbering": true,
+        "format_note": "Ongoing, never-ending part-by-part series covering hidden settings and features in major daily-used apps that normal users do not know about."
+      },
+      "story_angle": "One hidden setting or feature in one specific app, shown on a phone or app screen.",
+      "topic_sources": ["official app help pages", "tested on current app version", "last 48h news"],
+      "story_beats": [
+        "Hook: teaser of the hidden trick (app name + part number)",
+        "Instant screen proof",
+        "Secret 1: where to find it",
+        "Secret 2: how to use it",
+        "Result shown",
+        "Common mistake warning",
+        "Bonus shortcut",
+        "Practical takeaway",
+        "Quick recap",
+        "CTA question in comments + next part teaser"
+      ],
+      "visual_mode": "Presenter on Hook and CTA; middle scenes are phone or app screen recording with tap highlights.",
+      "flow_script_rules": {
+        "camera": "Phone-screen framing, finger tap highlights, quick zoom into the exact menu; occasional over-shoulder shot.",
+        "lighting_and_set": "Casual bright desk, phone prominent; mood 'insider secret'.",
+        "presenter_action": "Whisper-like lean-in gesture for secrets, holding phone.",
+        "hologram": "Not used."
+      },
+      "dialogue_tone": "Insider, 'kisi ko nahi pata' energy, quick and friendly.",
+      "hook_style": "Teaser revealing a hidden trick.",
+      "cta_style": "High-engagement question in comments and next part teaser.",
+      "thumbnail_style": "App icon area + 'secret' headline.",
+      "duplicate_check_scope": "Same app + same feature; rotate apps across parts."
+    },
+    {
+      "id": 8,
+      "name": "Income & Skills: Tools That Earn",
+      "type": "ideas_only",
+      "in_daily_rotation": true,
+      "aspect_ratio": "9:16",
+      "story_angle": "Ideas only: how viewers could build income with tools, skills and platforms. No step-by-step tutorials, no income promises.",
+      "topic_sources": ["official platform pages", "reputable sources", "last 48h news"],
+      "story_beats": [
+        "Hook: the idea in one line",
+        "Who this suits",
+        "What skill or tool is needed (free first)",
+        "How the idea can earn (no guarantees)",
+        "Realistic starting point",
+        "Idea variation",
+        "Honest risk or effort needed",
+        "First small step viewers can take",
+        "Quick recap",
+        "CTA"
+      ],
+      "visual_mode": "Presenter-led idea storytelling with simple idea cards or visuals; no hands-on screen walkthrough.",
+      "flow_script_rules": {
+        "camera": "Warm medium shots, idea cards appearing beside the presenter.",
+        "lighting_and_set": "Friendly studio, warm tones.",
+        "presenter_action": "Encouraging, conversational gestures.",
+        "hologram": "Not used."
+      },
+      "dialogue_tone": "Motivating but realistic; never claim guaranteed earnings.",
+      "hook_style": "Idea-first curiosity.",
+      "cta_style": "Ask which idea viewers want detailed next.",
+      "thumbnail_style": "Idea headline with simple icon visuals.",
+      "duplicate_check_scope": "Same idea; ideas-only, no overlap with tutorial categories.",
+      "open_item": "Earnings-claims policy check still pending."
+    },
+    {
+      "id": 9,
+      "name": "YT Automation",
+      "type": "lecture_series",
+      "in_daily_rotation": false,
+      "aspect_ratio": "16:9",
+      "series": {
+        "format": "Lecture Series Format, chapter by chapter",
+        "course_structure": "22 chapters in 6 modules (chapters 1-10 covered; next is Chapter 11)",
+        "free_first_for_tool_chapters": true
+      },
+      "story_angle": "Instructor-style lesson teaching one chapter of YouTube automation clearly, with free tools first.",
+      "topic_sources": ["chapter plan", "official tool docs", "tested workflow"],
+      "story_beats": [
+        "Chapter intro and recap of previous chapter",
+        "What this chapter will teach",
+        "Concept explained",
+        "Demo step 1",
+        "Demo step 2",
+        "Demo step 3",
+        "Common mistakes",
+        "Mini practice task",
+        "Chapter summary",
+        "Next chapter teaser + CTA"
+      ],
+      "visual_mode": "Lecture layout: presenter as instructor with slides or whiteboard; screen demo scenes for tool steps.",
+      "flow_script_rules": {
+        "camera": "Stable 16:9 instructor framing, slide inserts, screen-recording for demos.",
+        "lighting_and_set": "Classroom or studio with slide/whiteboard area.",
+        "presenter_action": "Teaching gestures, pointing at slides.",
+        "hologram": "Not used."
+      },
+      "dialogue_tone": "Calm, structured instructor tone.",
+      "hook_style": "Chapter promise.",
+      "cta_style": "Next chapter teaser and ask for questions.",
+      "thumbnail_style": "Chapter number + chapter title.",
+      "duplicate_check_scope": "Chapter number must be unique."
+    },
+    {
+      "id": 10,
+      "name": "Custom Search",
+      "type": "custom",
+      "in_daily_rotation": false,
+      "aspect_ratio": "9:16 unless the user says otherwise",
+      "story_angle": "Topic supplied directly by the user; always a separate item outside the regular rotation.",
+      "topic_sources": ["user topic", "official sources", "last 48h news if relevant"],
+      "story_beats": "Choose the closest module (1-8) by topic fit and use its story_beats, flow_script_rules and dialogue_tone.",
+      "visual_mode": "Inherited from the chosen closest module.",
+      "flow_script_rules": "Inherited from the chosen closest module.",
+      "dialogue_tone": "Inherited from the chosen closest module.",
+      "duplicate_check_scope": "Same topic already covered."
+    }
+  ]
+}
