@@ -294,9 +294,9 @@ function getWebhookConfig(): WebhookConfig {
     } catch {}
   }
   return {
-    webhookUrl: process.env.AUDIT_WEBHOOK_URL || '',
-    secretKey: process.env.WEBHOOK_SECRET || 'itcafeteria-audit-key-2026',
-    enabled: Boolean(process.env.AUDIT_WEBHOOK_URL),
+    webhookUrl: '',
+    secretKey: 'itcafeteria-audit-key-2026',
+    enabled: false,
     events: ['*']
   };
 }

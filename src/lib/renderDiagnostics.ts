@@ -264,14 +264,6 @@ class RenderDiagnosticsEngine {
         isConfigured: true,
         description: 'Production runtime flag ("production" activates optimized bundles & caching).',
         renderDashboardRemedy: 'Set NODE_ENV=production in Render Environment variables.'
-      },
-      {
-        name: 'AUDIT_WEBHOOK_URL',
-        required: false,
-        category: 'INTEGRATION',
-        isConfigured: true,
-        description: 'Real-time HMAC webhook endpoint for multi-user audit tracking.',
-        renderDashboardRemedy: 'Optional: Set AUDIT_WEBHOOK_URL to forward real-time logs to external monitoring.'
       }
     ];
 

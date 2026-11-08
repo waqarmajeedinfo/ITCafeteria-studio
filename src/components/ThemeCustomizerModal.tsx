@@ -69,10 +69,10 @@ export const DEFAULT_THEME_CONFIG: StudioThemeConfig = {
   topAnnouncementText: '🚀 LIVE STUDIO • Waqar Majeed: AI, Deep Learning & Automation Series',
   showTopLiveBadge: true,
   
-  autoThemeByTime: true,
-  activityReactiveHolo: true,
+  autoThemeByTime: false,
+  activityReactiveHolo: false,
   holoTheme: 'cyber-matrix',
-  holoOpacity: 0.65,
+  holoOpacity: 0.55,
   holoSpeed: 1.0,
   
   channelTagline: 'Better Content • Bigger Dreams',

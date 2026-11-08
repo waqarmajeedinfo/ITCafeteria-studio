@@ -53,18 +53,16 @@ if (accessKey && process.env.NODE_ENV === 'production' && !process.env.DEFAULT_A
   });
 }
 
-// Shared server-side AI client (supports AIHUBMIX_API_KEY and GEMINI_API_KEY)
+// Shared server-side AI client (Google Gemini)
 const getAiClient = () => {
-  const apiKey = (process.env.GEMINI_API_KEY || process.env.AIHUBMIX_API_KEY || '').trim();
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   console.log('[getAiClient] chosen key prefix:', apiKey ? apiKey.slice(0, 8) + '...' + apiKey.slice(-6) : 'none');
   if (!apiKey) {
-    throw new Error('AI key is not configured in environment secrets (GEMINI_API_KEY or AIHUBMIX_API_KEY).');
+    throw new Error('Gemini API key is not configured in environment secrets (GEMINI_API_KEY).');
   }
-  const isAihubmix = !process.env.GEMINI_API_KEY && Boolean(process.env.AIHUBMIX_API_KEY);
   return new GoogleGenAI({
     apiKey,
     httpOptions: {
-      ...(isAihubmix ? { baseUrl: 'https://aihubmix.com' } : {}),
       headers: {
         'User-Agent': 'aistudio-build',
       },
@@ -166,7 +164,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.get('/api/ai/key-status', async (_req, res) => {
-  const apiKey = (process.env.GEMINI_API_KEY || process.env.AIHUBMIX_API_KEY || '').trim();
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   if (!apiKey) {
     return res.json({
       configured: false,
@@ -1222,248 +1220,21 @@ Return ONLY valid JSON.`;
   }
 });
 
-// Xiaomi / MiMo Open Platform & AIHubMix Image Generator Helper
-async function generateXiaomiImage(params: {
-  prompt: string;
-  model: string;
-  aspectRatio: string;
-  imageSize: string;
-  apiKey: string;
-}): Promise<{ imageUrl: string; description?: string }> {
-  const { prompt, model, aspectRatio, apiKey } = params;
-
-  // Map aspect ratio to standard resolution string
-  const size = aspectRatio === '9:16' ? '720x1280' : aspectRatio === '16:9' ? '1280x720' : '1024x1024';
-
-  const baseUrls: string[] = [];
-  if (process.env.XIAOMI_API_BASE_URL) {
-    baseUrls.push(process.env.XIAOMI_API_BASE_URL.replace(/\/+$/, ''));
-  }
-  if (apiKey.startsWith('tp-') || apiKey.startsWith('ttp-')) {
-    baseUrls.push('https://token-plan-cn.xiaomimimo.com');
-  }
-  baseUrls.push('https://aihubmix.com');
-
-  let lastMeaningfulError: Error | null = null;
-
-  for (const baseUrl of baseUrls) {
-    const imageEndpoints = [
-      `${baseUrl}/v1/images/generations`,
-      `${baseUrl}/ai/v1/images/generations`
-    ];
-
-    for (const endpoint of imageEndpoints) {
-      // Try with b64_json first
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-            'api-key': apiKey
-          },
-          body: JSON.stringify({
-            model: model,
-            prompt: prompt,
-            n: 1,
-            size: size,
-            response_format: 'b64_json'
-          })
-        });
-
-        if (response.ok) {
-          const data: any = await response.json();
-          const first = data?.data?.[0];
-          if (first?.b64_json) {
-            return { imageUrl: `data:image/png;base64,${first.b64_json}`, description: `Generated with Xiaomi ${model}` };
-          }
-          if (first?.url) {
-            return { imageUrl: first.url, description: `Generated with Xiaomi ${model}` };
-          }
-        } else {
-          const errText = await response.text();
-          let parsedErr: any = null;
-          try { parsedErr = JSON.parse(errText); } catch {}
-          if (parsedErr?.error?.message) {
-            lastMeaningfulError = new Error(parsedErr.error.message);
-          } else if (!errText.includes('<html>')) {
-            lastMeaningfulError = new Error(errText);
-          }
-        }
-      } catch (e: any) {
-        if (!lastMeaningfulError) lastMeaningfulError = e;
-      }
-
-      // Try with default response format url
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-            'api-key': apiKey
-          },
-          body: JSON.stringify({
-            model: model,
-            prompt: prompt,
-            n: 1,
-            size: size
-          })
-        });
-
-        if (response.ok) {
-          const data: any = await response.json();
-          const first = data?.data?.[0];
-          if (first?.url) {
-            return { imageUrl: first.url, description: `Generated with Xiaomi ${model}` };
-          }
-          if (first?.b64_json) {
-            return { imageUrl: `data:image/png;base64,${first.b64_json}`, description: `Generated with Xiaomi ${model}` };
-          }
-        } else {
-          const errText = await response.text();
-          let parsedErr: any = null;
-          try { parsedErr = JSON.parse(errText); } catch {}
-          if (parsedErr?.error?.message) {
-            lastMeaningfulError = new Error(parsedErr.error.message);
-          }
-        }
-      } catch (e: any) {
-        if (!lastMeaningfulError) lastMeaningfulError = e;
-      }
-    }
-
-    // Fallback: If free tier route requires standard image models on same AIHubMix key
-    if (baseUrl.includes('aihubmix')) {
-      const fallbackImageModels = ['gemini-3.1-flash-image', 'qwen-image-max', 'flux-2-pro'];
-      for (const fbModel of fallbackImageModels) {
-        try {
-          const fbRes = await fetch(`${baseUrl}/v1/images/generations`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-              model: fbModel,
-              prompt: prompt,
-              n: 1,
-              size: size
-            })
-          });
-          if (fbRes.ok) {
-            const data: any = await fbRes.json();
-            const first = data?.data?.[0];
-            if (first?.url) {
-              return { imageUrl: first.url, description: `Generated with Xiaomi Gateway (${fbModel})` };
-            }
-            if (first?.b64_json) {
-              return { imageUrl: `data:image/png;base64,${first.b64_json}`, description: `Generated with Xiaomi Gateway (${fbModel})` };
-            }
-          }
-        } catch {}
-      }
-    }
-  }
-
-  // Also try Xiaomi official chat completions if images/generations failed
-  try {
-    const chatRes = await fetch('https://api.xiaomimimo.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: model.includes('pro') ? 'mimo-v2.6-pro' : 'mimo-v2.6-flash',
-        messages: [
-          { role: 'user', content: prompt }
-        ]
-      })
-    });
-    if (!chatRes.ok) {
-      const errData: any = await chatRes.json().catch(() => null);
-      if (errData?.error?.message) {
-        lastMeaningfulError = new Error(errData.error.message);
-      }
-    }
-  } catch {}
-
-  throw lastMeaningfulError || new Error(`Xiaomi MiMo image generation failed. Please verify your API key.`);
-}
-
-// Check Xiaomi server key status
+// Status for image generation engine (Google Gemini)
 app.get('/api/ai/xiaomi-status', (_req, res) => {
-  const envKey = process.env.XIAOMI_API_KEY ||
-    process.env.MIMO_API_KEY ||
-    process.env.XIAOMI_MIMO_API_KEY ||
-    process.env.AIHUBMIX_API_KEY ||
-    process.env.OPENROUTER_API_KEY;
-
-  const keySource = process.env.XIAOMI_API_KEY ? 'XIAOMI_API_KEY'
-    : process.env.AIHUBMIX_API_KEY ? 'AIHUBMIX_API_KEY'
-    : process.env.MIMO_API_KEY ? 'MIMO_API_KEY'
-    : process.env.XIAOMI_MIMO_API_KEY ? 'XIAOMI_MIMO_API_KEY'
-    : process.env.OPENROUTER_API_KEY ? 'OPENROUTER_API_KEY'
-    : null;
-
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY);
   res.json({
-    configured: Boolean(envKey && envKey.trim()),
-    keySource,
-    defaultModel: 'xiaomi-mimo-v2.6-pro-free'
+    configured: hasGemini,
+    keySource: 'GEMINI_API_KEY',
+    defaultModel: 'gemini-nano-banana-2.1'
   });
 });
 
-// 3. Image Generation & Editing API (Xiaomi MiMo & Google Gemini)
+// 3. Image Generation & Editing API (Google Gemini Native Engine)
 app.post('/api/ai/generate-image', async (req, res) => {
   try {
-    const { prompt, aspectRatio = '9:16', imageSize = '1K', base64InputImage, model = 'xiaomi-mimo-v2.6-pro-free' } = req.body;
+    const { prompt, aspectRatio = '9:16', imageSize = '1K', base64InputImage, model = 'gemini-nano-banana-2.1' } = req.body;
 
-    const isXiaomiModel = typeof model === 'string' && (model.toLowerCase().includes('xiaomi') || model.toLowerCase().includes('mimo'));
-
-    if (isXiaomiModel) {
-      const xiaomiKey = (
-        process.env.XIAOMI_API_KEY ||
-        process.env.MIMO_API_KEY ||
-        process.env.XIAOMI_MIMO_API_KEY ||
-        process.env.AIHUBMIX_API_KEY ||
-        process.env.OPENROUTER_API_KEY ||
-        process.env.XIAOMI_API_TOKEN ||
-        (req.headers['x-xiaomi-api-key'] as string) ||
-        (req.headers['x-mimo-api-key'] as string) ||
-        req.body?.xiaomiApiKey
-      )?.trim();
-
-      if (!xiaomiKey) {
-        return res.status(400).json({
-          error: "Xiaomi API Key server environment mein nahi mili. Render.com Environment Variables mein 'XIAOMI_API_KEY' add karein, ya page par diye gaye Xiaomi API Key box mein enter karein."
-        });
-      }
-
-      try {
-        const result = await generateXiaomiImage({
-          prompt,
-          model,
-          aspectRatio,
-          imageSize,
-          apiKey: xiaomiKey
-        });
-        return res.json(result);
-      } catch (xiaomiErr: any) {
-        console.error('Xiaomi image gen error:', xiaomiErr);
-        const errMsg = String(xiaomiErr?.message || xiaomiErr || '');
-        const message = /401|invalid key|unauthorized|no key provided/i.test(errMsg)
-          ? "Xiaomi API Key invalid ya unauthorized hai. Render / GitHub environment variables mein apni key check karein."
-          : /429|quota|rate limit/i.test(errMsg)
-          ? "Xiaomi MiMo API ki rate limit ya quota khatam hai. 1-2 minute baad dobara try karein ya doosra model chunein."
-          : errMsg && errMsg.length <= 250
-          ? errMsg
-          : "Xiaomi MiMo se thumbnail generate nahi ho saki. Dobara try karein.";
-        return res.status(500).json({ error: message });
-      }
-    }
-
-    // Google Gemini fallback flow
     const ai = getAiClient();
 
     const parts: any[] = [];

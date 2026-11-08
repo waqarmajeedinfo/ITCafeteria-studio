@@ -107,8 +107,8 @@ function getConfig(req: Request): IntegrationConfig {
       redirectUri: `${appUrl}/api/integrations/oauth/youtube/callback`,
     },
     tiktok: {
-      clientKey: process.env.TIKTOK_CLIENT_KEY || '',
-      clientSecret: process.env.TIKTOK_CLIENT_SECRET || '',
+      clientKey: '',
+      clientSecret: '',
       redirectUri: `${appUrl}/api/integrations/oauth/tiktok/callback`,
     },
   };
@@ -118,7 +118,7 @@ function providerConfigured(provider: Provider, cfg: IntegrationConfig): boolean
   if (!cfg.secret) return false;
   return provider === 'youtube'
     ? Boolean(cfg.youtube.clientId && cfg.youtube.clientSecret)
-    : Boolean(cfg.tiktok.clientKey && cfg.tiktok.clientSecret);
+    : false;
 }
 
 function parseStoredToken(value: string, secret: string): StoredToken | null {

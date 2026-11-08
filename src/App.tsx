@@ -488,40 +488,8 @@ export default function App() {
     return () => clearInterval(interval);
   }, [themeConfig.autoThemeByTime, themeConfig.holoTheme]);
 
-  // User activity-level reactive opacity sensor
-  const [userActive, setUserActive] = useState(false);
-  const activityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!themeConfig.activityReactiveHolo) {
-      setUserActive(false);
-      return;
-    }
-    const handleActivity = () => {
-      setUserActive(true);
-      if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
-      activityTimerRef.current = setTimeout(() => {
-        setUserActive(false);
-      }, 6000);
-    };
-
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('keydown', handleActivity);
-    window.addEventListener('scroll', handleActivity);
-    window.addEventListener('click', handleActivity);
-
-    return () => {
-      window.removeEventListener('mousemove', handleActivity);
-      window.removeEventListener('keydown', handleActivity);
-      window.removeEventListener('scroll', handleActivity);
-      window.removeEventListener('click', handleActivity);
-      if (activityTimerRef.current) clearTimeout(activityTimerRef.current);
-    };
-  }, [themeConfig.activityReactiveHolo]);
-
-  const activeHoloOpacity = themeConfig.activityReactiveHolo
-    ? (userActive ? Math.min(1.0, themeConfig.holoOpacity + 0.16) : Math.max(0.25, themeConfig.holoOpacity * 0.75))
-    : themeConfig.holoOpacity;
+  // Direct reactive holo opacity from themeConfig (HolographicBackground handles internal activity boost with zero React re-renders)
+  const activeHoloOpacity = themeConfig.holoOpacity;
 
   const cycleNextHoloTheme = () => {
     const idx = HOLOGRAPHIC_THEMES.findIndex((t) => t.id === effectiveHoloTheme);
@@ -627,22 +595,18 @@ export default function App() {
     };
   }, []);
 
-  // Framer-motion entrance animation variants for seamless tab transitions
+  // Instant, GPU-accelerated entrance animation for snappy tab switching (zero blur rasterization lag)
   const tabContentVariants = {
     hidden: {
       opacity: 0,
-      y: 16,
-      filter: 'blur(3px)',
+      y: 6,
     },
     visible: {
       opacity: 1,
       y: 0,
-      filter: 'blur(0px)',
       transition: {
-        duration: 0.35,
+        duration: 0.15,
         ease: 'easeOut' as const,
-        staggerChildren: 0.07,
-        delayChildren: 0.03,
       },
     },
   };
@@ -657,7 +621,8 @@ export default function App() {
   useEffect(() => {
     const handleScroll = () => {
       const currentY = window.scrollY;
-      setIsScrolled(currentY > 90);
+      const scrolled = currentY > 90;
+      setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
 
       // Record scroll position continuously for the active tab while reading
       if (!isSwitchingTabRef.current) {
@@ -682,8 +647,6 @@ export default function App() {
           behavior: 'instant' as ScrollBehavior,
         });
       } else {
-        // First visit to this tab:
-        // If sticky nav is already locked (isScrolled), smoothly anchor right below the sticky navigation
         const stickyThreshold = 520;
         if (window.scrollY > stickyThreshold) {
           window.scrollTo({
@@ -693,22 +656,11 @@ export default function App() {
         }
       }
 
-      setTimeout(() => {
-        isSwitchingTabRef.current = false;
-      }, 50);
+      isSwitchingTabRef.current = false;
     };
 
-    const rafId = requestAnimationFrame(() => {
-      restorePosition();
-    });
-    const timerId = setTimeout(() => {
-      restorePosition();
-    }, 40);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      clearTimeout(timerId);
-    };
+    const rafId = requestAnimationFrame(restorePosition);
+    return () => cancelAnimationFrame(rafId);
   }, [activeTab]);
 
   const scrollToTop = () => {
@@ -888,7 +840,12 @@ export default function App() {
   return (
     <div className="min-h-screen app-shell-bg text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white relative">
       {/* Fixed Full-Page Animated Holographic Background (Stays fixed during scroll, visible between blocks) */}
-      <HolographicBackground theme={effectiveHoloTheme} opacity={activeHoloOpacity} speed={themeConfig.holoSpeed} />
+      <HolographicBackground
+        theme={effectiveHoloTheme}
+        opacity={activeHoloOpacity}
+        speed={themeConfig.holoSpeed}
+        activityReactive={themeConfig.activityReactiveHolo}
+      />
 
       {/* Top Header — YouTube Channel Showcase with Full-Height Banner */}
       <header className="relative w-full bg-slate-950/80 backdrop-blur-sm z-30">

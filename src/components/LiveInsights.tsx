@@ -627,9 +627,7 @@ function SetupCard({
   const isYouTube = provider === 'youtube';
   const configured = isYouTube ? status.configured.youtube : status.configured.tiktok;
   const redirectUri = status.redirectUris[provider];
-  const envKeys = isYouTube
-    ? ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'INTEGRATION_SECRET', 'APP_URL']
-    : ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'INTEGRATION_SECRET', 'APP_URL'];
+  const envKeys = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'INTEGRATION_SECRET', 'APP_URL'];
   return (
     <Panel
       className={`p-5 bg-gradient-to-br ${
@@ -2006,20 +2004,13 @@ export function LiveInsights({ oauthNotice, onDismissOauthNotice }: LiveInsights
                 </button>
               </div>
               {setupOpen && (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="max-w-2xl">
                   <SetupCard
                     provider="youtube"
                     status={status}
                     copied={copied}
                     onCopy={(key, value) => void handleCopy(key, value)}
                     onConnect={() => handleConnect('youtube')}
-                  />
-                  <SetupCard
-                    provider="tiktok"
-                    status={status}
-                    copied={copied}
-                    onCopy={(key, value) => void handleCopy(key, value)}
-                    onConnect={() => handleConnect('tiktok')}
                   />
                 </div>
               )}
