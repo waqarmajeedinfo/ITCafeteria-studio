@@ -16,11 +16,12 @@ dotenv.config({ override: true });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// AI Studio container runs nginx on 8080 and proxies to 3000 (DEFAULT_APP_PORT).
-// On Render, Render sets a custom PORT (e.g. 10000).
+// Port resolution:
+// In AI Studio preview: DEFAULT_APP_PORT is 3000 (nginx listens on 8080 and proxies to 3000).
+// In Production or on Render/Cloud Run/Docker: DEFAULT_APP_PORT is undefined. We MUST bind to process.env.PORT (e.g. 8080 or 10000).
 const port = process.env.DEFAULT_APP_PORT
   ? Number(process.env.DEFAULT_APP_PORT)
-  : (process.env.PORT && process.env.PORT !== '8080')
+  : process.env.PORT
     ? Number(process.env.PORT)
     : 3000;
 
@@ -150,7 +151,7 @@ function extractJsonObject(raw: string): any | null {
   return null;
 }
 
-app.get('/api/health', (_req, res) => {
+app.get(['/api/health', '/health'], (_req, res) => {
   res.json({
     ok: true,
     service: 'IT Cafeteria Studio',
@@ -2500,7 +2501,11 @@ registerTopicResearchRoutes(app);
 // Setup Vite middleware in dev or static files in prod
 async function startServer() {
   let viteServer: any = null;
-  if (process.env.NODE_ENV !== 'production') {
+  const distPath = path.resolve(__dirname, 'dist');
+  const hasDist = fs.existsSync(path.resolve(distPath, 'index.html'));
+  const isProd = process.env.NODE_ENV === 'production' || (!process.env.DEFAULT_APP_PORT && hasDist);
+
+  if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     viteServer = await createViteServer({
       server: {
@@ -2510,15 +2515,41 @@ async function startServer() {
       appType: 'spa',
     });
     app.use(viteServer.middlewares);
+
+    // Development / AI Studio SPA fallback
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      try {
+        const indexPath = path.resolve(__dirname, 'index.html');
+        if (fs.existsSync(indexPath)) {
+          let template = fs.readFileSync(indexPath, 'utf-8');
+          template = await viteServer.transformIndexHtml(url, template);
+          res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        } else {
+          next();
+        }
+      } catch (e) {
+        if (viteServer?.ssrFixStacktrace) {
+          viteServer.ssrFixStacktrace(e);
+        }
+        next(e);
+      }
+    });
   } else {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
+    // Production deployment (Render, Docker, Cloud Run)
+    app.use(express.static(distPath, { maxAge: '1h', index: false }));
     app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+      const indexPath = path.resolve(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send('Application bundle index.html not found. Please run npm run build.');
+      }
     });
   }
 
   const server = app.listen(port, '0.0.0.0', () => {
-    console.log(`IT Cafeteria Full-Stack Studio running on http://0.0.0.0:${port}`);
+    console.log(`IT Cafeteria Full-Stack Studio running on http://0.0.0.0:${port} (mode: ${isProd ? 'production' : 'development'})`);
   });
 
   server.on('error', (err: any) => {

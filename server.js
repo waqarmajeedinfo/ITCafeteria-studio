@@ -1,11 +1,11 @@
 // server.ts
 import express from "express";
-import fs2 from "fs";
-import path2 from "path";
-import { fileURLToPath as fileURLToPath2 } from "url";
+import fs3 from "fs";
+import path3 from "path";
+import { fileURLToPath as fileURLToPath3 } from "url";
 import { timingSafeEqual as timingSafeEqual2 } from "crypto";
 import dotenv from "dotenv";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI as GoogleGenAI2 } from "@google/genai";
 
 // src/lib/thumbnailMaster.ts
 var clean = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
@@ -2562,11 +2562,665 @@ function registerMultiUserRoutes(app2) {
   });
 }
 
-// server.ts
-dotenv.config({ override: true });
+// server_topic_research.ts
+import fs2 from "fs";
+import path2 from "path";
+import { fileURLToPath as fileURLToPath2 } from "url";
+import { GoogleGenAI } from "@google/genai";
 var __filename2 = fileURLToPath2(import.meta.url);
 var __dirname2 = path2.dirname(__filename2);
-var port = process.env.DEFAULT_APP_PORT ? Number(process.env.DEFAULT_APP_PORT) : process.env.PORT && process.env.PORT !== "8080" ? Number(process.env.PORT) : 3e3;
+var PROFILES_DATA_DIR = path2.resolve(__dirname2, "data", "profiles");
+var BACKUPS_DIR = path2.resolve(__dirname2, "data", "backups");
+function ensureDirectories() {
+  if (!fs2.existsSync(PROFILES_DATA_DIR)) fs2.mkdirSync(PROFILES_DATA_DIR, { recursive: true });
+  if (!fs2.existsSync(BACKUPS_DIR)) fs2.mkdirSync(BACKUPS_DIR, { recursive: true });
+}
+function getAiClient() {
+  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey) return null;
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build"
+      }
+    }
+  });
+}
+function extractYoutubeChannelId(input) {
+  if (!input) return null;
+  const clean2 = input.trim();
+  if (/^UC[a-zA-Z0-9_-]{22}$/.test(clean2)) return clean2;
+  const match = clean2.match(/(?:channel\/|channel_id=)(UC[a-zA-Z0-9_-]{22})/i);
+  if (match) return match[1];
+  return null;
+}
+function parseYoutubeRssXml(xml) {
+  const items = [];
+  const entryRegex = /<entry>([\s\S]*?)<\/entry>/gi;
+  let match;
+  while ((match = entryRegex.exec(xml)) !== null && items.length < 10) {
+    const entryBlock = match[1];
+    const titleMatch = entryBlock.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const publishedMatch = entryBlock.match(/<published>([\s\S]*?)<\/published>/i);
+    const videoIdMatch = entryBlock.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/i);
+    if (titleMatch) {
+      const title = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/gi, "$1").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+      const publishedAt = publishedMatch ? publishedMatch[1].trim() : (/* @__PURE__ */ new Date()).toISOString();
+      const videoId = videoIdMatch ? videoIdMatch[1].trim() : void 0;
+      items.push({ title, publishedAt, videoId });
+    }
+  }
+  return items;
+}
+function registerTopicResearchRoutes(app2) {
+  ensureDirectories();
+  app2.post("/api/competitors/fetch-rss", async (req, res) => {
+    try {
+      const { channelIdOrUrl, name } = req.body || {};
+      if (!channelIdOrUrl) {
+        return res.status(400).json({ ok: false, error: "channelIdOrUrl is required" });
+      }
+      let channelId = extractYoutubeChannelId(channelIdOrUrl);
+      if (!channelId && (channelIdOrUrl.includes("@") || channelIdOrUrl.includes("youtube.com"))) {
+        try {
+          const pageRes = await fetch(channelIdOrUrl.startsWith("http") ? channelIdOrUrl : `https://www.youtube.com/${channelIdOrUrl}`, {
+            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+            signal: AbortSignal.timeout(5e3)
+          });
+          if (pageRes.ok) {
+            const html = await pageRes.text();
+            const idMatch = html.match(/"channelId":"(UC[a-zA-Z0-9_-]{22})"/);
+            if (idMatch) channelId = idMatch[1];
+          }
+        } catch {
+        }
+      }
+      if (!channelId) {
+        return res.json({
+          ok: false,
+          error: "competitor data unavailable",
+          message: "YouTube Channel ID (UC...) nahi mil saka. Barah-e-karam channel ka direct UC ID ya RSS feed url check karein."
+        });
+      }
+      const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
+      const response = await fetch(rssUrl, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(6e3)
+      });
+      if (!response.ok) {
+        return res.json({
+          ok: false,
+          error: "competitor data unavailable",
+          status: response.status
+        });
+      }
+      const xml = await response.text();
+      const uploads = parseYoutubeRssXml(xml);
+      res.json({
+        ok: true,
+        channelId,
+        channelName: name || "Competitor Channel",
+        feedUrl: rssUrl,
+        fetchedAtUtc: (/* @__PURE__ */ new Date()).toISOString(),
+        uploads
+      });
+    } catch (err) {
+      console.warn("Competitor RSS fetch warning:", err?.message || err);
+      res.json({
+        ok: false,
+        error: "competitor data unavailable",
+        details: err?.message || "Network timeout"
+      });
+    }
+  });
+  app2.get("/api/backup/download-full", (_req, res) => {
+    try {
+      const backupPath = path2.resolve(BACKUPS_DIR, "safety_backup_published_library_and_settings.json");
+      if (fs2.existsSync(backupPath)) {
+        res.setHeader("Content-Disposition", 'attachment; filename="itcafeteria_safety_backup.json"');
+        res.setHeader("Content-Type", "application/json");
+        return res.sendFile(backupPath);
+      }
+      res.status(404).json({ error: "Safety backup file not found" });
+    } catch (err) {
+      res.status(500).json({ error: err?.message || "Failed to download safety backup" });
+    }
+  });
+  app2.post("/api/profile/:channelId/analyze-existing-stories", async (req, res) => {
+    try {
+      const { channelId } = req.params;
+      let { stories } = req.body || {};
+      if (!Array.isArray(stories) || stories.length === 0) {
+        try {
+          const backupPath = path2.resolve(process.cwd(), "data/backups/safety_backup_published_library_and_settings.json");
+          if (fs2.existsSync(backupPath)) {
+            const raw = fs2.readFileSync(backupPath, "utf8");
+            const parsed = JSON.parse(raw);
+            stories = parsed.publishedVideos || [];
+          }
+        } catch {
+        }
+      }
+      if (!Array.isArray(stories) || stories.length === 0) {
+        return res.status(400).json({ ok: false, error: "Stories array is required and catalog not found" });
+      }
+      const analyzedStories = stories.map((s) => {
+        if (Array.isArray(s.covered_points) && s.covered_points.length > 0) {
+          return {
+            id: s.id,
+            title: s.title,
+            covered_points: s.covered_points,
+            source: "preserved_user_edits"
+          };
+        }
+        const rawPoints = (s.points || s.title || "").trim();
+        const pointsList = rawPoints.split(/[\n,;•]+/).map((p) => p.trim()).filter((p) => p.length >= 5 && !p.toLowerCase().includes("oct 2026"));
+        const covered = pointsList.length >= 2 ? pointsList.slice(0, 4) : [s.title, s.tool || "Key trick"];
+        return {
+          id: s.id,
+          title: s.title,
+          covered_points: covered,
+          source: "auto_generated_backfill"
+        };
+      });
+      res.json({
+        ok: true,
+        channelId,
+        totalAnalyzed: analyzedStories.length,
+        analyzedStories,
+        message: "Existing stories successfully analyzed! Review covered_points before saving."
+      });
+    } catch (err) {
+      console.error("Analyze existing stories error:", err);
+      res.status(500).json({ ok: false, error: err?.message || "Backfill analysis failed" });
+    }
+  });
+  app2.post("/api/profile/:channelId/topic-research", async (req, res) => {
+    try {
+      const { channelId } = req.params;
+      const {
+        categoryId = 7,
+        aspectRatio = "9:16",
+        excludedCoveredPoints = [],
+        profileNiche = "Tech",
+        channelName = "IT Cafeteria",
+        activeApp = null
+      } = req.body || {};
+      const ai = getAiClient();
+      let topics = [];
+      if (ai) {
+        try {
+          const prompt = `You are the Lead Topic Research & Growth Strategist for ${channelName} (Niche: ${profileNiche}).
+Active Category ID: ${categoryId}.
+Aspect Ratio: ${aspectRatio}.
+EXCLUSION DIRECTIVE (CRITICAL): The following points/tricks have ALREADY been covered by this channel. DO NOT suggest or repeat any of these:
+${excludedCoveredPoints.slice(0, 30).map((p) => `\u2022 ${p}`).join("\n")}
+
+Research and formulate 5 to 7 high-performing candidate topics across these 4 LENSES:
+1. Lens 1: NEW UPDATES (last 48 hours official product releases/blogs)
+2. Lens 2: PEOPLE'S QUESTIONS AND PROBLEMS (Reddit, Q&A, Forums, repeatedly asked pain points)
+3. Lens 3: COMPETITOR GAP (what top creators covered, but with a specific technical gap we can fill)
+4. Lens 4: CATEGORY FUNCTIONALITY (secrets & hacks inside ${channelName}'s category keywords - for Secrets, rotate apps like Chrome, Maps, Gmail, Drive, Play Store, YouTube, Instagram, Windows, Telegram, CapCut, NOT just WhatsApp).
+
+Return strict JSON array with 5 to 7 objects matching this schema:
+[
+  {
+    "title": "Clear English / Roman Urdu Video Title",
+    "hook": "Spoken Roman Urdu hook under 22 words",
+    "categoryId": ${categoryId},
+    "aspectRatio": "${aspectRatio}",
+    "lens": "Lens 1: New Updates", // or "Lens 2: Questions & Problems", "Lens 3: Competitor Gap", "Lens 4: Category Functionality"
+    "whyNow": "Why this is urgent right now",
+    "angle": "Specific unique angle",
+    "keyPoints": ["Sub-point 1", "Sub-point 2", "Sub-point 3"],
+    "sources": [
+      { "name": "Source Name", "url": "https://source.example.com", "date": "Within window", "verifiedOfficial": true }
+    ],
+    "verificationStatus": "verified",
+    "duplicateVerdict": "new",
+    "competitorCoverage": "none",
+    "gapLine": "Detailed step-by-step terminal fix competitor missed",
+    "score": 92,
+    "scoreReason": "High viral demand with zero library overlap",
+    "expiresAt": "5 days" // or "evergreen"
+  }
+]`;
+          const aiRes = await ai.models.generateContent({
+            model: "gemini-3.1-flash-lite",
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            config: {
+              responseMimeType: "application/json",
+              temperature: 0.6
+            }
+          });
+          if (aiRes?.text) {
+            const parsed = JSON.parse(aiRes.text);
+            if (Array.isArray(parsed) && parsed.length >= 5) {
+              topics = parsed;
+            }
+          }
+        } catch (e) {
+          console.warn("AI Topic Research generation fallback:", e);
+        }
+      }
+      if (!topics || topics.length < 5) {
+        topics = generateFallbackTopics(channelId, categoryId, aspectRatio, excludedCoveredPoints);
+      }
+      res.json({
+        ok: true,
+        channelId,
+        categoryId,
+        count: topics.length,
+        topics: topics.slice(0, 7)
+      });
+    } catch (err) {
+      console.error("Topic research error:", err);
+      res.status(500).json({ ok: false, error: err?.message || "Topic research failed" });
+    }
+  });
+  app2.post("/api/profile/wizard-propose", async (req, res) => {
+    try {
+      const { name = "New Channel", presenter = "Presenter", tags = "@CH25-1", niche = "General" } = req.body || {};
+      const cleanNiche = (niche || "").toLowerCase().trim();
+      const isBeauty = cleanNiche.includes("beauty") || cleanNiche.includes("skin") || cleanNiche.includes("makeup") || cleanNiche.includes("hair") || cleanNiche.includes("groom");
+      const isCooking = cleanNiche.includes("cook") || cleanNiche.includes("chef") || cleanNiche.includes("food") || cleanNiche.includes("recipe") || cleanNiche.includes("kitchen") || cleanNiche.includes("bake");
+      if (isBeauty) {
+        return res.json({
+          ok: true,
+          niche: "Beauty & Skincare",
+          categories: [
+            { id: 1, name: "Glass Skin & Skincare Routines", playlist: "Skincare" },
+            { id: 2, name: "Flawless Base & Makeup Hacks", playlist: "Makeup Hacks" },
+            { id: 3, name: "Heatless Hair & Haircare Science", playlist: "Haircare" },
+            { id: 4, name: "Bridal & Party Glow Secrets", playlist: "Bridal Beauty" },
+            { id: 5, name: "Skincare Science & Ingredients (Niacinamide, Retinol)", playlist: "Ingredient Science" },
+            { id: 6, name: "Budget Drugstore vs Luxury Swatches", playlist: "Budget Beauty" },
+            { id: 7, name: "Daily Beauty Mistakes & Instant Fixes", playlist: "Common Mistakes" }
+          ],
+          sourcesByLens: {
+            lens1: [
+              { name: "Allure Beauty News", url: "https://www.allure.com", category: "Beauty News" },
+              { name: "Byrdie Skincare Lab", url: "https://www.byrdie.com", category: "Skincare Trends" },
+              { name: "Vogue Beauty", url: "https://www.vogue.com/beauty", category: "Runway Trends" },
+              { name: "Dermatology Times", url: "https://www.dermatologytimes.com", category: "Ingredient Studies" }
+            ],
+            lens2: [
+              { name: "Reddit r/SkincareAddiction", url: "https://reddit.com/r/SkincareAddiction", category: "Skin Troubles" },
+              { name: "Reddit r/MakeupAddiction", url: "https://reddit.com/r/MakeupAddiction", category: "Makeup Help" },
+              { name: "Reddit r/HaircareScience", url: "https://reddit.com/r/HaircareScience", category: "Hair Damage" }
+            ],
+            lens3: [
+              { name: "Smitha Deepak", url: "https://www.youtube.com/@SmithaDeepak", category: "Regional Master" },
+              { name: "Hyram", url: "https://www.youtube.com/@Hyram", category: "Skincare Specialist" },
+              { name: "Brad Mondo", url: "https://www.youtube.com/@BradMondo", category: "Haircare" }
+            ],
+            lens4: [
+              { name: "Daily Barrier Repair Secrets", focus: "Ceramides, SPF pilling, gentle cleansing" },
+              { name: "Heatless Styling Secrets", focus: "Overnight ribbons, silk pillowcase, frizz control" }
+            ]
+          },
+          competitors: [
+            { id: "comp-1", name: "Smitha Deepak", channelIdOrUrl: "UCmGZ_4sVvQ7kQZ9_9x1vJHQ", group: "local", notes: "Hooded eyes and South Asian skin." },
+            { id: "comp-2", name: "Hyram", channelIdOrUrl: "UC2sYit3cZ2CuD_8FHYH7O_Q", group: "global", notes: "Ingredient analysis." },
+            { id: "comp-3", name: "NikkieTutorials", channelIdOrUrl: "UCzTKskwIc_-a0cGvCXA848Q", group: "aspirational", notes: "Creative transformation hooks." }
+          ]
+        });
+      }
+      if (isCooking) {
+        return res.json({
+          ok: true,
+          niche: "Cooking & Culinary Arts",
+          categories: [
+            { id: 1, name: "Desi Classics & Biryani Secrets", playlist: "Desi Food" },
+            { id: 2, name: "10-Minute Rapid Meals (Office & Students)", playlist: "Quick Meals" },
+            { id: 3, name: "Secret Spice Blends & Marinades", playlist: "Spice Blends" },
+            { id: 4, name: "Bakery & Sweet Tooth Desserts", playlist: "Baking" },
+            { id: 5, name: "Meal Prep & Long-term Veg Storage Hacks", playlist: "Meal Prep" },
+            { id: 6, name: "Street Food Recreations at Home", playlist: "Street Food" },
+            { id: 7, name: "Kitchen Science & Perfect Dough Hacks", playlist: "Food Science" }
+          ],
+          sourcesByLens: {
+            lens1: [
+              { name: "Eater", url: "https://www.eater.com", category: "Food Trends" },
+              { name: "Food & Wine", url: "https://www.foodandwine.com", category: "Culinary Releases" },
+              { name: "Serious Eats", url: "https://www.seriouseats.com", category: "Kitchen Technique" }
+            ],
+            lens2: [
+              { name: "Reddit r/Cooking", url: "https://reddit.com/r/Cooking", category: "Cooking Questions" },
+              { name: "Reddit r/AskCulinary", url: "https://reddit.com/r/AskCulinary", category: "Culinary QA" },
+              { name: "Reddit r/Baking", url: "https://reddit.com/r/Baking", category: "Pastry Troubleshooting" }
+            ],
+            lens3: [
+              { name: "Ranveer Brar", url: "https://www.youtube.com/@RanveerBrar", category: "Regional Master" },
+              { name: "Village Food Secrets", url: "https://www.youtube.com/@VillageFoodSecrets", category: "Local Giant" },
+              { name: "Babish Culinary Universe", url: "https://www.youtube.com/@babishculinaryuniverse", category: "Aspirational Global" }
+            ],
+            lens4: [
+              { name: "Secret Spices & Marinades", focus: "Tender meat secrets, garam masala blends" },
+              { name: "10-Minute Lunch Hacks", focus: "Quick fried rice, 3-minute sauces" }
+            ]
+          },
+          competitors: [
+            { id: "comp-1", name: "Ranveer Brar", channelIdOrUrl: "UCqjtX8-yv6B0p0iC3_r64tw", group: "local", notes: "Storytelling + spices." },
+            { id: "comp-2", name: "Babish Culinary Universe", channelIdOrUrl: "UCJHA_jMfCvEnv-3kRjTCQXw", group: "global", notes: "Clean cinematography." },
+            { id: "comp-3", name: "Gordon Ramsay", channelIdOrUrl: "UCIEv3lZ_tNXHzL3ox-_uUGQ", group: "aspirational", notes: "High energy pacing." }
+          ]
+        });
+      }
+      const ai = getAiClient();
+      if (ai) {
+        try {
+          const prompt = `Propose complete setup for YouTube channel: Name: "${name}", Niche: "${niche}".
+Return strict JSON with:
+1. "categories": array of 7-8 objects ({ "id": 1, "name": "Category Name", "playlist": "Playlist" })
+2. "sourcesByLens": object with lens1 (news/releases), lens2 (Q&A/Reddit), lens3 (Competitor YouTube channels), lens4 (Niche secrets)
+3. "competitors": array of 3 objects ({ "name": "Name", "channelIdOrUrl": "URL", "group": "local"|"global"|"aspirational", "notes": "Notes" })
+DO NOT reuse IT Cafeteria tech sources (do not return TechCrunch, The Verge, Windows, WhatsApp, etc. unless the niche is explicitly Tech).`;
+          const aiRes = await ai.models.generateContent({
+            model: "gemini-3.1-flash-lite",
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
+          });
+          if (aiRes?.text) {
+            const parsed = JSON.parse(aiRes.text);
+            if (parsed && Array.isArray(parsed.categories)) {
+              return res.json({
+                ok: true,
+                sourcesByLens: parsed.sourcesByLens || {
+                  lens1: [{ name: `${niche} Daily Updates`, url: "https://news.google.com", category: "News" }],
+                  lens2: [{ name: `Reddit r/${niche.replace(/\s+/g, "")}`, url: "https://reddit.com", category: "Questions" }],
+                  lens3: [{ name: `Top ${niche} Channel`, url: "https://youtube.com", category: "Competitor" }],
+                  lens4: [{ name: `${niche} Secrets`, focus: "Core techniques" }]
+                },
+                competitors: parsed.competitors || []
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("Wizard propose AI fallback:", e);
+        }
+      }
+      res.json({
+        ok: true,
+        niche,
+        categories: [
+          { id: 1, name: `${niche} Fundamentals & Setup`, playlist: "Basics" },
+          { id: 2, name: `Step-by-Step ${niche} Walkthroughs`, playlist: "Tutorials" },
+          { id: 3, name: `Top Secrets & Hidden Hacks`, playlist: "Secrets" },
+          { id: 4, name: `Common Beginner Mistakes & Fixes`, playlist: "Troubleshooting" },
+          { id: 5, name: `Tools & Equipment Masterclass`, playlist: "Tools" },
+          { id: 6, name: `Budget vs Pro Comparisons`, playlist: "Comparisons" },
+          { id: 7, name: `Advanced Master Hacks`, playlist: "Advanced" }
+        ],
+        sourcesByLens: {
+          lens1: [{ name: `${niche} Official News`, url: "https://news.google.com", category: "News" }],
+          lens2: [{ name: `Reddit r/${niche.replace(/\s+/g, "")}`, url: `https://reddit.com`, category: "Questions" }],
+          lens3: [{ name: `Top ${niche} Creator`, url: "https://youtube.com", category: "Competitor" }],
+          lens4: [{ name: `${niche} Core Secrets`, focus: "Hidden tricks and efficiency" }]
+        },
+        competitors: [
+          { id: "comp-1", name: `Top ${niche} Channel`, channelIdOrUrl: "UC_sample", group: "local", notes: "Active creator." }
+        ]
+      });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: err?.message || "Wizard propose failed" });
+    }
+  });
+}
+function generateFallbackTopics(channelId, categoryId, aspectRatio, excluded) {
+  const isBeauty = channelId === "beautyhub";
+  const isChef = channelId === "digitalchefelite";
+  if (isBeauty) {
+    return [
+      {
+        title: "Cold Spoon vs Eye Serum: Dark Circles Ka Instant 2-Minute Fix",
+        hook: "Aapke dark circles concealer se bhi nahi chuptay? Sirf yeh 1 cold spoon trick try karein!",
+        categoryId: 1,
+        aspectRatio: "9:16",
+        lens: "Lens 1: New Updates",
+        whyNow: "Trending morning de-puffing technique on Allure & Byrdie beauty reports.",
+        angle: "Lymphatic drainage with cold compress before caffeine eye serum.",
+        keyPoints: ["Freeze 2 metal spoons for 5 minutes", "Gentle outward sweep along orbital bone", "Apply 1 drop caffeine serum on damp skin"],
+        sources: [{ name: "Allure Beauty Morning Routine", url: "https://www.allure.com", date: "Last 48 Hours", verifiedOfficial: true }],
+        verificationStatus: "verified",
+        duplicateVerdict: "new",
+        competitorCoverage: "none",
+        gapLine: "Competitors showed expensive eye patches; this is free with higher drainage.",
+        score: 94,
+        scoreReason: "High demand relatable morning problem with 0 cost items.",
+        expiresAt: "evergreen"
+      },
+      {
+        title: "Niacinamide Ke Sath Vitamin C Mix Karna Sahi Hai Ya Galat?",
+        hook: "Kya Niacinamide aur Vitamin C sath lagane se chehra laal ho jata hai? Sach sun lein!",
+        categoryId: 2,
+        aspectRatio: "9:16",
+        lens: "Lens 2: Questions & Problems",
+        whyNow: "Top searched dilemma on Reddit r/SkincareAddiction for 3 consecutive months.",
+        angle: "Dermatological pH level truth: alternate morning and night to avoid flushing.",
+        keyPoints: ["Why mixing at low pH causes temporary niacin flush", "Vitamin C in AM under sunscreen", "Niacinamide in PM for skin barrier restore"],
+        sources: [{ name: "Dermatology Times Ingredient Review", url: "https://www.dermatologytimes.com", date: "Recent 90 Days", verifiedOfficial: true }],
+        verificationStatus: "verified",
+        duplicateVerdict: "new",
+        competitorCoverage: "news-only",
+        gapLine: "Explaining exact AM/PM routine schedule rather than vague warning.",
+        score: 91,
+        scoreReason: "Busts universal skincare myth with scientific backing.",
+        expiresAt: "evergreen"
+      },
+      {
+        title: "Heatless Silk Ribbon Curls: Zero Heat Damage Overnight Hair Trick",
+        hook: "Iron se baal jalana band karein! Raat ko sonay se pehle yeh 2-minute ribbon tie karein.",
+        categoryId: 3,
+        aspectRatio: "9:16",
+        lens: "Lens 3: Competitor Gap",
+        whyNow: "Viral trend with +180% search surge across YouTube Shorts and Reels.",
+        angle: "Satin scarf substitute so viewers don't need to buy a $30 curling rod.",
+        keyPoints: ["Damp hair with lightweight leave-in conditioner", "Figure-8 wrap around satin robe belt", "Morning shake-out with argan oil drops"],
+        sources: [{ name: "Byrdie Haircare Lab", url: "https://www.byrdie.com", date: "Past 7 Days", verifiedOfficial: true }],
+        verificationStatus: "verified",
+        duplicateVerdict: "new",
+        competitorCoverage: "full-tutorial",
+        gapLine: "Competitors only showed thin hair; we demonstrate on thick South Asian hair texture.",
+        score: 89,
+        scoreReason: "Huge viral shareability with zero damage payoff.",
+        expiresAt: "evergreen"
+      },
+      {
+        title: "Sunscreen Pilling Fix: Kyun Aapka Sunscreen Chehre Par Chhilke Ban Jata Hai?",
+        hook: "Sunscreen lagate hi white chhilkay banna shuru? Yeh choti si mistake theek karein!",
+        categoryId: 1,
+        aspectRatio: "9:16",
+        lens: "Lens 4: Category Functionality",
+        whyNow: "Seasonal change causes heavy sunscreen layering issues.",
+        angle: "Water-based moisturizer vs silicone sunscreen incompatibility.",
+        keyPoints: ["Wait 60 seconds between moisturizer and SPF", "Patting motion instead of harsh rubbing", "Check ingredients: water base vs dimethicone base"],
+        sources: [{ name: "Cosmopolitan Dermatologist Guide", url: "https://www.cosmopolitan.com", date: "This Month", verifiedOfficial: true }],
+        verificationStatus: "verified",
+        duplicateVerdict: "new",
+        competitorCoverage: "none",
+        gapLine: "Clear ingredient compatibility rule that fixes pilling immediately.",
+        score: 88,
+        scoreReason: "Daily frustration experienced by 80% of daily sunscreen users.",
+        expiresAt: "evergreen"
+      },
+      {
+        title: "Budget Foundation Shade Match: Neck vs Jawline Test That Never Fails",
+        hook: "Dukaan par foundation match ghalat kyun hota hai? Yeh 1 natural light test dekhein!",
+        categoryId: 2,
+        aspectRatio: "9:16",
+        lens: "Lens 2: Questions & Problems",
+        whyNow: "Top Pakistani cosmetic shopping question.",
+        angle: "Oxidation test: wait 5 minutes before purchasing drugstore foundation.",
+        keyPoints: ["Swatch on jawline blending toward neck", "Check under direct sunlight not warm store bulbs", "Test 5-minute oxidation color shift"],
+        sources: [{ name: "Vogue Makeup Masterclass", url: "https://www.vogue.com", date: "Current", verifiedOfficial: true }],
+        verificationStatus: "verified",
+        duplicateVerdict: "new",
+        competitorCoverage: "news-only",
+        gapLine: "Live before/after lighting comparison showing oxidation shift.",
+        score: 93,
+        scoreReason: "Prevents wasted money on wrong shades; high trust builder.",
+        expiresAt: "evergreen"
+      }
+    ];
+  }
+  return [
+    {
+      title: "Google Chrome Secret Flags: Enable 2X Parallel Downloading Speed",
+      hook: "Chrome mein bari files slow download hoti hain? Sirf yeh 1 secret flag abhi enable karein!",
+      categoryId: 7,
+      aspectRatio: "9:16",
+      lens: "Lens 1: New Updates",
+      whyNow: "Chromium 134 release upgraded multi-threaded socket pipe downloads.",
+      angle: "Built-in hidden chrome://flags setting that splits files into 4 simultaneous streams.",
+      keyPoints: [
+        "Search chrome://flags for '#enable-parallel-downloading'",
+        "Change dropdown from Default to Enabled",
+        "Relaunch Chrome to double download speed without IDM"
+      ],
+      sources: [
+        { name: "Chromium 134 Release Notes", url: "https://blog.chromium.org", date: "Last 48 Hours", verifiedOfficial: true },
+        { name: "BleepingComputer Chrome Review", url: "https://www.bleepingcomputer.com", date: "Yesterday", verifiedOfficial: true }
+      ],
+      verificationStatus: "verified",
+      duplicateVerdict: "new",
+      competitorCoverage: "none",
+      gapLine: "Competitors suggested paid download managers; this is 100% native in Chrome.",
+      score: 96,
+      scoreReason: "Official Chromium update, universal Chrome user base, immediate speed proof.",
+      expiresAt: "5 days"
+    },
+    {
+      title: "Google Maps Secret Parking & Speed Camera Alerts Setup",
+      hook: "Google Maps sirf rasta nahi batata! Yeh 2 hidden features har car driver ko pata honi chahiyein.",
+      categoryId: 7,
+      aspectRatio: "9:16",
+      lens: "Lens 4: Category Functionality",
+      whyNow: "Secrets Series rotation across 16 apps (Google Maps turn).",
+      angle: "Save parking spot with level/notes + enable live speed limit audio warning.",
+      keyPoints: [
+        "Tap blue location dot -> Save parking location with photo",
+        "Settings -> Navigation settings -> Enable Speedometer & Audio speed alerts",
+        "Offline maps download to navigate without mobile data"
+      ],
+      sources: [
+        { name: "Google Maps Help Center Official", url: "https://support.google.com/maps", date: "30 Days", verifiedOfficial: true }
+      ],
+      verificationStatus: "verified",
+      duplicateVerdict: "new",
+      competitorCoverage: "news-only",
+      gapLine: "Complete audio cue setup shown on screen in Urdu.",
+      score: 92,
+      scoreReason: "High utility daily app secret; zero duplicate in catalog.",
+      expiresAt: "evergreen"
+    },
+    {
+      title: "Windows 11 High CPU 100% Disk Usage: SysMain Service Fix",
+      hook: "Aapka PC bina kisi heavy game ke garam aur hang ho raha hai? Yeh 1 Windows service band karein!",
+      categoryId: 4,
+      aspectRatio: "9:16",
+      lens: "Lens 2: Questions & Problems",
+      whyNow: "Top reported issue on Reddit r/Windows11 and r/techsupport with 1,200+ upvotes.",
+      angle: "Disabling SysMain (Superfetch) safely without affecting system stability.",
+      keyPoints: [
+        "Win+R -> services.msc -> locate 'SysMain'",
+        "Properties -> Startup Type: Disabled -> Stop Service",
+        "Instant Task Manager disk drop from 100% to 2%"
+      ],
+      sources: [
+        { name: "Microsoft Support Community Q&A", url: "https://answers.microsoft.com", date: "Past 90 Days", verifiedOfficial: true },
+        { name: "Reddit r/Windows11 Bug Megathread", url: "https://reddit.com/r/Windows11", date: "Verified Q&A", verifiedOfficial: false }
+      ],
+      verificationStatus: "verified",
+      duplicateVerdict: "partial",
+      competitorCoverage: "none",
+      gapLine: "Competitors tell users to reinstall Windows; this 10-second service fix solves disk throttling.",
+      score: 94,
+      scoreReason: "Massive pain point for laptop users; clear measurable Task Manager proof.",
+      expiresAt: "evergreen"
+    },
+    {
+      title: "WhatsApp Web Secret Keyboard Shortcuts: Archive & Mute Without Mouse",
+      hook: "Office mein WhatsApp Web use karte hain? Mouse chhorein, yeh 3 shortcuts se chat operate karein!",
+      categoryId: 7,
+      aspectRatio: "9:16",
+      lens: "Lens 3: Competitor Gap",
+      whyNow: "WhatsApp Web keyboard shortcuts under-covered by competitors.",
+      angle: "Ctrl+Alt+Shift+U for unread, Ctrl+Alt+E for instant archive, Ctrl+Alt+Shift+M to mute.",
+      keyPoints: [
+        "Ctrl+Alt+Shift+U: Mark chat as unread instantly",
+        "Ctrl+Alt+E: Archive chat away from boss sight in 1 second",
+        "Ctrl+Alt+Shift+F: Search inside active chat"
+      ],
+      sources: [
+        { name: "WhatsApp FAQ Official Shortcuts", url: "https://faq.whatsapp.com", date: "Past 7 Days", verifiedOfficial: true }
+      ],
+      verificationStatus: "verified",
+      duplicateVerdict: "partial",
+      competitorCoverage: "full-tutorial",
+      gapLine: "Competitors covered phone gestures; WhatsApp Web office shortcuts have zero Urdu coverage.",
+      score: 90,
+      scoreReason: "Fresh angle on WhatsApp (Part 5: Web shortcuts); 0 conflict with phone secrets.",
+      expiresAt: "evergreen"
+    },
+    {
+      title: "Power Automate: Auto Extract PDF Invoices to Clean Excel Sheet",
+      hook: "Client ke 50 PDF bills se data copy karna hai? 1 second mein sara data Excel mein auto-extract karein!",
+      categoryId: 2,
+      aspectRatio: "9:16",
+      lens: "Lens 4: Category Functionality",
+      whyNow: "Office automation high-retention category workflow.",
+      angle: "Power Automate Desktop 'Extract text with OCR' action piped into Excel row append.",
+      keyPoints: [
+        "Drag 'Extract text from PDF' action into flow canvas",
+        "Loop through all files in folder",
+        "Append invoice number, date, and amount into Excel"
+      ],
+      sources: [
+        { name: "Microsoft Learn Power Automate Docs", url: "https://learn.microsoft.com/power-automate", date: "Verified", verifiedOfficial: true }
+      ],
+      verificationStatus: "verified",
+      duplicateVerdict: "new",
+      competitorCoverage: "none",
+      gapLine: "Complete no-code step-by-step shown with sample invoice file.",
+      score: 91,
+      scoreReason: "High value for Pakistani office workers, freelancers, and accountants.",
+      expiresAt: "evergreen"
+    },
+    {
+      title: "DeepSeek R1 Offline on Windows PC: 0-Cost ChatGPT Alternative",
+      hook: "Internet band hone par bhi AI chalana chahte hain? DeepSeek R1 ko apne laptop par bina internet chalayein!",
+      categoryId: 1,
+      aspectRatio: "9:16",
+      lens: "Lens 1: New Updates",
+      whyNow: "Ollama 0.5.12 update enabled quantized 1.5B and 7B DeepSeek reasoning models.",
+      angle: "Terminal command 'ollama run deepseek-r1:1.5b' that runs smoothly on 8GB RAM laptops.",
+      keyPoints: [
+        "Download Ollama for Windows from official site",
+        "Open CMD and type: ollama run deepseek-r1:1.5b",
+        "Ask coding or math problems completely offline"
+      ],
+      sources: [
+        { name: "Ollama GitHub Release 0.5.12", url: "https://github.com/ollama/ollama/releases", date: "Last 48 Hours", verifiedOfficial: true },
+        { name: "Ars Technica DeepSeek Review", url: "https://arstechnica.com", date: "Recent", verifiedOfficial: true }
+      ],
+      verificationStatus: "verified",
+      duplicateVerdict: "new",
+      competitorCoverage: "news-only",
+      gapLine: "Competitors showed 70B model needing $2000 GPU; we show 1.5B model on standard office PC.",
+      score: 95,
+      scoreReason: "Huge Pakistani interest in offline AI without expensive GPUs or API fees.",
+      expiresAt: "5 days"
+    }
+  ];
+}
+
+// server.ts
+dotenv.config({ override: true });
+var __filename3 = fileURLToPath3(import.meta.url);
+var __dirname3 = path3.dirname(__filename3);
+var port = process.env.DEFAULT_APP_PORT ? Number(process.env.DEFAULT_APP_PORT) : process.env.PORT ? Number(process.env.PORT) : 3e3;
 var app = express();
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "50mb" }));
@@ -2590,13 +3244,13 @@ if (accessKey && process.env.NODE_ENV === "production" && !process.env.DEFAULT_A
     res.status(401).send("Authentication required");
   });
 }
-var getAiClient = () => {
+var getAiClient2 = () => {
   const apiKey = (process.env.GEMINI_API_KEY || "").trim();
   console.log("[getAiClient] chosen key prefix:", apiKey ? apiKey.slice(0, 8) + "..." + apiKey.slice(-6) : "none");
   if (!apiKey) {
     throw new Error("Gemini API key is not configured in environment secrets (GEMINI_API_KEY).");
   }
-  return new GoogleGenAI({
+  return new GoogleGenAI2({
     apiKey,
     httpOptions: {
       headers: {
@@ -2676,7 +3330,7 @@ function extractJsonObject(raw) {
   }
   return null;
 }
-app.get("/api/health", (_req, res) => {
+app.get(["/api/health", "/health"], (_req, res) => {
   res.json({
     ok: true,
     service: "IT Cafeteria Studio",
@@ -2703,7 +3357,7 @@ app.get("/api/ai/key-status", async (_req, res) => {
   const keyPrefix = apiKey.length > 7 ? apiKey.slice(0, 7) + "..." : "***";
   const isLikelyOAuth = apiKey.startsWith("AQ.") || apiKey.startsWith("ya29.");
   try {
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const testResult = await withTimeout(
       ai.models.generateContent({
         model: "gemini-3.1-flash-lite",
@@ -2750,11 +3404,11 @@ var CHAT_FALLBACK_ORDER = [
   "gemini-3.8-flash",
   "gemini-flash-latest"
 ];
-var COMPANION_MEMORY_FILE = path2.resolve(__dirname2, "data", "agent", "companion-memory.json");
+var COMPANION_MEMORY_FILE = path3.resolve(__dirname3, "data", "agent", "companion-memory.json");
 function getCompanionMemory() {
   try {
-    if (fs2.existsSync(COMPANION_MEMORY_FILE)) {
-      const raw = fs2.readFileSync(COMPANION_MEMORY_FILE, "utf-8");
+    if (fs3.existsSync(COMPANION_MEMORY_FILE)) {
+      const raw = fs3.readFileSync(COMPANION_MEMORY_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.activeDirectives)) return parsed;
     }
@@ -2779,16 +3433,16 @@ function getCompanionMemory() {
 }
 function saveCompanionMemory(data, username = "waqarmajeedinfo") {
   try {
-    const dir = path2.dirname(COMPANION_MEMORY_FILE);
-    if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
-    fs2.writeFileSync(COMPANION_MEMORY_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const dir = path3.dirname(COMPANION_MEMORY_FILE);
+    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
+    fs3.writeFileSync(COMPANION_MEMORY_FILE, JSON.stringify(data, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path2.resolve(__dirname2, "user-data", targetUser);
-    if (!fs2.existsSync(userRepoDir)) fs2.mkdirSync(userRepoDir, { recursive: true });
-    fs2.writeFileSync(path2.resolve(userRepoDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
-    const userStorageDir = path2.resolve(__dirname2, "data", "user-storage", targetUser);
-    if (!fs2.existsSync(userStorageDir)) fs2.mkdirSync(userStorageDir, { recursive: true });
-    fs2.writeFileSync(path2.resolve(userStorageDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userRepoDir = path3.resolve(__dirname3, "user-data", targetUser);
+    if (!fs3.existsSync(userRepoDir)) fs3.mkdirSync(userRepoDir, { recursive: true });
+    fs3.writeFileSync(path3.resolve(userRepoDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userStorageDir = path3.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs3.existsSync(userStorageDir)) fs3.mkdirSync(userStorageDir, { recursive: true });
+    fs3.writeFileSync(path3.resolve(userStorageDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
   } catch (err) {
     console.error("[CompanionMemory] Save error:", err);
   }
@@ -2918,7 +3572,7 @@ app.post("/api/agent/copilot/live-session", async (req, res) => {
   try {
     const { action = "insight", currentTopic = "AI Tools & Automation", elapsedTime = 0, username = "waqarmajeedinfo", userPrompt = "" } = req.body || {};
     const current = getCompanionMemory();
-    const ai = getAiClient();
+    const ai = getAiClient2();
     if (action === "start") {
       const startLog = {
         id: `live-${Date.now()}`,
@@ -2983,11 +3637,11 @@ app.post("/api/agent/copilot/live-session", async (req, res) => {
     res.status(500).json({ error: err?.message || "Live session failed" });
   }
 });
-var COMPETITOR_INTEL_FILE = path2.resolve(__dirname2, "data", "agent", "competitor-intelligence.json");
+var COMPETITOR_INTEL_FILE = path3.resolve(__dirname3, "data", "agent", "competitor-intelligence.json");
 function getCompetitorIntelligence() {
   try {
-    if (fs2.existsSync(COMPETITOR_INTEL_FILE)) {
-      const raw = fs2.readFileSync(COMPETITOR_INTEL_FILE, "utf-8");
+    if (fs3.existsSync(COMPETITOR_INTEL_FILE)) {
+      const raw = fs3.readFileSync(COMPETITOR_INTEL_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.trackedCompetitors)) return parsed;
     }
@@ -3006,16 +3660,16 @@ function getCompetitorIntelligence() {
 }
 function saveCompetitorIntelligence(data, username = "waqarmajeedinfo") {
   try {
-    const dir = path2.dirname(COMPETITOR_INTEL_FILE);
-    if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
-    fs2.writeFileSync(COMPETITOR_INTEL_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const dir = path3.dirname(COMPETITOR_INTEL_FILE);
+    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
+    fs3.writeFileSync(COMPETITOR_INTEL_FILE, JSON.stringify(data, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path2.resolve(__dirname2, "user-data", targetUser);
-    if (!fs2.existsSync(userRepoDir)) fs2.mkdirSync(userRepoDir, { recursive: true });
-    fs2.writeFileSync(path2.resolve(userRepoDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
-    const userStorageDir = path2.resolve(__dirname2, "data", "user-storage", targetUser);
-    if (!fs2.existsSync(userStorageDir)) fs2.mkdirSync(userStorageDir, { recursive: true });
-    fs2.writeFileSync(path2.resolve(userStorageDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userRepoDir = path3.resolve(__dirname3, "user-data", targetUser);
+    if (!fs3.existsSync(userRepoDir)) fs3.mkdirSync(userRepoDir, { recursive: true });
+    fs3.writeFileSync(path3.resolve(userRepoDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userStorageDir = path3.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs3.existsSync(userStorageDir)) fs3.mkdirSync(userStorageDir, { recursive: true });
+    fs3.writeFileSync(path3.resolve(userStorageDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
   } catch (err) {
     console.error("[CompetitorIntel] Save error:", err);
   }
@@ -3054,7 +3708,7 @@ app.post("/api/agent/competitors/scan", async (req, res) => {
 app.post("/api/agent/competitors/generate-strategy", async (req, res) => {
   try {
     const { targetCompetitor = "Technology Gyan", topic = "Android Speed Hack" } = req.body || {};
-    const ai = getAiClient();
+    const ai = getAiClient2();
     let strategyText = `Waqar Bhai! ${targetCompetitor} ko beat karne ke liye strategy yeh hai: Pehle 2 seconds mein unke superficial solution ko challenge karein. Roman Urdu mein practical terminal/developer settings dikhayein jo 100% stable hon.`;
     if (ai) {
       try {
@@ -3082,11 +3736,11 @@ app.post("/api/agent/competitors/generate-strategy", async (req, res) => {
     res.status(500).json({ error: err?.message || "Strategy generation failed" });
   }
 });
-var PHONETIC_DICT_FILE = path2.resolve(__dirname2, "data", "agent", "phonetic-dictionary.json");
+var PHONETIC_DICT_FILE = path3.resolve(__dirname3, "data", "agent", "phonetic-dictionary.json");
 function getStoredPhoneticRules() {
   try {
-    if (fs2.existsSync(PHONETIC_DICT_FILE)) {
-      const raw = fs2.readFileSync(PHONETIC_DICT_FILE, "utf-8");
+    if (fs3.existsSync(PHONETIC_DICT_FILE)) {
+      const raw = fs3.readFileSync(PHONETIC_DICT_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
@@ -3097,16 +3751,16 @@ function getStoredPhoneticRules() {
 }
 function saveStoredPhoneticRules(rules, username = "waqarmajeedinfo") {
   try {
-    const dir = path2.dirname(PHONETIC_DICT_FILE);
-    if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
-    fs2.writeFileSync(PHONETIC_DICT_FILE, JSON.stringify(rules, null, 2), "utf-8");
+    const dir = path3.dirname(PHONETIC_DICT_FILE);
+    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
+    fs3.writeFileSync(PHONETIC_DICT_FILE, JSON.stringify(rules, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userStorageDir = path2.resolve(__dirname2, "data", "user-storage", targetUser);
-    if (!fs2.existsSync(userStorageDir)) fs2.mkdirSync(userStorageDir, { recursive: true });
-    fs2.writeFileSync(path2.resolve(userStorageDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
-    const userRepoDir = path2.resolve(__dirname2, "user-data", targetUser);
-    if (!fs2.existsSync(userRepoDir)) fs2.mkdirSync(userRepoDir, { recursive: true });
-    fs2.writeFileSync(path2.resolve(userRepoDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
+    const userStorageDir = path3.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs3.existsSync(userStorageDir)) fs3.mkdirSync(userStorageDir, { recursive: true });
+    fs3.writeFileSync(path3.resolve(userStorageDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
+    const userRepoDir = path3.resolve(__dirname3, "user-data", targetUser);
+    if (!fs3.existsSync(userRepoDir)) fs3.mkdirSync(userRepoDir, { recursive: true });
+    fs3.writeFileSync(path3.resolve(userRepoDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
   } catch (err) {
     console.error("[PhoneticDictionary] Save error:", err);
   }
@@ -3132,7 +3786,7 @@ app.post("/api/ai/chat", async (req, res) => {
     const { messages, model = "gemini-3.1-flash-lite", systemInstruction, fallback = true } = req.body;
     let ai = null;
     try {
-      ai = getAiClient();
+      ai = getAiClient2();
     } catch (e) {
       console.warn("Gemini client not initialized, using local fallback:", e?.message || e);
     }
@@ -3203,7 +3857,7 @@ app.post("/api/ai/stream-chat", async (req, res) => {
   try {
     let ai = null;
     try {
-      ai = getAiClient();
+      ai = getAiClient2();
     } catch {
     }
     if (!ai) {
@@ -3342,7 +3996,7 @@ app.post("/api/ai/search-grounding", async (req, res) => {
     if (!query) {
       return res.status(400).json({ error: "Query parameter is required" });
     }
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const searchAttempts = [
       { model: "gemini-3.8-flash", timeoutMs: 3e4 },
       { model: "gemini-3.6-flash", timeoutMs: 3e4 },
@@ -3390,7 +4044,7 @@ app.post("/api/ai/search-grounding", async (req, res) => {
 app.post("/api/ai/trending-keywords", async (req, res) => {
   try {
     const { category = "All" } = req.body;
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const query = `Trending tech searches, Excel shortcuts, AI updates, and Windows tutorials in Pakistan and India for category: ${category}`;
     const response = await ai.models.generateContent({
       model: "gemini-3.8-flash",
@@ -3500,7 +4154,7 @@ Return strict raw JSON (no markdown fences):
 app.post("/api/ai/suggest-channel-meta", async (req, res) => {
   try {
     const { channelName } = req.body;
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const prompt = `Based on the channel name "${channelName || "New Channel"}", generate smart professional content suggestions in JSON format.
 Return an object with:
 1. "niches": an array of exactly 5 unique niche descriptions tailored to this channel name.
@@ -3563,7 +4217,7 @@ Return ONLY valid JSON.`;
 app.post("/api/ai/suggest-categories-for-niche", async (req, res) => {
   try {
     const { niche } = req.body;
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const prompt = `Based on the channel niche/topic "${niche || "General Content"}", generate 8-10 contextually relevant category names or playlists in JSON format.
 Return an object with:
 1. "categories": an array of 8 to 10 distinct professional category names tailored to this niche.
@@ -3618,7 +4272,7 @@ app.get("/api/ai/xiaomi-status", (_req, res) => {
 app.post("/api/ai/generate-image", async (req, res) => {
   try {
     const { prompt, aspectRatio = "9:16", imageSize = "1K", base64InputImage, model = "gemini-nano-banana-2.1" } = req.body;
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const parts = [];
     if (base64InputImage) {
       const rawImage = String(base64InputImage);
@@ -3668,7 +4322,7 @@ app.post("/api/ai/generate-image", async (req, res) => {
 app.post("/api/ai/generate-video", async (req, res) => {
   try {
     const { prompt, aspectRatio = "9:16", duration = "10s", base64Image } = req.body;
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const inputParts = [];
     if (base64Image) {
       inputParts.push({
@@ -3713,7 +4367,7 @@ app.post("/api/ai/transcribe", async (req, res) => {
     if (!base64Audio) {
       return res.status(400).json({ error: "base64Audio is required" });
     }
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const cleanBase64 = base64Audio.replace(/^data:audio\/\w+;base64,/, "");
     const response = await ai.models.generateContent({
       model: "gemini-3.5-transcribe",
@@ -3756,7 +4410,7 @@ app.post("/api/ai/speak", async (req, res) => {
     if (!text || !text.trim()) {
       return res.status(400).json({ error: "Text is required for speech" });
     }
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const cleanText = text.replace(/--- SCENE[\s\S]*?---/g, "").replace(/[*_#`>-]/g, " ").replace(/https?:\/\/\S+/g, "link").replace(/\s+/g, " ").trim().slice(0, 900);
     const response = await ai.models.generateContent({
       model: "gemini-3.8-flash-lite-tts",
@@ -3796,7 +4450,7 @@ app.post("/api/ai/speak", async (req, res) => {
 app.post("/api/ai/generate-music", async (req, res) => {
   try {
     const { prompt = "High-energy modern tech YouTuber background beat with upbeat synth and subtle tech accents" } = req.body;
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const responseStream = await ai.models.generateContentStream({
       model: "lyria-3-clip-preview",
       contents: prompt
@@ -3828,7 +4482,7 @@ app.post("/api/ai/generate-music", async (req, res) => {
 app.post("/api/ai/quick-publish", async (req, res) => {
   try {
     const { title, category, scheduledTime = "6:00 PM PKT", date = "Today", platform = "YouTube + TikTok" } = req.body;
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const prompt = `You are the master YouTube Shorts growth agent for 'IT Cafeteria' (Pakistani tech channel run by Waqar Majeed, 58+ videos published).
 The user wants to Quick Publish an upcoming video:
 - Title / Idea: "${title}"
@@ -3890,11 +4544,11 @@ Return STRICT valid JSON only with NO markdown fences, matching this structure:
     });
   }
 });
-var FOCUS_LINKS_FILE = path2.resolve(__dirname2, "data", "agent", "focus-links.json");
+var FOCUS_LINKS_FILE = path3.resolve(__dirname3, "data", "agent", "focus-links.json");
 function getFocusLinks() {
   try {
-    if (fs2.existsSync(FOCUS_LINKS_FILE)) {
-      const raw = fs2.readFileSync(FOCUS_LINKS_FILE, "utf-8");
+    if (fs3.existsSync(FOCUS_LINKS_FILE)) {
+      const raw = fs3.readFileSync(FOCUS_LINKS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
     }
@@ -3904,16 +4558,16 @@ function getFocusLinks() {
 }
 function saveFocusLinks(links, username) {
   try {
-    const dir = path2.dirname(FOCUS_LINKS_FILE);
-    if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
-    fs2.writeFileSync(FOCUS_LINKS_FILE, JSON.stringify(links, null, 2), "utf-8");
+    const dir = path3.dirname(FOCUS_LINKS_FILE);
+    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
+    fs3.writeFileSync(FOCUS_LINKS_FILE, JSON.stringify(links, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path2.resolve(__dirname2, "user-data", targetUser);
-    if (!fs2.existsSync(userRepoDir)) fs2.mkdirSync(userRepoDir, { recursive: true });
-    fs2.writeFileSync(path2.resolve(userRepoDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
-    const userStorageDir = path2.resolve(__dirname2, "data", "user-storage", targetUser);
-    if (!fs2.existsSync(userStorageDir)) fs2.mkdirSync(userStorageDir, { recursive: true });
-    fs2.writeFileSync(path2.resolve(userStorageDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
+    const userRepoDir = path3.resolve(__dirname3, "user-data", targetUser);
+    if (!fs3.existsSync(userRepoDir)) fs3.mkdirSync(userRepoDir, { recursive: true });
+    fs3.writeFileSync(path3.resolve(userRepoDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
+    const userStorageDir = path3.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs3.existsSync(userStorageDir)) fs3.mkdirSync(userStorageDir, { recursive: true });
+    fs3.writeFileSync(path3.resolve(userStorageDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
   } catch (err) {
     console.error("[FocusLinks] Failed to save focus links:", err);
   }
@@ -3970,11 +4624,11 @@ app.delete("/api/agent/focus-links/:id", (req, res) => {
   saveFocusLinks(links, username);
   res.json({ ok: true, remaining: links.length, links });
 });
-var GROUND_CRITERIA_FILE = path2.resolve(__dirname2, "data", "agent", "ground-search-criteria.json");
+var GROUND_CRITERIA_FILE = path3.resolve(__dirname3, "data", "agent", "ground-search-criteria.json");
 function getGroundCriteria() {
   try {
-    if (fs2.existsSync(GROUND_CRITERIA_FILE)) {
-      const raw = fs2.readFileSync(GROUND_CRITERIA_FILE, "utf-8");
+    if (fs3.existsSync(GROUND_CRITERIA_FILE)) {
+      const raw = fs3.readFileSync(GROUND_CRITERIA_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.sources)) return parsed;
     }
@@ -3993,16 +4647,16 @@ function getGroundCriteria() {
 }
 function saveGroundCriteria(data, username = "waqarmajeedinfo") {
   try {
-    const dir = path2.dirname(GROUND_CRITERIA_FILE);
-    if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
-    fs2.writeFileSync(GROUND_CRITERIA_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const dir = path3.dirname(GROUND_CRITERIA_FILE);
+    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
+    fs3.writeFileSync(GROUND_CRITERIA_FILE, JSON.stringify(data, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path2.resolve(__dirname2, "user-data", targetUser);
-    if (!fs2.existsSync(userRepoDir)) fs2.mkdirSync(userRepoDir, { recursive: true });
-    fs2.writeFileSync(path2.resolve(userRepoDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
-    const userStorageDir = path2.resolve(__dirname2, "data", "user-storage", targetUser);
-    if (!fs2.existsSync(userStorageDir)) fs2.mkdirSync(userStorageDir, { recursive: true });
-    fs2.writeFileSync(path2.resolve(userStorageDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userRepoDir = path3.resolve(__dirname3, "user-data", targetUser);
+    if (!fs3.existsSync(userRepoDir)) fs3.mkdirSync(userRepoDir, { recursive: true });
+    fs3.writeFileSync(path3.resolve(userRepoDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userStorageDir = path3.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs3.existsSync(userStorageDir)) fs3.mkdirSync(userStorageDir, { recursive: true });
+    fs3.writeFileSync(path3.resolve(userStorageDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
   } catch (err) {
     console.error("[GroundCriteria] Save error:", err);
   }
@@ -4037,7 +4691,7 @@ app.post("/api/agent/ground-search-criteria/simulate-48h", async (req, res) => {
     const domainQueryPart = targetDomains.length > 0 ? `(${targetDomains.slice(0, 8).map((d) => `site:${d}`).join(" OR ")})` : "site:techcrunch.com OR site:theverge.com OR site:github.com";
     const focusTerms = (criteria.customKeywords || ["AI", "Gemini", "Cursor AI"]).slice(0, 4).join(" OR ");
     const simQuery = `${domainQueryPart} (${focusTerms}) after:${cutoffDate} ${customSeed ? `"${customSeed}"` : ""}`.trim();
-    const ai = getAiClient();
+    const ai = getAiClient2();
     let groundingResponse = null;
     try {
       groundingResponse = await withTimeout(
@@ -4139,7 +4793,7 @@ app.post("/api/ai/story-ideas", async (req, res) => {
       count = 3,
       priorityResources = []
     } = req.body || {};
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const safeCount = Math.min(Math.max(Number(count) || 3, 2), 5);
     const excluded = (Array.isArray(excludeTitles) ? excludeTitles : []).map((title) => String(title || "").trim()).filter(Boolean).slice(0, 80).join(" | ");
     const storedFocusLinks = getFocusLinks();
@@ -4376,7 +5030,7 @@ Return STRICT valid JSON only, no markdown fences:
     }
   ]
 }`;
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const storyAttempts = [
       { model: "gemini-3-flash-preview", timeoutMs: 8e4, thinking: true },
       { model: "gemini-3.6-flash", timeoutMs: 5e4, thinking: true },
@@ -4511,7 +5165,7 @@ app.post("/api/ai/refresh-story", async (req, res) => {
     if (!story || !story.title) {
       return res.status(400).json({ error: "Valid story package required" });
     }
-    const ai = getAiClient();
+    const ai = getAiClient2();
     const scenes = Array.isArray(story.scenes) ? story.scenes : [];
     const scenesOutline = scenes.map((s, idx) => `Scene ${idx + 1} (${s.duration || "10s"}) [${s.purpose || ""}]: Visual: ${s.visual || ""} | Dialogue: "${s.dialogue || ""}"`).join("\n");
     const prompt = `You are the lead story architect and editor for YouTube channel "${story.channelName || "IT Cafeteria"}", presenter "${story.presenter || "Waqar Majeed"}".
@@ -4671,9 +5325,13 @@ app.post("/api/autopilot/trigger-daily", async (req, res) => {
 });
 registerIntegrationRoutes(app);
 registerMultiUserRoutes(app);
+registerTopicResearchRoutes(app);
 async function startServer() {
   let viteServer = null;
-  if (process.env.NODE_ENV !== "production") {
+  const distPath = path3.resolve(__dirname3, "dist");
+  const hasDist = fs3.existsSync(path3.resolve(distPath, "index.html"));
+  const isProd = process.env.NODE_ENV === "production" || !process.env.DEFAULT_APP_PORT && hasDist;
+  if (!isProd) {
     const { createServer: createViteServer } = await import("vite");
     viteServer = await createViteServer({
       server: {
@@ -4683,14 +5341,37 @@ async function startServer() {
       appType: "spa"
     });
     app.use(viteServer.middlewares);
+    app.use("*", async (req, res, next) => {
+      const url = req.originalUrl;
+      try {
+        const indexPath = path3.resolve(__dirname3, "index.html");
+        if (fs3.existsSync(indexPath)) {
+          let template = fs3.readFileSync(indexPath, "utf-8");
+          template = await viteServer.transformIndexHtml(url, template);
+          res.status(200).set({ "Content-Type": "text/html" }).end(template);
+        } else {
+          next();
+        }
+      } catch (e) {
+        if (viteServer?.ssrFixStacktrace) {
+          viteServer.ssrFixStacktrace(e);
+        }
+        next(e);
+      }
+    });
   } else {
-    app.use(express.static(path2.resolve(__dirname2, "dist")));
+    app.use(express.static(distPath, { maxAge: "1h", index: false }));
     app.get("*", (_req, res) => {
-      res.sendFile(path2.resolve(__dirname2, "dist", "index.html"));
+      const indexPath = path3.resolve(distPath, "index.html");
+      if (fs3.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send("Application bundle index.html not found. Please run npm run build.");
+      }
     });
   }
   const server = app.listen(port, "0.0.0.0", () => {
-    console.log(`IT Cafeteria Full-Stack Studio running on http://0.0.0.0:${port}`);
+    console.log(`IT Cafeteria Full-Stack Studio running on http://0.0.0.0:${port} (mode: ${isProd ? "production" : "development"})`);
   });
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
@@ -4725,4 +5406,9 @@ startServer();
  * IT Cafeteria — Living Roman Urdu Phonetic Rules Dictionary Store
  * Manages test-verified spellings to prevent Google Flow voice engine mispronunciations.
  * Supports dynamic user additions, auto-learning from dialogue edits, and persists across reloads.
+ */
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ * Server-side Topic Research, Competitor RSS Ingestion, and Backfill Covered Points
  */

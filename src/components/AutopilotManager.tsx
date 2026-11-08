@@ -865,8 +865,12 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
       );
 
       if (duplicateFound) {
-        addLog('RADAR', `Duplicate collision detected. Autonomously applying fresh angle modifier.`);
-        task.title = `${task.title} (Part 2: Advanced Pro Trick)`;
+        addLog('RADAR', `Duplicate collision detected for "${task.title}". Auto-pivoting: Searching Category Topic Bank for fresh non-duplicate topic...`);
+        const bank = (CATEGORY_TOPIC_BANK[task.categoryId] || []).filter(Boolean);
+        const freshAlt = bank.find(bt => !PUBLISHED_VIDEOS.some(v => v.title.toLowerCase() === bt.toLowerCase().trim()))
+          || `${task.title.replace(/\s*\(Part\s*\d+.*?\)/i, '')} (Part 2: Advanced Pro Sequel)`;
+        task.title = freshAlt;
+        addLog('RADAR', `Zero-Halt Auto-Pivot: Selected fresh unique topic "${task.title}". Continuing generation without halting!`);
       } else {
         addLog('RADAR', `100% Unique confirmed. 0 collisions detected.`);
       }

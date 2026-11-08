@@ -14,6 +14,8 @@ COPY package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server.js ./server.js
+COPY data ./data
+COPY user-data ./user-data
 COPY character-refs ./character-refs
 RUN mkdir -p /app/data /app/user-data && chown -R node:node /app
 USER node
