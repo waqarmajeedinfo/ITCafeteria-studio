@@ -82,7 +82,7 @@ export function ensureFlowCinematicScript(
 
   if (isAlreadyCinematicFlowScript(stripped)) {
     const normalizedScript = stripped
-      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
+      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
       .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
 

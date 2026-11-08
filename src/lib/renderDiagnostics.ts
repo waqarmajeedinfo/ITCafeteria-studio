@@ -105,7 +105,12 @@ class RenderDiagnosticsEngine {
             !l.title?.toLowerCase().includes('websocket') &&
             !l.title?.toLowerCase().includes('web socket') &&
             !l.message?.toLowerCase().includes('websocket') &&
-            !l.message?.toLowerCase().includes('web socket')
+            !l.message?.toLowerCase().includes('web socket') &&
+            !l.title?.toLowerCase().includes('cinematic_presets') &&
+            !l.message?.toLowerCase().includes('cinematic_presets') &&
+            !l.technicalDetails?.toLowerCase().includes('cinematic_presets') &&
+            !l.title?.toLowerCase().includes('categoryid') &&
+            !l.message?.toLowerCase().includes('categoryid')
           );
         }
       }

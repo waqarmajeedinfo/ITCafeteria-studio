@@ -201,7 +201,10 @@ var CHANNEL_PROFILES = {
       { value: "@WM25-3", label: "@WM25-3 (Tech Setup)" },
       { value: "@WM25-4", label: "@WM25-4 (Lecture Series)" },
       { value: "@WM25-5", label: "@WM25-5 (Smart Casual)" },
-      { value: "@WM25-6", label: "@WM25-6 (Signature Studio / Black Jacket)" }
+      { value: "@WM25-6", label: "@WM25-6 (Signature Studio / Black Jacket)" },
+      { value: "@WM25-7", label: "@WM25-7 (Plaid Flannel / Vertical Studio)" },
+      { value: "@WM25-8", label: "@WM25-8 (Green Bomber / Tech Desk)" },
+      { value: "@WM25-9", label: "@WM25-9 (Black Blazer / Studio Suit)" }
     ],
     categories: CATEGORIES_IT_CAFETERIA.map(({ id, name, playlist }) => ({ id, name, playlist })),
     rotationCategoryIds: CATEGORIES_IT_CAFETERIA.filter((c) => c.id <= 8).map((c) => c.id),

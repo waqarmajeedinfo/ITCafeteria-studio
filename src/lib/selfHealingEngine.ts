@@ -83,7 +83,9 @@ class SelfHealingEngine {
             !r.technicalDetails?.toLowerCase().includes('websocket') &&
             !r.summary?.toLowerCase().includes('cinematic_presets') &&
             !r.technicalDetails?.toLowerCase().includes('cinematic_presets') &&
-            !r.summary?.toLowerCase().includes('cinematic_stage_directions')
+            !r.summary?.toLowerCase().includes('cinematic_stage_directions') &&
+            !r.summary?.toLowerCase().includes('categoryid') &&
+            !r.technicalDetails?.toLowerCase().includes('categoryid')
           );
         }
       }

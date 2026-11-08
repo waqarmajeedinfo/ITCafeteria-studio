@@ -213,7 +213,7 @@ export function buildStoryPackageText(rawStory: GeneratedStory): string {
     let directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
     // Enforce strictly 0-10s duration and @tag
     directedScript = (directedScript || '')
-      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
+      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
 
     return `Scene ${scene.num} — 0-10s [${scene.purpose}]${scene.isCTA ? ' — CTA' : ''} (${scene.words} words)
@@ -256,7 +256,7 @@ export function buildScenesOnlyText(rawStory: GeneratedStory): string {
   const scenesText = (story.scenes || []).map((scene) => {
     let directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
     directedScript = (directedScript || '')
-      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
+      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
 
     return `Scene ${scene.num} — 0-10s [${scene.purpose}]${scene.isCTA ? ' — CTA' : ''} (${scene.words} words)
@@ -427,7 +427,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
     let directed = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
     // Strictly format duration to 0-10s and tag with @
     directed = directed
-      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
+      .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
       .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
 
@@ -444,7 +444,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
     setSceneEditDialogue(scene.dialogue);
     let s = scene.script;
     if (s) {
-      s = s.replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1');
+      s = s.replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1');
       s = s.replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
     }
     setSceneEditScript(s);
@@ -708,7 +708,7 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
           const isThisEditing = editingSceneNum === scene.num;
           let directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
           directedScript = directedScript
-            .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d)/g, '[PRESENTER & ACTION]: @WM25-$1')
+            .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
             .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
             .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
 

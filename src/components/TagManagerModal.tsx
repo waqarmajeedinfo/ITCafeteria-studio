@@ -27,7 +27,10 @@ const PRESET_AVATARS = [
   { value: '@WM25-3', label: 'Tech Setup', path: '/character-refs/WM25-3.jpg' },
   { value: '@WM25-4', label: 'Lecture Series', path: '/character-refs/WM25-4.jpg' },
   { value: '@WM25-5', label: 'Smart Casual', path: '/character-refs/WM25-5.jpg' },
-  { value: '@WM25-6', label: 'Signature Studio / Black Jacket', path: '/character-refs/WM25-6.png' }
+  { value: '@WM25-6', label: 'Signature Studio / Black Jacket', path: '/character-refs/WM25-6.png' },
+  { value: '@WM25-7', label: 'Plaid Flannel / Vertical Studio', path: '/character-refs/WM25-7.jpeg' },
+  { value: '@WM25-8', label: 'Green Bomber / Tech Desk', path: '/character-refs/WM25-8.png' },
+  { value: '@WM25-9', label: 'Black Blazer / Studio Suit', path: '/character-refs/WM25-9.png' }
 ];
 
 export const TagManagerModal: React.FC<TagManagerModalProps> = ({

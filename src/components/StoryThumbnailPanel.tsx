@@ -36,10 +36,16 @@ const REFERENCE_EVENT = 'itcafeteria-character-reference';
 const BUNDLED_REFERENCE_BASE = '/character-refs/';
 
 const getBundledReferencePath = (tag: string): string | null => {
-  const match = /^@?(WM25-\d)$/.exec((tag || '').trim());
+  const match = /^@?(WM25-\d+)$/.exec((tag || '').trim());
   if (!match) return null;
-  if (match[1] === 'WM25-6') return `${BUNDLED_REFERENCE_BASE}${match[1]}.png`;
-  return `${BUNDLED_REFERENCE_BASE}${match[1]}.jpg`;
+  const tagId = match[1];
+  if (tagId === 'WM25-6' || tagId === 'WM25-8' || tagId === 'WM25-9') {
+    return `${BUNDLED_REFERENCE_BASE}${tagId}.png`;
+  }
+  if (tagId === 'WM25-7') {
+    return `${BUNDLED_REFERENCE_BASE}${tagId}.jpeg`;
+  }
+  return `${BUNDLED_REFERENCE_BASE}${tagId}.jpg`;
 };
 
 const readStoredReference = (tag: string): StoredReference | null => {

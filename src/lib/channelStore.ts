@@ -95,16 +95,25 @@ export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
       if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
         let modified = false;
 
-        // Ensure itcafeteria has @WM25-6 in its tags if present in storage
+        // Ensure itcafeteria has all 9 official @WM25 tags in its tags if present in storage
         if (parsed.itcafeteria) {
           if (Array.isArray(parsed.itcafeteria.tags)) {
-            const hasWM6 = parsed.itcafeteria.tags.some((t: any) => t.value === '@WM25-6');
-            if (!hasWM6) {
-              parsed.itcafeteria.tags.push({
-                value: '@WM25-6',
-                label: '@WM25-6 (Signature Studio / Black Jacket)'
-              });
-              modified = true;
+            const requiredTags = [
+              { value: '@WM25-6', label: '@WM25-6 (Signature Studio / Black Jacket)', path: '/character-refs/WM25-6.png' },
+              { value: '@WM25-7', label: '@WM25-7 (Plaid Flannel / Vertical Studio)', path: '/character-refs/WM25-7.jpeg' },
+              { value: '@WM25-8', label: '@WM25-8 (Green Bomber / Tech Desk)', path: '/character-refs/WM25-8.png' },
+              { value: '@WM25-9', label: '@WM25-9 (Black Blazer / Studio Suit)', path: '/character-refs/WM25-9.png' }
+            ];
+
+            for (const req of requiredTags) {
+              const exists = parsed.itcafeteria.tags.some((t: any) => t.value === req.value);
+              if (!exists) {
+                parsed.itcafeteria.tags.push({
+                  value: req.value,
+                  label: req.label
+                });
+                modified = true;
+              }
             }
           }
 
