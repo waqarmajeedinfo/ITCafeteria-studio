@@ -1,4 +1,4 @@
-import { CHANNEL_PROFILES, type ChannelProfile } from '../data/channelData';
+import { CHANNEL_PROFILES, CATEGORIES_IT_CAFETERIA, type ChannelProfile } from '../data/channelData';
 
 const STORAGE_KEY = 'itcafeteria_channels_store_v2';
 const HISTORY_KEY = 'itcafeteria_channels_history_v2';
@@ -94,15 +94,28 @@ export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
         // Ensure itcafeteria has @WM25-6 in its tags if present in storage
-        if (parsed.itcafeteria && Array.isArray(parsed.itcafeteria.tags)) {
-          const hasWM6 = parsed.itcafeteria.tags.some((t: any) => t.value === '@WM25-6');
-          if (!hasWM6) {
-            parsed.itcafeteria.tags.push({
-              value: '@WM25-6',
-              label: '@WM25-6 (Signature Studio / Black Jacket)'
-            });
-            saveAllChannels(parsed);
+        if (parsed.itcafeteria) {
+          if (Array.isArray(parsed.itcafeteria.tags)) {
+            const hasWM6 = parsed.itcafeteria.tags.some((t: any) => t.value === '@WM25-6');
+            if (!hasWM6) {
+              parsed.itcafeteria.tags.push({
+                value: '@WM25-6',
+                label: '@WM25-6 (Signature Studio / Black Jacket)'
+              });
+            }
           }
+
+          // Ensure itcafeteria categories strictly match the official 10 categories from Image 2
+          const isCorrupted = !Array.isArray(parsed.itcafeteria.categories) ||
+            parsed.itcafeteria.categories.length !== 10 ||
+            parsed.itcafeteria.categories.some((c: any) => c.name === 'Google' || c.name === 'Windows' || c.name.includes('etc.)') || c.name === 'Secrets (WhatsApp');
+
+          if (isCorrupted) {
+            parsed.itcafeteria.categories = CATEGORIES_IT_CAFETERIA.map(({ id, name, playlist, details, special }) => ({ id, name, playlist, details, special }));
+            parsed.itcafeteria.rotationCategoryIds = [1, 2, 3, 4, 5, 6, 7, 8];
+            parsed.itcafeteria.categoryRules = CHANNEL_PROFILES.itcafeteria.categoryRules;
+          }
+          saveAllChannels(parsed);
         }
         return parsed;
       }

@@ -31,7 +31,56 @@ import {
   type ExtendedChannelProfile,
   type ChannelEngineConfig
 } from '../lib/channelStore';
+import { CATEGORIES_IT_CAFETERIA } from '../data/channelData';
 import { dirtyManager } from '../lib/dirtyStore';
+
+function parseCategoriesInput(input: string): Array<{ id: number; name: string; playlist: string; details?: string; special?: string }> {
+  let rawList: string[] = [];
+  if (input.includes('\n')) {
+    rawList = input
+      .split('\n')
+      .map((s) => s.trim().replace(/^[\d+.-]+\s*/, ''))
+      .filter((s) => s.length > 0);
+  } else if (input.includes(';')) {
+    rawList = input
+      .split(';')
+      .map((s) => s.trim().replace(/^[\d+.-]+\s*/, ''))
+      .filter((s) => s.length > 0);
+  } else {
+    // Comma-separated, but strictly preserve commas inside parentheses () or brackets []
+    const tokens: string[] = [];
+    let current = '';
+    let parenDepth = 0;
+    for (let i = 0; i < input.length; i++) {
+      const char = input[i];
+      if (char === '(' || char === '[') parenDepth++;
+      else if (char === ')' || char === ']') parenDepth = Math.max(0, parenDepth - 1);
+
+      if (char === ',' && parenDepth === 0) {
+        if (current.trim()) tokens.push(current.trim().replace(/^[\d+.-]+\s*/, ''));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    if (current.trim()) tokens.push(current.trim().replace(/^[\d+.-]+\s*/, ''));
+    rawList = tokens;
+  }
+
+  return rawList.map((name, i) => {
+    // Check if name matches any standard IT Cafeteria category to preserve rich metadata
+    const standard = CATEGORIES_IT_CAFETERIA.find(
+      (c) => c.name.toLowerCase() === name.toLowerCase() || (c.id === i + 1 && name.startsWith(c.name.slice(0, 15)))
+    );
+    return {
+      id: i + 1,
+      name,
+      playlist: standard?.playlist || (name.length > 30 ? (name.split('(')[0].trim() || name) : name),
+      details: standard?.details,
+      special: standard?.special
+    };
+  });
+}
 
 interface ChannelManagerModalProps {
   isOpen: boolean;
@@ -227,7 +276,7 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     setTag(channel.defaultTag || (channel.tags && channel.tags[0]?.value) || '');
     setPlatform(channel.platform || 'Multi-Platform MCN (YouTube Shorts + TikTok + Reels)');
     setSceneCount(channel.defaultSceneCount || 10);
-    setCategoriesText(channel.categories.map((c) => c.name).join(', '));
+    setCategoriesText(channel.categories.map((c, i) => `${i + 1}. ${c.name}`).join('\n'));
     setAspectRatio(channel.aspectRatio || '9:16');
     setSuggestedNiches([]);
     setSuggestedCategories([]);
@@ -250,13 +299,10 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
 
-    const categories = categoriesText
-      .split(',')
-      .map((c, i) => ({ id: i + 1, name: c.trim(), playlist: c.trim() }))
-      .filter((c) => c.name.length > 0);
+    const parsedCategories = parseCategoriesInput(categoriesText);
 
-    const safeCategories = categories.length
-      ? categories
+    const safeCategories = parsedCategories.length
+      ? parsedCategories
       : [{ id: 1, name: 'Main Category', playlist: 'Main' }];
 
     const channelId = editingChannelId || name.toLowerCase().replace(/[^a-z0-9]/g, '') || `channel_${Date.now()}`;
@@ -668,10 +714,13 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
                               key={i}
                               type="button"
                               onClick={() => {
-                                const current = categoriesText ? categoriesText.split(',').map(s => s.trim()).filter(Boolean) : [];
-                                if (!current.includes(sCat)) {
-                                  current.push(sCat);
-                                  setCategoriesText(current.join(', '));
+                                const currentLines = categoriesText
+                                  .split('\n')
+                                  .map((s) => s.trim())
+                                  .filter(Boolean);
+                                if (!currentLines.some((l) => l.toLowerCase().includes(sCat.toLowerCase()))) {
+                                  currentLines.push(`${currentLines.length + 1}. ${sCat}`);
+                                  setCategoriesText(currentLines.join('\n'));
                                 }
                               }}
                               className="px-2 py-1 rounded-lg bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-200 text-[11px] transition-colors cursor-pointer"
@@ -841,18 +890,23 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-slate-300 font-semibold block mb-1">
-                    Channel Categories (Commas se alag karein)
-                  </label>
-                  <input
-                    type="text"
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-slate-300 font-semibold text-xs sm:text-sm">
+                      Channel Categories (Har category nayi line me likhein)
+                    </label>
+                    <span className="text-[10px] text-emerald-400 font-mono">
+                      Safe Parentheses Support
+                    </span>
+                  </div>
+                  <textarea
+                    rows={6}
                     value={categoriesText}
                     onChange={(e) => setCategoriesText(e.target.value)}
-                    placeholder="e.g. AI Tools & Agents, Windows & Cloud Hacks, Remote Income Skills"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    placeholder={'1. AI & Smart Technology\n2. AI Chatbots, Workflows & AI Tools\n3. PC & Windows Hacks\n4. Secrets (WhatsApp, Google, Windows, ChatGPT, etc.)'}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs sm:text-sm font-mono focus:outline-none focus:border-emerald-500 leading-relaxed resize-y"
                   />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Har category par AI Story Engine rotation aur specific prompts chalata hai.
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Har category ko alag line par likhein. Parentheses <code>(...)</code> ke andar ke commas safe rahenge aur alag category nahi banenge.
                   </p>
                 </div>
 

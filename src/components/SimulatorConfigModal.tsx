@@ -271,16 +271,66 @@ export const BEAUTY_HUB_SCRIPT_PRESETS: ScriptPresetItem[] = [
 export const SCRIPT_RULE_PRESETS = IT_CAFETERIA_SCRIPT_RULE_PRESETS;
 
 export const IT_CAFETERIA_10_CATEGORY_RULES: CategoryRuleItem[] = [
-  { id: 1, name: '1. AI & Smart Tech', instructions: 'Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.', boundCategoryIds: [1] },
-  { id: 2, name: '2. AI Workflows', instructions: 'Deep productivity and automation tutorial format. Structure: Business problem, Architecture and trigger breakdown, Step-by-step logic nodes, Live testing.', boundCategoryIds: [2] },
-  { id: 3, name: '3. AI Prompt Hacks', instructions: 'Slash commands, prompt formulas for realistic images, reverse prompt engineering, and workflow productivity shortcuts.', boundCategoryIds: [3] },
-  { id: 4, name: '4. PC & Windows Hacks', instructions: 'Extended format (10-15 scenes, 7-beat, 0.3s anchor). God mode, clipboard history (Win+V), graphics driver reset, speed boosts.', boundCategoryIds: [4] },
-  { id: 5, name: '5. New Tech Tutorials', instructions: 'Step-by-step UI walkthrough, zero prior coding knowledge needed, practical product review.', boundCategoryIds: [5] },
-  { id: 6, name: '6. Future Tech', instructions: 'Visionary tech breakthroughs, autonomous smart home agents, and positive future outlook.', boundCategoryIds: [6] },
-  { id: 7, name: '7. Secrets (WhatsApp, etc.)', instructions: 'Show actual tool in title/topic, hidden shortcuts, date-wise chat search, biometric chat lock.', boundCategoryIds: [7] },
-  { id: 8, name: '8. Income & Skills', instructions: 'Passive income ideas, store management, freelance skills, with strict reminder of no income guarantees.', boundCategoryIds: [8] },
-  { id: 9, name: '9. YT Automation (16:9)', instructions: '16:9 format mandatory, multi-agent AI script systems, retention optimization, high-CTR storytelling.', boundCategoryIds: [9] },
-  { id: 10, name: '10. Custom Search', instructions: 'User-driven search query and research grounding with prioritized external links and web insights.', boundCategoryIds: [10] }
+  {
+    id: 1,
+    name: '1. AI & Smart Technology',
+    instructions: 'Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.',
+    boundCategoryIds: [1]
+  },
+  {
+    id: 2,
+    name: '2. AI Chatbots, Workflows & AI Tools',
+    instructions: 'ChatGPT, Claude, Gemini, Google AI tools, Google Flow, Nano, workflows, new features/tools. Deep productivity and automation tutorial format.',
+    boundCategoryIds: [2]
+  },
+  {
+    id: 3,
+    name: '3. AI Prompt Hacks & Shortcuts',
+    instructions: 'prompt techniques, image+prompt workflows, practical AI tricks. Slash commands, prompt formulas for realistic images, reverse prompt engineering.',
+    boundCategoryIds: [3]
+  },
+  {
+    id: 4,
+    name: '4. PC & Windows Hacks',
+    instructions: 'Windows, PC optimization, troubleshooting, shortcuts, productivity, hidden features, plus Windows hidden tools/settings/CMD/PowerShell tricks to fix PC issues (slow PC, temp files, hidden settings, command-line and PowerShell tools, and any other method found via research); an ongoing, never-ending part-by-part series (Part 1, Part 2, Part 3...) that runs under its own extended-length test format.',
+    boundCategoryIds: [4]
+  },
+  {
+    id: 5,
+    name: '5. New Technology & Product Tutorials',
+    instructions: 'new launches, new features, new products. Step-by-step UI walkthrough, zero prior coding knowledge needed, practical product review.',
+    boundCategoryIds: [5]
+  },
+  {
+    id: 6,
+    name: '6. Future Tech & Positive Breakthroughs',
+    instructions: 'useful upcoming technology, major beneficial developments. Visionary tech breakthroughs, autonomous smart home agents, and positive future outlook.',
+    boundCategoryIds: [6]
+  },
+  {
+    id: 7,
+    name: '7. Secrets (WhatsApp, Google, Windows, ChatGPT, etc.)',
+    instructions: 'Secrets (WhatsApp, Google, Google Chrome, Google Maps, Gmail, Google Drive, Google Play Store, YouTube, Instagram, Facebook, TikTok, Telegram, Windows, ChatGPT, Google Gemini, CapCut) — an ongoing, never-ending part-by-part series covering hidden settings/features in major daily-used apps and tools that normal users don\'t know about.',
+    boundCategoryIds: [7]
+  },
+  {
+    id: 8,
+    name: '8. Income & Skills: Tools That Earn',
+    instructions: 'an ideas-only category about how viewers could build income with tools, skills and platforms. Passive income ideas, store management, freelance skills, with strict reminder of ideas only, no income guarantees.',
+    boundCategoryIds: [8]
+  },
+  {
+    id: 9,
+    name: '9. YT Automation',
+    instructions: 'a lecture-style course about YouTube automation, made chapter by chapter in 16:9 under the Lecture Series Format. 16:9 format mandatory, multi-agent AI script systems, retention optimization.',
+    boundCategoryIds: [9]
+  },
+  {
+    id: 10,
+    name: '10. Custom Search',
+    instructions: 'a topic supplied directly, always treated as a separate, additional item outside the regular rotation. User-driven search query and research grounding with prioritized external links and web insights.',
+    boundCategoryIds: [10]
+  }
 ];
 
 export function getScriptRulePresetsForProfile(profile?: any): ScriptPresetItem[] {
@@ -663,15 +713,15 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
     currentProfile?.categories && Array.isArray(currentProfile.categories) && currentProfile.categories.length > 0
       ? currentProfile.categories
       : [
-          { id: 1, name: 'AI & Smart Tech' },
-          { id: 2, name: 'AI Workflows' },
-          { id: 3, name: 'AI Prompt Hacks' },
+          { id: 1, name: 'AI & Smart Technology' },
+          { id: 2, name: 'AI Chatbots, Workflows & AI Tools' },
+          { id: 3, name: 'AI Prompt Hacks & Shortcuts' },
           { id: 4, name: 'PC & Windows Hacks' },
-          { id: 5, name: 'New Tech Tutorials' },
-          { id: 6, name: 'Future Tech' },
-          { id: 7, name: 'Secrets (WhatsApp, etc.)' },
-          { id: 8, name: 'Income & Skills' },
-          { id: 9, name: 'YT Automation (16:9)' },
+          { id: 5, name: 'New Technology & Product Tutorials' },
+          { id: 6, name: 'Future Tech & Positive Breakthroughs' },
+          { id: 7, name: 'Secrets (WhatsApp, Google, Google Chrome, Google Maps, Gmail, Google Drive, Google Play Store, YouTube, Instagram, Facebook, TikTok, Telegram, Windows, ChatGPT, Google Gemini, CapCut)' },
+          { id: 8, name: 'Income & Skills: Tools That Earn' },
+          { id: 9, name: 'YT Automation' },
           { id: 10, name: 'Custom Search' }
         ];
 

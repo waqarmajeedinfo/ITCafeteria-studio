@@ -583,22 +583,79 @@ export const YT_AUTOMATION_ROADMAP = [
 ];
 
 export const CATEGORIES_IT_CAFETERIA = [
-  { id: 1, name: "AI & Smart Technology", playlist: "AI & Smart Technology" },
-  { id: 2, name: "AI Chatbots, Workflows & AI Tools", playlist: "AI Chatbots, Workflows & AI Tools" },
-  { id: 3, name: "AI Prompt Hacks & Shortcuts", playlist: "AI Prompt Hacks & Shortcuts" },
-  { id: 4, name: "PC & Windows Hacks", playlist: "PC & Windows Hacks", special: "Extended format (10-15 scenes, 7-beat, 0.3s anchor)" },
-  { id: 5, name: "New Technology & Product Tutorials", playlist: "New Technology & Product Tutorials" },
-  { id: 6, name: "Future Tech & Positive Breakthroughs", playlist: "Future Tech & Positive Breakthroughs" },
-  { id: 7, name: "Secrets (WhatsApp, Google, Windows, ChatGPT, etc.)", playlist: "Secrets", special: "Show actual tool in title/topic" },
-  { id: 8, name: "Income & Skills: Tools That Earn", playlist: "Income & Skills: Tools That Earn", special: "Ideas only, no income guarantees" },
-  { id: 9, name: "YT Automation (Course Series)", playlist: "YT Automation", special: "16:9 format, manual selection" },
-  { id: 10, name: "Custom Search", playlist: "Digital Growth or closest category" }
+  {
+    id: 1,
+    name: "AI & Smart Technology",
+    playlist: "AI & Smart Technology",
+    details: "Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks."
+  },
+  {
+    id: 2,
+    name: "AI Chatbots, Workflows & AI Tools",
+    playlist: "AI Chatbots, Workflows & AI Tools",
+    details: "ChatGPT, Claude, Gemini, Google AI tools, Google Flow, Nano, workflows, new features/tools"
+  },
+  {
+    id: 3,
+    name: "AI Prompt Hacks & Shortcuts",
+    playlist: "AI Prompt Hacks & Shortcuts",
+    details: "prompt techniques, image+prompt workflows, practical AI tricks"
+  },
+  {
+    id: 4,
+    name: "PC & Windows Hacks",
+    playlist: "PC & Windows Hacks",
+    details: "Windows, PC optimization, troubleshooting, shortcuts, productivity, hidden features, plus Windows hidden tools/settings/CMD/PowerShell tricks to fix PC issues (slow PC, temp files, hidden settings, command-line and PowerShell tools, and any other method found via research); an ongoing, never-ending part-by-part series (Part 1, Part 2, Part 3...) that runs under its own extended-length test format",
+    special: "Extended format (10-15 scenes, 7-beat, 0.3s anchor); ongoing part-by-part series"
+  },
+  {
+    id: 5,
+    name: "New Technology & Product Tutorials",
+    playlist: "New Technology & Product Tutorials",
+    details: "new launches, new features, new products"
+  },
+  {
+    id: 6,
+    name: "Future Tech & Positive Breakthroughs",
+    playlist: "Future Tech & Positive Breakthroughs",
+    details: "useful upcoming technology, major beneficial developments"
+  },
+  {
+    id: 7,
+    name: "Secrets (WhatsApp, Google, Google Chrome, Google Maps, Gmail, Google Drive, Google Play Store, YouTube, Instagram, Facebook, TikTok, Telegram, Windows, ChatGPT, Google Gemini, CapCut)",
+    playlist: "Secrets",
+    details: "an ongoing, never-ending part-by-part series covering hidden settings/features in major daily-used apps and tools that normal users don't know about",
+    special: "Show actual tool in title/topic; ongoing part-by-part series"
+  },
+  {
+    id: 8,
+    name: "Income & Skills: Tools That Earn",
+    playlist: "Income & Skills: Tools That Earn",
+    details: "an ideas-only category about how viewers could build income with tools, skills and platforms",
+    special: "Ideas only, no income guarantees"
+  },
+  {
+    id: 9,
+    name: "YT Automation",
+    playlist: "YT Automation",
+    details: "a lecture-style course about YouTube automation, made chapter by chapter in 16:9 under the Lecture Series Format",
+    special: "16:9 format, Lecture Series Format"
+  },
+  {
+    id: 10,
+    name: "Custom Search",
+    playlist: "Custom Search",
+    details: "a topic supplied directly, always treated as a separate, additional item outside the regular rotation",
+    special: "Separate additional item outside regular rotation"
+  }
 ];
 
 export interface ChannelCategory {
   id: number;
   name: string;
   playlist: string;
+  details?: string;
+  special?: string;
 }
 
 export interface ChannelTagVariant {
@@ -680,16 +737,56 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
       10: { title: "Custom Topic: Aapki Research Ke Mutabiq", hook: "Reveal" }
     },
     categoryRules: {
-      1: { title: "AI & Smart Technology Rule", instructions: "Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.", defaultRatio: "9:16" },
-      2: { title: "AI Chatbots & Workflows Rule", instructions: "Deep productivity and automation tutorial format. Structure: Business problem, Architecture and trigger breakdown, Step-by-step logic nodes, Live testing.", defaultRatio: "9:16" },
-      3: { title: "AI Prompt Hacks Rule", instructions: "Slash commands, prompt formulas for realistic images, reverse prompt engineering, and workflow productivity shortcuts.", defaultRatio: "9:16" },
-      4: { title: "PC & Windows Hacks Rule", instructions: "Extended format (10-15 scenes, 7-beat, 0.3s anchor). God mode, clipboard history (Win+V), graphics driver reset, speed boosts.", defaultRatio: "9:16" },
-      5: { title: "New Technology Rule", instructions: "Step-by-step UI walkthrough, zero prior coding knowledge needed, practical product review.", defaultRatio: "9:16" },
-      6: { title: "Future Tech Rule", instructions: "Visionary tech breakthroughs, autonomous smart home agents, and positive future outlook.", defaultRatio: "9:16" },
-      7: { title: "Secrets Rule", instructions: "Show actual tool in title/topic, hidden shortcuts, date-wise chat search, biometric chat lock.", defaultRatio: "9:16" },
-      8: { title: "Income & Skills Rule", instructions: "Passive income ideas, store management, freelance skills, with strict reminder of no income guarantees.", defaultRatio: "9:16" },
-      9: { title: "YT Automation Rule", instructions: "16:9 format mandatory, multi-agent AI script systems, retention optimization, high-CTR storytelling.", defaultRatio: "16:9" },
-      10: { title: "Custom Search Rule", instructions: "User-driven search query and research grounding with prioritized external links and web insights.", defaultRatio: "9:16" }
+      1: {
+        title: "AI & Smart Technology Rule",
+        instructions: "Focus on latest AI breakthroughs, active memory/focus, multimodal live capabilities in Roman Urdu with pattern-interrupt hooks.",
+        defaultRatio: "9:16"
+      },
+      2: {
+        title: "AI Chatbots, Workflows & AI Tools Rule",
+        instructions: "ChatGPT, Claude, Gemini, Google AI tools, Google Flow, Nano, workflows, new features/tools. Deep productivity and automation tutorial format: Business problem, Architecture and trigger breakdown, Step-by-step logic nodes, Live testing.",
+        defaultRatio: "9:16"
+      },
+      3: {
+        title: "AI Prompt Hacks & Shortcuts Rule",
+        instructions: "prompt techniques, image+prompt workflows, practical AI tricks. Slash commands, prompt formulas for realistic images, reverse prompt engineering, and workflow productivity shortcuts.",
+        defaultRatio: "9:16"
+      },
+      4: {
+        title: "PC & Windows Hacks Rule",
+        instructions: "Windows, PC optimization, troubleshooting, shortcuts, productivity, hidden features, plus Windows hidden tools/settings/CMD/PowerShell tricks to fix PC issues (slow PC, temp files, hidden settings, command-line and PowerShell tools, and any other method found via research); an ongoing, never-ending part-by-part series (Part 1, Part 2, Part 3...) that runs under its own extended-length test format (10-15 scenes, 7-beat, 0.3s anchor).",
+        defaultRatio: "9:16"
+      },
+      5: {
+        title: "New Technology & Product Tutorials Rule",
+        instructions: "new launches, new features, new products. Step-by-step UI walkthrough, zero prior coding knowledge needed, practical product review.",
+        defaultRatio: "9:16"
+      },
+      6: {
+        title: "Future Tech & Positive Breakthroughs Rule",
+        instructions: "useful upcoming technology, major beneficial developments. Visionary tech breakthroughs, autonomous smart home agents, and positive future outlook.",
+        defaultRatio: "9:16"
+      },
+      7: {
+        title: "Secrets Rule",
+        instructions: "Secrets (WhatsApp, Google, Google Chrome, Google Maps, Gmail, Google Drive, Google Play Store, YouTube, Instagram, Facebook, TikTok, Telegram, Windows, ChatGPT, Google Gemini, CapCut) — an ongoing, never-ending part-by-part series covering hidden settings/features in major daily-used apps and tools that normal users don't know about. Show actual tool in title/topic, hidden shortcuts, date-wise search, biometric lock.",
+        defaultRatio: "9:16"
+      },
+      8: {
+        title: "Income & Skills: Tools That Earn Rule",
+        instructions: "an ideas-only category about how viewers could build income with tools, skills and platforms. Passive income ideas, store management, freelance skills, with strict reminder of ideas only, no income guarantees.",
+        defaultRatio: "9:16"
+      },
+      9: {
+        title: "YT Automation Rule",
+        instructions: "a lecture-style course about YouTube automation, made chapter by chapter in 16:9 under the Lecture Series Format. 16:9 format mandatory, multi-agent AI script systems, retention optimization, high-CTR storytelling.",
+        defaultRatio: "16:9"
+      },
+      10: {
+        title: "Custom Search Rule",
+        instructions: "a topic supplied directly, always treated as a separate, additional item outside the regular rotation. User-driven search query and research grounding with prioritized external links and web insights.",
+        defaultRatio: "9:16"
+      }
     }
   },
   beautyhub: {
