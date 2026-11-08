@@ -64,27 +64,31 @@ function saveRotationForChannel(channelId: ChannelProfile['id'], tag: string, ca
 }
 
 function resolveSavedTag(profile: ChannelProfile, tag?: string) {
+  if (!profile || !Array.isArray(profile.tags) || profile.tags.length === 0) return '@WM25-1';
   return tag && profile.tags.some((item) => item.value === tag) ? tag : profile.defaultTag;
 }
 
 function resolveSavedCategory(profile: ChannelProfile, categoryId?: number) {
+  if (!profile || !Array.isArray(profile.categories) || profile.categories.length === 0) return 1;
   return categoryId && profile.categories.some((item) => item.id === categoryId)
     ? categoryId
-    : profile.defaultCategoryId;
+    : (profile.defaultCategoryId || 1);
 }
 
 function getNextTag(profile: ChannelProfile, currentTag: string) {
+  if (!profile || !Array.isArray(profile.tags) || profile.tags.length === 0) return '@WM25-1';
   const index = profile.tags.findIndex((item) => item.value === currentTag);
   if (index === -1) return profile.tags[0]?.value ?? profile.defaultTag;
   return profile.tags[(index + 1) % profile.tags.length].value;
 }
 
 function getNextCategoryId(profile: ChannelProfile, currentCategoryId: number) {
-  const rotation = profile.rotationCategoryIds.length
+  if (!profile || !Array.isArray(profile.categories) || profile.categories.length === 0) return 1;
+  const rotation = profile.rotationCategoryIds && profile.rotationCategoryIds.length
     ? profile.rotationCategoryIds
     : profile.categories.map((item) => item.id);
   const index = rotation.indexOf(currentCategoryId);
-  if (index === -1) return rotation[0] ?? profile.defaultCategoryId;
+  if (index === -1) return rotation[0] ?? profile.defaultCategoryId ?? 1;
   return rotation[(index + 1) % rotation.length];
 }
 
@@ -210,16 +214,16 @@ export const AgentSimulator: React.FC = () => {
 
   const profilesMap = CHANNEL_PROFILES as unknown as Record<string, ChannelProfile>;
   const draftProfile = (channels[draftChannel] || profilesMap[draftChannel] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile;
-  const draftCategoryMeta = draftProfile.categories.find((cat) => cat.id === draftCategory) ?? draftProfile.categories[0];
+  const draftCategoryMeta = draftProfile?.categories?.find((cat) => cat.id === draftCategory) ?? draftProfile?.categories?.[0] ?? { id: 1, name: 'AI & Smart Technology', playlist: 'AI' };
   const nextDraftTagValue = getNextTag(draftProfile, draftTag);
-  const nextDraftTagLabel = draftProfile.tags.find((tag) => tag.value === nextDraftTagValue)?.label ?? nextDraftTagValue;
+  const nextDraftTagLabel = draftProfile?.tags?.find((tag) => tag.value === nextDraftTagValue)?.label ?? nextDraftTagValue;
   const nextDraftCategoryId = getNextCategoryId(draftProfile, draftCategory);
-  const nextDraftCategoryMeta = draftProfile.categories.find((cat) => cat.id === nextDraftCategoryId) ?? draftProfile.categories[0];
+  const nextDraftCategoryMeta = draftProfile?.categories?.find((cat) => cat.id === nextDraftCategoryId) ?? draftProfile?.categories?.[0] ?? { id: 1, name: 'AI & Smart Technology', playlist: 'AI' };
   const appliedProfile = appliedSelection
     ? ((channels[appliedSelection.channelId] || profilesMap[appliedSelection.channelId] || CHANNEL_PROFILES.itcafeteria) as ChannelProfile)
     : null;
   const appliedCategory = appliedSelection && appliedProfile
-    ? appliedProfile.categories.find((cat) => cat.id === appliedSelection.categoryId) ?? appliedProfile.categories[0]
+    ? appliedProfile.categories?.find((cat) => cat.id === appliedSelection.categoryId) ?? appliedProfile.categories?.[0]
     : null;
 
   const pendingChanges = !appliedSelection ||

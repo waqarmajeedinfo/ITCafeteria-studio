@@ -93,6 +93,8 @@ export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+        let modified = false;
+
         // Ensure itcafeteria has @WM25-6 in its tags if present in storage
         if (parsed.itcafeteria) {
           if (Array.isArray(parsed.itcafeteria.tags)) {
@@ -102,6 +104,7 @@ export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
                 value: '@WM25-6',
                 label: '@WM25-6 (Signature Studio / Black Jacket)'
               });
+              modified = true;
             }
           }
 
@@ -114,8 +117,14 @@ export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
             parsed.itcafeteria.categories = CATEGORIES_IT_CAFETERIA.map(({ id, name, playlist, details, special }) => ({ id, name, playlist, details, special }));
             parsed.itcafeteria.rotationCategoryIds = [1, 2, 3, 4, 5, 6, 7, 8];
             parsed.itcafeteria.categoryRules = CHANNEL_PROFILES.itcafeteria.categoryRules;
+            modified = true;
           }
-          saveAllChannels(parsed);
+
+          if (modified) {
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+            } catch {}
+          }
         }
         return parsed;
       }
@@ -164,8 +173,10 @@ function saveHistoryState(currentChannels: Record<string, ExtendedChannelProfile
 
 export function saveAllChannels(channels: Record<string, ExtendedChannelProfile>) {
   try {
-    const previous = loadAllChannels();
-    saveHistoryState(previous);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      localStorage.setItem(HISTORY_KEY, raw);
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(channels));
   } catch (e) {
     console.error('Error saving channels', e);
