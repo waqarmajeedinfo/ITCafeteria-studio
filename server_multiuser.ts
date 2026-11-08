@@ -977,7 +977,7 @@ export function registerMultiUserRoutes(app: Express) {
 
       res.json({
         ok: true,
-        message: `User @${user.username} ka status "${user.isApproved ? 'Approved (منظور شدہ)' : 'Pending Approval'}" ho gaya.`,
+        message: `User @${user.username} ka status "${user.isApproved ? 'Approved (Manzoor Shuda)' : 'Pending Approval'}" ho gaya.`,
         isApproved: user.isApproved
       });
     } catch (e: any) {

@@ -62,7 +62,6 @@ HEADER:
 HERO HEADLINE (center aligned):
 - Bold 3D lettering with a dual-color treatment: ${headline}.
 - Sharp neon outline/rim-light around both lines, strong dimensional depth, perfectly spelled, instantly readable at mobile size.
-- Add a small circular play-button icon with a ">" glyph near the end of the headline text.
 
 SUB-BANNER (center aligned, below the headline):
 - "${subBanner}" in bold black text on a vibrant yellow textured brush-stroke banner.
@@ -2259,7 +2258,7 @@ function registerMultiUserRoutes(app2) {
       );
       res.json({
         ok: true,
-        message: `User @${user.username} ka status "${user.isApproved ? "Approved (\u0645\u0646\u0638\u0648\u0631 \u0634\u062F\u06C1)" : "Pending Approval"}" ho gaya.`,
+        message: `User @${user.username} ka status "${user.isApproved ? "Approved (Manzoor Shuda)" : "Pending Approval"}" ho gaya.`,
         isApproved: user.isApproved
       });
     } catch (e) {
