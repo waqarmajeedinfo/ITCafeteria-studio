@@ -1866,6 +1866,7 @@ app.post('/api/ai/story-ideas', async (req, res) => {
       category = 'General',
       seedTopic = '',
       excludeTitles = [],
+      excludePoints = [],
       count = 3,
       priorityResources = [],
     } = req.body || {};
@@ -1877,6 +1878,12 @@ app.post('/api/ai/story-ideas', async (req, res) => {
       .filter(Boolean)
       .slice(0, 80)
       .join(' | ');
+
+    const excludedPointsList = (Array.isArray(excludePoints) ? excludePoints : [])
+      .map((p: any) => String(p || '').trim())
+      .filter(Boolean)
+      .slice(0, 30);
+    const excludedPointsText = excludedPointsList.map(p => `• ${p}`).join('\n');
 
     // Load persistent focus links from backend repository
     const storedFocusLinks = getFocusLinks();
@@ -1927,7 +1934,10 @@ Rules:
 - Channel IT/tech ho to practical tech tutorial, Beauty ho to beauty-specific idea ho.
 - Generic "is video mein" ya "aaj hum seekhenge" titles bilkul nahi.
 
-Excluded already-published / remembered titles (do NOT reuse or paraphrase):
+Already published specific secrets/tricks (DO NOT suggest these; propose completely fresh secrets/steps):
+${excludedPointsText || '(none)'}
+
+Excluded already-published titles (do NOT reuse or paraphrase):
 ${excluded || '(none)'}
 
 Return STRICT raw JSON only, no markdown fences:
@@ -1938,9 +1948,8 @@ Return STRICT raw JSON only, no markdown fences:
 }`;
 
     const ideaAttempts = [
-      { model: 'gemini-3.5-flash-lite', timeoutMs: 45000, thinking: false },
-      { model: 'gemini-3-flash-preview', timeoutMs: 45000, thinking: true },
-      { model: 'gemini-3.6-flash', timeoutMs: 45000, thinking: true },
+      { model: 'gemini-3.1-flash-lite', timeoutMs: 25000, thinking: false },
+      { model: 'gemini-3.8-flash', timeoutMs: 30000, thinking: true },
     ];
     let data: any = null;
     let lastError: any = null;
@@ -1971,7 +1980,7 @@ Return STRICT raw JSON only, no markdown fences:
         break;
       } catch (attemptError: any) {
         lastError = attemptError;
-        console.error(`Story ideas attempt ${attemptIndex + 1} (${attempt.model}) failed:`, attemptError?.message || attemptError);
+        console.warn(`Story ideas attempt (${attempt.model}) failed:`, attemptError?.message || attemptError);
       }
     }
 

@@ -30,13 +30,17 @@ import {
 import { GroundLevelSearchDashboard } from './GroundLevelSearchDashboard';
 import { PUBLISHED_VIDEOS, type ChannelProfile } from '../data/channelData';
 import { getAllPublishedVideos, type DynamicPublishedStory } from '../lib/publishedLibraryStore';
-import { loadPendingQueue } from '../lib/pendingQueueStore';
 import { StoryPackageView, type GeneratedStory, type StoryIdea, type StoryScene } from './StoryPackageView';
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import type { SimulatorConfig } from './SimulatorConfigModal';
 import { checkDeletedStoryBlacklist, loadDeletedStoryBlacklist } from '../lib/deletedStoryRegistry';
 import { applyPhoneticFixes, verifyAndCorrectStoryPhonetics, getPhoneticDictionary } from '../lib/phoneticDictionaryStore';
-import { checkSmarterDuplicate } from '../lib/profileStore';
+import {
+  checkHierarchicalDuplicate,
+  getAlreadyCoveredPointsList,
+  type DuplicateCheckResult,
+  extractCandidateSpecificPoints
+} from '../lib/profileStore';
 import { CATEGORY_TOPIC_BANK } from './AutopilotManager';
 
 export interface AgentTriggerSelection {
@@ -59,12 +63,21 @@ export interface AgentMemoryRecord {
 }
 
 export interface DuplicateMatch {
-  source: 'Catalog' | 'Session Memory' | 'Deleted Story (Permanent Blacklist)';
+  source: 'Catalog' | 'Published Library' | 'Deleted Story (Permanent Blacklist)';
   id: string;
   title: string;
   tool: string;
   points: string;
   matchedKeywords: string[];
+}
+
+export interface SkippedDuplicateRecord {
+  storyTitle: string;
+  coveredPoint: string;
+  attemptedTitle: string;
+  candidatePoint?: string;
+  reason: string;
+  timestamp: string;
 }
 
 export interface AgentTriggerOutcome {
@@ -98,159 +111,8 @@ interface ChatMessage {
 type Phase = 'checking' | 'duplicate' | 'auto-pivoting' | 'idea-input' | 'ideas' | 'discuss' | 'generating' | 'complete' | 'error';
 type CheckStage = 'initial' | 'idea';
 
-const STOP_WORDS = new Set([
-  'the', 'and', 'for', 'with', 'from', 'this', 'that', 'your', 'you', 'how', 'what', 'why', 'when', 'where',
-  'into', 'over', 'under', 'without', 'before', 'after', 'about', 'video', 'videos', 'short', 'shorts',
-  'windows', 'window', 'hidden', 'trick', 'tricks', 'secret', 'secrets', 'tip', 'tips', 'feature', 'features',
-  'guide', 'tutorial', 'explained', 'using', 'use', 'uses', 'used', 'make', 'makes', 'made', 'new', 'best',
-  'top', 'easy', 'quick', 'simple', 'full', 'part', 'karein', 'karin', 'karna', 'kaise', 'kya', 'mein', 'hai',
-  'hain', 'nahi', 'aur', 'ke', 'ki', 'ka', 'ko', 'se', 'ab', 'aik', 'ek', 'liye', 'aap', 'aapka', 'aapki',
-  'aapke', 'yeh', 'woh', 'jo', 'par', 'tha', 'thi', 'bhi', 'sirf', 'koi', 'kuch', 'bilkul', 'baad', 'pehle',
-  'ai', 'app', 'apps', 'tool', 'tools', 'tech', 'technology'
-]);
-
-function normalizeDuplicateText(text: string) {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-function stemWord(word: string) {
-  if (word.endsWith('ies') && word.length > 4) return word.slice(0, -3) + 'y';
-  if (word.endsWith('ing') && word.length > 5) return word.slice(0, -3);
-  if (word.endsWith('ed') && word.length > 4) return word.slice(0, -2);
-  if (word.endsWith('es') && word.length > 3) return word.slice(0, -2);
-  if (word.endsWith('s') && word.length > 3 && !word.endsWith('ss')) return word.slice(0, -1);
-  return word;
-}
-
-function tokenizeForMatch(text: string) {
-  return Array.from(new Set(
-    normalizeDuplicateText(text)
-      .split(' ')
-      .filter(Boolean)
-      .map(stemWord)
-      .filter((token) => token.length >= 4 && !STOP_WORDS.has(token) && !/^\d+$/.test(token))
-  ));
-}
-
-export interface TopicConcept {
-  id: string;
-  name: string;
-  aliases: string[];
-}
-
-export const CORE_TOPIC_CONCEPTS: TopicConcept[] = [
-  {
-    id: 'storage_sense',
-    name: 'Storage Sense & C-Drive Red Space',
-    aliases: [
-      'storage sense', 'c drive', 'c: drive', 'c-drive', 'red bar', 'drive red', 'disk space',
-      'free up space', 'cleanmgr', 'storage space', 'drive full', 'low disk', 'c drive red',
-      'c drive full', 'c drive space', 'free gb', 'junk files', 'temp files'
-    ]
-  },
-  {
-    id: 'clipboard_history',
-    name: 'Windows Clipboard History (Win+V)',
-    aliases: ['clipboard', 'win+v', 'win v', 'clipboard history', 'copy paste multiple', 'pin clipboard']
-  },
-  {
-    id: 'god_mode',
-    name: 'Windows God Mode Control Folder',
-    aliases: ['god mode', 'godmode', 'all tasks folder', 'master control panel', 'ed7ba470']
-  },
-  {
-    id: 'ultimate_performance',
-    name: 'Ultimate Performance Power Plan (powercfg)',
-    aliases: ['ultimate performance', 'powercfg', 'power plan', 'unhide power plan', 'power options']
-  },
-  {
-    id: 'run_commands',
-    name: 'Windows Win+R Secret Run Commands',
-    aliases: ['win+r', 'win r', 'run commands', 'secret run', 'msconfig', 'mrt', 'cleanmgr', 'perfmon']
-  },
-  {
-    id: 'excel_center_across',
-    name: 'Excel Center Across Selection',
-    aliases: ['center across selection', 'merge cells', 'merge and center', 'merge cells alternative', 'center across']
-  },
-  {
-    id: 'google_sheets_smart_fill',
-    name: 'Google Sheets AI Smart Fill',
-    aliases: ['smart fill', 'sheets ai', 'google sheets ai', 'flash fill sheets', 'sheets autofill']
-  },
-  {
-    id: 'voice_clone',
-    name: 'AI Voice Cloning & Voice Selling',
-    aliases: ['ai voice', 'voice clone', 'voice cloning', 'elevenlabs', 'sell ai voice', 'clone voice']
-  },
-  {
-    id: 'chatgpt_prompts',
-    name: 'ChatGPT & AI Prompt Hacks Masterclass',
-    aliases: ['prompt hacks', 'chatgpt secret', 'prompt engineering', 'chatgpt prompts', 'ai prompt masterclass']
-  },
-  {
-    id: 'chatbot_workflows',
-    name: 'AI Chatbot Workflows & Automation',
-    aliases: ['chatbot workflow', 'chatbots workflows', 'flow agent', 'bot workflow']
-  },
-  {
-    id: 'whatsapp_pin_chats',
-    name: 'WhatsApp Pin Chats & Secrets',
-    aliases: ['whatsapp pin', 'pin chat', 'pin chats', 'whatsapp secret']
-  },
-  {
-    id: 'power_automate_desktop',
-    name: 'Power Automate Desktop Daily Reports',
-    aliases: ['power automate', 'daily report automation', 'automate desktop']
-  }
-];
-
-export function findDuplicateMatches(
-  title: string,
-  points: string,
-  channelId: ChannelProfile['id'],
-  memoryRecords: AgentMemoryRecord[] = []
-): DuplicateMatch[] {
-  // 0. Permanent Blacklist Check: If story was deleted by user, immediately flag as duplicate
-  const deletedCheck = checkDeletedStoryBlacklist(title, points);
-  if (deletedCheck) {
-    return [
-      {
-        source: 'Deleted Story (Permanent Blacklist)',
-        id: `DELETED-BLACK-LIST`,
-        title: deletedCheck.matchedStoryTitle,
-        tool: 'Permanent Blacklist (Do Not Search)',
-        points: `Previously deleted story. System instruction: deleted stories must never be searched or regenerated. (${deletedCheck.reason})`,
-        matchedKeywords: ['DELETED_STORY', 'PERMANENT_BLACKLIST']
-      }
-    ];
-  }
-
-  // 1. Smarter Hierarchical Duplicate Check (Level 1 App Screen + Level 2 Deep Sub-Points)
-  const result = checkSmarterDuplicate({
-    title,
-    rawPointsText: points,
-    channelId
-  });
-
-  // EXACT DUPLICATE = BLOCK! Return matched story and covered point
-  if (result.verdict === 'exact') {
-    return [
-      {
-        source: 'Catalog',
-        id: `#${result.matchedStoryId || 'EXACT-DUP'}`,
-        title: result.matchedStoryTitle || title,
-        tool: result.level1AppDetected ? result.level1AppDetected.toUpperCase() : 'Tool',
-        points: `Exact Sub-Point Match: "${result.matchedPoint}". ${result.reason}`,
-        matchedKeywords: [result.matchedPoint || 'Exact Point Duplicate']
-      }
-    ];
-  }
-
-  // PARTIAL (Same app but different trick/feature) OR NEW (Completely new topic) = ALLOW!
-  // Never block simply because the app name (e.g. WhatsApp, Windows) is mentioned!
-  return [];
-}
+// Note: The old duplicate checking functions (STOP_WORDS, tokenizeForMatch, CORE_TOPIC_CONCEPTS, findDuplicateMatches)
+// have been permanently removed. checkHierarchicalDuplicate in profileStore.ts is the SINGLE canonical duplicate check.
 
 async function postJson(url: string, body: unknown, signal?: AbortSignal) {
   const response = await fetch(url, {
@@ -408,6 +270,10 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
   const [phase, setPhase] = useState<Phase>('checking');
   const [checkStage, setCheckStage] = useState<CheckStage>('initial');
   const [duplicates, setDuplicates] = useState<DuplicateMatch[]>([]);
+  const [skippedDuplicates, setSkippedDuplicates] = useState<SkippedDuplicateRecord[]>([]);
+  const [checkingProgress, setCheckingProgress] = useState<string>('Checking published library for duplicate tricks/points...');
+  const [lastCheckResult, setLastCheckResult] = useState<DuplicateCheckResult | null>(null);
+  const [exhaustedReport, setExhaustedReport] = useState<string | null>(null);
   const [ideas, setIdeas] = useState<StoryIdea[]>([]);
   const [ideasLoading, setIdeasLoading] = useState(false);
   const [ideasError, setIdeasError] = useState('');
@@ -435,6 +301,7 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
   const abortRef = useRef<AbortController | null>(null);
   const duplicateTimerRef = useRef<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const attemptedTitlesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     onOutcomeRef.current = onOutcome;
@@ -474,8 +341,7 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
     const deletedBlacklist = loadDeletedStoryBlacklist();
     const titles = new Set<string>([
       ...PUBLISHED_VIDEOS.map((video) => video.title),
-      ...memoryRecords.filter((record) => record.channelId === profile.id).map((record) => record.title),
-      ...duplicates.map((match) => match.title),
+      ...skippedDuplicates.map((item) => item.attemptedTitle),
       ...deletedBlacklist.map((d) => d.title),
       ...extra
     ]);
@@ -488,6 +354,7 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
     setIdeasError('');
     if (mode === 'search') setPhase('ideas');
     try {
+      const coveredPointsExclusion = getAlreadyCoveredPointsList(profile.id, category.name);
       const data = await postJson('/api/ai/story-ideas', {
         channelName: profile.name,
         presenter: profile.presenter,
@@ -495,6 +362,7 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
         category: `${category.id}. ${category.name}`,
         seedTopic: seed,
         excludeTitles: buildExcludedTitles([seed]),
+        excludePoints: coveredPointsExclusion,
         count: mode === 'duplicate' ? 4 : 3,
         priorityResources: (selection as any)?.priorityResources || []
       }, abortRef.current?.signal);
@@ -511,9 +379,18 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
         // Strictly filter out any idea matching deleted story blacklist
         .filter((idea: StoryIdea) => !checkDeletedStoryBlacklist(idea.title, idea.points));
 
-      const freshIdeas = rawIdeas.filter(
-        (idea) => findDuplicateMatches(idea.title, idea.points, profile.id, memoryRecords).length === 0
-      );
+      // Hierarchical duplicate check: check each candidate against published library only
+      const freshIdeas = rawIdeas.filter((idea) => {
+        const check = checkHierarchicalDuplicate({
+          title: idea.title,
+          points: idea.points ? [idea.points] : [],
+          rawPointsText: idea.points,
+          categoryId: category.id,
+          channelId: profile.id,
+          tool: idea.title.split(/[:\s—]+/)[0]
+        });
+        return check.verdict !== 'exact';
+      });
       const finalIdeas = freshIdeas.length ? freshIdeas : rawIdeas;
 
       if (!finalIdeas.length) {
@@ -710,75 +587,129 @@ Status: bani`;
     }
   }
 
-  async function autoPivotAndSearchNext(duplicateIdea: StoryIdea, matches: DuplicateMatch[], stage: CheckStage) {
+  async function autoMoveOnAfterExactDuplicate(
+    duplicateIdea: StoryIdea,
+    exactResult: DuplicateCheckResult,
+    stage: CheckStage,
+    currentCategoryId: number = category.id
+  ) {
     if (!mountedRef.current) return;
     setPhase('auto-pivoting');
 
-    onOutcomeRef.current({
-      status: 'duplicate',
-      selection,
-      title: `Bypassing duplicate: "${duplicateIdea.title.slice(0, 32)}..."`,
-      hook: 'Auto-searching fresh unique topic...',
-      duplicates: matches,
-      idea: duplicateIdea,
-      discussionNotes: duplicateIdea.points || undefined,
-      matchContext: stage
-    });
+    attemptedTitlesRef.current.add(duplicateIdea.title.trim().toLowerCase());
+    const skippedRecord: SkippedDuplicateRecord = {
+      storyTitle: exactResult.matchedStoryTitle || 'Published Story',
+      coveredPoint: exactResult.matchedPoint || 'Exact point duplicate',
+      attemptedTitle: duplicateIdea.title,
+      candidatePoint: exactResult.candidatePoint,
+      reason: exactResult.reason,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    setSkippedDuplicates((prev) => [...prev, skippedRecord]);
+    setCheckingProgress(`Skipped: already published — "${skippedRecord.storyTitle}" — covered point: "${skippedRecord.coveredPoint}"`);
 
-    // 1. Try immediate Category Topic Bank first for instant zero-duplicate match
-    const bank = (CATEGORY_TOPIC_BANK[category.id] || []).filter(Boolean);
-    const excludedTitles = new Set(buildExcludedTitles([duplicateIdea.title, ...matches.map(m => m.title)]));
-
-    const immediateCandidate = bank.find(candTitle => {
-      const trimmed = candTitle.trim();
-      if (excludedTitles.has(trimmed)) return false;
-      return findDuplicateMatches(trimmed, '', profile.id, memoryRecords).length === 0;
-    });
-
-    if (immediateCandidate) {
-      const freshIdea: StoryIdea = {
-        title: immediateCandidate,
-        hook: `Secret revealed: ${immediateCandidate.slice(0, 45)}`,
-        angle: `${category.id}. ${category.name} verified non-duplicate topic`,
-        points: `Hands-on practical walkthrough for ${immediateCandidate}`,
-        whyFresh: `Auto-pivoted from duplicate "${duplicateIdea.title}". 100% verified 0-duplicate.`
-      };
-
-      setBypassedDuplicates({
-        originalTitle: duplicateIdea.title,
-        pivotedToTitle: freshIdea.title,
-        reason: matches[0]?.points || 'Catalog exact match'
-      });
-      setSelectedIdea(freshIdea);
-
-      if (stage === 'initial') {
-        void generateStory(freshIdea, '');
-        return;
-      } else {
-        setPhase('discuss');
-        onOutcomeRef.current({
-          status: 'discussion',
-          selection,
-          title: freshIdea.title,
-          hook: freshIdea.hook,
-          duplicates: [],
-          idea: freshIdea,
-          topic: freshIdea.title,
-          matchContext: stage
+    // a. Next point inside the same topic
+    const subPoints = extractCandidateSpecificPoints(duplicateIdea);
+    if (subPoints.length > 1) {
+      for (let pIdx = 0; pIdx < subPoints.length; pIdx++) {
+        const testPoint = subPoints[pIdx];
+        if (testPoint === exactResult.candidatePoint) continue;
+        setCheckingProgress(`Checking point ${pIdx + 1} of ${subPoints.length}: "${testPoint.slice(0, 40)}..."`);
+        const pointCandidate: StoryIdea = {
+          ...duplicateIdea,
+          points: testPoint,
+          whyFresh: `Auto-verified sub-point ${pIdx + 1}`
+        };
+        const check = checkHierarchicalDuplicate({
+          title: pointCandidate.title,
+          points: [testPoint],
+          categoryId: currentCategoryId,
+          channelId: profile.id,
+          tool: pointCandidate.title.split(/[:\s—]+/)[0]
         });
-        return;
+        if (check.verdict !== 'exact') {
+          // Found fresh sub-point!
+          setLastCheckResult(check);
+          setSelectedIdea(pointCandidate);
+          setCheckingProgress(`✓ Fresh point verified: "${testPoint.slice(0, 40)}..."`);
+          if (stage === 'initial') {
+            void generateStory(pointCandidate, '');
+          } else {
+            setPhase('discuss');
+          }
+          return;
+        }
       }
     }
 
-    // 2. Query AI story-ideas endpoint with exclusions
+    // b. Next topic in the same category (from category topic bank)
+    setCheckingProgress(`Searching next verified topic in Category ${currentCategoryId}...`);
+    const bank = (CATEGORY_TOPIC_BANK[currentCategoryId] || []).filter(Boolean);
+    for (const bankTitle of bank) {
+      const cleanBankTitle = bankTitle.trim();
+      if (attemptedTitlesRef.current.has(cleanBankTitle.toLowerCase())) continue;
+      attemptedTitlesRef.current.add(cleanBankTitle.toLowerCase());
+
+      const candIdea: StoryIdea = {
+        title: cleanBankTitle,
+        hook: `Secret revealed: ${cleanBankTitle.slice(0, 45)}`,
+        angle: `${currentCategoryId}. ${category.name} verified non-duplicate topic`,
+        points: `Hands-on practical walkthrough for ${cleanBankTitle}`,
+        whyFresh: 'Category topic bank fresh verified candidate'
+      };
+
+      const check = checkHierarchicalDuplicate({
+        title: candIdea.title,
+        points: [candIdea.points],
+        categoryId: currentCategoryId,
+        channelId: profile.id,
+        tool: candIdea.title.split(/[:\s—]+/)[0]
+      });
+
+      if (check.verdict !== 'exact') {
+        setLastCheckResult(check);
+        setSelectedIdea(candIdea);
+        setBypassedDuplicates({
+          originalTitle: duplicateIdea.title,
+          pivotedToTitle: candIdea.title,
+          reason: check.reason
+        });
+        setCheckingProgress(`✓ Next topic selected: "${candIdea.title}"`);
+        if (stage === 'initial') {
+          void generateStory(candIdea, '');
+        } else {
+          setPhase('discuss');
+        }
+        return;
+      } else {
+        // Record skipped duplicate in list
+        setSkippedDuplicates((prev) => [
+          ...prev,
+          {
+            storyTitle: check.matchedStoryTitle || 'Published Story',
+            coveredPoint: check.matchedPoint || 'Exact point',
+            attemptedTitle: candIdea.title,
+            candidatePoint: check.candidatePoint,
+            reason: check.reason,
+            timestamp: new Date().toLocaleTimeString()
+          }
+        ]);
+        setCheckingProgress(`Skipped: already published — "${check.matchedStoryTitle}" — covered point: "${check.matchedPoint}"`);
+      }
+    }
+
+    // b2. If bank exhausted, query AI story ideas with already-covered points excluded ("do not suggest these")
+    setCheckingProgress(`Scanning 48h ground sources for Category ${currentCategoryId} (excluding published points)...`);
     try {
+      const coveredPointsExclusion = getAlreadyCoveredPointsList(profile.id, currentCategoryId);
       const data = await postJson('/api/ai/story-ideas', {
         channelName: profile.name,
         presenter: profile.presenter,
         niche: profile.niche,
-        category: `${category.id}. ${category.name}`,
+        category: `${currentCategoryId}. ${category.name}`,
         seedTopic: `${category.name} fresh tutorial 2026`,
-        excludeTitles: buildExcludedTitles([duplicateIdea.title, ...matches.map(m => m.title)]),
+        excludeTitles: Array.from(attemptedTitlesRef.current),
+        excludePoints: coveredPointsExclusion,
         count: 4,
         priorityResources: (selection as any)?.priorityResources || []
       }, abortRef.current?.signal);
@@ -793,63 +724,101 @@ Status: bani`;
         }))
         .filter((item: StoryIdea) => item.title && !checkDeletedStoryBlacklist(item.title, item.points));
 
-      const cleanIdeas = rawIdeas.filter(
-        item => findDuplicateMatches(item.title, item.points, profile.id, memoryRecords).length === 0
-      );
+      for (const freshCand of rawIdeas) {
+        if (attemptedTitlesRef.current.has(freshCand.title.toLowerCase())) continue;
+        attemptedTitlesRef.current.add(freshCand.title.toLowerCase());
 
-      const chosenIdea: StoryIdea = cleanIdeas[0] || rawIdeas[0] || {
-        title: `${duplicateIdea.title.replace(/\s*\(Part\s*\d+.*?\)/i, '')} (Part 2: Advanced Pro Sequel)`,
-        hook: 'Part 1 ke baad yeh advanced trick aapka 10x waqt bachaegi!',
-        angle: 'Part 2 Advanced Sequel continuation',
-        points: 'Advanced professional settings and automated workflow',
-        whyFresh: 'Official sequel continuation — 0 duplicate collision.'
-      };
-
-      setBypassedDuplicates({
-        originalTitle: duplicateIdea.title,
-        pivotedToTitle: chosenIdea.title,
-        reason: matches[0]?.points || 'Catalog match'
-      });
-      setSelectedIdea(chosenIdea);
-
-      if (stage === 'initial') {
-        void generateStory(chosenIdea, '');
-      } else {
-        setPhase('discuss');
-        onOutcomeRef.current({
-          status: 'discussion',
-          selection,
-          title: chosenIdea.title,
-          hook: chosenIdea.hook,
-          duplicates: [],
-          idea: chosenIdea,
-          topic: chosenIdea.title,
-          matchContext: stage
+        const check = checkHierarchicalDuplicate({
+          title: freshCand.title,
+          points: freshCand.points ? [freshCand.points] : [],
+          rawPointsText: freshCand.points,
+          categoryId: currentCategoryId,
+          channelId: profile.id,
+          tool: freshCand.title.split(/[:\s—]+/)[0]
         });
+
+        if (check.verdict !== 'exact') {
+          setLastCheckResult(check);
+          setSelectedIdea(freshCand);
+          setBypassedDuplicates({
+            originalTitle: duplicateIdea.title,
+            pivotedToTitle: freshCand.title,
+            reason: check.reason
+          });
+          setCheckingProgress(`✓ 48h Ground source verified: "${freshCand.title}"`);
+          if (stage === 'initial') {
+            void generateStory(freshCand, '');
+          } else {
+            setPhase('discuss');
+          }
+          return;
+        } else {
+          setSkippedDuplicates((prev) => [
+            ...prev,
+            {
+              storyTitle: check.matchedStoryTitle || 'Published Story',
+              coveredPoint: check.matchedPoint || 'Exact point',
+              attemptedTitle: freshCand.title,
+              candidatePoint: check.candidatePoint,
+              reason: check.reason,
+              timestamp: new Date().toLocaleTimeString()
+            }
+          ]);
+        }
       }
     } catch {
-      // Fallback: create Part 2 Sequel so flow NEVER halts
-      const fallbackIdea: StoryIdea = {
-        title: `${duplicateIdea.title.replace(/\s*\(Part\s*\d+.*?\)/i, '')} (Part 2: Advanced Pro Hack)`,
-        hook: 'Part 1 ke baad yeh hidden technique 99% log nahi jante!',
-        angle: 'Part 2 Sequel continuation with pro tools',
-        points: 'Advanced steps and speed benchmark',
-        whyFresh: 'Auto-pivoted sequel to avoid duplicate halt.'
-      };
+      // Search failed or timed out — move on to next lens / next category
+    }
 
-      setBypassedDuplicates({
-        originalTitle: duplicateIdea.title,
-        pivotedToTitle: fallbackIdea.title,
-        reason: 'Auto-recovered via Sequel angle'
-      });
-      setSelectedIdea(fallbackIdea);
+    // c. Next research lens: try next topic angle
+    // d. Next category in auto-rotate order
+    const nextCatId = (currentCategoryId % 10) + 1;
+    if (nextCatId !== category.id) {
+      setCheckingProgress(`Auto-rotating to next category in order (Category ${nextCatId})...`);
+      const nextBank = (CATEGORY_TOPIC_BANK[nextCatId] || []).filter(Boolean);
+      for (const nextBankTitle of nextBank) {
+        const clean = nextBankTitle.trim();
+        if (attemptedTitlesRef.current.has(clean.toLowerCase())) continue;
+        attemptedTitlesRef.current.add(clean.toLowerCase());
 
-      if (stage === 'initial') {
-        void generateStory(fallbackIdea, '');
-      } else {
-        setPhase('discuss');
+        const rotatedIdea: StoryIdea = {
+          title: clean,
+          hook: `Secret revealed: ${clean.slice(0, 45)}`,
+          angle: `Category ${nextCatId} rotation candidate`,
+          points: `Hands-on walkthrough for ${clean}`,
+          whyFresh: 'Auto-rotated from duplicate category'
+        };
+
+        const check = checkHierarchicalDuplicate({
+          title: rotatedIdea.title,
+          points: [rotatedIdea.points],
+          categoryId: nextCatId,
+          channelId: profile.id,
+          tool: rotatedIdea.title.split(/[:\s—]+/)[0]
+        });
+
+        if (check.verdict !== 'exact') {
+          setLastCheckResult(check);
+          setSelectedIdea(rotatedIdea);
+          setBypassedDuplicates({
+            originalTitle: duplicateIdea.title,
+            pivotedToTitle: rotatedIdea.title,
+            reason: `Auto-rotated to Category ${nextCatId}`
+          });
+          setCheckingProgress(`✓ Next category ${nextCatId} topic verified: "${rotatedIdea.title}"`);
+          if (stage === 'initial') {
+            void generateStory(rotatedIdea, '');
+          } else {
+            setPhase('discuss');
+          }
+          return;
+        }
       }
     }
+
+    // If completely exhausted all categories without finding anything:
+    setExhaustedReport(`Checked topics in Category ${category.id} (bank + 48h search) and Category ${nextCatId}. Tamam attempted candidates library duplicates nikle.`);
+    setPhase('idea-input');
   }
 
   function runDuplicateCheck(idea: StoryIdea, stage: CheckStage) {
@@ -859,17 +828,28 @@ Status: bani`;
     setIdeas([]);
     setIdeasError('');
     setPhase('checking');
+    setCheckingProgress(`Checking published library for duplicate tricks/points: "${idea.title.slice(0, 40)}..."`);
     if (duplicateTimerRef.current) window.clearTimeout(duplicateTimerRef.current);
 
     duplicateTimerRef.current = window.setTimeout(() => {
       if (!mountedRef.current) return;
-      const matches = findDuplicateMatches(idea.title, idea.points, profile.id, memoryRecords);
+      attemptedTitlesRef.current.add(idea.title.trim().toLowerCase());
 
-      if (matches.length > 0) {
-        setDuplicates(matches);
-        // CRITICAL DIRECTIVE: Do not halt when duplicate is detected!
-        // Immediately and automatically pivot to search and pick the next fresh unique topic!
-        void autoPivotAndSearchNext(idea, matches, stage);
+      const result = checkHierarchicalDuplicate({
+        title: idea.title,
+        points: idea.points ? [idea.points] : [],
+        rawPointsText: idea.points,
+        categoryId: category.id,
+        channelId: profile.id,
+        tool: idea.title.split(/[:\s—]+/)[0]
+      });
+
+      setLastCheckResult(result);
+
+      if (result.verdict === 'exact') {
+        // EXACT DUPLICATE = NEVER BLOCK!
+        // Automatically continue to next point/topic/category immediately!
+        void autoMoveOnAfterExactDuplicate(idea, result, stage);
       } else if (stage === 'initial') {
         setSelectedIdea(idea);
         void generateStory(idea, '');
@@ -891,7 +871,7 @@ Status: bani`;
           matchContext: stage
         });
       }
-    }, 900);
+    }, 250);
   }
 
   useEffect(() => {
@@ -1168,10 +1148,10 @@ Rules:
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-bold text-white text-sm">Trigger Flow — {profile.name}</h3>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-mono border bg-cyan-500/10 text-cyan-300 border-cyan-500/30">
-                  v3.42 AI Story Engine
+                  v3.45 AI Story Engine (Hierarchical Duplicate Defense)
                 </span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono border ${isSearch ? 'bg-amber-500/10 text-amber-300 border-amber-500/30' : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'}`}>
-                  {isSearch ? 'Category 10 — Idea + Discuss' : 'Category 1–9 — AI Direct Story'}
+                  {isSearch ? 'Category 10 — Idea + Discuss' : 'Category 1–10 — AI Direct Story'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
@@ -1258,8 +1238,8 @@ Rules:
             <div className="space-y-4">
               <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-4">
                 <p className="flex items-center gap-2 text-cyan-200 text-xs font-semibold">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {checkStage === 'idea' ? 'Selected idea ka duplicate check chal raha hai...' : 'Duplicate Check chal raha hai...'}
+                  <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                  {checkingProgress || (checkStage === 'idea' ? 'Selected idea ka duplicate check chal raha hai...' : 'Duplicate Check chal raha hai...')}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">
                   {checkStage === 'idea' && selectedIdea
@@ -1272,15 +1252,15 @@ Rules:
               <div className="space-y-2 text-xs">
                 <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-950/50 border border-slate-800">
                   <Database className="w-4 h-4 text-cyan-400" />
-                  <span className="text-slate-300">Catalog scan — {catalogCount} published videos</span>
+                  <span className="text-slate-300">Published Library scan — {catalogCount} published videos in {profile.name} (Scope: strictly published only)</span>
                 </div>
                 <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-950/50 border border-slate-800">
-                  <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                  <span className="text-slate-300">Application memory scan — {memoryRecords.length} records</span>
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span className="text-slate-300">Hierarchical check: Level 1 Topic/App → Level 2 Deep covered_points secret comparison</span>
                 </div>
                 <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-950/50 border border-slate-800">
-                  <Search className="w-4 h-4 text-cyan-400" />
-                  <span className="text-slate-300">Title + points keyword matching</span>
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span className="text-slate-300">Zero-Halt Defense: duplicate hone par automatically agla point/topic/lens rotate hoga</span>
                 </div>
               </div>
             </div>
@@ -1372,73 +1352,73 @@ Rules:
             </div>
           )}
 
+          {/* Non-blocking duplicate resolution UI: flow never halts */}
+          {skippedDuplicates.length > 0 && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-amber-300 font-semibold flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  Skipped: already published — “{skippedDuplicates[skippedDuplicates.length - 1].storyTitle}” — covered point: “{skippedDuplicates[skippedDuplicates.length - 1].coveredPoint}”
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-500/30 font-mono">
+                  {skippedDuplicates.length} Skipped
+                </span>
+              </div>
+              <details className="text-[11px] text-slate-400 cursor-pointer">
+                <summary className="text-cyan-300 hover:text-cyan-200 select-none">
+                  View Skipped (duplicates) list ({skippedDuplicates.length})
+                </summary>
+                <div className="mt-2 space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {skippedDuplicates.map((s, idx) => (
+                    <div key={idx} className="p-2 rounded-lg bg-slate-900/80 border border-slate-800 text-[10px] space-y-0.5">
+                      <div className="text-rose-300 font-medium">
+                        Candidate: “{s.attemptedTitle}”
+                      </div>
+                      <div className="text-slate-300">
+                        Matched Published Story: <strong className="text-white">{s.storyTitle}</strong>
+                      </div>
+                      <div className="text-amber-300/90 font-mono">
+                        Covered Point: {s.coveredPoint}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          )}
+
+          {/* Conditional Part 2 / Sequel Option: ONLY for PARTIAL verdicts or Ongoing Series (Cat 4 & 7), NEVER for EXACT duplicates */}
+          {(lastCheckResult?.verdict === 'partial' || category.id === 4 || category.id === 7) && selectedIdea && (
+            <div className="rounded-xl border border-cyan-500/40 bg-gradient-to-r from-blue-950/60 to-cyan-950/40 p-3.5 space-y-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <h5 className="text-xs font-bold text-cyan-200 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-cyan-400" />
+                    Fresh Angle / Sequel Detected (Part 2 Available)
+                  </h5>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    {lastCheckResult?.reason || 'App pehle cover ho chuka hai lekin yeh point/trick bilkul fresh hai.'} Aap iska direct Sequel (Part 2) generate kar sakte hain.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCreateSequelFromDuplicate(selectedIdea)}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-cyan-500/25 flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Film className="w-3.5 h-3.5" />
+                  <span>🎬 Generate Part 2 Sequel</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {phase === 'duplicate' && (
             <div className="space-y-4">
-              <div className="rounded-xl border border-rose-500/40 bg-rose-950/30 p-3.5">
-                <p className="font-semibold text-rose-200 text-xs flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-rose-400" />
-                  Duplicate mila — lekin flow yahin nahi rukta.
-                </p>
-                <p className="text-[11px] text-rose-200/80 mt-1">
-                  “{selectedIdea?.title || initialNote.title}” pehle cover ho chuka hai. Neeche AI ke fresh ideas ya apna naya topic use karke story generate karein.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Duplicate matches ({duplicates.length})
-                </p>
-                {duplicates.map((match) => (
-                  <div key={`${match.source}-${match.id}`} className="p-3 rounded-xl bg-slate-950/60 border border-rose-500/25 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[10px] font-mono">
-                        {match.source}
-                      </span>
-                      <span className="text-xs font-semibold text-white">{match.id} {match.title}</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-mono">Tool: {match.tool}</p>
-                    <p className="text-[10px] text-slate-400">{match.points}</p>
-                    {match.matchedKeywords.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {match.matchedKeywords.map((keyword) => (
-                          <span key={keyword} className="px-1.5 py-0.5 rounded bg-slate-800 text-[9px] text-amber-300 font-mono">
-                            {keyword}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Instant Part 2 / Sequel Option */}
-              <div className="rounded-xl border border-cyan-500/40 bg-gradient-to-r from-blue-950/60 to-cyan-950/40 p-3.5 space-y-2">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div>
-                    <h5 className="text-xs font-bold text-cyan-200 flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-cyan-400" />
-                      Is Topic Ka Agla Part (Part 2 / Sequel) Banana Chahte Hain?
-                    </h5>
-                    <p className="text-[11px] text-slate-300 mt-0.5">
-                      Part 1 pehle publish ho chuka hai. Agent Simulator is topic ka Advanced Sequel (Part 2) foran generate karega jisme pro tools aur advanced steps honge.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCreateSequelFromDuplicate(duplicates[0] || selectedIdea || initialIdea())}
-                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold shadow-md shadow-cyan-500/25 flex items-center gap-1.5 cursor-pointer shrink-0"
-                  >
-                    <Film className="w-3.5 h-3.5" />
-                    <span>🎬 Generate Part 2 Sequel</span>
-                  </button>
-                </div>
-              </div>
-
               <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/15 p-3.5 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-bold text-cyan-200 flex items-center gap-2">
                     <Lightbulb className="w-4 h-4" />
-                    Fresh Story Ideas — inhi par generation chalao
+                    Fresh Verified Story Ideas
                   </p>
                   <button
                     onClick={() => void fetchIdeas(selectedIdea?.title || category.name, 'duplicate')}

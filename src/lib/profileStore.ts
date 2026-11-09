@@ -5,7 +5,6 @@
  */
 
 import { PUBLISHED_VIDEOS, type PublishedVideo, type ChannelProfile } from '../data/channelData';
-import { loadPendingQueue } from './pendingQueueStore';
 import type { GeneratedStory } from '../components/StoryPackageView';
 
 export interface DynamicPublishedStory extends PublishedVideo {
@@ -18,7 +17,7 @@ export interface DynamicPublishedStory extends PublishedVideo {
   channelId?: string;
 }
 
-export type DuplicateVerdictType = 'new' | 'partial' | 'exact';
+export type DuplicateVerdictType = 'new' | 'partial' | 'exact' | 'unverified';
 
 export interface DuplicateCheckResult {
   verdict: DuplicateVerdictType;
@@ -28,6 +27,7 @@ export interface DuplicateCheckResult {
   matchedStoryId?: number | string;
   matchedStoryTitle?: string;
   matchedPoint?: string;
+  candidatePoint?: string;
   reason: string;
   confidence: number;
 }
@@ -104,66 +104,66 @@ export interface ProfileResearchSettings {
   };
 }
 
-// 58 catalog stories pre-analyzed covered points for IT Cafeteria
+// 58 catalog stories pre-analyzed covered points for IT Cafeteria (specific secrets/tricks/steps — never plain tool names)
 export const IT_CAFETERIA_CATALOG_COVERED_POINTS: Record<number, string[]> = {
-  1: ["Gemini 4 Argon multimodal reasoning", "GitHub Copilot complex coding support", "Enterprise task automation in seconds"],
-  2: ["Win+V Clipboard History activation", "Paste text copied hours earlier", "Pin frequently used text clips to clipboard"],
-  3: ["Shopify store setup without inventory", "Product listing and remote client handling", "Passive e-commerce earning workflow"],
-  4: ["Meta Muse Wonder Active Memory concept", "Active Focus for long-context tasks", "AI memory benchmark improvements"],
-  5: ["Power Automate desktop no-code flow", "Automating repetitive daily Excel tasks", "Trigger automation on file change"],
-  6: ["Google Flow Start Frame and End Frame workflow", "Smooth AI video transitions without morphing", "Maintaining character consistency between frames"],
-  7: ["Google Astra live camera vision assistant", "Real-time object and code scanning through camera", "Audio conversation while scanning"],
-  8: ["Gemini real-time screen share for debugging", "Live code error explanation without copy-paste", "Voice feedback while reviewing screen"],
-  9: ["NotebookLM research grounded Q&A", "Generate audio overview podcast from PDF notes", "Instant source citations from custom documents"],
-  10: ["ChatGPT vs Gemini vs Claude 2026 comparison", "Speed vs deep reasoning benchmarks", "Which model is best for Urdu and students"],
-  11: ["OpenAI Swarm and autonomous agent loops", "Multi-agent task handoff and collaboration", "Automated daily research workflows"],
-  12: ["WhatsApp Business message delivery and read analytics", "Customer engagement rate statistics", "Tracking broadcast campaign conversion"],
-  13: ["Pin up to 3 important chats to top", "Custom notification tones per contact", "Disappearing messages timer (24h/7d/90d)"],
-  14: ["Edit sent messages within 15 minutes", "Lock individual chats with fingerprint or FaceID", "Send HD uncompressed photos and media"],
-  15: ["Voice message 1.5x and 2x playback speed", "Companion Mode (linked devices on up to 4 phones)", "Hide online status while chatting"],
-  16: ["Read receipts without blue ticks", "Text formatting: bold (*), italic (_), strikethrough (~)", "Star messages for quick bookmarking"],
-  17: ["Windows God Mode control panel folder", "Create folder with GUID {ED7BA470-8E54-465E-825C-99712043E01C}", "200+ hidden system settings in one window"],
-  18: ["Canva Magic Studio AI design tools", "Magic Switch layout and resize", "Text to graphic asset generation"],
-  19: ["CapCut text-to-speech voice styles", "Auto-caption generator with animated presets", "Video background removal without green screen"],
-  20: ["Midjourney v7 photorealistic prompt syntax", "Character reference parameter (--cref)", "Style reference parameter (--sref)"],
-  21: ["Runway Gen-3 Alpha camera controls", "Motion brush for selective animation", "Text to high-fidelity video generation"],
-  22: ["ElevenLabs voice cloning from 1-minute audio", "Emotion and stability sliders", "Multilingual Urdu accent dubbing"],
-  23: ["Cleanmgr & %temp% junk file purge", "Freeing up C-Drive red bar space", "Disabling unnecessary startup apps in Task Manager"],
-  24: ["Suno AI v4 full song generation", "Custom lyrics and genre tags", "Commercial usage and instrumental stems"],
-  25: ["Center Across Selection (Ctrl+1 -> Alignment)", "Alternative to Merge Cells in Excel", "Preventing sorting and VLOOKUP formula breaks"],
-  26: ["Perplexity AI Pro search citations", "Focus modes: Academic, YouTube, Reddit", "Collections for persistent research projects"],
-  27: ["Claude 3.7 Sonnet hybrid reasoning", "Extended thinking mode toggle", "Complex full-stack code architecture generation"],
-  28: ["WhatsApp screen sharing with device audio in video call", "Secret code password for hidden locked chats", "Instant 60-second circular video messages"],
-  29: ["Unhide Ultimate Performance power plan via powercfg", "Maximum CPU frequency and zero power throttling", "Fixing FPS drops and render stutter"],
-  30: ["Google Sheets Smart Fill AI feature", "Auto-detect patterns and fill columns without formulas", "Instant phone number and email text splitting"],
-  31: ["Gamma App instant AI presentation slides", "Export to PowerPoint and interactive webpage", "Embedding live analytics into slides"],
-  32: ["DeepSeek R1 open-weight reasoning model", "Running DeepSeek locally with Ollama", "Zero-cost coding benchmarks vs o1"],
-  33: ["Kling AI 1.5 video generation camera paths", "Realistic human motion and facial physics", "Text to 1080p cinematic video clips"],
-  34: ["Bolt.new full-stack prompt-to-app generator", "In-browser WebContainer live execution", "One-click Netlify deployment"],
-  35: ["Lovable dev full-stack web builder", "Supabase authentication and database auto-wiring", "Export code to GitHub"],
-  36: ["Power Automate Ep 7: Automated WhatsApp alerts via HTTP API", "Webhook trigger on new customer order", "Sending templated WhatsApp message"],
-  37: ["Cursor AI Composer multi-file editing", "Project context indexing with codebase indexing", "Rules for AI (.cursorrules)"],
-  38: ["v0 by Vercel React UI generator", "Tailwind CSS component generation from screenshots", "Copy-paste into Next.js project"],
-  39: ["Flux 1.1 Pro Ultra image generation", "Text rendering inside images without gibberish", "High-detail 2K photorealism"],
-  40: ["Win+R secret run commands: msconfig, mrt, perfmon", "Direct access to Windows diagnostic utilities", "Malicious software removal tool background scan"],
-  41: ["Pika 2.0 Pikaffects physics simulation", "Melt, explode, inflate, and squish effects", "Keyframe timing and motion control"],
-  42: ["HeyGen interactive video avatar creation", "Custom studio avatar from webcam footage", "Voice sync in 40+ languages"],
-  43: ["Napkin AI text-to-infographic generator", "Paste article and generate flowcharts", "Vector SVG export for presentations"],
-  44: ["Make.com vs Zapier visual automation comparison", "Router branches and error handling", "Building cost-effective webhook pipelines"],
-  45: ["Ollama local LLM runner on PC", "Running Llama 3.3 and DeepSeek offline", "Privacy-first AI without internet"],
-  46: ["Whisper AI local voice transcription", "Subtitles SRT generation with word-level timestamps", "Transcribing Roman Urdu and English audio"],
-  47: ["WhatsApp Business Ep 6: Multi-Device sync without primary phone", "Meta AI assistant integration inside chats", "Catalog management across web and mobile"],
-  48: ["WhatsApp Business Ep 5: Color-coded customer labels", "Targeted broadcast lists without group clutter", "Filtering chats by paid, pending, and delivered"],
-  49: ["WhatsApp Business Ep 4: Product catalog setup with prices", "Creating direct WhatsApp purchase links", "Sharing collections with new customers"],
-  50: ["WhatsApp Business Ep 3: Away message and greeting auto-replies", "Quick reply keyboard shortcuts for FAQs (/price, /bank)", "Automating after-hours inquiries"],
-  51: ["WhatsApp Business Ep 2: Verified business profile details", "Setting business hours, email, and Google Maps pin", "Building trust with new buyers"],
-  52: ["WhatsApp Business Ep 1: Migration from regular WhatsApp", "Full chat and media backup to Google Drive", "Clean switch without losing customer chat history"],
-  53: ["Google Chrome secret flags for 2X browsing speed", "Parallel downloading flag activation", "Memory Saver and Tab Discarding settings"],
-  54: ["Google Drive hidden shortcuts and search operators", "type:pdf, owner:me, before:date filters", "Restoring permanently deleted file versions"],
-  55: ["Gmail secret search filters: size:10M, older_than:1y", "Auto-clean gigabytes of inbox storage in 1 click", "Creating smart filter labels"],
-  56: ["YouTube secret URL tricks: timestamp link, loop video", "Bypass age-gate and embed full screen", "Keyboard shortcuts: J, K, L, M, and F"],
-  57: ["Telegram secret features: Schedule message, silent send", "Send uncompressed 2GB files", "Creating custom anonymous usernames"],
-  58: ["Google Maps offline download for travel without internet", "Measure direct distance between points", "Save parking location and timeline history"]
+  1: ["Gemini 4 Argon multimodal reasoning on enterprise logs", "GitHub Copilot deep coding assistance", "Automated cloud infrastructure scripts"],
+  2: ["Win+V Clipboard History activation shortcut", "Pasting text clips copied hours earlier", "Pinning permanent text clips to clipboard menu"],
+  3: ["Setting up store catalog without holding physical inventory", "Automating supplier product sync and remote client chats", "No-inventory dropshipping cashflow pipeline"],
+  4: ["Active Memory and Active Focus context buffer", "Preserving conversational state across long tasks", "Benchmark speed for long-context recall"],
+  5: ["No-code desktop flow for daily Excel data entry", "Auto-triggering desktop tasks on file drop", "Automating repetitive spreadsheet formatting"],
+  6: ["Start Frame and End Frame interpolation in Google Flow", "Eliminating character face morphing across video cuts", "Locking visual continuity between keyframes"],
+  7: ["Real-time phone camera visual scanning of objects and error codes", "Hands-free audio inquiry during live camera inspection", "Instant visual troubleshooting of physical hardware and cables"],
+  8: ["Live screen-share error diagnosis in Gemini", "Instant debugging of running console errors without pasting", "Voice walkthrough while viewing developer screen"],
+  9: ["Source-grounded Q&A against uploaded PDF research", "Generating two-host audio podcast from document notes", "Clickable citation links pointing to exact document page"],
+  10: ["Speed vs deep reasoning benchmark comparison across frontier models", "Which model handles Roman Urdu technical nuances accurately", "Cost and latency evaluation for student workflows"],
+  11: ["Autonomous agent handoff loop in OpenAI Swarm", "Multi-agent task distribution and result synthesis", "Daily scheduled autonomous web research pipeline"],
+  12: ["Broadcast delivery and read analytics dashboard", "Measuring customer conversion rates from broadcast lists", "Tracking message open rates and reply latency"],
+  13: ["Pinning 3 most important priority chats to the top", "Setting distinct custom ringtones per client contact", "Setting disappearing messages timer for privacy (24h/7d/90d)"],
+  14: ["Editing sent messages within the 15-minute window", "Fingerprint and FaceID biometric chat lock", "Sending uncompressed full-resolution HD media"],
+  15: ["1.5x and 2x voice note playback acceleration", "Linking up to 4 companion phones to single account", "Hiding online presence status while actively typing"],
+  16: ["Disabling read receipts to hide blue double-ticks", "Markdown formatting with asterisks, underscores, and tildes", "Starring critical messages for quick bookmark search"],
+  17: ["Activating God Mode master panel with GUID folder code {ED7BA470-8E54-465E-825C-99712043E01C}", "Accessing 200+ hidden system settings in one window", "Quick administrative control shortcuts without settings app"],
+  18: ["Magic Switch layout and auto-resize across platforms", "Generative text-to-graphic asset synthesis in Canva", "Multi-page design consistency with Brand Kit"],
+  19: ["CapCut text-to-speech voice styling and tone adjustments", "Auto-caption generator with dynamic kinetic presets", "Video background removal without green screen"],
+  20: ["Midjourney v7 photorealistic prompt syntax rules", "Character reference parameter (--cref) for identical face", "Style reference parameter (--sref) for cinematic color grading"],
+  21: ["Runway Gen-3 Alpha multi-axis camera motion controls", "Motion brush for selective regional animation", "Text-to-high-fidelity cinematic 4K video rendering"],
+  22: ["ElevenLabs voice cloning from 1-minute audio sample", "Emotion stability and similarity sliders configuration", "Multilingual Urdu accent dubbing without robotic artifacts"],
+  23: ["Cleanmgr & %temp% junk file purge shortcut", "Freeing up C-Drive red bar space safely", "Disabling high-impact startup apps in Task Manager"],
+  24: ["Suno AI v4 full musical arrangement generation", "Custom lyrical metronome and style genre tags", "Commercial stems separation and instrumental mix"],
+  25: ["Center Across Selection (Ctrl+1 -> Alignment)", "Safe alternative to Merge Cells in Excel", "Preventing sorting and VLOOKUP formula breaks in tables"],
+  26: ["Perplexity AI Pro search citations and follow-up threads", "Focus mode filters: Academic, YouTube, and Reddit", "Collections feature for structured team research dossiers"],
+  27: ["Claude 3.7 Sonnet extended thinking mode toggle", "Architecting multi-file codebases without hallucinations", "Complex full-stack system debugging and refactoring"],
+  28: ["Screen sharing with device system audio in video calls", "Secret code password for hidden locked WhatsApp chats", "Instant 60-second circular video message shortcut"],
+  29: ["Activating Ultimate Performance power plan via powercfg command", "Maximum CPU frequency locking with zero throttling", "Eliminating FPS drops and render stutter in Windows"],
+  30: ["Google Sheets Smart Fill AI pattern auto-detection", "Splitting combined phone numbers and emails without formulas", "Instant multi-column text normalization"],
+  31: ["Gamma App prompt-to-presentation slide generation", "Exporting interactive decks to PowerPoint and web", "Embedding live analytics widgets directly into slides"],
+  32: ["DeepSeek R1 open-weight local model execution via Ollama", "Zero-cost local coding benchmarks matching proprietary models", "Offline reasoning pipelines without cloud API fees"],
+  33: ["Kling AI 1.5 camera path positioning and motion control", "Realistic human body physics and facial expression rendering", "Prompt structuring for 1080p cinematic video clips"],
+  34: ["Bolt.new prompt-to-fullstack application generator", "Live WebContainer execution inside browser tabs", "One-click deployment to Netlify and custom domains"],
+  35: ["Lovable dev full-stack web builder with Supabase backend", "Automated database schema creation and auth configuration", "Exporting clean React code directly to GitHub repository"],
+  36: ["Automating instant WhatsApp order alerts via HTTP webhooks", "Triggering customer notifications on new online store orders", "Sending approved templated WhatsApp messages automatically"],
+  37: ["Cursor AI Composer multi-file project refactoring", "Full codebase indexing for context-aware code generation", "Configuring custom .cursorrules for project standards"],
+  38: ["v0 by Vercel React UI generator from screenshots", "Tailwind CSS component generation and live preview", "Direct copy-paste integration into Next.js and Vite apps"],
+  39: ["Flux 1.1 Pro Ultra accurate typography rendering in images", "Clean legible English text inside generative visuals", "High-frequency 2K photorealism and skin textures"],
+  40: ["Win+R secret diagnostic commands: msconfig, mrt, perfmon", "Running malicious software removal tool deep background scans", "Diagnosing hardware resource bottlenecks via Performance Monitor"],
+  41: ["Pika 2.0 Pikaffects physics simulation: melt, explode, inflate", "Keyframe timing and motion physics parameters", "Transforming static image objects into kinetic effects"],
+  42: ["HeyGen custom interactive video avatar from webcam footage", "Lip-sync synthesis across 40+ languages", "Automating multilingual product tutorial video pipelines"],
+  43: ["Napkin AI text-to-infographic visual documentation", "Converting dense articles into structured visual flowcharts", "Exporting scalable vector SVG graphics for presentations"],
+  44: ["Make.com vs Zapier visual automation pipeline comparison", "Router branches, filters, and error-handling configurations", "Cost-effective webhook pipelines for high-volume tasks"],
+  45: ["Ollama local LLM runner setup on desktop PC", "Running Llama 3.3 and DeepSeek completely offline", "Privacy-first local AI operations without internet connection"],
+  46: ["Whisper AI local voice transcription with zero cloud latency", "SRT subtitle file generation with word-level timestamps", "Accurate Roman Urdu and English mixed dialect transcription"],
+  47: ["WhatsApp Business multi-device sync without keeping phone online", "Meta AI assistant integration inside business chats", "Catalog inventory management synced across desktop and mobile"],
+  48: ["WhatsApp Business color-coded customer lifecycle labels", "Targeted broadcast lists without creating noisy group chats", "Filtering customer chats by paid, pending, and shipped status"],
+  49: ["WhatsApp Business product catalog setup with item prices", "Generating direct WhatsApp purchase links for social media", "Sharing seasonal collections directly in customer chats"],
+  50: ["WhatsApp Business automated away messages and greeting replies", "Quick reply keyboard shortcuts for FAQs (/price, /bank, /hours)", "Handling after-hours customer inquiries automatically"],
+  51: ["WhatsApp Business verified official profile setup", "Configuring verified business hours, support email, and location", "Building buyer trust with complete business credentials"],
+  52: ["Migrating regular WhatsApp to WhatsApp Business without data loss", "Full chat and media backup to Google Drive before switch", "Clean profile transition retaining complete customer history"],
+  53: ["Google Chrome secret flags for 2X parallel download speed", "Enabling Memory Saver and proactive Tab Discarding", "Optimizing hardware-accelerated video decoding in browser"],
+  54: ["Google Drive advanced search operators: type:pdf, owner:me, before:date", "Restoring permanently overwritten document versions", "Organizing shared folders with color codes and shortcuts"],
+  55: ["Gmail search filters for gigabyte storage recovery: size:10M, older_than:1y", "Auto-cleaning bloated promotional inbox clutter in 1 click", "Creating automatic rule filters for incoming client attachments"],
+  56: ["YouTube secret URL parameters: exact timestamp sharing and loop toggle", "Clean distraction-free full-screen embeds", "Keyboard timeline navigation shortcuts: J, K, L, M, and F"],
+  57: ["Telegram scheduled messages and silent sending without notification sound", "Sending uncompressed original files up to 2GB in size", "Setting up anonymous custom public usernames"],
+  58: ["Google Maps offline city map downloads for internet-free navigation", "Measuring straight-line distance between geographic pins", "Saving exact vehicle parking locations and timeline history"]
 };
 
 // Default niche-specific sources for research lenses
@@ -523,13 +523,101 @@ export function extractPrimaryTopicEntity(text: string): string | null {
 /**
  * Cleans tokens for semantic comparison.
  */
-function cleanSemanticTokens(str: string): string[] {
+/**
+ * Helper to identify whether a string is merely a tool/app name or placeholder, not a real point.
+ * "A tool or app NAME is never a 'point'."
+ */
+export function isPlaceholderOrToolName(point: string, toolOrAppName?: string): boolean {
+  if (!point) return true;
+  const clean = point.trim().toLowerCase();
+  if (clean.length < 5) return true;
+  if (/^(tool|tools|tool:\s*tool|manual entry|custom tool|—|none|pending|untitled)$/i.test(clean)) return true;
+
+  if (toolOrAppName) {
+    const appClean = toolOrAppName.trim().toLowerCase();
+    if (clean === appClean) return true;
+    // e.g. "Google Astra" or "Google Astra live camera vision assistant" if it's just the app title
+    if (clean.replace(/[^a-z0-9]/g, '') === appClean.replace(/[^a-z0-9]/g, '')) return true;
+  }
+
+  // Check if it's just one of the known app names alone without an action/feature
+  for (const app of APP_TOPIC_KEYWORDS) {
+    if (clean === app || clean === `${app} tool` || clean === `${app} app`) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Ensures that a published story has real covered_points (specific secrets/tricks/steps/features).
+ * If a story has no real covered_points yet (empty, or just a title or a placeholder like "Tool: Tool"),
+ * generates them from its scenes and dialogue first.
+ */
+export function ensureStoryCoveredPoints(story: DynamicPublishedStory): string[] {
+  const toolName = story.tool || '';
+  const existing = (story.covered_points || []).filter(p => !isPlaceholderOrToolName(p, toolName));
+
+  if (existing.length > 0) {
+    return existing;
+  }
+
+  // Generate from storyPackage scenes and dialogue if available
+  if (story.storyPackage && Array.isArray(story.storyPackage.scenes) && story.storyPackage.scenes.length > 0) {
+    const extracted: string[] = [];
+    story.storyPackage.scenes.forEach((sc, idx) => {
+      // Key tutorial steps usually live in scenes 2-7
+      if (idx >= 1 && idx <= 7) {
+        const text = (sc as any).voiceoverUrdu || sc.dialogue || (sc as any).visualPrompt || sc.visual || '';
+        const sentence = text.split(/[.?!۔\n]+/)[0]?.trim();
+        if (sentence && sentence.length >= 12 && !isPlaceholderOrToolName(sentence, toolName)) {
+          extracted.push(`Step ${idx + 1}: ${sentence}`);
+        }
+      }
+    });
+    if (extracted.length > 0) {
+      return extracted.slice(0, 4);
+    }
+  }
+
+  // Extract from points field by splitting clauses
+  if (story.points && story.points.trim()) {
+    const parts = story.points
+      .split(/[\n,;•]+/)
+      .map(p => p.trim())
+      .filter(p => p.length >= 10 && !isPlaceholderOrToolName(p, toolName));
+    if (parts.length > 0) {
+      return parts.slice(0, 5);
+    }
+  }
+
+  // Fallback: check if the title contains actionable details beyond the app name
+  if (story.title && story.title.trim()) {
+    const titleClean = story.title.replace(/[\n\r]+/g, ' ').trim();
+    if (!isPlaceholderOrToolName(titleClean, toolName)) {
+      return [titleClean];
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Cleans tokens for semantic comparison.
+ * Excludes stop words and the detected app/tool name so app repeats don't give false positives.
+ */
+function cleanSemanticTokens(str: string, excludedAppEntity?: string | null): string[] {
   const stopWords = new Set([
     'the', 'a', 'an', 'in', 'on', 'of', 'for', 'with', 'and', 'or', 'to', 'is', 'it', 'by', 'as',
     'ka', 'ki', 'ke', 'ko', 'se', 'mein', 'hai', 'hain', 'aur', 'karein', 'karna', 'bina', 'par',
     'secret', 'secrets', 'trick', 'tricks', 'hack', 'hacks', 'hidden', 'feature', 'features',
-    'step', 'steps', 'setting', 'settings', 'part', 'episode'
+    'step', 'steps', 'setting', 'settings', 'part', 'episode', 'series', 'guide', 'tutorial',
+    'pro', 'new', 'latest', 'urdu', 'hindi', 'video', 'shorts', 'youtube', 'tool', 'tools', 'app', 'apps'
   ]);
+
+  if (excludedAppEntity) {
+    const appTokens = excludedAppEntity.toLowerCase().split(/\s+/);
+    appTokens.forEach(t => stopWords.add(t));
+  }
 
   return str
     .toLowerCase()
@@ -539,18 +627,27 @@ function cleanSemanticTokens(str: string): string[] {
 }
 
 /**
- * Calculates similarity between two text snippets based on shared key tokens.
+ * Calculates semantic similarity between a candidate point and an existing covered point.
  */
-function calculatePointSimilarity(candidatePoint: string, existingPoint: string): number {
-  const tCandidate = cleanSemanticTokens(candidatePoint);
-  const tExisting = cleanSemanticTokens(existingPoint);
+function calculatePointSimilarity(candidatePoint: string, existingPoint: string, appEntity?: string | null): number {
+  const tCandidate = cleanSemanticTokens(candidatePoint, appEntity);
+  const tExisting = cleanSemanticTokens(existingPoint, appEntity);
   if (!tCandidate.length || !tExisting.length) return 0;
 
   let common = 0;
   for (const c of tCandidate) {
-    if (tExisting.some(e => e.includes(c) || c.includes(e))) {
+    if (tExisting.some(e => e.includes(c) || c.includes(e) || (e.length > 4 && c.length > 4 && e.slice(0, 4) === c.slice(0, 4)))) {
       common++;
     }
+  }
+
+  // Check critical anchor pairs (e.g. blue tick & read receipts, voice & transcribe)
+  const cLower = candidatePoint.toLowerCase();
+  const eLower = existingPoint.toLowerCase();
+  const hasBlueTickExact = (cLower.includes('blue tick') || cLower.includes('read receipt')) &&
+                           (eLower.includes('blue tick') || eLower.includes('read receipt') || eLower.includes('blue double-tick'));
+  if (hasBlueTickExact) {
+    return 0.85;
   }
 
   const recall = common / Math.min(tCandidate.length, tExisting.length);
@@ -558,86 +655,137 @@ function calculatePointSimilarity(candidatePoint: string, existingPoint: string)
 }
 
 /**
- * SMARTER DUPLICATE CHECK
- *
- * LEVEL 1: Topic/App screen (NEVER BLOCKS).
- * If the candidate shares an app (e.g. WhatsApp, Windows, Excel) with existing stories,
- * we note it: "WhatsApp covered N times; checking what specific tricks/steps were shared".
- *
- * LEVEL 2: Deep content check (DECIDES).
- * Compares candidate's specific points/tricks against the "covered_points" of earlier stories.
- *
- * Series Categories (4 PC & Windows Hacks, 7 Secrets):
- * Same app repeating is NORMAL and EXPECTED. Only an already-covered specific point is a duplicate.
- *
- * Verdicts:
- * - EXACT DUPLICATE (same point already covered): BLOCK and show matched story and matched point.
- * - PARTIAL (same app but different trick / deeper angle): ALLOW, mark "fresh angle / Part N".
- * - NEW: ALLOW, mark "Naya Topic".
+ * Extract candidate specific points (never just the app name).
  */
-export function checkSmarterDuplicate(
+export function extractCandidateSpecificPoints(candidate: {
+  title: string;
+  points?: string[] | string;
+  rawPointsText?: string;
+  tool?: string;
+}): string[] {
+  const toolName = candidate.tool || '';
+  if (Array.isArray(candidate.points) && candidate.points.length > 0) {
+    const filtered = candidate.points.map(p => p.trim()).filter(p => !isPlaceholderOrToolName(p, toolName));
+    if (filtered.length > 0) return filtered;
+  } else if (typeof candidate.points === 'string' && candidate.points.trim()) {
+    const split = candidate.points.split(/[\n,;•]+/).map(p => p.trim()).filter(p => !isPlaceholderOrToolName(p, toolName));
+    if (split.length > 0) return split;
+  }
+
+  if (candidate.rawPointsText && candidate.rawPointsText.trim()) {
+    const filtered = candidate.rawPointsText
+      .split(/[\n,;•]+/)
+      .map(p => p.trim())
+      .filter(p => !isPlaceholderOrToolName(p, toolName));
+    if (filtered.length > 0) return filtered;
+  }
+
+  // Fallback to title
+  const cleanTitle = candidate.title.trim();
+  return isPlaceholderOrToolName(cleanTitle, toolName) ? [] : [cleanTitle];
+}
+
+/**
+ * PHASE 2: NEW HIERARCHICAL DUPLICATE CHECK (The ONLY duplicate check in the project)
+ *
+ * Scope: The check runs ONLY against stories already PUBLISHED in the active channel profile's library.
+ * Never against pending items, session memory, Topic Bank items, or current queue. Never across channels.
+ *
+ * Hierarchy, in this order:
+ * 1. Search the published stories for the same topic/app name.
+ * 2. If there is a match, OPEN that story and read its covered_points (the specific secrets/tricks/steps/features it shared).
+ *    If a story has no real covered_points yet (empty, or just a title or a placeholder like "Tool: Tool"), generate them from its scenes and dialogue first.
+ *    A tool or app NAME is never a "point".
+ * 3. Compare the candidate's specific points with those covered_points by meaning.
+ * 4. Verdict:
+ *    - EXACT (same point already published) -> skip / auto-move-on;
+ *    - PARTIAL (same app, different trick or deeper angle) -> allow and mark "fresh angle / Part N";
+ *    - NEW -> allow.
+ * 5. If the story cannot be verified (no covered_points could be generated), do NOT block; mark "unverified" and continue.
+ *
+ * Ongoing series categories (4 PC & Windows, 7 Secrets):
+ * The same app repeating is normal; only an already-published specific point counts as duplicate.
+ */
+export function checkHierarchicalDuplicate(
   candidate: {
     title: string;
     points?: string[];
     rawPointsText?: string;
     categoryId?: number;
     channelId: string;
+    tool?: string;
   },
   options?: {
     customLibrary?: DynamicPublishedStory[];
-    customTopicBank?: TopicCard[];
   }
 ): DuplicateCheckResult {
   const channelId = candidate.channelId;
+  // Strictly isolated to published stories in active channel profile library
   const library = options?.customLibrary || loadProfileLibrary(channelId);
-  const topicBank = options?.customTopicBank || loadProfileTopicBank(channelId);
 
   const candidateTitle = candidate.title.trim();
-  const candidatePointsList: string[] = candidate.points && candidate.points.length > 0
-    ? candidate.points
-    : candidate.rawPointsText
-    ? candidate.rawPointsText.split(/[\n,;•]+/).map(s => s.trim()).filter(Boolean)
-    : [candidateTitle];
+  const fullCandidateText = `${candidateTitle} ${(candidate.points || []).join(' ')} ${candidate.rawPointsText || ''} ${candidate.tool || ''}`.toLowerCase();
 
-  const fullCandidateText = `${candidateTitle} ${candidatePointsList.join(' ')}`.toLowerCase();
-
-  // LEVEL 1: Detect App / Topic Entity
+  // STEP 1: Search the published stories for the same topic/app name
   const entity = extractPrimaryTopicEntity(fullCandidateText);
-  let entityMatchCount = 0;
+  let matchedPublishedStories: DynamicPublishedStory[] = [];
 
   if (entity) {
-    entityMatchCount = library.filter(story => {
-      const storyText = `${story.title} ${story.tool} ${story.points} ${(story.covered_points || []).join(' ')}`.toLowerCase();
+    matchedPublishedStories = library.filter(story => {
+      const storyText = `${story.title} ${story.tool} ${story.series}`.toLowerCase();
       return storyText.includes(entity);
-    }).length;
+    });
+  } else {
+    // If no common keyword matched, check if tool name directly matches an existing published story tool
+    const candidateTool = candidate.tool?.toLowerCase().trim();
+    if (candidateTool && candidateTool.length >= 3 && !isPlaceholderOrToolName(candidateTool)) {
+      matchedPublishedStories = library.filter(story => {
+        return (story.tool && story.tool.toLowerCase().includes(candidateTool)) ||
+          story.title.toLowerCase().includes(candidateTool);
+      });
+    }
   }
 
   const isSeriesCategory = candidate.categoryId === 4 || candidate.categoryId === 7;
 
-  // LEVEL 2: Deep Content Check against covered_points
-  // We compare candidate's specific sub-points against all covered_points in the library and Topic Bank
+  // If no published story covers this app/topic at all -> NEW (ALLOW!)
+  if (matchedPublishedStories.length === 0) {
+    return {
+      verdict: 'new',
+      level1AppDetected: null,
+      level1Count: 0,
+      reason: `NEW TOPIC: Published library mein "${entity || candidate.title}" ka koi pehla record nahi hai. 100% unique!`,
+      confidence: 100
+    };
+  }
+
+  // STEP 2 & 3: OPEN matching stories, read covered_points, compare specific points by meaning
+  const candidatePoints = extractCandidateSpecificPoints(candidate);
+  let verifiedStoriesCount = 0;
   let exactMatch: {
     storyId: number | string;
     storyTitle: string;
     coveredPoint: string;
+    candidatePoint: string;
     similarity: number;
   } | null = null;
 
-  for (const story of library) {
-    const covered = story.covered_points && story.covered_points.length > 0
-      ? story.covered_points
-      : [story.points || story.title];
+  for (const story of matchedPublishedStories) {
+    const coveredPoints = ensureStoryCoveredPoints(story);
+    if (coveredPoints.length > 0) {
+      verifiedStoriesCount++;
+    }
 
-    for (const cp of covered) {
-      for (const candPoint of candidatePointsList) {
-        const sim = calculatePointSimilarity(candPoint, cp);
-        // If similarity is very high (>= 0.70) or candidate title matches exactly
-        if (sim >= 0.70) {
+    for (const cp of coveredPoints) {
+      for (const candPoint of candidatePoints) {
+        const sim = calculatePointSimilarity(candPoint, cp, entity);
+        if (sim >= 0.68) {
           if (!exactMatch || sim > exactMatch.similarity) {
             exactMatch = {
               storyId: story.id,
               storyTitle: story.title,
               coveredPoint: cp,
+              candidatePoint: candPoint,
               similarity: sim
             };
           }
@@ -646,85 +794,59 @@ export function checkSmarterDuplicate(
     }
   }
 
-  // Also check against Topic Bank (in production or published)
-  if (!exactMatch) {
-    for (const bankItem of topicBank) {
-      if (bankItem.status === 'published' || bankItem.status === 'in_production') {
-        for (const kp of bankItem.keyPoints) {
-          for (const candPoint of candidatePointsList) {
-            const sim = calculatePointSimilarity(candPoint, kp);
-            if (sim >= 0.75) {
-              exactMatch = {
-                storyId: bankItem.id,
-                storyTitle: bankItem.title,
-                coveredPoint: kp,
-                similarity: sim
-              };
-              break;
-            }
-          }
-        }
-      }
-    }
+  // STEP 5: If no covered points could be generated for any matched story -> UNVERIFIED (ALLOW, do NOT block)
+  if (verifiedStoriesCount === 0 && candidatePoints.length === 0) {
+    return {
+      verdict: 'unverified',
+      level1AppDetected: entity,
+      level1Count: matchedPublishedStories.length,
+      level1Note: entity ? `${entity.toUpperCase()} library mein hai lekin specific points verify nahi ho sake.` : undefined,
+      reason: `UNVERIFIED: Story covered points verify nahi ho sake — flow ko block kiye baghair allow kiya gaya.`,
+      confidence: 50
+    };
   }
 
-  // Exact title duplicate check
-  if (!exactMatch) {
-    const titleMatch = library.find(s => s.title.trim().toLowerCase() === candidateTitle.toLowerCase());
-    if (titleMatch) {
-      exactMatch = {
-        storyId: titleMatch.id,
-        storyTitle: titleMatch.title,
-        coveredPoint: titleMatch.points || titleMatch.title,
-        similarity: 1.0
-      };
-    }
-  }
-
-  // VERDICT DETERMINATION
+  // STEP 4: VERDICT
+  // EXACT: same point already published -> SKIP
   if (exactMatch) {
     return {
       verdict: 'exact',
       level1AppDetected: entity,
-      level1Count: entityMatchCount,
-      level1Note: entity ? `${entity.toUpperCase()} pehle ${entityMatchCount} baar cover ho chuka hai.` : undefined,
+      level1Count: matchedPublishedStories.length,
+      level1Note: entity ? `${entity.toUpperCase()} pehle ${matchedPublishedStories.length} published stories mein cover ho chuka hai.` : undefined,
       matchedStoryId: exactMatch.storyId,
       matchedStoryTitle: exactMatch.storyTitle,
       matchedPoint: exactMatch.coveredPoint,
-      reason: `EXACT DUPLICATE: Yeh specific point/trick pehle Story #${exactMatch.storyId} ("${exactMatch.storyTitle}") mein cover ho chuka hai: "${exactMatch.coveredPoint}".`,
+      candidatePoint: exactMatch.candidatePoint,
+      reason: `EXACT DUPLICATE: Yeh specific feature/trick pehle Published Story #${exactMatch.storyId} ("${exactMatch.storyTitle}") mein cover ho chuka hai: "${exactMatch.coveredPoint}".`,
       confidence: Math.round(exactMatch.similarity * 100)
     };
   }
 
-  // If entity was covered before, but the specific points are fresh -> PARTIAL (Allowed)
-  if (entity && entityMatchCount > 0) {
-    const seriesNote = isSeriesCategory
-      ? `Series Category (${candidate.categoryId === 7 ? 'Secrets' : 'PC & Windows'}) mein same app aana normal hai.`
-      : `Same tool/app area, lekin naye sub-points aur fresh angle hai.`;
+  // PARTIAL: same app/tool, different trick or deeper angle -> ALLOW!
+  const seriesNote = isSeriesCategory
+    ? `Series Category (${candidate.categoryId === 7 ? 'Secrets' : 'PC & Windows'}) mein same app repeat hona normal hai.`
+    : `Same app/tool area, lekin bilkul naya secret/trick hai.`;
 
-    return {
-      verdict: 'partial',
-      level1AppDetected: entity,
-      level1Count: entityMatchCount,
-      level1Note: `${entity.toUpperCase()} library mein ${entityMatchCount} dafa pehle aya hai.`,
-      reason: `PARTIAL ALLOW: ${seriesNote} (0 duplicate sub-points match). Approved as fresh episode/angle!`,
-      confidence: 88
-    };
-  }
-
-  // Completely new topic
   return {
-    verdict: 'new',
-    level1AppDetected: null,
-    level1Count: 0,
-    reason: `NEW TOPIC: Active profile library aur Topic Bank mein koi match nahi mila. 100% unique!`,
-    confidence: 100
+    verdict: 'partial',
+    level1AppDetected: entity,
+    level1Count: matchedPublishedStories.length,
+    level1Note: `${entity?.toUpperCase() || 'App'} library mein ${matchedPublishedStories.length} dafa pehle published hai.`,
+    reason: `PARTIAL ALLOW (Fresh Angle): ${seriesNote} Covered points se koi collision nahi mila. Approved as fresh angle/Part N!`,
+    confidence: 88
   };
 }
 
 /**
+ * Canonical Alias: checkSmarterDuplicate routes directly to checkHierarchicalDuplicate.
+ * Guarantees that there is only ONE duplicate check function throughout the entire codebase.
+ */
+export const checkSmarterDuplicate = checkHierarchicalDuplicate;
+
+/**
  * Returns a list of all already-covered points for a given app/topic entity or category.
- * Used BEFORE searching to exclude known points from the search prompt.
+ * Used BEFORE searching to exclude known points from the search prompt ("do not suggest these").
  */
 export function getAlreadyCoveredPointsList(channelId: string, filterEntityOrCategory?: string | number): string[] {
   const library = loadProfileLibrary(channelId);
@@ -739,15 +861,12 @@ export function getAlreadyCoveredPointsList(channelId: string, filterEntityOrCat
       story.series.toLowerCase().includes(filterStr);
 
     if (match) {
-      if (story.covered_points && story.covered_points.length > 0) {
-        points.push(...story.covered_points);
-      } else if (story.points) {
-        points.push(story.points);
-      }
+      const covered = ensureStoryCoveredPoints(story);
+      points.push(...covered);
     }
   }
 
-  return Array.from(new Set(points)).slice(0, 40);
+  return Array.from(new Set(points)).slice(0, 35);
 }
 
 /**
@@ -755,19 +874,17 @@ export function getAlreadyCoveredPointsList(channelId: string, filterEntityOrCat
  */
 export function extractCoveredPointsFromStoryPackage(story: GeneratedStory): string[] {
   if (story.idea?.points) {
-    const raw = story.idea.points.split(/[\n,;•]+/).map(s => s.trim()).filter(s => s.length > 3);
+    const raw = story.idea.points.split(/[\n,;•]+/).map(s => s.trim()).filter(s => s.length > 5);
     if (raw.length >= 2) return raw.slice(0, 5);
   }
 
   const extracted: string[] = [];
   if (Array.isArray(story.scenes)) {
     story.scenes.forEach((sc, idx) => {
-      // Pick key action scenes (scenes 3, 4, 5, 6 often contain the core steps/secrets)
       if (idx >= 2 && idx <= 6) {
         const text = (sc as any).voiceoverUrdu || sc.dialogue || (sc as any).visualPrompt || (sc as any).visual || '';
-        // extract first meaningful sentence
         const firstSentence = text.split(/[.?!۔]+/)[0]?.trim();
-        if (firstSentence && firstSentence.length > 15 && firstSentence.length < 80) {
+        if (firstSentence && firstSentence.length >= 15 && firstSentence.length <= 80) {
           extracted.push(`Scene ${idx + 1}: ${firstSentence}`);
         }
       }

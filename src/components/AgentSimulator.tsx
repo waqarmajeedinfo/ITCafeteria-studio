@@ -1021,7 +1021,7 @@ export const AgentSimulator: React.FC = () => {
             </div>
             <h3 className="text-base font-bold text-white">Aapki AI-generated story yahan aayegi</h3>
             <p className="text-xs text-slate-400 max-w-lg mx-auto">
-              Upar <strong className="text-cyan-300">Trigger</strong> dabayein. Category 1–9 seedha AI story generate karengi; Category 10 mein pehle idea, phir 3 fresh ideas, discussion aur Final Story Generate hoga.
+              Upar <strong className="text-cyan-300">Trigger</strong> dabayein. Category 1–10 seedha AI story generate karengi; Category 10 mein custom idea prompt, 3 fresh ideas, discussion aur Final Story Generate hoga.
             </p>
             <p className="text-[11px] text-slate-500">
               Purana Windows 11 reference sample hata diya gaya hai — ab yahan sirf aapki apni generated story dikhegi aur reload par bhi save rahegi.
