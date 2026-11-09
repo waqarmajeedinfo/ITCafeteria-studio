@@ -548,7 +548,12 @@ Status: bani`;
         memoryBlock,
         idea,
         discussionNotes: notes,
-        modelUsed: data.modelUsed
+        modelUsed: data.modelUsed,
+        practicalBlueprint: data.practicalBlueprint,
+        consistencyReport: data.consistencyReport,
+        practicalSteps: data.practicalBlueprint?.steps?.map((s: any) => `${s.stepNumber}. ${s.actionTitle}: ${s.exactPathOrCommand}`),
+        outsourcedLinks: data.practicalBlueprint?.sourceLinks || data.outsourcedLinks,
+        demoPrompt: data.demoPrompt
       };
 
       // Mandatory Verification & Correction Pass:

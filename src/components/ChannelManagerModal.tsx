@@ -1366,6 +1366,24 @@ export const ChannelManagerModal: React.FC<ChannelManagerModalProps> = ({
                       Script format, hook guidelines aur outro CTAs jo is channel ke har short ke andar lazmi follow honge.
                     </p>
                   </div>
+
+                  {/* Practical Blueprint Configuration */}
+                  <div className="p-3 rounded-xl bg-slate-950/80 border border-cyan-500/30 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1 rounded bg-cyan-500/20 text-cyan-400">
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </span>
+                      <h6 className="font-bold text-white text-xs">
+                        Practical Blueprint Architecture (No Stories Without Concrete Steps/Facts)
+                      </h6>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      Har channel ke liye Practical Blueprint enforce hota hai: Cooking channels ke liye exact ingredients aur cooking steps; Beauty channels ke liye exact products aur skin application steps; Tech channels ke liye exact UI buttons aur commands.
+                    </p>
+                    <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-[10px] text-cyan-300 font-mono">
+                      ✓ Zero Vague Placeholders Guarantee • Scene-by-Scene Step Matching • YouTube Description Step Binding
+                    </div>
+                  </div>
                 </div>
 
                 {/* Form Action Buttons: Distinct Save Changes vs Channel Creation buttons! */}

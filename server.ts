@@ -7,6 +7,12 @@ import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { buildMasterThumbnailPrompt, splitHeadline } from './src/lib/thumbnailMaster';
 import { applyPhoneticFixes } from './src/lib/phoneticDictionaryStore';
+import {
+  buildPracticalBlueprint,
+  runConsistencyGate,
+  buildYouTubeDescriptionFromBlueprint,
+  isConcreteTopic
+} from './src/lib/practicalBlueprint';
 import { INTEGRATION_PUBLIC_PATHS, registerIntegrationRoutes } from './integrations';
 import { registerMultiUserRoutes } from './server_multiuser';
 import { registerTopicResearchRoutes } from './server_topic_research';
@@ -2035,6 +2041,24 @@ app.post('/api/ai/generate-story', async (req, res) => {
       return res.status(400).json({ error: 'Story idea ka title required hai' });
     }
 
+    // 1. NEVER GENERATE WITHOUT A REAL CONCRETE TOPIC
+    const concreteCheck = isConcreteTopic(ideaTitle, category);
+    if (!concreteCheck.valid) {
+      return res.status(400).json({
+        error: `Concrete Topic Required: ${concreteCheck.reason || 'Generic title or category name cannot be used as a topic.'}`
+      });
+    }
+
+    // 2. Pre-build Practical Blueprint based on category and topic
+    const categoryIdNum = Number(String(category).match(/^\d+/)?.[0]) || 1;
+    const practicalBlueprint = buildPracticalBlueprint({
+      topic: ideaTitle,
+      categoryName: category,
+      categoryId: categoryIdNum,
+      channelId: channelName.toLowerCase().includes('beauty') ? 'beautyhub' : 'itcafeteria',
+      sourceLinks: Array.isArray(idea.sources) ? idea.sources.map((s: any) => s.url || s).filter(Boolean) : []
+    });
+
     const totalScenes = Math.min(Math.max(Number(sceneCount) || 10, 4), 30);
     const beatGuide = totalScenes <= 4
       ? 'Hook; Problem + Reveal; Demonstration + Proof; Benefit + Save CTA'
@@ -2117,26 +2141,44 @@ To mathematically boost channel velocity and fix these leaks, every generated st
 3. PILLAR 3 (Mid-Story Subscriber Trigger at 60-75% Mark - Lift Subs from 3.99 to 5+/1k): In Scene 4 or 5 (approx. 35-45s in), deliver an explicit high-value reason to subscribe (e.g. "Is trick ka automated script agle episode mein share karunga — channel subscribe karke bell daba lein!").
 4. PILLAR 4 (High-Engagement A/B Dilemma - Push Engagement from 2.62% to 4%+): In the final CTA scene, ask the audience a direct 2-option question or dilemma (e.g. "Aap konsa tool prefer karte hain, A ya B? Comment mein batayein!"), and prompt a reply-worthy question in the description.
 
+PRACTICAL BLUEPRINT (MANDATORY EXECUTION FOUNDATION):
+- Concrete Topic: "${practicalBlueprint.concreteTopic}"
+- Blueprint Type: "${practicalBlueprint.blueprintType}"
+- Named Tool/App/Subject: "${practicalBlueprint.namedToolOrApp || 'Specified in topic'}"
+- Platform/Environment: "${practicalBlueprint.platformAndVersion || 'Web/Desktop/Mobile'}"
+- Verified Source Links: ${practicalBlueprint.sourceLinks.join(', ')}
+${practicalBlueprint.steps.length > 0 ? `- Planned Step Sequence (All scenes & description MUST follow these EXACT steps):
+${practicalBlueprint.steps.map(s => `  * Step ${s.stepNumber} [${s.actionTitle}]: Exact Command/Path: "${s.exactPathOrCommand}" | Expected: "${s.expectedResult}" | Dialogue Focus: "${s.dialogueFocus}"`).join('\n')}` : ''}
+${practicalBlueprint.weakPrompt ? `- Prompt Hack Comparison:
+  * Weak Prompt to Expose: "${practicalBlueprint.weakPrompt}"
+  * Improved Prompt (Exact Copy-Paste): "${practicalBlueprint.improvedPrompt}"` : ''}
+${practicalBlueprint.problemSolved ? `- Breakthrough Research:
+  * Problem Solved: "${practicalBlueprint.problemSolved}"
+  * Realistic Timeline: "${practicalBlueprint.realisticTimeline}"` : ''}
+${practicalBlueprint.honestRisksAndDisclaimers ? `- Income & Skills (Ideas Only):
+  * Disclaimer: "${practicalBlueprint.honestRisksAndDisclaimers}"` : ''}
+
+CRITICAL CONSISTENCY & ZERO-VAGUENESS RULES:
+1. SCENES ARE DERIVED DIRECTLY FROM THE BLUEPRINT: Spoken dialogue must name the EXACT tool, menu path, setting, command, or parameter from the blueprint above. ZERO generic placeholders allowed: NEVER say "hidden parameter", "specific setting", "core mechanism", "this setting", or "X or Y".
+2. VISUALS MUST MATCH DIALOGUE: The visual description MUST show the exact screen, button, dialog box, or subject named in the dialogue. No abstract "monitor screen with delay icon".
+3. NEVER READ CATEGORY NAME OR TITLE ALOUD: Scene 1 must NOT recite the category title (e.g. do not say "AI & Smart Technology mein...").
+4. DESCRIPTION MUST MATCH SCENES: The YouTube description's practical steps/facts must reflect the EXACT same steps in the exact same sequence as shown in the scenes.
+5. NO INVENTED NUMBERS / UNSOURCED CLAIMS: Do not claim "10x faster", "5 seconds", "official secret shortcut, 100% free and working" unless backed by the verified blueprint facts.
+
 STORY RULES (strict)
 1. Exactly ${totalScenes} scenes. Beat guide: ${beatGuide}
 2. Every scene is exactly 10 seconds and the spoken "dialogue" must be 22 to 25 Roman Urdu words (2.7 words per second). Count carefully. "words" field must match the actual dialogue word count.
 3. Scene 1 Hook: no greeting, immediate pattern interrupt in the first line. Final scene must be a Save/Follow CTA with high-engagement question.
-4. Dialogue must be Roman Urdu in Latin script. No Devanagari. English only for tool names/tech terms. No repeated word or syllable, no filler.
+4. Dialogue must be Roman Urdu in Latin script. No Devanagari. English only for tool names/tech terms. Acronyms MUST be hyphenated for TTS pronunciation (e.g. A-I, G-P-T, C-M-D, P-C, U-R-L).
 5. Each "script" is a paste-ready Google Flow prompt for that scene following "${flowGuide}":
    - Character scenes start with "${tag}" and include: sitting/standing anchor pose (0.5s), studio setting, gesture/visual overlay, voice instruction line ("He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated."), then the exact dialogue in double quotes, then the closing anchor pose.
    - Screen-demo scenes start with "The camera cuts to a full-screen..." and include ${tag}'s voiceover plus the exact dialogue in quotes.
    - The dialogue inside script must be word-for-word identical to the "dialogue" field.
    - Every scene script must include strictly "Duration: 0-10s."
-6. The story must follow the creator's idea and discussion notes. Do not drift to an unrelated topic.
-7. Title must NOT be the raw topic sentence. Max 65 characters, curiosity + search keyword. Do not reuse excluded titles.
-8. Description: 2-3 Roman Urdu lines + a "PRACTICAL STEPS / COMMANDS:" block with 3-6 concrete steps when the topic is a tech tutorial + a Pinned Comment engagement prompt.
-   - If the video demonstrates or references an AI tool (ChatGPT, Claude, Gemini, Midjourney, Google Flow, etc.), you MUST provide "demoPrompt" containing the exact reusable prompt used in the demonstration so viewers can copy-paste it directly.
-   - If any tools or websites are discussed, list 1-3 direct URLs or tool names in "outsourcedLinks".
-9. THUMBNAIL AGENT v3.45 structured output (server master prompt khud banayega, is liye poora image prompt mat likho):
-   - thumbnailLine1 + thumbnailLine2: total 3-5 UPPERCASE words, har line maximum 14 characters. Line 1 white aur line 2 neon-cyan render hogi. Raw topic sentence kabhi nahi.
-   - thumbnailSubBanner: 2-4 word punchy yellow-banner hook, Roman Urdu + English mix allowed.
-   - thumbnailHologram: 20-35 words mein EXACT story/tool-specific floating 3D hologram (icons, UI panels, data flows) + uske around adapted energy trails. Generic "tech hologram" bilkul nahi.
-   - Thumbnail text story ke core result/tool par ho, clickbait jhooth par nahi.
+6. Scene headers format: Every scene header in your minds and outputs must be "Scene N - 0-10s [purpose]". Scene 1 included.
+7. Exactly 3 hashtags in the hashtags array: [primaryHashtag, '#Shorts', '#(ToolOrTopic)'].
+8. Title must NOT be the raw topic sentence. Max 65 characters, curiosity + search keyword. Do not reuse excluded titles.
+9. Description: Derived from the blueprint containing a structured "PRACTICAL STEPS / COMMANDS" (or "KEY FACTS") section with scene numbers, exact copy-paste parameters/prompts, prerequisites, and source links.
 10. seriesPlan: one line teaser for the next episode.
 
 Return STRICT valid JSON only, no markdown fences:
@@ -2299,6 +2341,39 @@ DIALOGUE: "${dialogue}"`;
     });
     const thumbnailHeadline = [thumbnailLine1, thumbnailLine2].filter(Boolean).join(' ').slice(0, 40);
 
+    const structuredDescription = buildYouTubeDescriptionFromBlueprint({
+      blueprint: practicalBlueprint,
+      presenter,
+      channelName,
+      hook: safeString(data.hook) || safeString(idea.hook) || 'Reveal'
+    });
+
+    // Run Consistency Gate on generated scenes
+    const consistencyReport = runConsistencyGate({
+      title,
+      hook: safeString(data.hook) || safeString(idea.hook) || 'Reveal',
+      description: structuredDescription,
+      scenes
+    }, practicalBlueprint);
+
+    // If gate fails due to generic placeholders, repair dialogue and visuals using blueprint steps
+    if (!consistencyReport.passed) {
+      scenes.forEach((sc, idx) => {
+        const step = practicalBlueprint.steps[idx - 3] || practicalBlueprint.steps[0];
+        if (step) {
+          sc.dialogue = sc.dialogue
+            .replace(/hidden\s+parameter/gi, `${step.exactPathOrCommand}`)
+            .replace(/specific\s+setting/gi, `${step.exactPathOrCommand}`)
+            .replace(/core\s+mechanism/gi, `${practicalBlueprint.namedToolOrApp || 'tool'}`)
+            .replace(/10x\s+faster/gi, 'verified result')
+            .replace(/5\s+seconds/gi, 'instantly');
+          if (sc.visual.includes('Monitor screen displaying slow')) {
+            sc.visual = step.visualDescription;
+          }
+        }
+      });
+    }
+
     res.json({
       title,
       hook: safeString(data.hook) || safeString(idea.hook) || 'Reveal',
@@ -2307,16 +2382,20 @@ DIALOGUE: "${dialogue}"`;
       thumbnailHeadline,
       thumbnailSubBadge,
       thumbnailHologram,
-      hashtags,
-      description: safeString(data.description),
+      hashtags: hashtags.slice(0, 3),
+      description: structuredDescription,
       tags,
       tiktokCaption,
       thumbnailPrompt,
       seriesPlan: safeString(data.seriesPlan),
-      demoPrompt: safeString(data.demoPrompt),
-      outsourcedLinks: Array.isArray(data.outsourcedLinks) ? data.outsourcedLinks.map((item: any) => safeString(item)).filter(Boolean) : [],
+      demoPrompt: practicalBlueprint.improvedPrompt || safeString(data.demoPrompt),
+      outsourcedLinks: practicalBlueprint.sourceLinks.length > 0
+        ? practicalBlueprint.sourceLinks
+        : (Array.isArray(data.outsourcedLinks) ? data.outsourcedLinks.map((item: any) => safeString(item)).filter(Boolean) : []),
       scenes,
       modelUsed,
+      practicalBlueprint,
+      consistencyReport
     });
   } catch (err: any) {
     console.error('Story generation error:', err);

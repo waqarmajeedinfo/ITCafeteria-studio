@@ -9,6 +9,13 @@
 import type { GeneratedStory, StoryScene } from '../components/StoryPackageView';
 import { applyCinematicDirecting } from './cinematicDirector';
 import { applyPhoneticFixes } from './phoneticDictionaryStore';
+import {
+  buildPracticalBlueprint,
+  runConsistencyGate,
+  buildYouTubeDescriptionFromBlueprint,
+  isConcreteTopic,
+  type PracticalBlueprint
+} from './practicalBlueprint';
 
 export interface GenerateStoryParams {
   id?: string;
@@ -589,58 +596,72 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
             dialogue: `Aise authentic beauty aur skincare secrets rozana seekhne ke liye ${channelName} ko foran follow karein!`
           }
         ]
-      : [
-          {
-            purpose: 'Disruptive Hook (Pattern Interrupt)',
-            visual: `${charTag} stands at dynamic presentation workstation, gestures urgently toward floating 3D headline: "${titleClean}".`,
-            dialogue: `Kya aap jante hain ke ${titleClean} se aapka ghanton ka kaam sirf chand seconds mein ho sakta hai?`
-          },
-          {
-            purpose: 'The Problem Exposed',
-            visual: 'Monitor screen displaying slow traditional manual workflow with red delay icon.',
-            dialogue: `Aksar creators aur professionals ${category} mein purana tareeqa use kar ke apna bohot sa qeemti waqt zaya karte hain.`
-          },
-          {
-            purpose: 'Secret Feature Reveal',
-            visual: `Camera swoops into dual screen setup highlighting the core mechanism for ${titleClean}.`,
-            dialogue: `Lekin aaj ${channelName} par mein aapko iska ek official secret shortcut dikha raha hoon jo 100% free aur working hai.`
-          },
-          {
-            purpose: 'Step 1: Configuration',
-            visual: 'Tactile keyboard shortcut execution with cyan ripple lighting on workspace.',
-            dialogue: `Pehla step: Apne system ya tool mein yeh hidden parameter open karein jese screen par highlight ho raha hai.`
-          },
-          {
-            purpose: 'Step 2: Core Execution',
-            visual: 'Real-time execution interface completing the operation with glowing progress bar.',
-            dialogue: `Doosra step: Yeh specific setting apply karein aur execute dabayein. Background ka saara manual process automate ho jayega!`
-          },
-          {
-            purpose: 'Live Verification Proof',
-            visual: 'Before vs after visual comparison proving 10x faster result with green validation checkmarks.',
-            dialogue: `Nateeja aapke samne hai! Jo kaam ghanton mein nahi hota tha ab sirf 5 seconds mein complete aur verified hai.`
-          },
-          {
-            purpose: 'Pro Tip & Optimization',
-            visual: 'Holographic callout widget displaying advanced recurring trigger or keyboard shortcut.',
-            dialogue: `Pro tip: Is setting ko default par save kar lein taake aapko har bar manual setup na karna pare.`
-          },
-          {
-            purpose: 'Mistake Avoidance',
-            visual: 'Red caution box highlighting common error that breaks workflow consistency.',
-            dialogue: `Dhyan rahe, is mein ghalti se extra parameters add na karein warna system output accurate nahi aayega.`
-          },
-          {
-            purpose: 'Executive Summary',
-            visual: `${charTag} framing the key takeaway cards in dynamic 3D space with confident smile.`,
-            dialogue: `Yeh chota sa workflow hack aapke daily digital production ko bohot asaan aur tez bana dega.`
-          },
-          {
-            purpose: 'Call to Action & Community',
-            visual: `${channelName} subscribe button pulse with ${presenter} presentation end-card.`,
-            dialogue: `Aise rozana high-value shortcuts aur tips seekhne ke liye ${channelName} ko follow karein aur doston se share karein!`
-          }
-        ];
+      : (() => {
+          // Derive scenes directly from Practical Blueprint
+          const bp = buildPracticalBlueprint({
+            topic: titleClean,
+            categoryName: category,
+            categoryId: params.categoryId || 1,
+            channelId: channelName.toLowerCase().includes('beauty') ? 'beautyhub' : 'itcafeteria'
+          });
+          const tool = bp.namedToolOrApp || titleClean;
+          const s1 = bp.steps[0] || { actionTitle: 'Access Tool', exactPathOrCommand: tool, expectedResult: 'Tool Ready', dialogueFocus: `Pehla step: ${tool} open karein.` };
+          const s2 = bp.steps[1] || { actionTitle: 'Execute Action', exactPathOrCommand: 'Settings -> Feature', expectedResult: 'Feature active', dialogueFocus: `Doosra step: Yeh specific setting toggle karein.` };
+          const s3 = bp.steps[2] || { actionTitle: 'Verify Output', exactPathOrCommand: 'Run / Test', expectedResult: 'Output verified', dialogueFocus: `Teesra step: Ab live test run karke verify karein.` };
+
+          return [
+            {
+              purpose: 'Disruptive Hook (Pattern Interrupt)',
+              visual: `${charTag} standing at workstation, points toward high-contrast floating 3D graphic of ${tool}.`,
+              dialogue: `Kya aap jante hain ke ${tool} se aapka ghanton ka kaam asan ho sakta hai? Dekhein yeh verified tareeqa.`
+            },
+            {
+              purpose: 'The Problem Exposed',
+              visual: `Split screen displaying traditional slow manual bottleneck without ${tool}.`,
+              dialogue: `Aksar log is kaam ke liye ghanton lagate hain aur unka output phir bhi standard nahi aata.`
+            },
+            {
+              purpose: 'Feature & Tool Reveal',
+              visual: `Screencast zooming into ${tool} official interface displaying the verified feature.`,
+              dialogue: `Lekin ${tool} ka yeh feature aapke kaam ko step-by-step simplify kar deta hai.`
+            },
+            {
+              purpose: `Step 1: ${s1.actionTitle}`,
+              visual: s1.visualDescription || `Screencast executing ${s1.exactPathOrCommand} in ${tool}.`,
+              dialogue: s1.dialogueFocus || `Pehla step: ${s1.exactPathOrCommand} open karein jesa screen par dikh raha hai.`
+            },
+            {
+              purpose: `Step 2: ${s2.actionTitle}`,
+              visual: s2.visualDescription || `Screencast applying ${s2.exactPathOrCommand} with clear cursor highlight.`,
+              dialogue: s2.dialogueFocus || `Doosra step: ${s2.exactPathOrCommand} configure karein.`
+            },
+            {
+              purpose: `Step 3: ${s3.actionTitle}`,
+              visual: s3.visualDescription || `Live verification screen confirming ${s3.expectedResult}.`,
+              dialogue: s3.dialogueFocus || `Teesra step: Ab ${s3.actionTitle} verify karein, result tayyar hai!`
+            },
+            {
+              purpose: 'Pro Tip & Optimization',
+              visual: `Callout graphic displaying advanced parameter or shortcut for ${tool}.`,
+              dialogue: `Pro tip: Is feature ko default workflow mein save kar lein taake rozana manual setup na karna pare.`
+            },
+            {
+              purpose: 'Honest Limitation & Caution',
+              visual: `Caution box detailing: ${bp.honestLimitations || 'Stable internet connection required'}.`,
+              dialogue: `Dhyan rahe: ${bp.honestLimitations || 'Is feature ko use karte waqt stable internet lazmi rakhein'}.`
+            },
+            {
+              purpose: 'Executive Summary',
+              visual: `${charTag} in studio framing key takeaway card for ${tool}.`,
+              dialogue: `Yeh verified workflow aapki digital productivity aur output ko bohot behtar bana dega.`
+            },
+            {
+              purpose: 'Call to Action & Community',
+              visual: `${channelName} subscribe button animation with ${presenter} presentation end-card.`,
+              dialogue: `Aise rozana verified shortcuts aur tutorials seekhne ke liye ${channelName} ko subscribe karein!`
+            }
+          ];
+        })();
   }
 
   // Construct scenes with cinematic directing & living phonetic dictionary rules
@@ -664,6 +685,27 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     };
   });
 
+  const practicalBlueprint = buildPracticalBlueprint({
+    topic: titleClean,
+    categoryName: category,
+    categoryId: params.categoryId || 1,
+    channelId: channelName.toLowerCase().includes('beauty') ? 'beautyhub' : 'itcafeteria'
+  });
+
+  const structuredDescription = buildYouTubeDescriptionFromBlueprint({
+    blueprint: practicalBlueprint,
+    presenter,
+    channelName,
+    hook: applyPhoneticFixes(hook)
+  });
+
+  const consistencyReport = runConsistencyGate({
+    title: rawTitle,
+    hook: applyPhoneticFixes(hook),
+    description: structuredDescription,
+    scenes
+  }, practicalBlueprint);
+
   return {
     title: rawTitle,
     hook: applyPhoneticFixes(hook),
@@ -675,8 +717,8 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     dateLabel,
     sceneCount: scenes.length,
     scenes,
-    hashtags,
-    description,
+    hashtags: ['#Shorts', `#${channelName.replace(/[^a-zA-Z0-9]/g, '')}`, `#${(practicalBlueprint.namedToolOrApp || 'Tech').replace(/[^a-zA-Z0-9]/g, '')}`].slice(0, 3),
+    description: structuredDescription,
     tags,
     tiktokCaption,
     thumbnailHeadline,
@@ -694,21 +736,17 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
       points: `Authentic Roman Urdu demonstration for ${titleClean}`
     },
     discussionNotes: `Tailored 10-scene sequence specifically crafted for ${titleClean}. Strictly 10s per scene, 22-25 words per dialogue.`,
-    practicalSteps: [
-      `1. Open tool or environment for ${titleClean}.`,
-      `2. Execute step 1 shortcut as demonstrated in Scene 4.`,
-      `3. Confirm verified output in Scene 6.`
-    ],
-    outsourcedLinks: [
-      `https://www.youtube.com/@${channelName.toLowerCase().replace(/[^a-z0-9]/g, '')}`
-    ],
-    demoPrompt: isGoogleSheets
+    practicalSteps: practicalBlueprint.steps.map(s => `${s.stepNumber}. ${s.actionTitle}: ${s.exactPathOrCommand}`),
+    outsourcedLinks: practicalBlueprint.sourceLinks,
+    demoPrompt: practicalBlueprint.improvedPrompt || (isGoogleSheets
       ? `Extract first name and format official email from messy Column A data using Google Sheets AI Smart Fill (Ctrl + E).`
       : isPromptHacks
       ? `Act as an expert systems architect. Provide direct, non-fluff, tabular checklist of the architecture without filler text.`
       : isChatbotWorkflow
       ? `Create a multi-agent webhook router that classifies incoming inquiries into Support, Sales, or Booking with zero code.`
-      : `Complete hands-on demonstration of ${titleClean} in Roman Urdu.`
+      : `Complete hands-on demonstration of ${titleClean} in Roman Urdu.`),
+    practicalBlueprint,
+    consistencyReport
   };
 }
 

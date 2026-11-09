@@ -83,10 +83,11 @@ export interface GeneratedStory {
   modelUsed?: string;
   cinematicDirectingActive?: boolean;
   customCinematicDirection?: string;
-  lastRefreshedAt?: string;
   practicalSteps?: string[];
   outsourcedLinks?: string[];
   demoPrompt?: string;
+  practicalBlueprint?: any;
+  consistencyReport?: any;
 }
 
 /**
@@ -691,6 +692,94 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* PRACTICAL BLUEPRINT & CONSISTENCY GATE VIEWER */}
+      {story.practicalBlueprint && (
+        <div className="rounded-2xl border border-cyan-500/40 bg-gradient-to-br from-slate-900 via-cyan-950/20 to-blue-950/30 p-4 space-y-3 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                <Terminal className="w-4 h-4" />
+              </span>
+              <div>
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  Practical Blueprint: {story.practicalBlueprint.concreteTopic}
+                </h4>
+                <p className="text-[10px] text-cyan-300/80 font-mono">
+                  Type: {story.practicalBlueprint.blueprintType} • Platform: {story.practicalBlueprint.platformAndVersion || 'Web/Desktop'} • Verification: {story.practicalBlueprint.verificationStatus}
+                </p>
+              </div>
+            </div>
+            {story.consistencyReport && (
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border flex items-center gap-1 ${
+                story.consistencyReport.passed
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              }`}>
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Consistency Gate: {story.consistencyReport.passed ? 'PASSED (100%)' : 'REPAIRED'}
+              </span>
+            )}
+          </div>
+
+          {/* Blueprint Steps Grid */}
+          {Array.isArray(story.practicalBlueprint.steps) && story.practicalBlueprint.steps.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Concrete Step Sequence (Dialogue & Visuals strictly bound to these):
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                {story.practicalBlueprint.steps.map((st: any) => (
+                  <div key={st.stepNumber} className="p-2.5 rounded-xl bg-slate-950/70 border border-cyan-500/20 text-xs space-y-1">
+                    <div className="flex items-center justify-between text-cyan-300 font-bold text-[11px]">
+                      <span>Step {st.stepNumber}: {st.actionTitle}</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">Scene {st.stepNumber + 3}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-300 font-mono bg-slate-900/90 p-1.5 rounded border border-slate-800">
+                      <strong>Path/Cmd:</strong> {st.exactPathOrCommand}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      <strong>Expected:</strong> {st.expectedResult}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Prompt Hack details if applicable */}
+          {story.practicalBlueprint.improvedPrompt && (
+            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-fuchsia-500/30 text-xs space-y-1.5">
+              <div className="text-[11px] font-bold text-fuchsia-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Exact Copy-Paste Prompt:</span>
+              </div>
+              <div className="text-[11px] font-mono text-white bg-slate-900 p-2 rounded border border-slate-800 select-all whitespace-pre-wrap">
+                {story.practicalBlueprint.improvedPrompt}
+              </div>
+            </div>
+          )}
+
+          {/* Source Links */}
+          {Array.isArray(story.practicalBlueprint.sourceLinks) && story.practicalBlueprint.sourceLinks.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-[10px] pt-1 border-t border-slate-800/80">
+              <span className="text-slate-400">Verified Sources:</span>
+              {story.practicalBlueprint.sourceLinks.map((link: string, lIdx: number) => (
+                <a
+                  key={lIdx}
+                  href={link.startsWith('http') ? link : '#'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-cyan-400 hover:underline flex items-center gap-1"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>{link.replace(/^https?:\/\//, '').split('/')[0]}</span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 1. SCENE-BY-SCENE STORY WITH EDIT SCENE + COPY SCENE BUTTONS */}
       <div className="space-y-3">

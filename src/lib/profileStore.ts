@@ -63,6 +63,7 @@ export interface TopicCard {
   status: 'saved' | 'in_production' | 'published' | 'stale' | 'discarded';
   createdAt: string;
   linkedStoryId?: string;
+  practicalBlueprint?: any;
 }
 
 export interface CompetitorItem {

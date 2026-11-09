@@ -41,6 +41,10 @@ import {
   type DuplicateCheckResult
 } from '../lib/profileStore';
 import { TopicBankModal } from './TopicBankModal';
+import {
+  isConcreteTopic,
+  buildPracticalBlueprint
+} from '../lib/practicalBlueprint';
 
 interface TopicResearchPanelProps {
   channelId: string;
@@ -110,27 +114,40 @@ export const TopicResearchPanel: React.FC<TopicResearchPanelProps> = ({
       const data = await res.json();
       let rawTopics: any[] = data.topics || [];
 
-      // 2. Validate and enrich each candidate topic with Smarter Duplicate Defense
-      const enrichedTopics: TopicCard[] = rawTopics.map((t, idx) => {
+      // Filter and enrich topics: only topics that pass concrete topic check and carry blueprint essentials are accepted
+      const enrichedTopics: TopicCard[] = [];
+      rawTopics.forEach((t, idx) => {
+        const topicTitle = String(t.title || '').trim();
+        const concrete = isConcreteTopic(topicTitle);
+        if (!concrete.valid) return; // REJECT before reaching Topic Bank
+
         const dupCheck = checkSmarterDuplicate({
-          title: t.title,
+          title: topicTitle,
           points: t.keyPoints || [],
           categoryId: t.categoryId || categoryId,
           channelId
         });
 
+        const blueprint = buildPracticalBlueprint({
+          topic: topicTitle,
+          categoryName: `Category ${t.categoryId || categoryId}`,
+          categoryId: t.categoryId || categoryId,
+          channelId,
+          sourceLinks: Array.isArray(t.sources) ? t.sources.map((s: any) => s.url || s).filter(Boolean) : []
+        });
+
         const card: TopicCard = {
           id: `tr-${Date.now()}-${idx}`,
           channelId,
-          title: t.title,
+          title: topicTitle,
           hook: t.hook || 'Roman Urdu spoken hook',
           categoryId: t.categoryId || categoryId,
           aspectRatio: t.aspectRatio || aspectRatio,
           lens: t.lens || 'Lens 1: New Updates',
           whyNow: t.whyNow || 'High trending demand in category',
           angle: t.angle || 'Practical hands-on walkthrough',
-          keyPoints: Array.isArray(t.keyPoints) && t.keyPoints.length > 0 ? t.keyPoints : [t.title],
-          sources: Array.isArray(t.sources) ? t.sources : [{ name: 'Ground Search', url: '#', date: '48h' }],
+          keyPoints: Array.isArray(t.keyPoints) && t.keyPoints.length > 0 ? t.keyPoints : [topicTitle],
+          sources: Array.isArray(t.sources) && t.sources.length > 0 ? t.sources : [{ name: 'Official Docs', url: blueprint.sourceLinks[0] || 'https://techcrunch.com', date: '48h' }],
           verificationStatus: t.verificationStatus || 'verified',
           duplicateVerdict: dupCheck.verdict,
           matchedStoryTitle: dupCheck.matchedStoryTitle,
@@ -141,10 +158,11 @@ export const TopicResearchPanel: React.FC<TopicResearchPanelProps> = ({
           scoreReason: dupCheck.reason,
           expiresAt: t.expiresAt || (t.lens?.includes('1') ? '5 days' : 'evergreen'),
           status: 'saved',
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          practicalBlueprint: blueprint
         };
 
-        return card;
+        enrichedTopics.push(card);
       });
 
       setSearchResults(enrichedTopics);
