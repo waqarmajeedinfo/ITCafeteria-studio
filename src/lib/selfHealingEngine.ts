@@ -336,7 +336,7 @@ class SelfHealingEngine {
    * Run comprehensive diagnostics across all applet engines
    */
   public runCompleteDiagnostics(): SystemHealthStatus {
-    const scrollHealed = this.healScrollLock(true);
+    const scrollHealed = this.healScrollLock(false);
     const storageRepairs = this.healCorruptStorage();
 
     const activeFaults = this.records.filter((r) => r.status === 'ACTION_REQUIRED').length;

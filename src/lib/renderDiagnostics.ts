@@ -231,6 +231,11 @@ class RenderDiagnosticsEngine {
       const res = await fetch('/api/health');
       if (res.ok) {
         serverHealthData = await res.json();
+        // If backend is active and healthy, clear any stale communication drop alerts
+        if (this.errorLogs.some(l => l.category === 'RENDER_PIPELINE')) {
+          this.errorLogs = this.errorLogs.filter(l => l.category !== 'RENDER_PIPELINE');
+          this.saveLogs();
+        }
       }
     } catch {
       // Backend might be offline during static build check

@@ -1,5 +1,29 @@
 [
   {
+    "id": "audit-1794279901703-dd9f3d",
+    "timestamp": "2026-11-10T03:05:01.703Z",
+    "userId": "user-admin-01",
+    "username": "waqarmajeed",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeed",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1794279861003-0da8ab",
+    "timestamp": "2026-11-10T03:04:21.003Z",
+    "userId": "user-admin-01",
+    "username": "waqarmajeed",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeed",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
     "id": "audit-1794117726865-70655b",
     "timestamp": "2026-11-08T06:02:06.865Z",
     "userId": "user-admin-01",
