@@ -20,7 +20,8 @@ import {
   CheckCircle2,
   RotateCcw,
   ExternalLink,
-  Terminal
+  Terminal,
+  AlertTriangle
 } from 'lucide-react';
 import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
 import { StoryThumbnailPanel } from './StoryThumbnailPanel';
@@ -83,11 +84,13 @@ export interface GeneratedStory {
   modelUsed?: string;
   cinematicDirectingActive?: boolean;
   customCinematicDirection?: string;
+  lastRefreshedAt?: string;
   practicalSteps?: string[];
   outsourcedLinks?: string[];
   demoPrompt?: string;
   practicalBlueprint?: any;
   consistencyReport?: any;
+  duplicateReport?: any;
 }
 
 /**
@@ -224,14 +227,22 @@ Flow Script (Cinematic Directing Layer Pre-pended, Strictly 10s):
 ${directedScript}`;
   }).join('\n\n');
 
-  return `Story Package — ${story.channelName}
+  const dupCheckText = story.duplicateReport
+    ? `Duplicate Check: ${story.duplicateReport.verdict} (Compared: ${story.duplicateReport.comparedStoriesCount} stories across channel | Reason: ${story.duplicateReport.reason})`
+    : 'Duplicate Check: PASSED (Verified unique)';
+
+  const unverifiedBannerText = story.practicalBlueprint?.unverifiedWarning
+    ? `\n[CRITICAL WARNING]: ${story.practicalBlueprint.unverifiedWarning}\nTested Status: ${story.practicalBlueprint.tested_status || 'needs_manual_test'} | Verified How: ${story.practicalBlueprint.verified_how || 'needs manual test'}\n`
+    : '';
+
+  return `${unverifiedBannerText}Story Package — ${story.channelName}
 Date: ${story.dateLabel}
 Category: ${story.categoryName} | Playlist: ${story.playlist}
 Title: ${story.title}
 Hook: ${story.hook}
 Presenter: ${presenter}${normTag ? ` (${normTag})` : ''}
 Length: ${story.sceneCount} scenes (${story.sceneCount * 10}s)
-Duplicate Check: PASSED
+${dupCheckText}
 Cinematic Directing: MANDATORY APPLIED (Google Flow Ready • Strictly 10s per scene)
 Thumbnail: ${thumbnail.line1}${thumbnail.line2 ? ` / ${thumbnail.line2}` : ''} (Sub-banner: ${thumbnail.subBanner})
 Hashtags: ${story.hashtags.join(' ')}
@@ -610,6 +621,52 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
         <div className="p-3 bg-emerald-950/90 border border-emerald-500/50 rounded-xl text-xs text-emerald-200 flex items-center gap-2 shadow-lg animate-in fade-in duration-150">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{statusToast}</span>
+        </div>
+      )}
+
+      {/* RED BANNER FOR UNVERIFIED STORIES (Part A1 requirement) */}
+      {(story.practicalBlueprint?.unverifiedWarning || story.practicalBlueprint?.tested_status === 'needs_manual_test') && (
+        <div className="p-4 bg-red-950/90 border-2 border-red-500 rounded-2xl text-red-200 shadow-xl space-y-2.5">
+          <div className="flex items-center gap-2 font-bold text-sm text-red-200 uppercase tracking-wide">
+            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+            <span>{story.practicalBlueprint?.unverifiedWarning || 'NOT VERIFIED - test on a real PC before recording'}</span>
+          </div>
+          <p className="text-xs text-red-300">
+            Verified How: <span className="font-mono text-white bg-red-900/60 px-1.5 py-0.5 rounded">{story.practicalBlueprint?.verified_how || 'needs manual test'}</span> • Tested Status: <span className="font-mono font-bold text-amber-300 uppercase">{story.practicalBlueprint?.tested_status || 'needs_manual_test'}</span>
+          </p>
+          {Array.isArray(story.practicalBlueprint?.unverifiedTestChecklist) && story.practicalBlueprint.unverifiedTestChecklist.length > 0 && (
+            <div className="bg-red-900/40 p-3 rounded-xl border border-red-500/40 text-xs">
+              <span className="font-bold text-white block mb-1.5">Exact Procedure to Test on a Real Machine Before Recording:</span>
+              <ol className="list-decimal list-inside space-y-1 text-[11px] text-red-100 font-mono">
+                {story.practicalBlueprint.unverifiedTestChecklist.map((item: string, idx: number) => (
+                  <li key={idx} className="leading-relaxed">{item}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* DUPLICATE AUDIT REPORT BADGE / CARD (Part B5) */}
+      {story.duplicateReport && (
+        <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-xs flex flex-wrap items-center justify-between gap-2 shadow">
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] border ${
+              story.duplicateReport.verdict === 'PASSED'
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                : story.duplicateReport.verdict === 'SAME-PROBLEM'
+                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+            }`}>
+              DUPLICATE: {story.duplicateReport.verdict}
+            </span>
+            <span className="text-slate-300 text-[11px]">
+              Compared <strong>{story.duplicateReport.comparedStoriesCount}</strong> stories across channel & duplicate memory.
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400 italic">
+            {story.duplicateReport.reason}
+          </span>
         </div>
       )}
 

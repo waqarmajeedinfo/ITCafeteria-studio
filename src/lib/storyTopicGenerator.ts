@@ -9,6 +9,7 @@
 import type { GeneratedStory, StoryScene } from '../components/StoryPackageView';
 import { applyCinematicDirecting } from './cinematicDirector';
 import { applyPhoneticFixes } from './phoneticDictionaryStore';
+import { validateAndRepairDialogue } from './dialogueCompleteness';
 import {
   buildPracticalBlueprint,
   runConsistencyGate,
@@ -97,13 +98,13 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
   let rawBeats: { purpose: string; visual: string; dialogue: string }[] = [];
 
   if (isGoogleSheets) {
-    hook = 'Excel ya Google Sheets mein ghanton ka manual data entry sirf 5 seconds mein automate karein!';
-    description = `Google Sheets AI Smart Fill hack! Ghanton ka data formatting aur extraction ab chand seconds mein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
+    hook = 'Excel ya Google Sheets mein ghanton ka manual data entry bina kisi complex formula ke automate karein!';
+    description = `Google Sheets AI Smart Fill hack! Ghanton ka data formatting aur extraction ab seedha built-in AI se automate karein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
     tags = ['google sheets ai', 'smart fill', 'google sheets shortcut', 'excel tricks', 'it cafeteria', 'waqar majeed', 'data entry automation', 'urdu tech'];
     hashtags = ['#Shorts', '#GoogleSheets', '#AISmartFill', '#ITCafeteria', '#DataHacks', '#ExcelUrdu'];
     tiktokCaption = 'Google Sheets ka yeh AI Smart Fill hack aapka ghanton ka waqt bachaega! 📊⚡ #itcafeteria #googlesheets #techhacks';
     thumbnailHeadline = 'SHEETS AI SMART FILL';
-    thumbnailSubBadge = 'GHANTON KA DATA SECONDS MEIN';
+    thumbnailSubBadge = 'AUTOMATE MANUAL DATA';
 
     rawBeats = [
       {
@@ -664,11 +665,14 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
         })();
   }
 
-  // Construct scenes with cinematic directing & living phonetic dictionary rules
+  // Construct scenes with dialogue completeness defense, cinematic directing & living phonetic dictionary rules
   const scenes: StoryScene[] = rawBeats.map((beat, idx) => {
     const sceneNum = idx + 1;
     const isCTA = sceneNum === rawBeats.length;
-    const phoneticDialogue = applyPhoneticFixes(beat.dialogue);
+
+    // Rule A2: Enforce grammatical completeness, proper punctuation, no "...", and typo fixing
+    const validated = validateAndRepairDialogue(beat.dialogue, sceneNum, beat.purpose);
+    const phoneticDialogue = applyPhoneticFixes(validated.dialogue);
     const words = phoneticDialogue.split(/\s+/).filter(Boolean).length;
     const rawScript = `${charTag} — anchor studio presentation.\nDialogue (Roman Urdu): "${phoneticDialogue}"\nVisual details: ${beat.visual}`;
     const directedScript = applyCinematicDirecting(sceneNum, rawScript, undefined, beat.purpose);
@@ -692,11 +696,19 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     channelId: channelName.toLowerCase().includes('beauty') ? 'beautyhub' : 'itcafeteria'
   });
 
+  // Calculate dynamic scene mapping for practical demonstration steps (Scenes 4, 5, 6, 7...)
+  const sceneMapping: Record<number, number> = {};
+  practicalBlueprint.steps.forEach((step, sIdx) => {
+    // Demonstration steps in 10-scene short structure normally start at Scene 4
+    sceneMapping[step.stepNumber] = Math.min(4 + sIdx, scenes.length - 1);
+  });
+
   const structuredDescription = buildYouTubeDescriptionFromBlueprint({
     blueprint: practicalBlueprint,
     presenter,
     channelName,
-    hook: applyPhoneticFixes(hook)
+    hook: applyPhoneticFixes(hook),
+    sceneMapping
   });
 
   const consistencyReport = runConsistencyGate({

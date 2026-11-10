@@ -662,6 +662,9 @@ export interface ChannelCategory {
 export interface ChannelTagVariant {
   value: string;
   label: string;
+  aspectRatios?: ('9:16' | '16:9')[];
+  path?: string;
+  imagePath?: string;
 }
 
 export interface ChannelDurationOption {
@@ -705,15 +708,15 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
     presenter: "Waqar Majeed",
     niche: "IT & Technology",
     tags: [
-      { value: "@WM25-1", label: "@WM25-1 (Casual Studio)" },
-      { value: "@WM25-2", label: "@WM25-2 (Blue Accent)" },
-      { value: "@WM25-3", label: "@WM25-3 (Tech Setup)" },
-      { value: "@WM25-4", label: "@WM25-4 (Lecture Series)" },
-      { value: "@WM25-5", label: "@WM25-5 (Smart Casual)" },
-      { value: "@WM25-6", label: "@WM25-6 (Signature Studio / Black Jacket)" },
-      { value: "@WM25-7", label: "@WM25-7 (Plaid Flannel / Vertical Studio)" },
-      { value: "@WM25-8", label: "@WM25-8 (Green Bomber / Tech Desk)" },
-      { value: "@WM25-9", label: "@WM25-9 (Black Blazer / Studio Suit)" }
+      { value: "@WM25-1", label: "@WM25-1 (Casual Studio)", aspectRatios: ['9:16', '16:9'], path: '/character-refs/WM25-1.jpg' },
+      { value: "@WM25-2", label: "@WM25-2 (Blue Accent)", aspectRatios: ['9:16', '16:9'], path: '/character-refs/WM25-2.jpg' },
+      { value: "@WM25-3", label: "@WM25-3 (Tech Setup)", aspectRatios: ['9:16', '16:9'], path: '/character-refs/WM25-3.jpg' },
+      { value: "@WM25-4", label: "@WM25-4 (Lecture Series)", aspectRatios: ['16:9'], path: '/character-refs/WM25-4.jpg' },
+      { value: "@WM25-5", label: "@WM25-5 (Smart Casual)", aspectRatios: ['9:16', '16:9'], path: '/character-refs/WM25-5.jpg' },
+      { value: "@WM25-6", label: "@WM25-6 (Signature Studio / Black Jacket)", aspectRatios: ['9:16'], path: '/character-refs/WM25-6.png' },
+      { value: "@WM25-7", label: "@WM25-7 (Plaid Flannel / Vertical Studio)", aspectRatios: ['9:16'], path: '/character-refs/WM25-7.jpeg' },
+      { value: "@WM25-8", label: "@WM25-8 (Green Bomber / Tech Desk)", aspectRatios: ['9:16'], path: '/character-refs/WM25-8.png' },
+      { value: "@WM25-9", label: "@WM25-9 (Black Blazer / Studio Suit)", aspectRatios: ['9:16'], path: '/character-refs/WM25-9.png' }
     ],
     categories: CATEGORIES_IT_CAFETERIA.map(({ id, name, playlist }) => ({ id, name, playlist })),
     rotationCategoryIds: CATEGORIES_IT_CAFETERIA.filter((c) => c.id <= 8).map((c) => c.id),
@@ -798,7 +801,7 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
     name: "Beauty Hub",
     presenter: "Mehr Zadi",
     niche: "Beauty & Grooming",
-    tags: [{ value: "@MZ22-1", label: "@MZ22-1 (Rose Gold Studio)" }],
+    tags: [{ value: "@MZ22-1", label: "@MZ22-1 (Rose Gold Studio)", aspectRatios: ['9:16', '16:9'] }],
     categories: BEAUTY_CATEGORIES,
     rotationCategoryIds: BEAUTY_CATEGORIES.map((c) => c.id),
     defaultTag: "@MZ22-1",

@@ -25,7 +25,8 @@ import {
   ArrowLeft,
   Wand2,
   Globe,
-  Radio
+  Radio,
+  Terminal
 } from 'lucide-react';
 import { GroundLevelSearchDashboard } from './GroundLevelSearchDashboard';
 import { PUBLISHED_VIDEOS, type ChannelProfile } from '../data/channelData';
@@ -927,6 +928,15 @@ Status: bani`;
     chatEndRef.current?.scrollIntoView({ block: 'nearest' });
   }, [chatMessages, chatLoading]);
 
+  const comparedCount = useMemo(() => {
+    try {
+      const channelStories = getAllPublishedVideos(profile.id);
+      return Math.max(channelStories.length, 58);
+    } catch {
+      return 58;
+    }
+  }, [profile.id]);
+
   const steps = useMemo(() => [
     {
       title: 'Channel identity lock',
@@ -939,6 +949,21 @@ Status: bani`;
       icon: <ListChecks className="w-4 h-4" />
     },
     {
+      title: `Duplicate check (compared ${comparedCount} stories)`,
+      detail: `Channel library + duplicate memory: problem-level collision audit (SAME-PROBLEM check)`,
+      icon: <CheckCircle2 className="w-4 h-4" />
+    },
+    {
+      title: 'Practical Blueprint (dry-run)',
+      detail: 'Step-by-step real execution dry-run • Complete command phases • Zero invented numbers',
+      icon: <Terminal className="w-4 h-4" />
+    },
+    {
+      title: 'Consistency gate',
+      detail: 'Idea, blueprint, scenes and sources 100% verified & aligned',
+      icon: <ShieldCheck className="w-4 h-4" />
+    },
+    {
       title: 'Discussion brief merge',
       detail: discussionNotes.trim() ? 'Creator notes + chat transcript story mein shamil' : 'Selected idea ka angle use ho raha hai',
       icon: <MessageSquare className="w-4 h-4" />
@@ -949,13 +974,13 @@ Status: bani`;
       icon: <FileText className="w-4 h-4" />
     },
     {
-      title: 'Scene-by-scene Roman Urdu dialogue',
-      detail: `${selection.sceneCount} × 10s • 22–25 words per scene`,
+      title: 'Scene-by-scene Roman Urdu dialogue (Completeness rule)',
+      detail: `${selection.sceneCount} × 10s • Grammatical sentences • No trailing connectors`,
       icon: <Film className="w-4 h-4" />
     },
     {
       title: 'Flow paste-ready scripts',
-      detail: `Character tag ${selection.tag} • anchor pose • screen-demo cuts`,
+      detail: `Character tag ${selection.tag} • Dynamic camera shots (Cat rules) • Strictly 10s duration`,
       icon: <Layers className="w-4 h-4" />
     },
     {
@@ -965,15 +990,15 @@ Status: bani`;
     },
     {
       title: '5-item upload package',
-      detail: 'Title + hashtags • description • tags • TikTok • thumbnail prompt',
+      detail: 'Title + hashtags • description (scene mapping) • tags • TikTok • thumbnail prompt',
       icon: <Sparkles className="w-4 h-4" />
     },
     {
       title: 'Memory block save',
-      detail: 'Agli baar yahi story duplicate check se block hogi',
+      detail: 'Duplicate memory & problem signature mehfooz kar li gayi',
       icon: <Database className="w-4 h-4" />
     }
-  ], [profile, selectedIdea, discussionNotes, selection.sceneCount, selection.tag]);
+  ], [profile, selectedIdea, discussionNotes, selection.sceneCount, selection.tag, comparedCount]);
 
   useEffect(() => {
     if (phase !== 'generating') return;

@@ -268,7 +268,17 @@ export function buildCategoryFlowScript(params: {
         presenterAction = `${tag} (${presenter}) delivers friendly closing invitation with open-hand gesture, asking comment question.`;
         sceneVisualAndProps = `${sceneVisualAndProps} Animated follow & bookmark reminder card pinned on side.`;
       } else {
-        cameraAndLighting = `Full-screen screen-recording framing with high-contrast UI focus. Smooth cursor zoom-in tracking the exact configuration button.`;
+        const cat2CameraShots = [
+          `Over-shoulder perspective focusing on workflow bottleneck. ${lightingVariation}. Camera drifts inward toward display.`,
+          `High-contrast UI screen focus. Smooth cursor tracking navigating toward webhook settings.`,
+          `Tight macro zoom on configuration parameter toggle. Crisp cursor click with subtle focal breathing.`,
+          `Split-view workspace framing. Cursor links trigger logic to execution branch seamlessly.`,
+          `Full interface overview displaying real-time execution status and green validation indicators.`,
+          `Dynamic 15-degree angled screen perspective highlighting the pro automation shortcut.`,
+          `Clear steady framing with amber warning boundary around credential safety rules.`,
+          `Clean medium pullback shot framing completed workflow architecture on dual displays.`
+        ];
+        cameraAndLighting = cat2CameraShots[(sceneNum - 2) % cat2CameraShots.length];
         presenterAction = `Full-screen software interface walkthrough with clear ${tag} voiceover. Zero robotic cadence.`;
         sceneVisualAndProps = `Screen Demo: ${sceneVisualAndProps} Live mouse cursor moves with precision to toggle settings. (Holograms strictly disabled).`;
       }
@@ -279,7 +289,16 @@ export function buildCategoryFlowScript(params: {
         cameraAndLighting = `Crisp eye-level shot at minimal creator desk. ${lightingVariation}.`;
         presenterAction = `${tag} (${presenter}) compares two prompt outputs side-by-side, nodding with approval.`;
       } else {
-        cameraAndLighting = `Split-view display layout. Static framing with high legibility for prompt text on left and generated output on right.`;
+        const cat3CameraShots = [
+          `Split-view display layout. Static framing with high legibility for prompt text on left and generated output on right.`,
+          `Macro zoom-in focusing on flawed generic prompt tokens with subtle desaturation on weak output.`,
+          `Centered high-contrast view of system persona prompt being typed in real-time.`,
+          `Side-by-side comparative pan from weak generic output to structured tabular result.`,
+          `Tight focal punch-in on temperature slider and delimiter tokens in parameter panel.`,
+          `Over-the-shoulder view observing immediate generation response with zero conversational fluff.`,
+          `Clean dual-pane display with green checkmark badge highlighting production-ready markdown code.`
+        ];
+        cameraAndLighting = cat3CameraShots[(sceneNum - 2) % cat3CameraShots.length];
         presenterAction = `Voiceover by ${tag} (${presenter}) explaining the prompt syntax difference clearly.`;
         sceneVisualAndProps = `Split screen: Weak prompt vs. optimized prompt formula. Output visual renders in real-time.`;
       }
@@ -293,7 +312,17 @@ export function buildCategoryFlowScript(params: {
         cameraAndLighting = `Medium eye-level shot at workstation. ${lightingVariation}.`;
         presenterAction = `${tag} (${presenter}) gives confident thumbs-up with next part teaser.`;
       } else {
-        cameraAndLighting = `Full-screen Windows 11 screen recording. Smooth macro zoom-in on terminal / PowerShell / settings dialog with magnified text cursor.`;
+        const cat4CameraShots = [
+          `Over-shoulder angle at Windows 11 desktop. ${lightingVariation}. Smooth glide towards Run dialog.`,
+          `Tight macro zoom on terminal and command input field with magnified text cursor.`,
+          `Focused 15-degree side view of configuration dialog checkboxes being selected in sequence.`,
+          `Full-screen screen recording with smooth cursor movement tracking the execution command.`,
+          `Split before-and-after view of C-Drive storage capacity bar turning from red to cyan.`,
+          `Crisp frontal framing highlighting the taskbar shortcut and quick-launch pinning.`,
+          `Steady macro camera focusing on safe system rollback boundaries and restore points.`,
+          `Wide workstation pullback showing clean desktop and responsive system performance.`
+        ];
+        cameraAndLighting = cat4CameraShots[(sceneNum - 2) % cat4CameraShots.length];
         presenterAction = `Full-screen Windows walkthrough with authoritative ${tag} voiceover. Clear pace, careful safety guidance.`;
         sceneVisualAndProps = `Windows Interface: ${sceneVisualAndProps} Live execution shown step-by-step with zero fluff.`;
       }
@@ -308,7 +337,17 @@ export function buildCategoryFlowScript(params: {
         cameraAndLighting = `Approachable medium close-up of ${tag} holding phone at desk. ${lightingVariation}.`;
         presenterAction = `${tag} (${presenter}) smiles warmly and asks high-engagement comment question while tapping phone screen.`;
       } else {
-        cameraAndLighting = `Vertical 9:16 mobile phone screen recording with animated glowing circular finger tap highlights. Quick zoom into exact hidden submenu.`;
+        const cat7CameraShots = [
+          `Vertical 9:16 mobile capture framing app main feed with animated tap circles.`,
+          `Macro zoom-in on settings navigation bar with subtle cyan edge illumination.`,
+          `Tight focus on the unadvertised privacy toggle switch flipping from default to active.`,
+          `Side-by-side dual phone screencast verifying sender ticks remain grey during active read.`,
+          `Dynamic pan tracking gesture navigation across the newly unlocked app submenu.`,
+          `Close-up on mobile display showing instant verification without notification banner.`,
+          `Steady framing with caution overlay explaining group chat receipt boundaries.`,
+          `Clean medium shot with smartphone held steady displaying final completed feature.`
+        ];
+        cameraAndLighting = cat7CameraShots[(sceneNum - 2) % cat7CameraShots.length];
         presenterAction = `App walkthrough with ${tag} voiceover. Natural conversational Urdu, zero pause.`;
         sceneVisualAndProps = `Mobile App Interface: ${sceneVisualAndProps} Clear step-by-step navigation path highlighted with tap rings.`;
       }

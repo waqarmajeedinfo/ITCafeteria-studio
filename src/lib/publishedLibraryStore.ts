@@ -29,6 +29,8 @@ export interface DynamicPublishedStory extends PublishedVideo {
   youtubeUrl?: string;
   covered_points?: string[];
   channelId?: string;
+  isExternalVideo?: boolean;
+  problem_signature?: any;
 }
 
 /**

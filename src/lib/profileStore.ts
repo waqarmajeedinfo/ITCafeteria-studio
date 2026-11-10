@@ -7,6 +7,13 @@
 import { PUBLISHED_VIDEOS, type PublishedVideo, type ChannelProfile } from '../data/channelData';
 import type { GeneratedStory } from '../components/StoryPackageView';
 
+export interface ProblemSignature {
+  viewerProblem: string;      // e.g. "Low disk space on C-Drive from Windows update and temp cache"
+  promisedOutcome: string;    // e.g. "Free up gigabytes of storage safely without deleting personal files"
+  methodOrTool: string;       // e.g. "cleanmgr with /sageset:1 and /sagerun:1"
+  keySteps: string[];         // e.g. ["Configure Disk Cleanup presets", "Select Temporary files and Update cleanup", "Execute /sagerun:1 purge", "Verify in File Explorer"]
+}
+
 export interface DynamicPublishedStory extends PublishedVideo {
   sourceRecordId?: string;
   storyPackage?: GeneratedStory;
@@ -14,10 +21,27 @@ export interface DynamicPublishedStory extends PublishedVideo {
   publishedAt?: string;
   youtubeUrl?: string;
   covered_points?: string[];
+  problem_signature?: ProblemSignature;
+  isExternalVideo?: boolean;
+  status?: 'published' | 'generated' | 'rejected';
   channelId?: string;
 }
 
-export type DuplicateVerdictType = 'new' | 'partial' | 'exact' | 'unverified';
+export type DuplicateVerdictType = 'new' | 'partial' | 'exact' | 'SAME-PROBLEM' | 'unverified';
+
+export interface DuplicateReport {
+  comparedStoriesCount: number;
+  candidateTitle: string;
+  candidatePoints: string[];
+  candidateSignature?: ProblemSignature;
+  comparedStories: Array<{ id: string | number; title: string; tool?: string; matchNote?: string }>;
+  matchedStoryTitle?: string;
+  matchedPoint?: string;
+  verdict: DuplicateVerdictType;
+  reason: string;
+  confidence: number;
+  checkedAt: string;
+}
 
 export interface DuplicateCheckResult {
   verdict: DuplicateVerdictType;
@@ -28,6 +52,8 @@ export interface DuplicateCheckResult {
   matchedStoryTitle?: string;
   matchedPoint?: string;
   candidatePoint?: string;
+  candidateSignature?: ProblemSignature;
+  report?: DuplicateReport;
   reason: string;
   confidence: number;
 }
@@ -270,8 +296,289 @@ const PROFILE_LIBRARY_PREFIX = 'itcafeteria_profile_library_';
 const PROFILE_TOPIC_BANK_PREFIX = 'itcafeteria_profile_topic_bank_';
 const PROFILE_COMPETITORS_PREFIX = 'itcafeteria_profile_competitors_';
 const PROFILE_RESEARCH_PREFIX = 'itcafeteria_profile_research_';
+const PROFILE_REJECTED_PREFIX = 'itcafeteria_rejected_topics_';
+const PROFILE_GENERATED_MEMORY_PREFIX = 'itcafeteria_generated_memory_';
+
 export const TOPIC_BANK_UPDATED_EVENT = 'itcafeteria_topic_bank_updated';
 export const PROFILE_LIBRARY_UPDATED_EVENT = 'itcafeteria_profile_library_updated';
+export const REJECTED_TOPICS_UPDATED_EVENT = 'itcafeteria_rejected_topics_updated';
+
+export interface RejectedTopic {
+  id: string;
+  channelId: string;
+  title: string;
+  rejectedAt: string;
+  reason?: string;
+  problem_signature?: ProblemSignature;
+}
+
+/**
+ * Loads Rejected Topics for a specific channel.
+ */
+export function loadRejectedTopics(channelId: string): RejectedTopic[] {
+  if (typeof window === 'undefined') return [];
+  const key = `${PROFILE_REJECTED_PREFIX}${channelId}`;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error(`Error loading rejected topics for ${channelId}:`, e);
+  }
+  return [];
+}
+
+/**
+ * Saves a rejected/discarded topic so it is permanently blocked from future suggestions.
+ */
+export function saveRejectedTopic(
+  channelId: string,
+  topic: { title: string; reason?: string; signature?: ProblemSignature }
+): void {
+  if (typeof window === 'undefined') return;
+  const list = loadRejectedTopics(channelId);
+  const cleanTitle = topic.title.trim();
+  const exists = list.some(item => item.title.toLowerCase() === cleanTitle.toLowerCase());
+  if (exists) return;
+
+  const newItem: RejectedTopic = {
+    id: `rej-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    channelId,
+    title: cleanTitle,
+    rejectedAt: new Date().toISOString(),
+    reason: topic.reason || 'User discarded / blocked from future suggestions',
+    problem_signature: topic.signature || inferProblemSignature({ title: cleanTitle })
+  };
+
+  list.unshift(newItem);
+  const key = `${PROFILE_REJECTED_PREFIX}${channelId}`;
+  try {
+    localStorage.setItem(key, JSON.stringify(list));
+    window.dispatchEvent(new CustomEvent(REJECTED_TOPICS_UPDATED_EVENT, { detail: { channelId, list } }));
+  } catch (e) {
+    console.error(`Error saving rejected topic:`, e);
+  }
+}
+
+/**
+ * Restores a previously rejected topic so it can be suggested again.
+ */
+export function restoreRejectedTopic(channelId: string, id: string): void {
+  if (typeof window === 'undefined') return;
+  const list = loadRejectedTopics(channelId).filter(i => i.id !== id);
+  const key = `${PROFILE_REJECTED_PREFIX}${channelId}`;
+  try {
+    localStorage.setItem(key, JSON.stringify(list));
+    window.dispatchEvent(new CustomEvent(REJECTED_TOPICS_UPDATED_EVENT, { detail: { channelId, list } }));
+  } catch (e) {
+    console.error(`Error restoring rejected topic:`, e);
+  }
+}
+
+/**
+ * Checks if a candidate topic or problem signature is blocked in the Rejected Topics list.
+ */
+export function isTopicBlocked(
+  channelId: string,
+  candidateTitle: string,
+  candidateSignature?: ProblemSignature
+): { blocked: boolean; matchedReason?: string; blockedTopicTitle?: string } {
+  const rejectedList = loadRejectedTopics(channelId);
+  if (rejectedList.length === 0) return { blocked: false };
+
+  const candTitleLower = candidateTitle.toLowerCase().trim();
+  const candSig = candidateSignature || inferProblemSignature({ title: candidateTitle });
+
+  for (const item of rejectedList) {
+    const itemTitleLower = item.title.toLowerCase().trim();
+    if (candTitleLower === itemTitleLower || (candTitleLower.length > 8 && itemTitleLower.includes(candTitleLower))) {
+      return {
+        blocked: true,
+        matchedReason: `Exact/title match with rejected topic "${item.title}".`,
+        blockedTopicTitle: item.title
+      };
+    }
+
+    if (item.problem_signature) {
+      const probSim = calculatePointSimilarity(candSig.viewerProblem, item.problem_signature.viewerProblem);
+      const outSim = calculatePointSimilarity(candSig.promisedOutcome, item.problem_signature.promisedOutcome);
+      if (probSim >= 0.70 && outSim >= 0.70) {
+        return {
+          blocked: true,
+          matchedReason: `Problem signature match with rejected topic "${item.title}".`,
+          blockedTopicTitle: item.title
+        };
+      }
+    }
+  }
+
+  return { blocked: false };
+}
+
+/**
+ * Loads stories generated by the agent (to prevent regenerating duplicate ideas).
+ */
+export function loadDuplicateMemoryStories(channelId: string): DynamicPublishedStory[] {
+  if (typeof window === 'undefined') return [];
+  const key = `${PROFILE_GENERATED_MEMORY_PREFIX}${channelId}`;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error(`Error loading duplicate memory for ${channelId}:`, e);
+  }
+  return [];
+}
+
+/**
+ * Records a newly generated story to memory with status 'generated'.
+ */
+export function recordGeneratedStoryToMemory(channelId: string, story: DynamicPublishedStory): void {
+  if (typeof window === 'undefined') return;
+  const list = loadDuplicateMemoryStories(channelId);
+  const exists = list.some(s => s.title.toLowerCase().trim() === story.title.toLowerCase().trim());
+  if (exists) return;
+
+  const entry: DynamicPublishedStory = {
+    ...story,
+    channelId,
+    status: 'generated',
+    isPlatformGenerated: true,
+    covered_points: story.covered_points || extractCoveredPointsFromStoryPackage(story.storyPackage || ({} as any)),
+    problem_signature: story.problem_signature || inferProblemSignature(story)
+  };
+
+  list.unshift(entry);
+  // Keep up to 200 items in duplicate memory
+  const trimmed = list.slice(0, 200);
+  const key = `${PROFILE_GENERATED_MEMORY_PREFIX}${channelId}`;
+  try {
+    localStorage.setItem(key, JSON.stringify(trimmed));
+  } catch (e) {
+    console.error(`Error recording generated story to duplicate memory:`, e);
+  }
+}
+
+/**
+ * Generates or infers a concrete ProblemSignature for any story.
+ */
+export function inferProblemSignature(story: {
+  title: string;
+  tool?: string;
+  points?: string;
+  covered_points?: string[];
+}): ProblemSignature {
+  const title = story.title || '';
+  const lower = (title + ' ' + (story.tool || '') + ' ' + (story.points || '')).toLowerCase();
+  const tool = story.tool || extractPrimaryTopicEntity(title) || 'Tool';
+  const covered = story.covered_points && story.covered_points.length > 0
+    ? story.covered_points
+    : [story.points || title];
+
+  if (lower.includes('cleanmgr') || lower.includes('c-drive') || lower.includes('storage') || lower.includes('free space') || lower.includes('junk')) {
+    return {
+      viewerProblem: 'C-Drive full and low storage from accumulated Windows update cache and temporary junk',
+      promisedOutcome: 'Safely reclaim gigabytes of drive storage without deleting personal user files',
+      methodOrTool: 'cleanmgr with /sageset:1 configuration and /sagerun:1 execution',
+      keySteps: ['Win+R cleanmgr /sageset:1', 'Select temp files and update cleanup', 'Execute cleanmgr /sagerun:1', 'Verify in File Explorer']
+    };
+  }
+  if (lower.includes('center across') || lower.includes('merge cells')) {
+    return {
+      viewerProblem: 'Merged cells in Excel breaking formulas, VLOOKUP functions, and table column sorting',
+      promisedOutcome: 'Center headings perfectly across multiple columns without merging cells or corrupting formulas',
+      methodOrTool: 'Center Across Selection (Ctrl + 1 -> Alignment)',
+      keySteps: ['Select heading cells', 'Press Ctrl+1', 'Choose Center Across Selection in Horizontal alignment', 'Confirm OK']
+    };
+  }
+  if (lower.includes('clipboard') || lower.includes('win+v') || lower.includes('win + v')) {
+    return {
+      viewerProblem: 'Losing copied snippets when copying something new, wasting time re-copying',
+      promisedOutcome: 'Access complete clipboard history, paste clips copied hours earlier, and pin vital templates',
+      methodOrTool: 'Windows Clipboard History (Win + V)',
+      keySteps: ['Press Win + V', 'Click Turn on', 'Pin critical items', 'Paste past snippets anytime']
+    };
+  }
+  if (lower.includes('blue tick') || lower.includes('read receipt')) {
+    return {
+      viewerProblem: 'Read receipts alerting senders with blue double-ticks before you are ready to reply',
+      promisedOutcome: 'Read any incoming WhatsApp message quietly without showing blue ticks to the sender',
+      methodOrTool: 'WhatsApp Privacy Settings -> Read Receipts toggle',
+      keySteps: ['Open WhatsApp Settings', 'Tap Privacy', 'Toggle Read Receipts to OFF', 'Read messages without blue tick']
+    };
+  }
+  if (lower.includes('smart fill') || lower.includes('sheets') || lower.includes('excel')) {
+    return {
+      viewerProblem: 'Hours spent on repetitive manual text extraction, formatting, and splitting in spreadsheets',
+      promisedOutcome: 'Automate entire column formatting and extraction instantly without writing complex formulas',
+      methodOrTool: `${tool} AI Smart Fill`,
+      keySteps: ['Type format sample in first row', 'Press Ctrl + E or trigger Smart Fill', 'Verify entire column populated']
+    };
+  }
+  if (lower.includes('god mode') || lower.includes('guid')) {
+    return {
+      viewerProblem: 'Windows administrative tools scattered across complicated nested menus and legacy panels',
+      promisedOutcome: 'Access all 200+ hidden system settings and controls inside a single searchable folder',
+      methodOrTool: 'Windows God Mode GUID Folder',
+      keySteps: ['Create new desktop folder', 'Rename with GodMode GUID string', 'Open master control window']
+    };
+  }
+
+  // General inference
+  const viewerProblem = `Manual friction, repetitive delays, or hidden configuration obstacles in ${title}`;
+  const promisedOutcome = `Automate workflow, resolve the bottleneck, and achieve verified outcome using ${tool}`;
+  const keySteps = covered.slice(0, 4);
+
+  return {
+    viewerProblem,
+    promisedOutcome,
+    methodOrTool: tool,
+    keySteps: keySteps.length > 0 ? keySteps : [`Step 1: Setup ${tool}`, `Step 2: Configure setting`, `Step 3: Execute and verify`]
+  };
+}
+
+/**
+ * Returns backfilled problem signatures for all stories in a channel profile library for user review.
+ */
+export function getBackfilledProblemSignatures(channelId: string): Array<{
+  id: number | string;
+  title: string;
+  tool: string;
+  covered_points: string[];
+  problem_signature: ProblemSignature;
+}> {
+  const library = loadProfileLibrary(channelId);
+  return library.map(story => ({
+    id: story.id,
+    title: story.title,
+    tool: story.tool || 'Tool',
+    covered_points: ensureStoryCoveredPoints(story),
+    problem_signature: story.problem_signature || inferProblemSignature(story)
+  }));
+}
+
+/**
+ * Applies and commits reviewed backfilled problem signatures into the profile library.
+ */
+export function applyBackfilledProblemSignatures(
+  channelId: string,
+  signaturesMap: Record<string | number, ProblemSignature>
+): void {
+  const library = loadProfileLibrary(channelId);
+  const updated = library.map(story => {
+    const customSig = signaturesMap[story.id];
+    return {
+      ...story,
+      problem_signature: customSig || story.problem_signature || inferProblemSignature(story)
+    };
+  });
+  saveProfileLibrary(channelId, updated);
+}
 
 /**
  * Loads published stories for a specific profile.
@@ -715,32 +1022,70 @@ export function checkHierarchicalDuplicate(
     categoryId?: number;
     channelId: string;
     tool?: string;
+    problemSignature?: ProblemSignature;
   },
   options?: {
     customLibrary?: DynamicPublishedStory[];
   }
 ): DuplicateCheckResult {
   const channelId = candidate.channelId;
-  // Strictly isolated to published stories in active channel profile library
-  const library = options?.customLibrary || loadProfileLibrary(channelId);
-
   const candidateTitle = candidate.title.trim();
+  const candSig = candidate.problemSignature || inferProblemSignature({
+    title: candidateTitle,
+    points: Array.isArray(candidate.points) ? candidate.points.join(' ') : candidate.rawPointsText,
+    tool: candidate.tool
+  });
+
+  // 1. REJECTED / BLOCKED TOPICS CHECK (Part B3)
+  const blockedCheck = isTopicBlocked(channelId, candidateTitle, candSig);
+  if (blockedCheck.blocked) {
+    const report: DuplicateReport = {
+      comparedStoriesCount: 1,
+      candidateTitle,
+      candidatePoints: extractCandidateSpecificPoints(candidate),
+      candidateSignature: candSig,
+      comparedStories: [{ id: 'rejected', title: blockedCheck.blockedTopicTitle || candidateTitle, matchNote: 'In Rejected Topics list' }],
+      matchedStoryTitle: blockedCheck.blockedTopicTitle,
+      verdict: 'SAME-PROBLEM',
+      reason: `REJECTED TOPIC BLOCKED: "${candidateTitle}" matches a topic previously discarded or deleted from this channel: ${blockedCheck.matchedReason}`,
+      confidence: 100,
+      checkedAt: new Date().toISOString()
+    };
+    return {
+      verdict: 'SAME-PROBLEM',
+      level1AppDetected: null,
+      level1Count: 1,
+      matchedStoryTitle: blockedCheck.blockedTopicTitle,
+      candidatePoint: candidateTitle,
+      candidateSignature: candSig,
+      report,
+      reason: report.reason,
+      confidence: 100
+    };
+  }
+
+  // 2. POOL: Published Library + Generated Memory Stories (Part B4)
+  const library = options?.customLibrary || loadProfileLibrary(channelId);
+  const generatedMemory = loadDuplicateMemoryStories(channelId);
+  // Deduplicate pool by id / title
+  const poolMap = new Map<string, DynamicPublishedStory>();
+  library.forEach(s => poolMap.set(String(s.id) + s.title.toLowerCase(), s));
+  generatedMemory.forEach(s => poolMap.set('gen-' + s.title.toLowerCase(), s));
+  const fullPool = Array.from(poolMap.values());
+
   const fullCandidateText = `${candidateTitle} ${(candidate.points || []).join(' ')} ${candidate.rawPointsText || ''} ${candidate.tool || ''}`.toLowerCase();
-
-  // STEP 1: Search the published stories for the same topic/app name
   const entity = extractPrimaryTopicEntity(fullCandidateText);
-  let matchedPublishedStories: DynamicPublishedStory[] = [];
 
+  let matchedStories: DynamicPublishedStory[] = [];
   if (entity) {
-    matchedPublishedStories = library.filter(story => {
-      const storyText = `${story.title} ${story.tool} ${story.series}`.toLowerCase();
+    matchedStories = fullPool.filter(story => {
+      const storyText = `${story.title} ${story.tool} ${story.series || ''}`.toLowerCase();
       return storyText.includes(entity);
     });
   } else {
-    // If no common keyword matched, check if tool name directly matches an existing published story tool
     const candidateTool = candidate.tool?.toLowerCase().trim();
     if (candidateTool && candidateTool.length >= 3 && !isPlaceholderOrToolName(candidateTool)) {
-      matchedPublishedStories = library.filter(story => {
+      matchedStories = fullPool.filter(story => {
         return (story.tool && story.tool.toLowerCase().includes(candidateTool)) ||
           story.title.toLowerCase().includes(candidateTool);
       });
@@ -748,21 +1093,82 @@ export function checkHierarchicalDuplicate(
   }
 
   const isSeriesCategory = candidate.categoryId === 4 || candidate.categoryId === 7;
+  const candidatePoints = extractCandidateSpecificPoints(candidate);
 
-  // If no published story covers this app/topic at all -> NEW (ALLOW!)
-  if (matchedPublishedStories.length === 0) {
-    return {
-      verdict: 'new',
-      level1AppDetected: null,
-      level1Count: 0,
-      reason: `NEW TOPIC: Published library mein "${entity || candidate.title}" ka koi pehla record nahi hai. 100% unique!`,
-      confidence: 100
-    };
+  // 3. PROBLEM-LEVEL CHECK: Check SAME-PROBLEM across the entire pool (Part B1)
+  for (const story of fullPool) {
+    const storySig = story.problem_signature || inferProblemSignature(story);
+    const probSim = calculatePointSimilarity(candSig.viewerProblem, storySig.viewerProblem);
+    const outSim = calculatePointSimilarity(candSig.promisedOutcome, storySig.promisedOutcome);
+
+    // If both viewer problem and promised outcome match
+    if (probSim >= 0.68 && outSim >= 0.68) {
+      const toolSim = calculatePointSimilarity(candSig.methodOrTool, storySig.methodOrTool);
+      const isPartNOrAlternative = /\b(part\s*\d+|alternative|tarika\s*2|method\s*2|vol\s*\d+|part\s*[a-z]|nayi\s*trick)\b/i.test(candidateTitle);
+
+      // If tool is also identical -> EXACT duplicate
+      if (toolSim >= 0.70) {
+        const report: DuplicateReport = {
+          comparedStoriesCount: fullPool.length,
+          candidateTitle,
+          candidatePoints,
+          candidateSignature: candSig,
+          comparedStories: fullPool.slice(0, 10).map(s => ({ id: s.id, title: s.title, tool: s.tool })),
+          matchedStoryTitle: story.title,
+          matchedPoint: storySig.viewerProblem,
+          verdict: 'exact',
+          reason: `EXACT DUPLICATE: Story #${story.id} ("${story.title}") pehle se isi viewer problem ("${storySig.viewerProblem}") ko isi tool (${storySig.methodOrTool}) se solve karti hai.`,
+          confidence: Math.round(((probSim + outSim + toolSim) / 3) * 100),
+          checkedAt: new Date().toISOString()
+        };
+        return {
+          verdict: 'exact',
+          level1AppDetected: entity,
+          level1Count: matchedStories.length,
+          matchedStoryId: story.id,
+          matchedStoryTitle: story.title,
+          matchedPoint: storySig.viewerProblem,
+          candidatePoint: candSig.viewerProblem,
+          candidateSignature: candSig,
+          report,
+          reason: report.reason,
+          confidence: report.confidence
+        };
+      }
+
+      // If tool differs but solves SAME-PROBLEM without explicit Part N / alternative value -> SAME-PROBLEM
+      if (!isPartNOrAlternative) {
+        const report: DuplicateReport = {
+          comparedStoriesCount: fullPool.length,
+          candidateTitle,
+          candidatePoints,
+          candidateSignature: candSig,
+          comparedStories: fullPool.slice(0, 10).map(s => ({ id: s.id, title: s.title, tool: s.tool })),
+          matchedStoryTitle: story.title,
+          matchedPoint: storySig.viewerProblem,
+          verdict: 'SAME-PROBLEM',
+          reason: `SAME-PROBLEM DUPLICATE: Published/generated video #${story.id} ("${story.title}") already solves this exact viewer problem ("${storySig.viewerProblem}") with outcome ("${storySig.promisedOutcome}"). Different tool alone is not allowed unless marked as Part N / alternative method with new value. Skipped to next topic.`,
+          confidence: Math.round(((probSim + outSim) / 2) * 100),
+          checkedAt: new Date().toISOString()
+        };
+        return {
+          verdict: 'SAME-PROBLEM',
+          level1AppDetected: entity,
+          level1Count: matchedStories.length,
+          matchedStoryId: story.id,
+          matchedStoryTitle: story.title,
+          matchedPoint: storySig.viewerProblem,
+          candidatePoint: candSig.viewerProblem,
+          candidateSignature: candSig,
+          report,
+          reason: report.reason,
+          confidence: report.confidence
+        };
+      }
+    }
   }
 
-  // STEP 2 & 3: OPEN matching stories, read covered_points, compare specific points by meaning
-  const candidatePoints = extractCandidateSpecificPoints(candidate);
-  let verifiedStoriesCount = 0;
+  // 4. POINT-LEVEL CHECK against matched stories
   let exactMatch: {
     storyId: number | string;
     storyTitle: string;
@@ -771,12 +1177,8 @@ export function checkHierarchicalDuplicate(
     similarity: number;
   } | null = null;
 
-  for (const story of matchedPublishedStories) {
+  for (const story of matchedStories) {
     const coveredPoints = ensureStoryCoveredPoints(story);
-    if (coveredPoints.length > 0) {
-      verifiedStoriesCount++;
-    }
-
     for (const cp of coveredPoints) {
       for (const candPoint of candidatePoints) {
         const sim = calculatePointSimilarity(candPoint, cp, entity);
@@ -795,46 +1197,84 @@ export function checkHierarchicalDuplicate(
     }
   }
 
-  // STEP 5: If no covered points could be generated for any matched story -> UNVERIFIED (ALLOW, do NOT block)
-  if (verifiedStoriesCount === 0 && candidatePoints.length === 0) {
-    return {
-      verdict: 'unverified',
-      level1AppDetected: entity,
-      level1Count: matchedPublishedStories.length,
-      level1Note: entity ? `${entity.toUpperCase()} library mein hai lekin specific points verify nahi ho sake.` : undefined,
-      reason: `UNVERIFIED: Story covered points verify nahi ho sake — flow ko block kiye baghair allow kiya gaya.`,
-      confidence: 50
-    };
-  }
-
-  // STEP 4: VERDICT
-  // EXACT: same point already published -> SKIP
   if (exactMatch) {
+    const report: DuplicateReport = {
+      comparedStoriesCount: fullPool.length,
+      candidateTitle,
+      candidatePoints,
+      candidateSignature: candSig,
+      comparedStories: matchedStories.map(s => ({ id: s.id, title: s.title, tool: s.tool })),
+      matchedStoryTitle: exactMatch.storyTitle,
+      matchedPoint: exactMatch.coveredPoint,
+      verdict: 'exact',
+      reason: `EXACT DUPLICATE: Yeh specific feature/trick pehle Story #${exactMatch.storyId} ("${exactMatch.storyTitle}") mein cover ho chuka hai: "${exactMatch.coveredPoint}".`,
+      confidence: Math.round(exactMatch.similarity * 100),
+      checkedAt: new Date().toISOString()
+    };
     return {
       verdict: 'exact',
       level1AppDetected: entity,
-      level1Count: matchedPublishedStories.length,
-      level1Note: entity ? `${entity.toUpperCase()} pehle ${matchedPublishedStories.length} published stories mein cover ho chuka hai.` : undefined,
+      level1Count: matchedStories.length,
       matchedStoryId: exactMatch.storyId,
       matchedStoryTitle: exactMatch.storyTitle,
       matchedPoint: exactMatch.coveredPoint,
       candidatePoint: exactMatch.candidatePoint,
-      reason: `EXACT DUPLICATE: Yeh specific feature/trick pehle Published Story #${exactMatch.storyId} ("${exactMatch.storyTitle}") mein cover ho chuka hai: "${exactMatch.coveredPoint}".`,
-      confidence: Math.round(exactMatch.similarity * 100)
+      candidateSignature: candSig,
+      report,
+      reason: report.reason,
+      confidence: report.confidence
     };
   }
 
-  // PARTIAL: same app/tool, different trick or deeper angle -> ALLOW!
+  // If no match in pool at all -> NEW
+  if (matchedStories.length === 0) {
+    const report: DuplicateReport = {
+      comparedStoriesCount: fullPool.length,
+      candidateTitle,
+      candidatePoints,
+      candidateSignature: candSig,
+      comparedStories: fullPool.slice(0, 5).map(s => ({ id: s.id, title: s.title, tool: s.tool })),
+      verdict: 'new',
+      reason: `NEW TOPIC: Active profile library aur generated memory (total ${fullPool.length} stories compared) mein "${entity || candidate.title}" ka koi pehla record nahi hai. 100% unique!`,
+      confidence: 100,
+      checkedAt: new Date().toISOString()
+    };
+    return {
+      verdict: 'new',
+      level1AppDetected: null,
+      level1Count: 0,
+      candidateSignature: candSig,
+      report,
+      reason: report.reason,
+      confidence: 100
+    };
+  }
+
+  // PARTIAL (Fresh angle on known app)
   const seriesNote = isSeriesCategory
     ? `Series Category (${candidate.categoryId === 7 ? 'Secrets' : 'PC & Windows'}) mein same app repeat hona normal hai.`
     : `Same app/tool area, lekin bilkul naya secret/trick hai.`;
 
+  const report: DuplicateReport = {
+    comparedStoriesCount: fullPool.length,
+    candidateTitle,
+    candidatePoints,
+    candidateSignature: candSig,
+    comparedStories: matchedStories.map(s => ({ id: s.id, title: s.title, tool: s.tool })),
+    verdict: 'partial',
+    reason: `PARTIAL ALLOW (Fresh Angle): ${seriesNote} Total ${matchedStories.length} matched stories ke covered points se koi collision nahi mila. Approved as fresh angle/Part N!`,
+    confidence: 88,
+    checkedAt: new Date().toISOString()
+  };
+
   return {
     verdict: 'partial',
     level1AppDetected: entity,
-    level1Count: matchedPublishedStories.length,
-    level1Note: `${entity?.toUpperCase() || 'App'} library mein ${matchedPublishedStories.length} dafa pehle published hai.`,
-    reason: `PARTIAL ALLOW (Fresh Angle): ${seriesNote} Covered points se koi collision nahi mila. Approved as fresh angle/Part N!`,
+    level1Count: matchedStories.length,
+    level1Note: `${entity?.toUpperCase() || 'App'} library mein ${matchedStories.length} dafa pehle published hai.`,
+    candidateSignature: candSig,
+    report,
+    reason: report.reason,
     confidence: 88
   };
 }

@@ -34,7 +34,7 @@ import {
 } from './SimulatorConfigModal';
 import { ChannelManagerModal } from './ChannelManagerModal';
 import { TagManagerModal } from './TagManagerModal';
-import { loadAllChannels, getEngineConfigForChannel, type ExtendedChannelProfile } from '../lib/channelStore';
+import { loadAllChannels, getEngineConfigForChannel, filterTagsByAspectRatio, type ExtendedChannelProfile } from '../lib/channelStore';
 import { TopicResearchPanel } from './TopicResearchPanel';
 import { loadProfileTopicBank, type TopicCard } from '../lib/profileStore';
 
@@ -65,21 +65,18 @@ function saveRotationForChannel(channelId: ChannelProfile['id'], tag: string, ca
   }
 }
 
-export const IT_CAFETERIA_LONG_FORM_TAGS = ['@WM25-6', '@WM25-8', '@WM25-9'];
-export const IT_CAFETERIA_SHORT_FORM_TAGS = ['@WM25-1', '@WM25-2', '@WM25-3', '@WM25-4', '@WM25-5', '@WM25-7'];
+function getValidTagsForRatio(profile: ChannelProfile, ratio: '9:16' | '16:9' = '9:16') {
+  return filterTagsByAspectRatio(profile?.tags || [], ratio);
+}
 
-function resolveSavedTag(profile: ChannelProfile, tag?: string, aspectRatio?: '9:16' | '16:9') {
+function resolveSavedTag(profile: ChannelProfile, tag?: string, aspectRatio: '9:16' | '16:9' = '9:16') {
   if (!profile || !Array.isArray(profile.tags) || profile.tags.length === 0) return '@WM25-1';
-  if (profile.id === 'itcafeteria') {
-    if (aspectRatio === '16:9') {
-      if (tag && IT_CAFETERIA_LONG_FORM_TAGS.includes(tag)) return tag;
-      return IT_CAFETERIA_LONG_FORM_TAGS[0];
-    } else {
-      if (tag && IT_CAFETERIA_SHORT_FORM_TAGS.includes(tag)) return tag;
-      return IT_CAFETERIA_SHORT_FORM_TAGS[0];
-    }
+  const pool = getValidTagsForRatio(profile, aspectRatio);
+  if (pool.length === 0) return profile.tags[0]?.value || '@WM25-1';
+  if (tag && pool.some((item) => item.value.toLowerCase() === tag.toLowerCase())) {
+    return tag;
   }
-  return tag && profile.tags.some((item) => item.value === tag) ? tag : profile.defaultTag;
+  return pool[0].value;
 }
 
 function resolveSavedCategory(profile: ChannelProfile, categoryId?: number) {
@@ -89,27 +86,13 @@ function resolveSavedCategory(profile: ChannelProfile, categoryId?: number) {
     : (profile.defaultCategoryId || 1);
 }
 
-function getNextTag(profile: ChannelProfile, currentTag: string, aspectRatio?: '9:16' | '16:9') {
+function getNextTag(profile: ChannelProfile, currentTag: string, aspectRatio: '9:16' | '16:9' = '9:16') {
   if (!profile || !Array.isArray(profile.tags) || profile.tags.length === 0) return '@WM25-1';
-
-  // For IT Cafeteria: Aspect-Ratio synced rotation
-  if (profile.id === 'itcafeteria') {
-    if (aspectRatio === '16:9') {
-      const pool = IT_CAFETERIA_LONG_FORM_TAGS;
-      const index = pool.indexOf(currentTag);
-      if (index === -1) return pool[0];
-      return pool[(index + 1) % pool.length];
-    } else {
-      const pool = IT_CAFETERIA_SHORT_FORM_TAGS;
-      const index = pool.indexOf(currentTag);
-      if (index === -1) return pool[0];
-      return pool[(index + 1) % pool.length];
-    }
-  }
-
-  const index = profile.tags.findIndex((item) => item.value === currentTag);
-  if (index === -1) return profile.tags[0]?.value ?? profile.defaultTag;
-  return profile.tags[(index + 1) % profile.tags.length].value;
+  const pool = getValidTagsForRatio(profile, aspectRatio);
+  if (pool.length === 0) return profile.tags[0]?.value || '@WM25-1';
+  const index = pool.findIndex((item) => item.value.toLowerCase() === currentTag.toLowerCase());
+  if (index === -1) return pool[0].value;
+  return pool[(index + 1) % pool.length].value;
 }
 
 function getNextCategoryId(profile: ChannelProfile, currentCategoryId: number) {
@@ -385,37 +368,20 @@ export const AgentSimulator: React.FC = () => {
 
   const handleCategoryChange = (newCatId: number) => {
     setDraftCategory(newCatId);
-    const targetRatio = draftProfile.categoryRules?.[newCatId]?.defaultRatio || (newCatId === 9 ? '16:9' : '9:16');
-    setDraftAspectRatio(targetRatio as any);
+    const targetRatio = (draftProfile.categoryRules?.[newCatId]?.defaultRatio || (newCatId === 9 ? '16:9' : '9:16')) as '9:16' | '16:9';
+    setDraftAspectRatio(targetRatio);
 
-    // Sync tag rotation pool based on ratio for IT Cafeteria
-    if (draftChannel === 'itcafeteria') {
-      if (targetRatio === '16:9') {
-        if (!IT_CAFETERIA_LONG_FORM_TAGS.includes(draftTag)) {
-          setDraftTag(IT_CAFETERIA_LONG_FORM_TAGS[0]);
-        }
-      } else {
-        if (IT_CAFETERIA_LONG_FORM_TAGS.includes(draftTag)) {
-          setDraftTag(IT_CAFETERIA_SHORT_FORM_TAGS[0]);
-        }
-      }
+    const validTags = getValidTagsForRatio(draftProfile, targetRatio);
+    if (!validTags.some(t => t.value.toLowerCase() === draftTag.toLowerCase()) && validTags.length > 0) {
+      setDraftTag(validTags[0].value);
     }
   };
 
   const handleAspectRatioChange = (newRatio: '9:16' | '16:9') => {
     setDraftAspectRatio(newRatio);
-
-    // Sync tag rotation pool based on ratio for IT Cafeteria
-    if (draftChannel === 'itcafeteria') {
-      if (newRatio === '16:9') {
-        if (!IT_CAFETERIA_LONG_FORM_TAGS.includes(draftTag)) {
-          setDraftTag(IT_CAFETERIA_LONG_FORM_TAGS[0]);
-        }
-      } else {
-        if (IT_CAFETERIA_LONG_FORM_TAGS.includes(draftTag)) {
-          setDraftTag(IT_CAFETERIA_SHORT_FORM_TAGS[0]);
-        }
-      }
+    const validTags = getValidTagsForRatio(draftProfile, newRatio);
+    if (!validTags.some(t => t.value.toLowerCase() === draftTag.toLowerCase()) && validTags.length > 0) {
+      setDraftTag(validTags[0].value);
     }
   };
 
@@ -785,15 +751,11 @@ export const AgentSimulator: React.FC = () => {
               onChange={(e) => setDraftTag(e.target.value)}
               className="w-full h-[36px] bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-cyan-400 font-mono text-xs"
             >
-              {draftProfile.tags.map((tag) => {
-                const isLongTag = IT_CAFETERIA_LONG_FORM_TAGS.includes(tag.value);
-                const isRecommended = draftAspectRatio === '16:9' ? isLongTag : !isLongTag;
-                return (
-                  <option key={tag.value} value={tag.value}>
-                    {tag.label} {isLongTag ? '• [16:9 Studio]' : '• [9:16 Short]'} {isRecommended ? '★' : ''}
-                  </option>
-                );
-              })}
+              {filterTagsByAspectRatio(draftProfile.tags || [], draftAspectRatio).map((tag) => (
+                <option key={tag.value} value={tag.value}>
+                  {tag.label}
+                </option>
+              ))}
             </select>
           </div>
 

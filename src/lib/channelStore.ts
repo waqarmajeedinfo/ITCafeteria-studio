@@ -1,4 +1,4 @@
-import { CHANNEL_PROFILES, CATEGORIES_IT_CAFETERIA, type ChannelProfile } from '../data/channelData';
+import { CHANNEL_PROFILES, CATEGORIES_IT_CAFETERIA, type ChannelProfile, type ChannelTagVariant } from '../data/channelData';
 
 const STORAGE_KEY = 'itcafeteria_channels_store_v2';
 const HISTORY_KEY = 'itcafeteria_channels_history_v2';
@@ -97,22 +97,26 @@ export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
 
         // Ensure itcafeteria has all 9 official @WM25 tags in its tags if present in storage
         if (parsed.itcafeteria) {
-          if (Array.isArray(parsed.itcafeteria.tags)) {
-            const requiredTags = [
-              { value: '@WM25-6', label: '@WM25-6 (Signature Studio / Black Jacket)', path: '/character-refs/WM25-6.png' },
-              { value: '@WM25-7', label: '@WM25-7 (Plaid Flannel / Vertical Studio)', path: '/character-refs/WM25-7.jpeg' },
-              { value: '@WM25-8', label: '@WM25-8 (Green Bomber / Tech Desk)', path: '/character-refs/WM25-8.png' },
-              { value: '@WM25-9', label: '@WM25-9 (Black Blazer / Studio Suit)', path: '/character-refs/WM25-9.png' }
-            ];
-
-            for (const req of requiredTags) {
-              const exists = parsed.itcafeteria.tags.some((t: any) => t.value === req.value);
-              if (!exists) {
-                parsed.itcafeteria.tags.push({
-                  value: req.value,
-                  label: req.label
-                });
+          if (!Array.isArray(parsed.itcafeteria.tags)) {
+            parsed.itcafeteria.tags = CHANNEL_PROFILES.itcafeteria.tags;
+            modified = true;
+          } else {
+            const officialTags = CHANNEL_PROFILES.itcafeteria.tags;
+            for (const off of officialTags) {
+              const existingIdx = parsed.itcafeteria.tags.findIndex((t: any) => t.value.toLowerCase() === off.value.toLowerCase());
+              if (existingIdx === -1) {
+                parsed.itcafeteria.tags.push({ ...off });
                 modified = true;
+              } else {
+                // Ensure official aspect ratios are preserved/restored if missing
+                if (!parsed.itcafeteria.tags[existingIdx].aspectRatios) {
+                  parsed.itcafeteria.tags[existingIdx].aspectRatios = off.aspectRatios;
+                  modified = true;
+                }
+                if (!parsed.itcafeteria.tags[existingIdx].path && off.path) {
+                  parsed.itcafeteria.tags[existingIdx].path = off.path;
+                  modified = true;
+                }
               }
             }
           }
@@ -145,7 +149,58 @@ export function loadAllChannels(): Record<string, ExtendedChannelProfile> {
   return DEFAULT_CHANNELS;
 }
 
-export function addTagToChannel(channelId: string, newTag: { value: string; label: string; imagePath?: string }) {
+/**
+ * Filters a channel's tags by the active aspect ratio ('9:16' or '16:9').
+ * Strictly follows explicit tag metadata; never guesses from the tag name.
+ */
+export function filterTagsByAspectRatio(
+  tags: ChannelTagVariant[],
+  ratio: '9:16' | '16:9' = '9:16'
+): ChannelTagVariant[] {
+  if (!Array.isArray(tags)) return [];
+  return tags.filter(tag => {
+    if (tag.aspectRatios && Array.isArray(tag.aspectRatios) && tag.aspectRatios.length > 0) {
+      return tag.aspectRatios.includes(ratio);
+    }
+    // Fallback if tag was created without explicit ratios: default to 9:16
+    return ratio === '9:16';
+  });
+}
+
+export function updateTagInChannel(
+  channelId: string,
+  tagValue: string,
+  updates: Partial<ChannelTagVariant>
+) {
+  const current = loadAllChannels();
+  const targetChannel = current[channelId] || DEFAULT_CHANNELS[channelId];
+  if (!targetChannel || !Array.isArray(targetChannel.tags)) return current;
+
+  const updatedTags = targetChannel.tags.map(t => {
+    if (t.value.toLowerCase() === tagValue.toLowerCase()) {
+      return { ...t, ...updates };
+    }
+    return t;
+  });
+
+  const updatedChannel: ExtendedChannelProfile = {
+    ...targetChannel,
+    tags: updatedTags
+  };
+
+  const updatedAll = {
+    ...current,
+    [channelId]: updatedChannel
+  };
+
+  saveAllChannels(updatedAll);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('itcafeteria_channels_updated', { detail: updatedAll }));
+  }
+  return updatedAll;
+}
+
+export function addTagToChannel(channelId: string, newTag: { value: string; label: string; imagePath?: string; aspectRatios?: ('9:16' | '16:9')[] }) {
   const current = loadAllChannels();
   const targetChannel = current[channelId] || DEFAULT_CHANNELS[channelId];
   if (!targetChannel) return current;
@@ -153,9 +208,16 @@ export function addTagToChannel(channelId: string, newTag: { value: string; labe
   const existingTags = targetChannel.tags || [];
   const tagExists = existingTags.some(t => t.value.toLowerCase() === newTag.value.toLowerCase());
   
+  const formattedTag: ChannelTagVariant = {
+    value: newTag.value,
+    label: newTag.label,
+    imagePath: newTag.imagePath,
+    aspectRatios: newTag.aspectRatios || ['9:16']
+  };
+
   const updatedTags = tagExists
-    ? existingTags.map(t => t.value.toLowerCase() === newTag.value.toLowerCase() ? newTag : t)
-    : [...existingTags, newTag];
+    ? existingTags.map(t => t.value.toLowerCase() === newTag.value.toLowerCase() ? { ...t, ...formattedTag } : t)
+    : [...existingTags, formattedTag];
 
   const updatedChannel: ExtendedChannelProfile = {
     ...targetChannel,

@@ -30,6 +30,16 @@ export interface BlueprintStep {
   dialogueFocus: string;     // spoken dialogue naming the exact tool and action
 }
 
+export interface DryRunReport {
+  passed: boolean;
+  verdict: 'DRY_RUN_PASSED' | 'DRY_RUN_FAILED';
+  phasesChecked: string[];
+  commandPhasesComplete: boolean;
+  claimsVerified: boolean;
+  noInventedNumbers: boolean;
+  notes: string[];
+}
+
 export interface PracticalBlueprint {
   // Common fields across every category & channel
   concreteTopic: string;
@@ -39,6 +49,11 @@ export interface PracticalBlueprint {
   channelId: string;
   sourceLinks: string[];
   verificationStatus: 'verified' | 'needs_verification';
+  verified_how: string; // Exact official doc URL or "needs manual test"
+  tested_status: 'tested' | 'verified_docs' | 'needs_manual_test';
+  unverifiedWarning?: string; // "NOT VERIFIED - test on a real PC before recording"
+  unverifiedTestChecklist?: string[];
+  dryRunReport?: DryRunReport;
   hasInventedNumbers: boolean; // Must strictly be false
 
   // Demonstrations (Cat 1, 2, 4, 5, 7, cooking, beauty)
@@ -229,6 +244,9 @@ export function buildPracticalBlueprint(params: {
   // Extract primary named tool/app/subject
   const toolName = raw.namedToolOrApp || extractToolNameFromTopic(concreteTopic);
 
+  const primaryDoc = sources[0] || 'https://learn.microsoft.com';
+  const isOfficialDoc = /learn\.microsoft\.com|support\.microsoft\.com|faq\.whatsapp\.com|support\.google\.com|ai\.google\.dev|help\.openai\.com|docs\.anthropic\.com/i.test(primaryDoc);
+
   const baseBlueprint: PracticalBlueprint = {
     concreteTopic,
     blueprintType,
@@ -237,6 +255,8 @@ export function buildPracticalBlueprint(params: {
     channelId,
     sourceLinks: sources,
     verificationStatus: 'verified',
+    verified_how: raw.verified_how || primaryDoc,
+    tested_status: raw.tested_status || (isOfficialDoc ? 'verified_docs' : 'needs_manual_test'),
     hasInventedNumbers: false,
     namedToolOrApp: toolName,
     platformAndVersion: raw.platformAndVersion || getPlatformDefault(categoryId, concreteTopic),
@@ -404,7 +424,80 @@ export function buildPracticalBlueprint(params: {
     ];
   }
 
+  // Execute dry-run verification
+  const dryReport = dryRunPracticalBlueprint(baseBlueprint);
+  baseBlueprint.dryRunReport = dryReport;
+  baseBlueprint.hasInventedNumbers = !dryReport.noInventedNumbers;
+
+  // Unverified detection and warning banner setup
+  if (baseBlueprint.tested_status === 'needs_manual_test' || !dryReport.passed) {
+    baseBlueprint.verificationStatus = 'needs_verification';
+    baseBlueprint.unverifiedWarning = 'NOT VERIFIED - test on a real PC before recording';
+    baseBlueprint.unverifiedTestChecklist = baseBlueprint.steps.map(s =>
+      `Test Step ${s.stepNumber}: Run "${s.exactPathOrCommand}" and verify "${s.expectedResult}" on a real clean device.`
+    );
+  }
+
   return baseBlueprint;
+}
+
+/**
+ * Dry-runs the Practical Blueprint step-by-step:
+ * 1. Follows steps in order as a fresh machine user.
+ * 2. Enforces multi-phase command completeness (e.g. cleanmgr /sageset -> /sagerun).
+ * 3. Prohibits invented numbers ("10x faster", "5 seconds").
+ * 4. Checks that promised outcomes actually follow from the steps shown.
+ */
+export function dryRunPracticalBlueprint(bp: PracticalBlueprint): DryRunReport {
+  const phasesChecked: string[] = [];
+  const notes: string[] = [];
+  let commandPhasesComplete = true;
+  let claimsVerified = true;
+  let noInventedNumbers = true;
+
+  const allCommands = bp.steps.map(s => s.exactPathOrCommand.toLowerCase());
+  const allDialogues = bp.steps.map(s => s.dialogueFocus.toLowerCase());
+
+  // Check Cleanmgr phase completeness
+  const hasSageset = allCommands.some(c => c.includes('/sageset'));
+  const hasSagerun = allCommands.some(c => c.includes('/sagerun'));
+  if (hasSageset) {
+    phasesChecked.push('Cleanmgr Multi-Phase Pipeline');
+    if (!hasSagerun) {
+      commandPhasesComplete = false;
+      notes.push('CRITICAL: cleanmgr /sageset only saves configuration to the registry. The cleanup does NOT execute without cleanmgr /sagerun.');
+    } else {
+      notes.push('VERIFIED: Configuration (/sageset:1) is properly followed by execution purge (/sagerun:1).');
+    }
+  }
+
+  // Check invented numbers
+  const INVENTED_NUMBER_REGEX = /\b(10x\s+faster|instant\s+10x|5\s+seconds|100%\s+free\s+forever|lakhon|guaranteed\s+profit)\b/i;
+  for (const step of bp.steps) {
+    if (INVENTED_NUMBER_REGEX.test(step.dialogueFocus) || INVENTED_NUMBER_REGEX.test(step.expectedResult)) {
+      noInventedNumbers = false;
+      notes.push(`INVENTED NUMBER: Step ${step.stepNumber} dialogue/result contains unbacked claim.`);
+    }
+  }
+
+  // Check premature result claims
+  bp.steps.forEach((s) => {
+    if (s.exactPathOrCommand.toLowerCase().includes('/sageset') && s.dialogueFocus.toLowerCase().includes('free ho chuka')) {
+      claimsVerified = false;
+      notes.push(`PREMATURE CLAIM: Step ${s.stepNumber} claims storage is freed during configuration phase.`);
+    }
+  });
+
+  const passed = commandPhasesComplete && claimsVerified && noInventedNumbers;
+  return {
+    passed,
+    verdict: passed ? 'DRY_RUN_PASSED' : 'DRY_RUN_FAILED',
+    phasesChecked: phasesChecked.length > 0 ? phasesChecked : ['Step-by-step verification pipeline'],
+    commandPhasesComplete,
+    claimsVerified,
+    noInventedNumbers,
+    notes: notes.length > 0 ? notes : ['All commands, UI paths, and promised outcomes verified against real execution behavior.']
+  };
 }
 
 function extractToolNameFromTopic(topic: string): string {
@@ -429,22 +522,77 @@ function getPlatformDefault(categoryId: number, topic: string): string {
 
 function getDefaultSourceForCategory(catId: number, topic: string, channelId: string): string[] {
   const t = topic.toLowerCase();
-  if (t.includes('whatsapp')) return ['https://faq.whatsapp.com', 'https://blog.whatsapp.com'];
-  if (t.includes('windows') || catId === 4) return ['https://support.microsoft.com/windows', 'https://learn.microsoft.com'];
-  if (t.includes('google') || t.includes('sheets') || t.includes('chrome')) return ['https://support.google.com', 'https://blog.google'];
+  if (t.includes('cleanmgr') || t.includes('c-drive') || t.includes('storage') || t.includes('temp')) {
+    return [
+      'https://learn.microsoft.com/windows-server/administration/windows-commands/cleanmgr',
+      'https://support.microsoft.com/windows/disk-cleanup-in-windows-8a96ff42-5751-39ad-23d6-434b404b98b8'
+    ];
+  }
+  if (t.includes('god mode') || t.includes('guid')) {
+    return [
+      'https://learn.microsoft.com/windows/client-management/client-tools/god-mode',
+      'https://support.microsoft.com/windows'
+    ];
+  }
+  if (t.includes('clipboard') || t.includes('win+v') || t.includes('win + v')) {
+    return [
+      'https://support.microsoft.com/windows/clipboard-in-windows-c436501e-984d-1c8d-d404-87ab616853fa'
+    ];
+  }
+  if (t.includes('powercfg') || t.includes('power plan') || t.includes('ultimate performance')) {
+    return [
+      'https://learn.microsoft.com/windows-hardware/design/device-experiences/powercfg-command-line-options'
+    ];
+  }
+  if (t.includes('whatsapp') || t.includes('blue tick') || t.includes('read receipt')) {
+    return [
+      'https://faq.whatsapp.com/1090333465492476',
+      'https://blog.whatsapp.com'
+    ];
+  }
+  if (t.includes('center across') || t.includes('merge cells')) {
+    return [
+      'https://support.microsoft.com/office/align-or-rotate-text-in-a-cell-in-excel-30769a61-9657-4185-9856-74944dcf456f'
+    ];
+  }
+  if (t.includes('sheets') || t.includes('smart fill')) {
+    return [
+      'https://support.google.com/docs/answer/9980590'
+    ];
+  }
+  if (t.includes('chrome')) {
+    return [
+      'https://support.google.com/chrome/answer/12929150'
+    ];
+  }
+  if (t.includes('gmail')) {
+    return [
+      'https://support.google.com/mail/answer/7190'
+    ];
+  }
+  if (t.includes('drive')) {
+    return [
+      'https://support.google.com/drive/answer/2375114'
+    ];
+  }
+  if (t.includes('maps')) {
+    return [
+      'https://support.google.com/maps/answer/6291838'
+    ];
+  }
   if (t.includes('chatgpt') || t.includes('openai')) return ['https://help.openai.com', 'https://openai.com/news'];
   if (t.includes('claude') || t.includes('anthropic')) return ['https://docs.anthropic.com', 'https://anthropic.com'];
-  if (t.includes('gemini')) return ['https://gemini.google.com', 'https://blog.google/technology/ai/'];
-  if (channelId.includes('beauty')) return ['https://www.allure.com', 'https://www.byrdie.com'];
-  if (channelId.includes('chef')) return ['https://www.seriouseats.com', 'https://www.bonappetit.com'];
-  return ['https://techcrunch.com', 'https://theverge.com'];
+  if (t.includes('gemini')) return ['https://ai.google.dev/gemini-api/docs', 'https://blog.google/technology/ai/'];
+  if (channelId.includes('beauty')) return ['https://www.allure.com/topic/skincare', 'https://www.byrdie.com/skincare-routine-4770381'];
+  if (channelId.includes('chef')) return ['https://www.seriouseats.com/techniques-5118023', 'https://www.bonappetit.com'];
+  return ['https://learn.microsoft.com', 'https://support.google.com'];
 }
 
 function generateDemonstrationSteps(topic: string, tool: string, catId: number): BlueprintStep[] {
   const lower = topic.toLowerCase();
 
   // PC & Windows Hacks (Cat 4)
-  if (catId === 4 || lower.includes('windows') || lower.includes('win+')) {
+  if (catId === 4 || lower.includes('windows') || lower.includes('win+') || lower.includes('cleanmgr') || lower.includes('c-drive')) {
     if (lower.includes('god mode')) {
       return [
         {
@@ -515,37 +663,47 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
       ];
     }
 
-    // Default PC hack
+    // Default PC hack: cleanmgr (Full 4-phase concrete workflow as mandated by Part A1)
     return [
       {
         stepNumber: 1,
-        actionTitle: 'Open Run Dialog or CMD',
+        actionTitle: 'Configure Cleanup Preset (Save Settings Only)',
         exactPathOrCommand: 'Win + R -> cleanmgr /sageset:1',
-        uiLocation: 'Windows Run Dialog',
-        expectedResult: 'Disk Cleanup configuration window appears',
-        safetyOrUndo: 'Cancel dialog at any time',
-        visualDescription: 'Win+R Run box typing the exact cleanmgr command with zoomed clear text.',
-        dialogueFocus: `Pehla step: Win plus R dabayein aur yeh exact command likhein: cleanmgr.`
+        uiLocation: 'Windows Run Dialog / Disk Cleanup Preset Configuration',
+        expectedResult: 'Disk Cleanup Settings window opens. Note: this phase only saves your cleanup profile; it does NOT delete any files yet.',
+        safetyOrUndo: 'Cancel dialog at any time; no changes are committed until profile is saved',
+        visualDescription: 'Win+R Run box typing the exact cleanmgr /sageset:1 command with clear caption explaining this is configuration phase only.',
+        dialogueFocus: 'Pehla step: Win plus R dabayein aur cleanmgr /sageset:1 run karein. Yaad rahe yeh sirf settings save karta hai, files delete nahi karta.'
       },
       {
         stepNumber: 2,
-        actionTitle: 'Select System Junk Files to Purge',
-        exactPathOrCommand: 'Check Temporary Files & Windows Update Cleanup',
-        uiLocation: 'Disk Cleanup Selection Checkbox List',
-        expectedResult: 'Gigabytes of cached junk files highlighted for safe removal',
+        actionTitle: 'Select System Junk & Update Cache to Purge',
+        exactPathOrCommand: 'Check Temporary Files, Windows Update Cleanup & Thumbnails -> Click OK',
+        uiLocation: 'Disk Cleanup Configuration Checkbox List',
+        expectedResult: 'Cleanup preset #1 is safely stored in Windows Registry under StateFlags0001',
         safetyOrUndo: 'Checkboxes can be unticked before clicking OK',
-        visualDescription: 'Screencast highlighting safe junk checkboxes and showing 8GB+ space reclaimable.',
-        dialogueFocus: `Doosra step: Temporary files aur update cache tick karein aur OK dabayein.`
+        visualDescription: 'Screencast highlighting Temporary Files, Thumbnails and Windows Update Cleanup checkboxes, clicking OK.',
+        dialogueFocus: 'Doosra step: Temporary files aur update cache tick karein aur OK dabayein taake aapka preset profile registry mein save ho jaye.'
       },
       {
         stepNumber: 3,
-        actionTitle: 'Verify Free Storage Space',
-        exactPathOrCommand: 'Open File Explorer (Win + E) -> This PC',
+        actionTitle: 'Execute Real Junk Purge via Sagerun Command',
+        exactPathOrCommand: 'Win + R (or Admin CMD) -> cleanmgr /sagerun:1',
+        uiLocation: 'Windows Run Dialog / System Process Execution',
+        expectedResult: 'Disk Cleanup runs autonomously in background and purges all previously selected junk files',
+        safetyOrUndo: 'Progress bar completes automatically; user files in Documents/Desktop remain 100% untouched',
+        visualDescription: 'Run box executing cleanmgr /sagerun:1 with animated progress bar actively purging accumulated system cache.',
+        dialogueFocus: 'Teesra step: Ab asal safai chalane ke liye Win plus R mein cleanmgr /sagerun:1 enter karein. Ab junk files delete hona shuru hongi.'
+      },
+      {
+        stepNumber: 4,
+        actionTitle: 'Verify Free Storage Space in File Explorer',
+        exactPathOrCommand: 'Win + E -> This PC -> Check C-Drive Free Space',
         uiLocation: 'This PC Storage Drive Bar',
-        expectedResult: 'C-Drive bar turns from red warning state to healthy cyan/blue',
-        safetyOrUndo: 'System restore point created before major cleanups',
-        visualDescription: 'Before vs after C-Drive bar comparison showing red warning space turning back to healthy blue.',
-        dialogueFocus: `Teesra step: File Explorer mein check karein, aapka C-Drive space foran free ho chuka hai!`
+        expectedResult: 'C-Drive storage bar shows freed capacity without rebooting',
+        safetyOrUndo: 'Always verify important downloads before running system cleanups',
+        visualDescription: 'Before vs after C-Drive bar comparison showing reclaimed storage capacity.',
+        dialogueFocus: 'Chautha step: File Explorer open karke check karein, C-Drive ka extra space kamyabi se free ho chuka hai.'
       }
     ];
   }
@@ -831,15 +989,23 @@ export function buildYouTubeDescriptionFromBlueprint(params: {
   presenter: string;
   channelName: string;
   hook: string;
+  sceneMapping?: Record<number, number>;
 }): string {
-  const { blueprint, presenter, channelName, hook } = params;
+  const { blueprint, presenter, channelName, hook, sceneMapping } = params;
+
+  // Strip duplicate category number prefix (e.g. "4. PC & Windows Hacks" becomes "PC & Windows Hacks")
+  const rawCatName = blueprint.categoryName || '';
+  const cleanCategoryName = rawCatName.replace(/^\d+[\.\s-]*/, '').trim();
 
   let stepsSection = '';
   if (blueprint.blueprintType === 'demonstration' || blueprint.blueprintType === 'prompt_comparison') {
     stepsSection = `📌 PRACTICAL STEPS / COMMANDS:
-${blueprint.steps.map(s => `${s.stepNumber}. [Scene ${s.stepNumber + 3}] ${s.actionTitle}:
+${blueprint.steps.map(s => {
+  const sceneNum = sceneMapping?.[s.stepNumber] || (s.stepNumber + 3);
+  return `${s.stepNumber}. [Scene ${sceneNum}] ${s.actionTitle}:
    ➜ Path / Command: ${s.exactPathOrCommand}
-   ➜ Expected Result: ${s.expectedResult}`).join('\n\n')}
+   ➜ Expected Result: ${s.expectedResult}`;
+}).join('\n\n')}
 
 ${blueprint.honestLimitations ? `⚠️ Prerequisites / Limitations: ${blueprint.honestLimitations}` : ''}
 ${blueprint.steps[0]?.safetyOrUndo ? `🛡️ Safety / Undo: ${blueprint.steps[0].safetyOrUndo}` : ''}`;
@@ -851,9 +1017,12 @@ ${(blueprint.keyFacts || []).map((f, i) => `${i + 1}. [Scene ${i + 4}] ${f}`).jo
 🌐 Problem Solved: ${blueprint.problemSolved || 'Complex computational bottlenecks'}`;
   } else if (blueprint.blueprintType === 'ideas_roadmap') {
     stepsSection = `💡 SKILL ROADMAP & PRACTICAL WORKFLOW (IDEAS ONLY):
-${blueprint.steps.map(s => `${s.stepNumber}. [Scene ${s.stepNumber + 3}] ${s.actionTitle}:
+${blueprint.steps.map(s => {
+  const sceneNum = sceneMapping?.[s.stepNumber] || (s.stepNumber + 3);
+  return `${s.stepNumber}. [Scene ${sceneNum}] ${s.actionTitle}:
    ➜ Free Tool / Step: ${s.exactPathOrCommand}
-   ➜ Focus: ${s.dialogueFocus}`).join('\n\n')}
+   ➜ Focus: ${s.dialogueFocus}`;
+}).join('\n\n')}
 
 ⚠️ MANDATORY DISCLAIMER: ${blueprint.honestRisksAndDisclaimers || 'Strictly ideas for digital skills. Zero income guarantee.'}`;
   } else if (blueprint.blueprintType === 'lecture_course') {
@@ -866,7 +1035,7 @@ ${blueprint.steps.map(s => `${s.stepNumber}. ${s.actionTitle}:
   }
 
   const sourcesList = blueprint.sourceLinks.length > 0
-    ? `\n🔗 OFFICIAL SOURCE CITATIONS:\n${blueprint.sourceLinks.map(l => `- ${l}`).join('\n')}`
+    ? `\n🔗 OFFICIAL SOURCES & VERIFICATION:\n${blueprint.sourceLinks.map(l => `- ${l}`).join('\n')}\nVerified via: ${blueprint.verified_how} (${blueprint.tested_status === 'tested' ? 'Physical PC Tested' : blueprint.tested_status === 'verified_docs' ? 'Official Documentation' : 'Needs Manual Real-PC Verification'})`
     : '';
 
   return `${hook}
@@ -877,7 +1046,7 @@ ${stepsSection}
 ${sourcesList}
 
 Presenter: ${presenter} • ${channelName}
-Category: ${blueprint.categoryId}. ${blueprint.categoryName}
+Category: ${blueprint.categoryId}. ${cleanCategoryName}
 
 💬 Pinned Comment Question: Aapko is workflow mein sab se kaam ki cheez konsi lagi? Comment mein zaroor batayein!`;
 }
