@@ -522,7 +522,7 @@ function getPlatformDefault(categoryId: number, topic: string): string {
 
 function getDefaultSourceForCategory(catId: number, topic: string, channelId: string): string[] {
   const t = topic.toLowerCase();
-  if (t.includes('cleanmgr') || t.includes('c-drive') || t.includes('storage') || t.includes('temp')) {
+  if (t.includes('cleanmgr') || t.includes('c-drive') || t.includes('c drive') || t.includes('storage') || t.includes('temp') || t.includes('disk cleanup') || t.includes('disk-cleanup')) {
     return [
       'https://learn.microsoft.com/windows-server/administration/windows-commands/cleanmgr',
       'https://support.microsoft.com/windows/disk-cleanup-in-windows-8a96ff42-5751-39ad-23d6-434b404b98b8'
@@ -530,8 +530,7 @@ function getDefaultSourceForCategory(catId: number, topic: string, channelId: st
   }
   if (t.includes('god mode') || t.includes('guid')) {
     return [
-      'https://learn.microsoft.com/windows/client-management/client-tools/god-mode',
-      'https://support.microsoft.com/windows'
+      'https://learn.microsoft.com/windows/client-management/client-tools/god-mode'
     ];
   }
   if (t.includes('clipboard') || t.includes('win+v') || t.includes('win + v')) {
@@ -546,8 +545,7 @@ function getDefaultSourceForCategory(catId: number, topic: string, channelId: st
   }
   if (t.includes('whatsapp') || t.includes('blue tick') || t.includes('read receipt')) {
     return [
-      'https://faq.whatsapp.com/1090333465492476',
-      'https://blog.whatsapp.com'
+      'https://faq.whatsapp.com/1090333465492476'
     ];
   }
   if (t.includes('center across') || t.includes('merge cells')) {
@@ -580,12 +578,12 @@ function getDefaultSourceForCategory(catId: number, topic: string, channelId: st
       'https://support.google.com/maps/answer/6291838'
     ];
   }
-  if (t.includes('chatgpt') || t.includes('openai')) return ['https://help.openai.com', 'https://openai.com/news'];
-  if (t.includes('claude') || t.includes('anthropic')) return ['https://docs.anthropic.com', 'https://anthropic.com'];
-  if (t.includes('gemini')) return ['https://ai.google.dev/gemini-api/docs', 'https://blog.google/technology/ai/'];
-  if (channelId.includes('beauty')) return ['https://www.allure.com/topic/skincare', 'https://www.byrdie.com/skincare-routine-4770381'];
-  if (channelId.includes('chef')) return ['https://www.seriouseats.com/techniques-5118023', 'https://www.bonappetit.com'];
-  return ['https://learn.microsoft.com', 'https://support.google.com'];
+  if (t.includes('chatgpt') || t.includes('openai')) return ['https://help.openai.com'];
+  if (t.includes('claude') || t.includes('anthropic')) return ['https://docs.anthropic.com'];
+  if (t.includes('gemini')) return ['https://ai.google.dev/gemini-api/docs'];
+  if (channelId.includes('beauty')) return ['https://www.byrdie.com/skincare-routine-4770381'];
+  if (channelId.includes('chef')) return ['https://www.seriouseats.com/techniques-5118023'];
+  return [];
 }
 
 function generateDemonstrationSteps(topic: string, tool: string, catId: number): BlueprintStep[] {
@@ -993,9 +991,9 @@ export function buildYouTubeDescriptionFromBlueprint(params: {
 }): string {
   const { blueprint, presenter, channelName, hook, sceneMapping } = params;
 
-  // Strip duplicate category number prefix (e.g. "4. PC & Windows Hacks" becomes "PC & Windows Hacks")
+  // Strip duplicate category number prefix (e.g. "4. 4. PC & Windows Hacks" becomes "PC & Windows Hacks")
   const rawCatName = blueprint.categoryName || '';
-  const cleanCategoryName = rawCatName.replace(/^\d+[\.\s-]*/, '').trim();
+  const cleanCategoryName = rawCatName.replace(/^(\d+[\.\s-]*)+/, '').trim();
 
   let stepsSection = '';
   if (blueprint.blueprintType === 'demonstration' || blueprint.blueprintType === 'prompt_comparison') {

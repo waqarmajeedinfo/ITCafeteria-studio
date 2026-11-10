@@ -38,6 +38,9 @@ import { loadAllChannels, getEngineConfigForChannel, filterTagsByAspectRatio, ty
 import { TopicResearchPanel } from './TopicResearchPanel';
 import { loadProfileTopicBank, type TopicCard } from '../lib/profileStore';
 
+export const IT_CAFETERIA_LONG_FORM_TAGS = ['@WM25-1', '@WM25-2', '@WM25-3', '@WM25-4', '@WM25-5'];
+export const IT_CAFETERIA_SHORT_FORM_TAGS = ['@WM25-1', '@WM25-2', '@WM25-3', '@WM25-5', '@WM25-6', '@WM25-7', '@WM25-8', '@WM25-9'];
+
 const LATEST_STORY_KEY = 'itcafeteria_latest_story';
 const MEMORY_RECORDS_KEY = 'itcafeteria_memory_records';
 const ROTATION_STATE_KEY = 'itcafeteria_agent_rotation_v1';

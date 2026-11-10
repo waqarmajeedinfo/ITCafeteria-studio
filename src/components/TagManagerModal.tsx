@@ -110,9 +110,9 @@ export const TagManagerModal: React.FC<TagManagerModalProps> = ({
     const currentTag = activeChannel.tags.find(t => t.value === tagVal);
     if (!currentTag) return;
 
-    const currentRatios = currentTag.aspectRatios && currentTag.aspectRatios.length > 0
+    const currentRatios: ('9:16' | '16:9')[] = (currentTag.aspectRatios && currentTag.aspectRatios.length > 0
       ? currentTag.aspectRatios
-      : ['9:16'];
+      : ['9:16']) as ('9:16' | '16:9')[];
 
     let nextRatios: ('9:16' | '16:9')[];
     if (currentRatios.includes(ratioToToggle)) {
@@ -120,7 +120,7 @@ export const TagManagerModal: React.FC<TagManagerModalProps> = ({
         alert('Kam az kam aik aspect ratio select hona zaroori hai (9:16 ya 16:9).');
         return;
       }
-      nextRatios = currentRatios.filter(r => r !== ratioToToggle);
+      nextRatios = currentRatios.filter((r): r is '9:16' | '16:9' => r !== ratioToToggle);
     } else {
       nextRatios = [...currentRatios, ratioToToggle];
     }
