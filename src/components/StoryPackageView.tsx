@@ -220,7 +220,14 @@ export function buildStoryPackageText(rawStory: GeneratedStory): string {
       .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
 
-    return `Scene ${scene.num} — 0-10s [${scene.purpose}]${scene.isCTA ? ' — CTA' : ''} (${scene.words} words)
+    const sceneStart = (scene.num - 1) * 10;
+    const sceneEnd = scene.num * 10;
+    let cleanPurpose = (scene.purpose || `Scene ${scene.num}`).trim();
+    if (scene.num !== 10) {
+      cleanPurpose = cleanPurpose.replace(/\s*[-—]\s*CTA\b/gi, '').trim();
+    }
+
+    return `Scene ${scene.num} — ${sceneStart}-${sceneEnd}s [${cleanPurpose}] (${scene.words} words)
 Visual: ${scene.visual || '—'}
 Dialogue: "${scene.dialogue}"
 Flow Script (Cinematic Directing Layer Pre-pended, Strictly 10s):
@@ -271,7 +278,14 @@ export function buildScenesOnlyText(rawStory: GeneratedStory): string {
       .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
 
-    return `Scene ${scene.num} — 0-10s [${scene.purpose}]${scene.isCTA ? ' — CTA' : ''} (${scene.words} words)
+    const sceneStart = (scene.num - 1) * 10;
+    const sceneEnd = scene.num * 10;
+    let cleanPurpose = (scene.purpose || `Scene ${scene.num}`).trim();
+    if (scene.num !== 10) {
+      cleanPurpose = cleanPurpose.replace(/\s*[-—]\s*CTA\b/gi, '').trim();
+    }
+
+    return `Scene ${scene.num} — ${sceneStart}-${sceneEnd}s [${cleanPurpose}] (${scene.words} words)
 Visual: ${scene.visual || '—'}
 Dialogue: "${scene.dialogue}"
 Flow Script (Strictly 10s):
@@ -867,9 +881,9 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
               <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-bold text-white text-base">
-                    Scene {scene.num} — 0-10s [{scene.purpose}]{scene.isCTA ? ' — CTA' : ''}
+                    Scene {scene.num} — {(scene.num - 1) * 10}-{scene.num * 10}s [{scene.num !== 10 ? scene.purpose.replace(/\s*[-—]\s*CTA\b/gi, '').trim() : scene.purpose}]
                   </span>
-                  {scene.isCTA && (
+                  {scene.num === 10 && scene.isCTA && (
                     <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-mono">
                       SAVE CTA
                     </span>

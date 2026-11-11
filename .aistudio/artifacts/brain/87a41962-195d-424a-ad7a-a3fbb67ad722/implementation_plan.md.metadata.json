@@ -1,6 +1,0 @@
-{
-  "summary": "Comprehensive architectural plan to resolve authentication issues, direct admin and standard user login, instant on-screen password reset with email dispatch, full feature checklist with Select All in Superuser privileges, and global log cleanup utility on boot.",
-  "updatedAt": "2026-11-04T01:19:44.104139792Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

@@ -362,7 +362,7 @@ export function buildPracticalBlueprint(params: {
         uiLocation: `${toolName || 'Tool'} Dashboard & Practice Workspace`,
         expectedResult: 'Confidence in core operations without spending money upfront',
         visualDescription: `Clean modern workspace showing ${toolName} interface with free tier indicator active.`,
-        dialogueFocus: `Pehla step: Kisi paid course par paisa zaya mat karein. Is free tool par 2 din practice karke core skill samjhein.`
+        dialogueFocus: `Step 1: Kisi paid course par paisa zaya mat karein. Is free tool par 2 din practice karke core skill samjhein.`
       },
       {
         stepNumber: 2,
@@ -371,7 +371,7 @@ export function buildPracticalBlueprint(params: {
         uiLocation: 'Portfolio Presentation / Notion Page / PDF Deck',
         expectedResult: 'Concrete proof of capability to show prospective clients',
         visualDescription: `Split screen showing before vs after sample project ready to share with international or local clients.`,
-        dialogueFocus: `Doosra step: Real clients dhoondne se pehle 3 authentic portfolio samples banayein jese screen par dikh rahe hain.`
+        dialogueFocus: `Step 2: Real clients dhoondne se pehle 3 authentic portfolio samples banayein jese screen par dikh rahe hain.`
       },
       {
         stepNumber: 3,
@@ -601,7 +601,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
           expectedResult: 'A new folder named "New folder" is created on the desktop',
           safetyOrUndo: 'Can be safely deleted anytime like any standard folder',
           visualDescription: 'Clean 9:16 Windows 11 desktop screencast showing right-click context menu and New Folder selection.',
-          dialogueFocus: 'Pehla step: Desktop par khali jagah right-click karein aur aik new folder create karein.'
+          dialogueFocus: 'Step 1: Desktop par khali jagah right-click karein aur aik new folder create karein.'
         },
         {
           stepNumber: 2,
@@ -611,7 +611,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
           expectedResult: 'Folder icon instantly transforms into the blue Control Panel icon with no extension',
           safetyOrUndo: 'Rename back or press Shift+Delete to remove',
           visualDescription: 'Zoomed-in cursor typing the exact GUID string into folder name, icon changing into Control Panel.',
-          dialogueFocus: 'Doosra step: Folder ka naam rename karke yeh exact GUID code paste karein jo description mein diya hai.'
+          dialogueFocus: 'Step 2: Folder ka naam rename karke yeh exact GUID code paste karein jo description mein diya hai.'
         },
         {
           stepNumber: 3,
@@ -621,7 +621,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
           expectedResult: 'All 200+ hidden system settings organized alphabetically in one single searchable window',
           safetyOrUndo: 'No system files are altered until a setting is clicked',
           visualDescription: 'God Mode window opening, displaying instant search bar and categorized system administrative tools.',
-          dialogueFocus: 'Teesra step: Ab isay open karein aur tamam 200+ hidden Windows settings aik jagah access karein!'
+          dialogueFocus: 'Step 3: Ab isay open karein aur tamam 200+ hidden Windows settings aik jagah access karein!'
         }
       ];
     }
@@ -636,7 +636,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
           expectedResult: 'Clipboard History flyout menu pops up in bottom right',
           safetyOrUndo: 'Press Esc to dismiss flyout',
           visualDescription: 'Hands pressing Win + V on backlit mechanical keyboard, animated HUD flyout appearing on desktop.',
-          dialogueFocus: 'Pehla step: Keyboard se Windows button ke sath V dabayein.'
+          dialogueFocus: 'Step 1: Keyboard se Windows button ke sath V dabayein.'
         },
         {
           stepNumber: 2,
@@ -646,7 +646,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
           expectedResult: 'Clipboard history activation status turns to "On"',
           safetyOrUndo: 'Toggle off in Settings -> System -> Clipboard anytime',
           visualDescription: 'Cursor clicking the Turn On toggle button with cyan glow confirming activation.',
-          dialogueFocus: 'Doosra step: Agar pehli bar use kar rahe hain to Turn On par click karke activate karein.'
+          dialogueFocus: 'Step 2: Agar pehli bar use kar rahe hain to Turn On par click karke activate karein.'
         },
         {
           stepNumber: 3,
@@ -656,7 +656,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
           expectedResult: 'Text copied 2 hours ago is instantly pasted into active document',
           safetyOrUndo: 'Click Clear all to empty unpinned history',
           visualDescription: 'User selecting a snippet copied an hour ago and pinning critical passwords/notes.',
-          dialogueFocus: 'Teesra step: Ab ghanton pehle copy kiye text par click karein aur foran paste karein!'
+          dialogueFocus: 'Step 3: Ab ghanton pehle copy kiye text par click karein aur foran paste karein!'
         }
       ];
     }
@@ -671,7 +671,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         expectedResult: 'Disk Cleanup Settings window opens. Note: this phase only saves your cleanup profile; it does NOT delete any files yet.',
         safetyOrUndo: 'Cancel dialog at any time; no changes are committed until profile is saved',
         visualDescription: 'Win+R Run box typing the exact cleanmgr /sageset:1 command with clear caption explaining this is configuration phase only.',
-        dialogueFocus: 'Pehla step: Win plus R dabayein aur cleanmgr /sageset:1 run karein. Yaad rahe yeh sirf settings save karta hai, files delete nahi karta.'
+        dialogueFocus: 'Step 1: Win plus R dabayein aur cleanmgr /sageset:1 run karein. Yaad rahe yeh sirf settings save karta hai, files delete nahi karta.'
       },
       {
         stepNumber: 2,
@@ -681,7 +681,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         expectedResult: 'Cleanup preset #1 is safely stored in Windows Registry under StateFlags0001',
         safetyOrUndo: 'Checkboxes can be unticked before clicking OK',
         visualDescription: 'Screencast highlighting Temporary Files, Thumbnails and Windows Update Cleanup checkboxes, clicking OK.',
-        dialogueFocus: 'Doosra step: Temporary files aur update cache tick karein aur OK dabayein taake aapka preset profile registry mein save ho jaye.'
+        dialogueFocus: 'Step 2: Temporary files aur update cache tick karein aur OK dabayein taake aapka preset profile registry mein save ho jaye.'
       },
       {
         stepNumber: 3,
@@ -691,7 +691,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         expectedResult: 'Disk Cleanup runs autonomously in background and purges all previously selected junk files',
         safetyOrUndo: 'Progress bar completes automatically; user files in Documents/Desktop remain 100% untouched',
         visualDescription: 'Run box executing cleanmgr /sagerun:1 with animated progress bar actively purging accumulated system cache.',
-        dialogueFocus: 'Teesra step: Ab asal safai chalane ke liye Win plus R mein cleanmgr /sagerun:1 enter karein. Ab junk files delete hona shuru hongi.'
+        dialogueFocus: 'Step 3: Ab asal safai chalane ke liye Win plus R mein cleanmgr /sagerun:1 enter karein. Ab junk files delete hona shuru hongi.'
       },
       {
         stepNumber: 4,
@@ -701,7 +701,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         expectedResult: 'C-Drive storage bar shows freed capacity without rebooting',
         safetyOrUndo: 'Always verify important downloads before running system cleanups',
         visualDescription: 'Before vs after C-Drive bar comparison showing reclaimed storage capacity.',
-        dialogueFocus: 'Chautha step: File Explorer open karke check karein, C-Drive ka extra space kamyabi se free ho chuka hai.'
+        dialogueFocus: 'Step 4: File Explorer open karke check karein, C-Drive ka extra space kamyabi se free ho chuka hai.'
       }
     ];
   }
@@ -718,7 +718,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
           expectedResult: 'WhatsApp settings menu opens',
           safetyOrUndo: 'Press back arrow to exit',
           visualDescription: 'Smartphone screen showing WhatsApp chats tab, finger tapping 3 dots and selecting Settings.',
-          dialogueFocus: 'Pehla step: WhatsApp open karein, 3 dots par tap karke Settings mein jayein.'
+          dialogueFocus: 'Step 1: WhatsApp open karein, 3 dots par tap karke Settings mein jayein.'
         },
         {
           stepNumber: 2,
@@ -728,7 +728,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
           expectedResult: 'Read receipts switch changes from green ON to gray OFF',
           safetyOrUndo: 'Toggle back to ON at any time',
           visualDescription: 'Screen sliding down to Read Receipts toggle, tapping switch to turn it off.',
-          dialogueFocus: 'Doosra step: Privacy par click karein aur Read Receipts ka toggle band kar dein.'
+          dialogueFocus: 'Step 2: Privacy par click karein aur Read Receipts ka toggle band kar dein.'
         },
         {
           stepNumber: 3,
@@ -738,7 +738,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
           expectedResult: 'Sender only sees 2 grey ticks; blue double-ticks never appear',
           safetyOrUndo: 'Sender group chats may still show info receipts',
           visualDescription: 'Split test showing phone A reading message while phone B sender screen stays on grey ticks.',
-          dialogueFocus: 'Teesra step: Ab aap kisi ka bhi message open karke parhein, unhein blue tick nahi dikhega!'
+          dialogueFocus: 'Step 3: Ab aap kisi ka bhi message open karke parhein, unhein blue tick nahi dikhega!'
         }
       ];
     }
@@ -753,7 +753,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         expectedResult: 'Hidden options menu unfolds',
         safetyOrUndo: 'No changes until switch is pressed',
         visualDescription: `Clear mobile phone capture showing ${tool} navigation path with glowing touch circles.`,
-        dialogueFocus: `Pehla step: ${tool} ki settings mein yeh specific menu open karein.`
+        dialogueFocus: `Step 1: ${tool} ki settings mein yeh specific menu open karein.`
       },
       {
         stepNumber: 2,
@@ -763,7 +763,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         expectedResult: 'New capability icon appears in status bar or action sheet',
         safetyOrUndo: 'Toggle back to default anytime',
         visualDescription: `Finger tapping the exact toggle button on the mobile screen with cyan pulse animation.`,
-        dialogueFocus: `Doosra step: Yeh unadvertised toggle on karein jese screen par highlighted hai.`
+        dialogueFocus: `Step 2: Yeh unadvertised toggle on karein jese screen par highlighted hai.`
       },
       {
         stepNumber: 3,
@@ -772,7 +772,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         uiLocation: `${tool} Working Screen`,
         expectedResult: 'Immediate practical feature activation with zero delay',
         visualDescription: `Real-time split comparison confirming the feature working seamlessly.`,
-        dialogueFocus: `Teesra step: Ab iska live test dekhein — kaam bina kisi rukawat ke mukammal hai!`
+        dialogueFocus: `Step 3: Ab iska live test dekhein — kaam bina kisi rukawat ke mukammal hai!`
       }
     ];
   }
@@ -787,7 +787,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
       expectedResult: 'Clean workspace ready for execution',
       safetyOrUndo: 'Free tier requires no credit card',
       visualDescription: `Browser interface showing ${tool} clean homepage and free sign-in dashboard.`,
-      dialogueFocus: `Pehla step: ${tool} ki official website par jayein aur free workspace open karein.`
+      dialogueFocus: `Step 1: ${tool} ki official website par jayein aur free workspace open karein.`
     },
     {
       stepNumber: 2,
@@ -797,7 +797,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
       expectedResult: 'Parameter configured with green status badge',
       safetyOrUndo: 'Reset parameters via Reset button',
       visualDescription: `Close-up screencast of the specific setting parameter toggle with clear pointer highlight.`,
-      dialogueFocus: `Doosra step: Sidebar mein yeh specific parameter set karein jesa screen par dikh raha hai.`
+      dialogueFocus: `Step 2: Sidebar mein yeh specific parameter set karein jesa screen par dikh raha hai.`
     },
     {
       stepNumber: 3,
@@ -807,7 +807,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
       expectedResult: 'Instant production-ready result generated on screen',
       safetyOrUndo: 'Re-run or export output to disk',
       visualDescription: `Result appearing on screen with green checkmarks confirming high-accuracy output.`,
-      dialogueFocus: `Teesra step: Run dabayein aur live result dekhein jo seedha kaam ke liye tayyar hai.`
+      dialogueFocus: `Step 3: Run dabayein aur live result dekhein jo seedha kaam ke liye tayyar hai.`
     }
   ];
 }

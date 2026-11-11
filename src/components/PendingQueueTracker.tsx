@@ -358,8 +358,8 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
             isCTA: false,
             words: 24,
             visual: 'Direct mouse click on the secret feature with glowing green border.',
-            dialogue: 'Pehla step: Apne browser ya software mein is hidden option ko on karein.',
-            script: 'Pehla step: Apne browser ya software mein is hidden option ko on karein.'
+            dialogue: 'Step 1: Apne browser ya software mein is hidden option ko on karein.',
+            script: 'Step 1: Apne browser ya software mein is hidden option ko on karein.'
           },
           {
             num: 4,
@@ -368,8 +368,8 @@ export const PendingQueueTracker: React.FC<PendingQueueTrackerProps> = ({ onNavi
             isCTA: false,
             words: 23,
             visual: 'Speed run showing task getting completed in 5 seconds.',
-            dialogue: 'Doosra step: Yeh shortcut dabayein aur dekhein sara process khud-ba-khud complete ho gaya.',
-            script: 'Doosra step: Yeh shortcut dabayein aur dekhein sara process khud-ba-khud complete ho gaya.'
+            dialogue: 'Step 2: Yeh shortcut dabayein aur dekhein sara process khud-ba-khud complete ho gaya.',
+            script: 'Step 2: Yeh shortcut dabayein aur dekhein sara process khud-ba-khud complete ho gaya.'
           },
           {
             num: 5,

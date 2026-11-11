@@ -247,17 +247,17 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
       {
         purpose: 'Step 1: Webhook Trigger Setup',
         visual: 'Connecting incoming webhook node from contact form or WhatsApp business API.',
-        dialogue: 'Pehla step: Incoming webhook trigger set karein jese hi user koi message bheje, hamara workflow foran activate ho jaye.'
+        dialogue: 'Step 1: Incoming webhook trigger set karein jese hi user koi message bheje, hamara workflow foran activate ho jaye.'
       },
       {
         purpose: 'Step 2: AI Intent Classification',
         visual: 'AI agent node routing query: "Pricing", "Support", or "Booking" into 3 different colored logic branches.',
-        dialogue: 'Doosra step: AI agent message ka maqsad classify karta hai ke user pricing maang raha hai ya appointment schedule kar raha hai.'
+        dialogue: 'Step 2: AI agent message ka maqsad classify karta hai ke user pricing maang raha hai ya appointment schedule kar raha hai.'
       },
       {
         purpose: 'Step 3: Automated Action & Database Write',
         visual: 'Data saving into Google Sheets while WhatsApp notification fires with tailored response in under 2 seconds.',
-        dialogue: 'Teesra step: Customer ka data sheet mein save hota hai aur personalized reply 2 second mein deliver ho jata hai.'
+        dialogue: 'Step 3: Customer ka data sheet mein save hota hai aur personalized reply 2 second mein deliver ho jata hai.'
       },
       {
         purpose: 'Live Real-Time Demo',
@@ -295,58 +295,58 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
 
       rawBeats = [
         {
-          purpose: 'Disruptive Hook (Part 2 Bridge)',
-          visual: `${charTag} holds red glowing internal SSD drive up to camera with intense focus.`,
-          dialogue: 'Agar Storage Sense chalane ke baad bhi aapki C-Drive red hai, to yeh Part 2 advance trick note karein!'
+          purpose: 'Hook',
+          visual: `${charTag} holds glowing internal SSD drive up to camera with intense focus.`,
+          dialogue: 'Agar aapki Windows C-Drive red ho chuki hai, to yeh advanced command-line cleaning formula foran note karein!'
         },
         {
-          purpose: 'Hidden Space Thieves Exposed',
-          visual: 'Disk space analyzer visualizer mapping 25GB locked inside System Volume Information and dormant update cache.',
-          dialogue: 'Asal masla surface files nahi, balkay purane Windows updates ke superseded packages aur dormant hibernation files hain.'
+          purpose: 'Problem + Agitate',
+          visual: 'Disk space analyzer visualizer mapping locked space inside System Volume Information and dormant update cache.',
+          dialogue: 'Asal masla surface files nahi, purane Windows updates ke packages aur ghost hibernation files hain. Agar isay foran saaf na karein to drive crash hogi aur PC freeze ho jayega.'
         },
         {
-          purpose: 'Step 1: Terminal as Administrator',
-          visual: 'Keyboard pressing Win + X, selecting Terminal (Admin) with glowing cyan command prompt opening.',
-          dialogue: 'Pehla step: Keyboard se Windows plus X dabayein aur Terminal ko Run as Administrator open karein.'
+          purpose: 'Reveal',
+          visual: 'Windows terminal opening with administrative privileges highlighting official built-in tools.',
+          dialogue: 'Lekin Windows ke paas built-in commands hain jo baghair kisi paid software ke sari dormant space free karti hain.'
         },
         {
-          purpose: 'Step 2: Compact OS Compression',
-          visual: 'Typing "compact.exe /compactos:always" into command line with instant compression progress bar.',
-          dialogue: 'Doosra step: Yeh command enter karein: compact.exe slash compactos always. Yeh Windows OS ko compress karke 8 GB foran free karta hai.'
+          purpose: 'Demo 1',
+          visual: 'Keyboard pressing Win + X, selecting Terminal Admin, running compact.exe /compactos:always.',
+          dialogue: 'Step 1: Win plus X daba kar Terminal Admin kholein aur compact.exe slash compactos always enter karein.'
         },
         {
-          purpose: 'Step 3: DISM Deep Component Cleanup',
-          visual: 'Typing "dism.exe /online /cleanup-image /startcomponentcleanup /resetbase" into terminal.',
-          dialogue: 'Teesra step: DISM component cleanup command chalayein jo tamam expire ho chuki update files ko permanently delete karti hai.'
+          purpose: 'Demo 2',
+          visual: 'Typing dism.exe /online /cleanup-image /startcomponentcleanup /resetbase into terminal.',
+          dialogue: 'Step 2: DISM cleanup command chalayein jo tamam expire ho chuki update files ko permanently delete karti hai.'
         },
         {
-          purpose: 'Step 4: Disable Unused Hibernation',
-          visual: 'Desktop PC screen showing "powercfg -h off", instantly wiping the 16GB hiberfil.sys ghost file.',
-          dialogue: 'Chautha step: Agar desktop use kar rahe hain to powercfg minus h off dabayein. 16 GB ki hidden hiberfil file usi waqt khatam!'
+          purpose: 'Demo 3',
+          visual: 'Desktop screen showing powercfg -h off command, instantly wiping dormant hiberfil file.',
+          dialogue: 'Step 3: Desktop users powercfg minus h off dabayein taake unused hibernation ghost file khatam ho jaye.'
         },
         {
-          purpose: 'Visual Transformation (Red to Cyan)',
-          visual: 'File Explorer refreshing: C-Drive storage bar transforms from solid warning red to healthy glowing cyan with 35GB free.',
-          dialogue: 'Check karein! C-Drive ka red bar khatam ho kar healthy blue ho chuka hai aur 30 GB se zyada clean space ready hai.'
+          purpose: 'Proof + Result',
+          visual: 'File Explorer refreshing: C-Drive storage bar transforms from warning red to healthy cyan with 35GB free space.',
+          dialogue: 'Nateeja dekhein! C-Drive ka red bar blue ho chuka hai aur 30 GB se zyada clean space ready hai.'
         },
         {
-          purpose: 'Common Mistake Alert',
-          visual: 'Red prohibition symbol over manually deleting System32 or Windows folder files.',
-          dialogue: 'Khabardaar! Kabhi bhi Windows ya System32 folder se manual files delete mat karein warna OS crash ho sakta hai.'
+          purpose: 'Benefit',
+          visual: 'System diagnostics showing fast CPU boost and zero lag across active apps.',
+          dialogue: 'Iska faida yeh hai ke system par zero load hai aur read write speed pehle se 2 guna fast respond kar rahi hai.'
         },
         {
-          purpose: 'Speed Benchmark',
-          visual: 'System diagnostics showing fast 4.2 GHz CPU boost and zero lag across active apps.',
-          dialogue: 'System par zero load hai aur read write speed pehle se 2 guna fast respond kar rahi hai.'
+          purpose: 'Curiosity Loop',
+          visual: `${charTag} pointing toward Windows settings with futuristic holographic lock.`,
+          dialogue: 'Kya aap jante hain ke isi tarah RAM cache bhi baghair restart kiye instant refresh ho sakti hai?'
         },
         {
-          purpose: 'Episodic Outro & CTA',
-          visual: 'IT Cafeteria Part 2 complete badge with subscribe button pulsating on screen.',
-          dialogue: 'Yeh Part 2 apne doston ke sath share karein aur IT Cafeteria ko follow karke notification on karein!'
+          purpose: 'Conclusion + Save CTA',
+          visual: 'IT Cafeteria save video badge with subscribe button pulsating on screen.',
+          dialogue: 'Is video ko abhi save kar lein aur IT Cafeteria ko follow karke notification on karein!'
         }
       ];
     } else {
-      // Standard Part 1 Storage Sense
+      // Standard Storage Sense
       hook = 'Windows PC slow ho raha hai? Sirf yeh ek hidden setting on karein aur system 2X fast karein!';
       description = `Windows 11 aur PC speedup secrets! Bina kisi third party tool ke RAM aur storage optimize karein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
       tags = ['windows 11', 'pc speedup', 'c drive clean', 'storage sense', 'it cafeteria', 'waqar majeed', 'pc hacks urdu'];
@@ -357,54 +357,54 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
 
       rawBeats = [
         {
-          purpose: 'Disruptive Hook (Pattern Interrupt)',
+          purpose: 'Hook',
           visual: `${charTag} gestures toward a computer monitor showing heavy lag and spinning mouse cursor.`,
           dialogue: 'Aapka computer ya laptop achanak hang ho raha hai? Kisi third party cleaner app ko bilkul mat install karein!'
         },
         {
-          purpose: 'Root Cause Breakdown',
+          purpose: 'Problem + Agitate',
           visual: 'Task manager opening with 100% disk usage and red warning bar across background services.',
-          dialogue: 'Asal masla background update cache aur temporary log files hain jo silently hard drive par jam hoti rehti hain.'
+          dialogue: 'Background update cache aur temporary files silently hard drive par jam hoti rehti hain. Agar isay saaf na karein to hard drive crash kar sakti hai aur daily kaam atak jayega.'
         },
         {
-          purpose: 'Windows Built-in Setting Reveal',
+          purpose: 'Reveal',
           visual: 'Keyboard pressing Windows + I, navigating straight to System > Storage settings.',
           dialogue: 'Windows key plus I dabayein aur System mein Storage par click karein. Yahan Windows ka built-in cleaner maujood hai.'
         },
         {
-          purpose: 'Storage Sense Activation',
+          purpose: 'Demo 1',
           visual: 'Toggling Storage Sense switch to ON and configuring automatic cleanup intervals.',
-          dialogue: 'Storage Sense ko on karein aur cleanup frequency ko Every Week par set karein taake junk auto delete hota rahe.'
+          dialogue: 'Step 1: Storage Sense ko on karein aur cleanup frequency ko Every Week par set karein taake junk auto delete hota rahe.'
         },
         {
-          purpose: 'Run Cleaner Now',
-          visual: 'Clicking Run Storage Sense Now button, releasing 18GB of temporary cache in 3 seconds.',
-          dialogue: 'Ab Run Storage Sense dabayein. Chand seconds ke andar 15 se 20 GB tak hidden junk baghair kisi error ke saaf!'
+          purpose: 'Demo 2',
+          visual: 'Clicking Run Storage Sense Now button, releasing temporary cache.',
+          dialogue: 'Step 2: Ab Run Storage Sense dabayein taake temporary junk files baghair kisi error ke saaf ho jayein.'
         },
         {
-          purpose: 'Performance Proof',
+          purpose: 'Demo 3',
+          visual: 'Task Manager startup tab: Disabling unnecessary background apps.',
+          dialogue: 'Step 3: Task Manager mein Startup Apps par ja kar faltu software disable karein taake boot time aadha reh jaye.'
+        },
+        {
+          purpose: 'Proof + Result',
           visual: 'Task Manager disk and CPU drop from 95% down to 3%, green checkmark appears.',
           dialogue: 'Nateeja dekhein! System load foran normal ho gaya aur applications bina kisi delay ke instant open ho rahi hain.'
         },
         {
-          purpose: 'Startup Apps Audit',
-          visual: 'Task Manager startup tab: Disabling Spotify and Steam auto-start on boot.',
-          dialogue: 'Task Manager mein Startup Apps par ja kar faltu software disable karein taake PC boot time aadha reh jaye.'
-        },
-        {
-          purpose: 'Safety Alert',
-          visual: 'Warning graphic showing corrupted registry error caused by unsafe cleaners.',
-          dialogue: 'Kabhi bhi unsafe registry cleaner mat use karein jo Windows files delete kar ke blue screen of death le aaye.'
-        },
-        {
-          purpose: 'Summary & Value',
+          purpose: 'Benefit',
           visual: `${charTag} in sleek cyber workstation with smooth running monitors and clean desktop.`,
-          dialogue: 'Yeh do minute ki setting aapke laptop ki life aur speed ko salon tak fresh aur tez rakhegi.'
+          dialogue: 'Iska faida yeh hai ke aapke laptop ki life aur speed salon tak fresh aur tez rahegi.'
         },
         {
-          purpose: 'Closing & Subscribe',
+          purpose: 'Curiosity Loop',
+          visual: 'Keyboard glowing with shortcut hint for Windows hidden memory diagnostics.',
+          dialogue: 'Kya aap jante hain ke Windows mein baghair restart kiye bhi memory clean ho sakti hai?'
+        },
+        {
+          purpose: 'Conclusion + Save CTA',
           visual: 'IT Cafeteria subscribe button and YouTube channel bell animation.',
-          dialogue: 'Daily Windows aur laptop shortcuts seekhne ke liye IT Cafeteria ko foran subscribe karein!'
+          dialogue: 'Daily Windows shortcuts seekhne ke liye is video ko save karein aur IT Cafeteria ko subscribe karein!'
         }
       ];
     }
@@ -419,54 +419,54 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
 
     rawBeats = [
       {
-        purpose: 'Disruptive Hook (Pattern Interrupt)',
+        purpose: 'Hook',
         visual: `${charTag} stands before multiple holographic control panels expanding in 360 degrees.`,
         dialogue: 'Windows ki settings dhoondne ke liye kya aap abhi bhi 10 alag alag menus mein bhatak rahe hain?'
       },
       {
-        purpose: 'God Mode Reveal',
+        purpose: 'Problem + Agitate',
+        visual: 'User struggling through nested settings and broken control panel links with frustrated expression.',
+        dialogue: 'Zaroori settings dhoondne mein ghanton zaya hote hain. Is maslay ki wajah se aksar log ghalat options click karke system settings kharab kar bethte hain.'
+      },
+      {
+        purpose: 'Reveal',
         visual: 'Desktop screen creating new folder and renaming with secret GUID code.',
-        dialogue: 'Desktop par right-click karke new folder banayein aur yeh secret GUID code paste karein.'
+        dialogue: 'Lekin Windows 11 ka secret God Mode tamam 200 se zyada hidden settings ko sirf aik single folder mein le aata hai.'
       },
       {
-        purpose: 'Step 1: GUID Code Rename',
+        purpose: 'Demo 1',
+        visual: 'Desktop par right click context menu se New Folder create karna.',
+        dialogue: 'Step 1: Desktop par khali jagah right click karein aur aik naya folder banayein.'
+      },
+      {
+        purpose: 'Demo 2',
         visual: 'Pasting "GodMode.{ED7BA470-8E54-465E-825C-99712043E01C}" into folder name.',
-        dialogue: 'Folder name mein likhein: GodMode dot aur curly braces mein secret GUID code.'
+        dialogue: 'Step 2: Folder ka naam rename karke exact GodMode GUID code paste karein jo screen par dikh raha hai.'
       },
       {
-        purpose: 'Instant Icon Transformation',
-        visual: 'Ordinary yellow folder instantly morphs into official blue Control Panel icon.',
-        dialogue: 'Enter dabate hi aam folder official Control Panel icon mein transform ho jayega.'
-      },
-      {
-        purpose: 'Explore 200+ Settings',
+        purpose: 'Demo 3',
         visual: 'Folder opens revealing categorized list of 206 master settings in one window.',
-        dialogue: 'Isay open karein! Yahan Power, Display, Security aur User Accounts ki 200 se zyada hidden settings aik click par dastyab hain.'
+        dialogue: 'Step 3: Enter dabayein aur is folder ko open karein, tamam control panel options aik jagah ready hain.'
       },
       {
-        purpose: 'Pro Tip: Search Shortcut',
-        visual: 'Typing "power" into search bar, instant 1-click access to advanced power plan.',
-        dialogue: 'Pro tip: Search bar mein sirf keyword type karein aur ghanton ka kaam seconds mein karein.'
+        purpose: 'Proof + Result',
+        visual: 'Search bar filtering instant 1-click access to advanced power plan and security toggles.',
+        dialogue: 'Nateeja dekhein! Yahan Power, Display aur User Accounts ki 200 settings aik click par access ho rahi hain.'
       },
       {
-        purpose: 'Desktop Pinning',
-        visual: 'Dragging shortcut to taskbar with cyan neon outline.',
-        dialogue: 'Is folder ka shortcut taskbar par pin karein taake hamesha ready rahe.'
-      },
-      {
-        purpose: 'Zero Registry Risk',
-        visual: 'Green shield security badge confirming 100% native safe Windows feature.',
-        dialogue: 'Yeh 100 fisad safe Windows official feature hai, koi registry edit nahi hoti.'
-      },
-      {
-        purpose: 'Summary & Value',
+        purpose: 'Benefit',
         visual: `${charTag} pointing to organized workstation with clean control panel.`,
-        dialogue: 'Har computer user ke paas yeh God Mode folder lazmi hona chahiye.'
+        dialogue: 'Iska faida yeh hai ke aapko kabhi bhi alag alag menus mein bhatakna nahi paray ga aur time bachega.'
       },
       {
-        purpose: 'Closing & Subscribe',
+        purpose: 'Curiosity Loop',
+        visual: 'Glowing cyber icon hinting at hidden Windows terminal shortcuts.',
+        dialogue: 'Kya aap jante hain ke is folder ke ilawa Windows 11 mein aik shortcut se direct super-admin mode bhi khulta hai?'
+      },
+      {
+        purpose: 'Conclusion + Save CTA',
         visual: 'IT Cafeteria subscribe button and community card.',
-        dialogue: 'Aisi mazeed hidden Windows tricks ke liye IT Cafeteria ko follow karein!'
+        dialogue: 'Aisi hidden Windows tricks ke liye is video ko save karein aur IT Cafeteria ko follow karein!'
       }
     ];
   } else if (isExcelCenter) {
@@ -564,12 +564,12 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
           {
             purpose: 'Step 1: Configuration',
             visual: 'Clean application step with morning sunlight highlighting natural skin texture.',
-            dialogue: `Pehla step: Sab se pehle gentle cleanser se base clean karein aur yeh pehli step apply karein.`
+            dialogue: `Step 1: Sab se pehle gentle cleanser se base clean karein aur yeh pehli step apply karein.`
           },
           {
             purpose: 'Step 2: Core Execution',
             visual: 'Smooth upward massage technique demonstration with timer overlay.',
-            dialogue: `Doosra step: Is product ko circular motion mein sirf do minute tak massage karein taake skin absorb kar sake.`
+            dialogue: `Step 2: Is product ko circular motion mein sirf do minute tak massage karein taake skin absorb kar sake.`
           },
           {
             purpose: 'Live Verification Proof',
@@ -606,60 +606,60 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
             channelId: channelName.toLowerCase().includes('beauty') ? 'beautyhub' : 'itcafeteria'
           });
           const tool = bp.namedToolOrApp || titleClean;
-          const s1 = bp.steps[0] || { actionTitle: 'Access Tool', exactPathOrCommand: tool, expectedResult: 'Tool Ready', dialogueFocus: `Pehla step: ${tool} open karein.` };
-          const s2 = bp.steps[1] || { actionTitle: 'Execute Action', exactPathOrCommand: 'Settings -> Feature', expectedResult: 'Feature active', dialogueFocus: `Doosra step: Yeh specific setting toggle karein.` };
-          const s3 = bp.steps[2] || { actionTitle: 'Verify Output', exactPathOrCommand: 'Run / Test', expectedResult: 'Output verified', dialogueFocus: `Teesra step: Ab live test run karke verify karein.` };
+          const s1 = bp.steps[0] || { actionTitle: 'Access Tool', exactPathOrCommand: tool, expectedResult: 'Tool Ready', dialogueFocus: `Step 1: ${tool} open karein.` };
+          const s2 = bp.steps[1] || { actionTitle: 'Execute Action', exactPathOrCommand: 'Settings -> Feature', expectedResult: 'Feature active', dialogueFocus: `Step 2: Yeh specific setting toggle karein.` };
+          const s3 = bp.steps[2] || { actionTitle: 'Verify Output', exactPathOrCommand: 'Run / Test', expectedResult: 'Output verified', dialogueFocus: `Step 3: Ab live test run karke verify karein.` };
 
           return [
             {
-              purpose: 'Disruptive Hook (Pattern Interrupt)',
+              purpose: 'Hook',
               visual: `${charTag} standing at workstation, points toward high-contrast floating 3D graphic of ${tool}.`,
               dialogue: `Kya aap jante hain ke ${tool} se aapka ghanton ka kaam asan ho sakta hai? Dekhein yeh verified tareeqa.`
             },
             {
-              purpose: 'The Problem Exposed',
+              purpose: 'Problem + Agitate',
               visual: `Split screen displaying traditional slow manual bottleneck without ${tool}.`,
-              dialogue: `Aksar log is kaam ke liye ghanton lagate hain aur unka output phir bhi standard nahi aata.`
+              dialogue: `Aksar log is kaam ke liye ghanton manual tareeqay use karte hain. Is maslay ko ignore karne se rozana waqt zaya hota hai aur kaam hamesha atak jata hai.`
             },
             {
-              purpose: 'Feature & Tool Reveal',
+              purpose: 'Reveal',
               visual: `Screencast zooming into ${tool} official interface displaying the verified feature.`,
-              dialogue: `Lekin ${tool} ka yeh feature aapke kaam ko step-by-step simplify kar deta hai.`
+              dialogue: `Lekin ${tool} ka yeh official feature aapke poore process ko 3 simple steps mein convert kar deta hai.`
             },
             {
-              purpose: `Step 1: ${s1.actionTitle}`,
+              purpose: 'Demo 1',
               visual: s1.visualDescription || `Screencast executing ${s1.exactPathOrCommand} in ${tool}.`,
-              dialogue: s1.dialogueFocus || `Pehla step: ${s1.exactPathOrCommand} open karein jesa screen par dikh raha hai.`
+              dialogue: s1.dialogueFocus || `Step 1: ${s1.exactPathOrCommand} open karein jesa screen par dikh raha hai.`
             },
             {
-              purpose: `Step 2: ${s2.actionTitle}`,
+              purpose: 'Demo 2',
               visual: s2.visualDescription || `Screencast applying ${s2.exactPathOrCommand} with clear cursor highlight.`,
-              dialogue: s2.dialogueFocus || `Doosra step: ${s2.exactPathOrCommand} configure karein.`
+              dialogue: s2.dialogueFocus || `Step 2: ${s2.exactPathOrCommand} configure karein.`
             },
             {
-              purpose: `Step 3: ${s3.actionTitle}`,
-              visual: s3.visualDescription || `Live verification screen confirming ${s3.expectedResult}.`,
-              dialogue: s3.dialogueFocus || `Teesra step: Ab ${s3.actionTitle} verify karein, result tayyar hai!`
+              purpose: 'Demo 3',
+              visual: s3.visualDescription || `Live verification screen executing ${s3.exactPathOrCommand}.`,
+              dialogue: s3.dialogueFocus || `Step 3: Ab ${s3.actionTitle} run karein aur final settings save karein.`
             },
             {
-              purpose: 'Pro Tip & Optimization',
-              visual: `Callout graphic displaying advanced parameter or shortcut for ${tool}.`,
-              dialogue: `Pro tip: Is feature ko default workflow mein save kar lein taake rozana manual setup na karna pare.`
+              purpose: 'Proof + Result',
+              visual: `Live verification screen confirming ${s3.expectedResult}.`,
+              dialogue: `Nateeja dekhein! Screen par verified output ready hai aur har calculation bilkul accurate hai.`
             },
             {
-              purpose: 'Honest Limitation & Caution',
-              visual: `Caution box detailing: ${bp.honestLimitations || 'Stable internet connection required'}.`,
-              dialogue: `Dhyan rahe: ${bp.honestLimitations || 'Is feature ko use karte waqt stable internet lazmi rakhein'}.`
-            },
-            {
-              purpose: 'Executive Summary',
+              purpose: 'Benefit',
               visual: `${charTag} in studio framing key takeaway card for ${tool}.`,
-              dialogue: `Yeh verified workflow aapki digital productivity aur output ko bohot behtar bana dega.`
+              dialogue: `Iska faida yeh hai ke aapka daily workflow bilkul automate ho jata hai aur consistency barqarar rehti hai.`
             },
             {
-              purpose: 'Call to Action & Community',
+              purpose: 'Curiosity Loop',
+              visual: `Graphic card highlighting another smart option inside ${tool}.`,
+              dialogue: `Kya aap jante hain ke is tool ki advanced settings mein aik aur time-saving trick bhi maujood hai?`
+            },
+            {
+              purpose: 'Conclusion + Save CTA',
               visual: `${channelName} subscribe button animation with ${presenter} presentation end-card.`,
-              dialogue: `Aise rozana verified shortcuts aur tutorials seekhne ke liye ${channelName} ko subscribe karein!`
+              dialogue: `Is tutorial ko abhi save kar lein aur ${channelName} ko follow karein!`
             }
           ];
         })();

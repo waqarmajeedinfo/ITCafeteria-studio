@@ -761,7 +761,7 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
       },
       4: {
         title: "PC & Windows Hacks Rule",
-        instructions: "IT Cafeteria Script Rule (Cat 4 — Windows & PC Hacks): Ongoing part-by-part series (Part 1, Part 2...) for Windows optimization, troubleshooting & command-line tricks. Structure: 1) Shocking PC lag/error hook with Part number (0-10s), 2) Root cause of why Windows slows down/breaks, 3) Hidden tool/setting or PowerShell/CMD trick reveal, 4) Step 1 exact command or hotkey (Win+R, Win+V, CMD), 5) Step 2 verification, 6) Instant benchmark test & RAM/CPU drop proof, 7) Safety disclaimer & restore point tip, 8) Advanced power-user tweak, 9) Part summary & next episode teaser, 10) Subscribe for daily PC hacks CTA. 9:16 high-contrast desktop screencast with zoomed cursor keys and Waqar Majeed cutaways.",
+        instructions: "IT Cafeteria Script Rule (Cat 4 — Windows & PC Hacks): Standalone complete-in-one-video tutorial. Structure: 1) Hook (0-10s), 2) Problem + Agitate (show problem, last line shows cost of ignoring it), 3) Reveal, 4) Demo 1 (Step 1 exact action), 5) Demo 2 (Step 2 exact action), 6) Demo 3 (Step 3 exact action), 7) Proof + Result, 8) Benefit, 9) Curiosity Loop, 10) Conclusion + Save CTA. Never promise next part or episode. 9:16 desktop screencast with zoomed cursor keys.",
         defaultRatio: "9:16"
       },
       5: {

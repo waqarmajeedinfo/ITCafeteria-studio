@@ -131,8 +131,9 @@ test('A2 - Dialogue Completeness: Trailing connectors and unfinished endings are
   // Test typo fix
   const typoText = 'Tstep step mein Terminal ko open karein.';
   const resTypo = validateAndRepairDialogue(typoText, 3);
-  assert.ok(resTypo.dialogue.includes('Teesra step'));
+  assert.ok(resTypo.dialogue.includes('Step 3'));
   assert.ok(!resTypo.dialogue.includes('Tstep'));
+  assert.ok(!resTypo.dialogue.includes('Teesra step'));
 });
 
 test('B1 & B4 - Duplicate Engine: SAME-PROBLEM verdict triggers when same problem & outcome are matched', () => {

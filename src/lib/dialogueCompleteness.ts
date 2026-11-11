@@ -27,15 +27,20 @@ const FORBIDDEN_TRAILING_CONNECTORS = [
 ];
 
 const TYPO_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/\bTstep\s*step\b/gi, 'Teesra step'],
-  [/\bTstep\b/gi, 'Teesra step'],
-  [/\bPstep\s*step\b/gi, 'Pehla step'],
-  [/\bPstep\b/gi, 'Pehla step'],
-  [/\bDstep\s*step\b/gi, 'Doosra step'],
-  [/\bDstep\b/gi, 'Doosra step'],
-  [/\bCstep\s*step\b/gi, 'Chautha step'],
-  [/\bCstep\b/gi, 'Chautha step'],
-  [/\bstep\s+step\b/gi, 'step'],
+  // Spoken step labels must be "Step 1", "Step 2", "Step 3", "Step 4" in order
+  [/\b(Pehla|Pehlay|Pehle)\s+step\b/gi, 'Step 1'],
+  [/\b(Doosra|Dusra|Doosray)\s+step\b/gi, 'Step 2'],
+  [/\b(Teesra|Tisra|Teesray)\s+step\b/gi, 'Step 3'],
+  [/\b(Chautha|Chotha|Chauthay)\s+step\b/gi, 'Step 4'],
+  [/\bTstep\s*step\b/gi, 'Step 3'],
+  [/\bTstep\b/gi, 'Step 3'],
+  [/\bPstep\s*step\b/gi, 'Step 1'],
+  [/\bPstep\b/gi, 'Step 1'],
+  [/\bDstep\s*step\b/gi, 'Step 2'],
+  [/\bDstep\b/gi, 'Step 2'],
+  [/\bCstep\s*step\b/gi, 'Step 4'],
+  [/\bCstep\b/gi, 'Step 4'],
+  [/\bstep\s+step\b/gi, 'Step'],
   [/\b10x\s+faster\b/gi, 'tezi se'],
   [/\b5\s+seconds\b/gi, 'chand lamhon'],
   [/\b100%\s+free\s+aur\s+working\b/gi, 'official tareeqay se']
@@ -70,23 +75,45 @@ export function validateAndRepairDialogue(
     };
   }
 
-  // 1. Fix common typos
+  // 1. Fix step labels & common typos (Enforce "Step 1", "Step 2", "Step 3", "Step 4")
   for (const [pattern, replacement] of TYPO_REPLACEMENTS) {
     if (pattern.test(text)) {
       text = text.replace(pattern, replacement);
       repaired = true;
-      issues.push(`Typo fixed: replaced matching pattern with "${replacement}".`);
+      issues.push(`Typo / step label fixed: replaced matching pattern with "${replacement}".`);
     }
   }
 
-  // 2. Remove trailing ellipsis
+  // 2. CTA Rule: A CTA (subscribe, follow, save, comment) is allowed ONLY in Scene 10
+  if (sceneNum < 10) {
+    const ctaMatch = /\s*(is video ko save|save kar lein|subscribe karein|follow karein|comment karein|channel ko follow|channel ko subscribe)[^.?!۔]*[.?!۔]?/gi;
+    if (ctaMatch.test(text)) {
+      text = text.replace(ctaMatch, '').trim();
+      repaired = true;
+      issues.push('Removed premature CTA from scenes 1-9 (CTA allowed ONLY in Scene 10).');
+    }
+  }
+
+  // 3. Complete in one video rule: Never promise next part, next episode, or sharing script/file later
+  const nextPartPattern = /\b(agli\s+video\s+mein|agle\s+episode\s+mein|agla\s+part|next\s+part|next\s+episode|part\s+\d+|script\s+share\s+karenge|file\s+share\s+karenge|blueprint\s+share)\b[^.?!۔]*[.?!۔]?/gi;
+  if (nextPartPattern.test(text)) {
+    if (sceneNum === 10) {
+      text = text.replace(nextPartPattern, 'Is video ko abhi save kar lein aur IT Cafeteria ko follow karein!').trim();
+    } else {
+      text = text.replace(nextPartPattern, '').trim();
+    }
+    repaired = true;
+    issues.push('Removed next-part / next-episode promise; story must be complete in one video.');
+  }
+
+  // 4. Remove trailing ellipsis
   if (/\.{2,}$/.test(text)) {
     text = text.replace(/\.{2,}$/, '').trim();
     repaired = true;
     issues.push('Removed trailing ellipsis (...).');
   }
 
-  // 3. Check and remove forbidden trailing connector words repeatedly until clean
+  // 5. Check and remove forbidden trailing connector words repeatedly until clean
   let foundConnector = true;
   while (foundConnector) {
     foundConnector = false;
@@ -103,8 +130,8 @@ export function validateAndRepairDialogue(
     }
   }
 
-  // 4. Incomplete teaser / curiosity loop repair (Scene 9/10)
-  const isClosingOrTeaser = sceneNum >= 9 || /teaser|cta|summary|closing/i.test(purpose);
+  // 6. Incomplete teaser / curiosity loop repair (Scene 9/10)
+  const isClosingOrTeaser = sceneNum >= 9 || /teaser|cta|summary|closing|curiosity|conclusion/i.test(purpose);
   if (isClosingOrTeaser) {
     // If it ends with something like "magar yaad rakhein" without an object
     if (/yaad\s+rakhein$/i.test(text) || /yaad\s+rahe$/i.test(text)) {
@@ -118,21 +145,25 @@ export function validateAndRepairDialogue(
       repaired = true;
       issues.push('Appended question mark to curiosity query.');
     }
+    // If scene 10, ensure it is a complete, well-formed sentence concluding the topic
+    if (sceneNum === 10 && !/save|follow|subscribe/i.test(text)) {
+      text = `${text.replace(/[.?!۔\s]+$/, '')}. Is video ko save kar lein aur IT Cafeteria ko follow karein!`;
+      repaired = true;
+      issues.push('Ensured Scene 10 contains complete Save CTA sentence.');
+    }
   }
 
-  // 5. Ensure terminal punctuation (. ? ! or Urdu ۔)
+  // 7. Ensure terminal punctuation (. ? ! or Urdu ۔)
   if (!/[.?!۔]$/.test(text)) {
-    // Default to '!' for energetic tech shorts or '.' for explanation
     const punct = sceneNum === 1 || isClosingOrTeaser ? '!' : '.';
     text = `${text}${punct}`;
     repaired = true;
     issues.push(`Appended missing terminal punctuation "${punct}".`);
   }
 
-  // 6. Word count target: 20-25 words
+  // 8. Word count target: if over 28 words, shorten into a complete sentence
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length > 28) {
-    // Trim excessively long dialogue into a complete sentence
     const firstSentence = text.split(/[.?!۔]+/)[0]?.trim();
     if (firstSentence && firstSentence.split(/\s+/).length >= 15) {
       text = `${firstSentence}!`;

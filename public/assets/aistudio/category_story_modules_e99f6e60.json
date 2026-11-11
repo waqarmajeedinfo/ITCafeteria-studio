@@ -12,7 +12,6 @@
       "6. Run 'anti_repetition' check against the last stories before showing output."
     ]
   },
-
   "global_rules": {
     "language": "Roman Urdu only for dialogue and all agent replies",
     "scene_duration_seconds": 10,
@@ -36,7 +35,6 @@
       "Thumbnail prompt as text"
     ]
   },
-
   "anti_repetition": {
     "visual_signature_fields": [
       "camera movement type",
@@ -49,7 +47,6 @@
     "rule": "Store the visual signature of the last 5 stories. A new story must differ from each of the last 3 in at least 3 of the 6 fields. If not, regenerate the Flow blocks (not the dialogue).",
     "forbidden": "Do not start every Flow script with the same sentence. Do not reuse the same camera/lighting/presenter block word-for-word across videos."
   },
-
   "module_types": {
     "standard_tutorial": "One topic, one video, 10 scenes, self-contained.",
     "ongoing_series": "Never-ending part-by-part series (Part 1, 2, 3...). Each part links to the previous one. Runs under its own extended-length test format already defined in the agent file.",
@@ -57,7 +54,6 @@
     "lecture_series": "Course style, chapter by chapter, 16:9, Lecture Series Format.",
     "custom": "Topic supplied directly by the user, outside the regular rotation."
   },
-
   "categories": [
     {
       "id": 1,
@@ -66,7 +62,11 @@
       "in_daily_rotation": true,
       "aspect_ratio": "9:16",
       "story_angle": "Explain what a new AI or smart-tech development means for an ordinary Pakistani viewer and what they can do with it today.",
-      "topic_sources": ["last 48h news", "official product blogs", "reputable tech sites"],
+      "topic_sources": [
+        "last 48h news",
+        "official product blogs",
+        "reputable tech sites"
+      ],
       "story_beats": [
         "Hook: surprising claim about the AI/smart tech",
         "What it is in one simple sentence",
@@ -99,7 +99,11 @@
       "in_daily_rotation": true,
       "aspect_ratio": "9:16",
       "story_angle": "Show one concrete task done with a chatbot or AI tool (ChatGPT, Claude, Gemini, Google AI tools, Google Flow, Nano) or a small workflow built from them.",
-      "topic_sources": ["official feature announcements", "tool docs", "last 48h news"],
+      "topic_sources": [
+        "official feature announcements",
+        "tool docs",
+        "last 48h news"
+      ],
       "story_beats": [
         "Hook: task that normally takes long, done fast",
         "The everyday problem",
@@ -132,7 +136,11 @@
       "in_daily_rotation": true,
       "aspect_ratio": "9:16",
       "story_angle": "One prompt technique or image+prompt workflow, shown with a weak prompt vs strong prompt and the visible difference in output.",
-      "topic_sources": ["official prompting guides", "tested techniques", "last 48h news"],
+      "topic_sources": [
+        "official prompting guides",
+        "tested techniques",
+        "last 48h news"
+      ],
       "story_beats": [
         "Hook: same AI, two very different results",
         "The weak prompt and its poor result",
@@ -165,22 +173,26 @@
       "in_daily_rotation": true,
       "aspect_ratio": "9:16",
       "series": {
-        "part_numbering": true,
-        "format_note": "Ongoing, never-ending part-by-part series (Part 1, Part 2, Part 3...) running under its own extended-length test format as defined in the agent file. Length test result pending."
+        "part_numbering": false,
+        "format_note": "Stand-alone complete 10-scene tutorial format: exactly 10 scenes from Hook to Conclusion + Save CTA with zero next-part promises."
       },
       "story_angle": "Windows hidden tools, settings, CMD and PowerShell tricks to fix real PC problems (slow PC, temp files, hidden settings, command-line tools) or any other method found via research.",
-      "topic_sources": ["Microsoft official docs", "tested methods", "last 48h news"],
+      "topic_sources": [
+        "Microsoft official docs",
+        "tested methods",
+        "last 48h news"
+      ],
       "story_beats": [
-        "Hook: PC problem everyone has (with part number)",
-        "Recap of previous part in one line",
-        "Where to find the tool/setting",
-        "Step 1 on screen",
-        "Step 2 on screen (or command)",
-        "Result before/after",
-        "Safety note or what not to do",
-        "Bonus tip",
-        "Quick recap",
-        "CTA + next part teaser"
+        "Hook",
+        "Problem + Agitate",
+        "Reveal",
+        "Demo 1",
+        "Demo 2",
+        "Demo 3",
+        "Proof + Result",
+        "Benefit",
+        "Curiosity Loop",
+        "Conclusion + Save CTA"
       ],
       "visual_mode": "Demonstration mode: presenter on Hook and CTA; middle scenes full-screen Windows screen recording, with CMD or PowerShell close-ups when commands are used.",
       "flow_script_rules": {
@@ -190,8 +202,8 @@
         "hologram": "Not used."
       },
       "dialogue_tone": "Helpful repair-guy tone, calm, safety-aware.",
-      "hook_style": "Relatable PC annoyance.",
-      "cta_style": "Next part teaser plus ask for next problem.",
+      "hook_style": "Hook: direct PC problem with zero invented numbers.",
+      "cta_style": "Conclusion + Save CTA in Scene 10 only; topic complete in one video with zero next-part promises.",
       "thumbnail_style": "Windows screen with highlighted fix and part number.",
       "duplicate_check_scope": "Same fix; new part must add something new."
     },
@@ -202,7 +214,11 @@
       "in_daily_rotation": true,
       "aspect_ratio": "9:16",
       "story_angle": "New launch, new feature or new product: what is new, who it is for, and how to try or use it.",
-      "topic_sources": ["official launch posts", "reputable reviews", "last 48h news"],
+      "topic_sources": [
+        "official launch posts",
+        "reputable reviews",
+        "last 48h news"
+      ],
       "story_beats": [
         "Hook: what just launched",
         "What is new compared to before",
@@ -235,7 +251,11 @@
       "in_daily_rotation": true,
       "aspect_ratio": "9:16",
       "story_angle": "Useful upcoming technology or major beneficial developments; optimistic but honest about timelines.",
-      "topic_sources": ["research announcements", "reputable science/tech news", "last 48h news"],
+      "topic_sources": [
+        "research announcements",
+        "reputable science/tech news",
+        "last 48h news"
+      ],
       "story_beats": [
         "Hook: breakthrough in one sentence",
         "The problem it solves",
@@ -273,7 +293,11 @@
         "format_note": "Ongoing, never-ending part-by-part series covering hidden settings and features in major daily-used apps that normal users do not know about."
       },
       "story_angle": "One hidden setting or feature in one specific app, shown on a phone or app screen.",
-      "topic_sources": ["official app help pages", "tested on current app version", "last 48h news"],
+      "topic_sources": [
+        "official app help pages",
+        "tested on current app version",
+        "last 48h news"
+      ],
       "story_beats": [
         "Hook: teaser of the hidden trick (app name + part number)",
         "Instant screen proof",
@@ -306,7 +330,11 @@
       "in_daily_rotation": true,
       "aspect_ratio": "9:16",
       "story_angle": "Ideas only: how viewers could build income with tools, skills and platforms. No step-by-step tutorials, no income promises.",
-      "topic_sources": ["official platform pages", "reputable sources", "last 48h news"],
+      "topic_sources": [
+        "official platform pages",
+        "reputable sources",
+        "last 48h news"
+      ],
       "story_beats": [
         "Hook: the idea in one line",
         "Who this suits",
@@ -345,7 +373,11 @@
         "free_first_for_tool_chapters": true
       },
       "story_angle": "Instructor-style lesson teaching one chapter of YouTube automation clearly, with free tools first.",
-      "topic_sources": ["chapter plan", "official tool docs", "tested workflow"],
+      "topic_sources": [
+        "chapter plan",
+        "official tool docs",
+        "tested workflow"
+      ],
       "story_beats": [
         "Chapter intro and recap of previous chapter",
         "What this chapter will teach",
@@ -378,7 +410,11 @@
       "in_daily_rotation": false,
       "aspect_ratio": "9:16 unless the user says otherwise",
       "story_angle": "Topic supplied directly by the user; always a separate item outside the regular rotation.",
-      "topic_sources": ["user topic", "official sources", "last 48h news if relevant"],
+      "topic_sources": [
+        "user topic",
+        "official sources",
+        "last 48h news if relevant"
+      ],
       "story_beats": "Choose the closest module (1-8) by topic fit and use its story_beats, flow_script_rules and dialogue_tone.",
       "visual_mode": "Inherited from the chosen closest module.",
       "flow_script_rules": "Inherited from the chosen closest module.",
