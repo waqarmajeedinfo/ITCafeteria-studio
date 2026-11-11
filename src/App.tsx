@@ -1077,7 +1077,7 @@ export default function App() {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Desktop Navbar with 4 Interactive Dropdown Menus + Clean Unified Action Cluster */}
-          <div className="hidden md:flex items-center justify-between gap-3 overflow-x-auto no-scrollbar py-0.5">
+          <div className="hidden md:flex items-center justify-between gap-3 py-0.5">
             {/* Left: 4 Group Dropdown Menus with Precise Uniform Dimensions */}
             <div className="flex items-center gap-2 shrink-0">
               {groups.map((group) => {

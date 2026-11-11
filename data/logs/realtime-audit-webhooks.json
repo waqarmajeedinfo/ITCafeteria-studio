@@ -1,5 +1,77 @@
 [
   {
+    "id": "audit-1794370745048-249012",
+    "timestamp": "2026-11-11T04:19:05.048Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1794370704107-8ad075",
+    "timestamp": "2026-11-11T04:18:24.107Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1794370662257-59a359",
+    "timestamp": "2026-11-11T04:17:42.257Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1794370606538-829a6f",
+    "timestamp": "2026-11-11T04:16:46.538Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1794370585042-952034",
+    "timestamp": "2026-11-11T04:16:25.042Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1794370544088-f24fce",
+    "timestamp": "2026-11-11T04:15:44.088Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
     "id": "audit-1794330461257-705d2f",
     "timestamp": "2026-11-10T17:07:41.257Z",
     "userId": "user-admin-01",
