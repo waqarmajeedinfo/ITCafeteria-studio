@@ -1,5 +1,41 @@
 [
   {
+    "id": "audit-1794330461257-705d2f",
+    "timestamp": "2026-11-10T17:07:41.257Z",
+    "userId": "user-admin-01",
+    "username": "waqarmajeed",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeed",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1794330406132-4fc6cf",
+    "timestamp": "2026-11-10T17:06:46.132Z",
+    "userId": "user-admin-01",
+    "username": "waqarmajeed",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeed",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1794330370517-4c8fbc",
+    "timestamp": "2026-11-10T17:06:10.517Z",
+    "userId": "user-admin-01",
+    "username": "waqarmajeed",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeed",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
     "id": "audit-1794279901703-dd9f3d",
     "timestamp": "2026-11-10T03:05:01.703Z",
     "userId": "user-admin-01",

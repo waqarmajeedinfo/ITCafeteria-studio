@@ -81,3 +81,13 @@ body.modal-open {
   line-height: 1.45;
 }
 
+/* Hide scrollbars while retaining touch/wheel scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+

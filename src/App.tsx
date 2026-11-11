@@ -995,59 +995,60 @@ export default function App() {
         </div>
 
         {/* Sub-Header Action Bar — Go Live button completely removed */}
-        <div className="w-full bg-slate-950/95 border-b border-slate-800/80 backdrop-blur-md py-2.5 px-4 sm:px-6 lg:px-8">
+        {/* Sub-Header Action Bar */}
+        <div className="w-full bg-slate-950/95 border-b border-slate-800/80 backdrop-blur-md py-2 px-4 sm:px-6 lg:px-8">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-0.5">
               {/* 1. Channel Button */}
               <a
                 href="https://www.youtube.com/@itcafeteria"
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
+                className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
               >
-                <Youtube className="w-4 h-4 text-red-500" />
+                <Youtube className="w-4 h-4 text-red-500 shrink-0" />
                 <span>YouTube Channel</span>
               </a>
 
               {/* 2. Phonetic Rules Dictionary */}
               <button
                 onClick={() => setShowDictionary(true)}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
+                className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
               >
-                <BookOpen className="w-4 h-4 text-cyan-400" />
+                <BookOpen className="w-4 h-4 text-cyan-400 shrink-0" />
                 <span>Phonetic Rules Dictionary</span>
               </button>
 
               {/* 3. Manage Channels Shortcut */}
               <button
                 onClick={() => setShowChannelManager(true)}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/85 hover:bg-slate-800/90 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-md"
+                className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
               >
-                <Plus className="w-4 h-4 text-cyan-400" />
+                <Plus className="w-4 h-4 text-cyan-400 shrink-0" />
                 <span>Manage Channels</span>
               </button>
 
               {/* 3b. Topic Bank Hub */}
               <button
                 onClick={() => setShowTopicBankModal(true)}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-950/80 to-teal-950/80 hover:from-emerald-900/80 hover:to-teal-900/80 border border-emerald-500/40 hover:border-emerald-400 text-xs sm:text-sm font-semibold text-emerald-200 hover:text-white transition-all cursor-pointer backdrop-blur-md shadow-md"
-                title="Profile Topic Bank, Backfill Covered Points, & Smarter Duplicate Check"
+                className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-emerald-500/40 hover:border-emerald-400 text-xs sm:text-sm font-medium text-emerald-200 hover:text-white transition-all cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
+                title="Profile Topic Bank, Backfill Covered Points, & Smarter Duplicate Radar"
               >
-                <Database className="w-4 h-4 text-emerald-400" />
+                <Database className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Topic Bank</span>
               </button>
 
               {/* 4. Go Live Co-Pilot Button alongside Phonetic Dictionary & Manage Channels */}
               <button
                 onClick={() => setShowLiveCoPilotModal(true)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer backdrop-blur-md shadow-md ${
+                className={`h-9 px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0 ${
                   isLiveActive
                     ? 'bg-gradient-to-r from-rose-950/90 via-slate-900 to-rose-950/90 border border-rose-500/70 text-rose-300 shadow-rose-950/50 animate-pulse'
-                    : 'bg-slate-900/85 hover:bg-slate-800/90 border border-rose-500/40 hover:border-rose-400 text-slate-200 hover:text-white'
+                    : 'bg-slate-900/85 hover:bg-slate-800 border border-rose-500/40 hover:border-rose-400 text-slate-200 hover:text-white'
                 }`}
                 title="Go Live Co-Pilot with Real-Time Adaptive Guidance"
               >
-                <Radio className={`w-4 h-4 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
+                <Radio className={`w-4 h-4 shrink-0 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
                 <span>{isLiveActive ? '🔴 On Air (Live)' : 'Go Live'}</span>
                 {isLiveActive && (
                   <span className="text-[10px] font-mono px-1.5 py-0.5 bg-rose-600 text-white rounded font-bold">
@@ -1057,8 +1058,8 @@ export default function App() {
               </button>
             </div>
 
-            <div className="text-[11px] text-slate-400 hidden md:flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <div className="text-[11px] text-slate-400 hidden md:flex items-center gap-2 shrink-0 whitespace-nowrap">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
               <span>Full-Stack Roman Urdu Autonomous Engine Active</span>
             </div>
           </div>
@@ -1071,126 +1072,137 @@ export default function App() {
         className={`sticky top-0 z-50 transition-all duration-300 border-b ${
           isScrolled
             ? 'bg-slate-950/98 backdrop-blur-2xl border-cyan-500/40 shadow-2xl shadow-cyan-950/60 py-1'
-            : 'bg-slate-950/95 backdrop-blur-md border-slate-800/80 shadow-lg shadow-black/40 py-0'
+            : 'bg-slate-950/95 backdrop-blur-md border-slate-800/80 shadow-lg shadow-black/40 py-1.5'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Desktop Navbar with 4 Interactive Dropdown Menus */}
-          <div className="hidden md:flex items-center gap-3 py-2.5">
-            {groups.map((group) => {
-              const isGroupActive = activeGroup === group.id;
-              const isMenuOpen = openMenu === group.id;
-              const groupTabs = tabs.filter((t) => t.group === group.id);
+          {/* Desktop Navbar with 4 Interactive Dropdown Menus + Clean Unified Action Cluster */}
+          <div className="hidden md:flex items-center justify-between gap-3 overflow-x-auto no-scrollbar py-0.5">
+            {/* Left: 4 Group Dropdown Menus with Precise Uniform Dimensions */}
+            <div className="flex items-center gap-2 shrink-0">
+              {groups.map((group) => {
+                const isGroupActive = activeGroup === group.id;
+                const isMenuOpen = openMenu === group.id;
+                const groupTabs = tabs.filter((t) => t.group === group.id);
 
-              return (
-                <div key={group.id} className="relative">
-                  <button
-                    onClick={() => setOpenMenu(isMenuOpen ? null : group.id)}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2.5 transition-all cursor-pointer border ${
-                      isMenuOpen || isGroupActive
-                        ? 'text-cyan-300 bg-cyan-950/40 border-cyan-500/50 shadow-md shadow-cyan-950/50'
-                        : 'text-slate-300 hover:text-white bg-slate-900/60 hover:bg-slate-900 border-slate-800 hover:border-slate-700'
-                    }`}
-                    aria-expanded={isMenuOpen}
-                  >
-                    <span className="shrink-0">{group.icon}</span>
-                    <span>{group.label}</span>
-                    <span className="text-xs text-slate-400 font-mono font-normal">({group.count})</span>
-                    <ChevronDown
-                      className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
-                        isMenuOpen ? 'rotate-180 text-cyan-400' : ''
+                return (
+                  <div key={group.id} className="relative shrink-0">
+                    <button
+                      onClick={() => setOpenMenu(isMenuOpen ? null : group.id)}
+                      className={`h-10 px-3.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer border whitespace-nowrap select-none ${
+                        isMenuOpen || isGroupActive
+                          ? 'text-cyan-300 bg-cyan-950/50 border-cyan-500/60 shadow-md shadow-cyan-950/50 ring-1 ring-cyan-500/30'
+                          : 'text-slate-300 hover:text-white bg-slate-900/70 hover:bg-slate-850 border-slate-800 hover:border-slate-700 shadow-sm'
                       }`}
-                    />
-                  </button>
+                      aria-expanded={isMenuOpen}
+                    >
+                      <span className="shrink-0">{group.icon}</span>
+                      <span className="whitespace-nowrap">{group.label}</span>
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-slate-800/80 text-slate-400 font-mono font-medium shrink-0">
+                        ({group.count})
+                      </span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
+                          isMenuOpen ? 'rotate-180 text-cyan-400' : ''
+                        }`}
+                      />
+                    </button>
 
-                  {/* Floating Dropdown Popup Menu */}
-                  {isMenuOpen && (
-                    <div className="absolute left-0 top-full mt-2 w-72 bg-[#0c1427]/98 backdrop-blur-2xl border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 flex flex-col gap-1 ring-1 ring-white/10 animate-in fade-in zoom-in-95 duration-150">
-                      {groupTabs.map((tab) => {
-                        const isActive = activeTab === tab.id;
-                        return (
-                          <button
-                            key={tab.id}
-                            onClick={() => selectTab(tab.id)}
-                            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left text-sm transition-colors cursor-pointer ${
-                              isActive
-                                ? 'bg-cyan-950/60 text-cyan-300 font-medium border border-cyan-500/30 shadow-sm'
-                                : 'text-slate-200 hover:bg-slate-800/80 hover:text-white'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <span className="shrink-0">{tab.icon}</span>
-                              <span className="truncate text-sm">{tab.label}</span>
-                            </div>
-                            {isActive && <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    {/* Floating Dropdown Popup Menu */}
+                    {isMenuOpen && (
+                      <div className="absolute left-0 top-full mt-2 w-72 bg-[#0c1427]/98 backdrop-blur-2xl border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 flex flex-col gap-1 ring-1 ring-white/10 animate-in fade-in zoom-in-95 duration-150">
+                        {groupTabs.map((tab) => {
+                          const isActive = activeTab === tab.id;
+                          return (
+                            <button
+                              key={tab.id}
+                              onClick={() => selectTab(tab.id)}
+                              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left text-sm transition-colors cursor-pointer ${
+                                isActive
+                                  ? 'bg-cyan-950/60 text-cyan-300 font-medium border border-cyan-500/30 shadow-sm'
+                                  : 'text-slate-200 hover:bg-slate-800/80 hover:text-white'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className="shrink-0">{tab.icon}</span>
+                                <span className="truncate text-sm">{tab.label}</span>
+                              </div>
+                              {isActive && <Check className="w-4 h-4 text-cyan-400 shrink-0 ml-2" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
-            {/* Active Tab Indicator & Top Scroll Jump on the right */}
-            <div className="ml-auto flex items-center gap-2 text-xs text-slate-400">
-              <span className="hidden lg:inline text-slate-400 text-xs">Currently Open:</span>
-              <div className="text-cyan-300 font-medium px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2 shadow-inner">
-                {activeTabMeta?.icon}
-                <span className="font-semibold text-xs sm:text-sm">{activeTabMeta?.label}</span>
+            {/* Right: Unified Navigation Controls Cluster (Single precise baseline & height) */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Active Tab Indicator (Precise h-10 with truncated label) */}
+              <div className="h-10 px-3 rounded-xl bg-slate-900/90 border border-slate-800/90 flex items-center gap-2 shadow-inner whitespace-nowrap shrink-0">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold hidden xl:inline">Open:</span>
+                <span className="shrink-0">{activeTabMeta?.icon}</span>
+                <span className="font-semibold text-xs text-cyan-300 whitespace-nowrap max-w-[130px] sm:max-w-[160px] truncate">
+                  {activeTabMeta?.label}
+                </span>
               </div>
 
-              {/* Menu Bar Handler / Customizer Button (Right-side corner of menu bar) */}
-              <button
-                onClick={() => setShowMenuCustomizer(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-400 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer transition-all shadow-md group shrink-0"
-                title="Menu Settings (Rename, Shift/Move Items, Lock/Unlock)"
-              >
-                <FolderTree className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform" />
-                <span className="hidden sm:inline text-xs font-semibold text-slate-200">Settings</span>
-              </button>
-
-              {/* 48-Hour Ground Search Criteria Dashboard Quick Button */}
-              <button
-                onClick={() => setShowGroundCriteriaModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-950/80 to-blue-950/80 hover:from-cyan-900/80 hover:to-blue-900/80 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 hover:text-white text-xs font-semibold cursor-pointer transition-all shadow-md group shrink-0"
-                title="48-Hour Ground-Level Search Criteria & Sources Dashboard"
-              >
-                <Globe className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform" />
-                <span className="hidden sm:inline text-xs font-semibold text-cyan-200">48h Search</span>
-              </button>
-
-              {/* AI Companion Permanent Memory & Directives Button (100% Free) */}
-              <button
-                onClick={() => setShowCompanionMemoryModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-950/80 to-slate-900/90 hover:from-purple-900/80 hover:to-slate-800 border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white text-xs font-semibold cursor-pointer transition-all shadow-md group shrink-0"
-                title="AI Companion Permanent Memory & Rules Engine (100% Free - 80vh Scroll Law)"
-              >
-                <Brain className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
-                <span className="hidden sm:inline text-xs font-semibold text-purple-200">AI Memory</span>
-              </button>
-
-              {/* Topic Bank Hub Quick Access */}
-              <button
-                onClick={() => setShowTopicBankModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-950/80 to-slate-900/90 hover:from-emerald-900/80 hover:to-slate-800 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 hover:text-white text-xs font-semibold cursor-pointer transition-all shadow-md group shrink-0"
-                title="Topic Bank & Smarter Duplicate Radar"
-              >
-                <Database className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
-                <span className="hidden sm:inline text-xs font-semibold text-emerald-200">Topic Bank</span>
-              </button>
-
-              {/* Scroll To Top Jump Button when Scrolled */}
-              {isScrolled && (
+              {/* Unified Quick Actions Group (Exact same height h-10, rounded-xl, balanced alignment) */}
+              <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-950/60 border border-slate-800/80 shadow-sm shrink-0">
+                {/* Menu Bar Settings */}
                 <button
-                  onClick={scrollToTop}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/30 hover:border-cyan-400 text-cyan-400 hover:text-cyan-300 text-xs font-semibold cursor-pointer transition-all shadow-md group ml-1"
-                  title="Upar Jayein / Header Dekhein"
+                  onClick={() => setShowMenuCustomizer(true)}
+                  className="h-9 px-2.5 sm:px-3 rounded-lg bg-slate-900/80 hover:bg-slate-850 hover:border-slate-700 border border-slate-800/60 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-all shadow-sm group shrink-0"
+                  title="Menu Settings (Rename, Shift/Move Items, Lock/Unlock)"
                 >
-                  <ArrowUp className="w-3.5 h-3.5 group-hover:-translate-y-0.5 transition-transform" />
-                  <span className="hidden sm:inline text-[11px]">Top</span>
+                  <FolderTree className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform shrink-0" />
+                  <span className="hidden sm:inline">Settings</span>
                 </button>
-              )}
+
+                {/* 48-Hour Ground Search Criteria Dashboard */}
+                <button
+                  onClick={() => setShowGroundCriteriaModal(true)}
+                  className="h-9 px-2.5 sm:px-3 rounded-lg bg-slate-900/80 hover:bg-slate-850 hover:border-cyan-500/40 border border-slate-800/60 text-cyan-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-all shadow-sm group shrink-0"
+                  title="48-Hour Ground-Level Search Criteria & Sources Dashboard"
+                >
+                  <Globe className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform shrink-0" />
+                  <span className="hidden sm:inline">48h Search</span>
+                </button>
+
+                {/* AI Companion Memory */}
+                <button
+                  onClick={() => setShowCompanionMemoryModal(true)}
+                  className="h-9 px-2.5 sm:px-3 rounded-lg bg-slate-900/80 hover:bg-slate-850 hover:border-purple-500/40 border border-slate-800/60 text-purple-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-all shadow-sm group shrink-0"
+                  title="AI Companion Permanent Memory & Rules Engine"
+                >
+                  <Brain className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform shrink-0" />
+                  <span className="hidden sm:inline">AI Memory</span>
+                </button>
+
+                {/* Topic Bank */}
+                <button
+                  onClick={() => setShowTopicBankModal(true)}
+                  className="h-9 px-2.5 sm:px-3 rounded-lg bg-slate-900/80 hover:bg-slate-850 hover:border-emerald-500/40 border border-slate-800/60 text-emerald-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-all shadow-sm group shrink-0"
+                  title="Topic Bank & Smarter Duplicate Radar"
+                >
+                  <Database className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+                  <span className="hidden sm:inline">Topic Bank</span>
+                </button>
+
+                {/* Scroll To Top Jump Button */}
+                {isScrolled && (
+                  <button
+                    onClick={scrollToTop}
+                    className="h-9 px-2 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-400 hover:text-cyan-300 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all shadow-sm group shrink-0"
+                    title="Upar Jayein / Header Dekhein"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
+                    <span className="hidden sm:inline text-[11px]">Top</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
