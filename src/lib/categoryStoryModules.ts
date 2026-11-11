@@ -192,6 +192,95 @@ export function getNextSecretsApp(recentTitles: string[] = []): string {
 }
 
 /**
+ * Resolves visual description and camera direction adaptively for tutorial demo & proof scenes.
+ * Adheres strictly to Mode A (screen only) vs Mode B (presenter + screen) and zoom rules.
+ */
+function resolveTutorialDemoVisualAndCamera(params: {
+  sceneNum: number;
+  beatPurpose: string;
+  visual: string;
+  dialogue: string;
+  lightingVariation: string;
+  presenter: string;
+}): { cameraAndLighting: string; sceneVisualAndProps: string } {
+  const combined = `${params.visual} ${params.dialogue}`;
+  const lower = combined.toLowerCase();
+
+  // Mode B: use ONLY for a small item, such as a single shortcut or one key combination.
+  // Rule of thumb: small item = Mode B, software/setting/dialog/multi-step = Mode A.
+  const isComplexOrSoftware = /cleanmgr|compact\.exe|dism\.exe|powercfg|\.exe|terminal|cmd|command line|checkbox|temporary files|update cleanup|thumbnails|tick|dialog|progress|purging|purge|storage sense|settings >|context menu|right click|new folder|folder|guid|explorer|this pc|c-drive|c drive|toggle switch|install|multi|browser|sheet/i.test(combined);
+
+  const shortcutMatch = combined.match(/\b(Win\s*\+\s*[A-Z0-9]|Windows\s*key\s*plus\s*[A-Z0-9]|Ctrl\s*\+\s*[A-Z0-9]|Alt\s*\+\s*[A-Z0-9]|Win\s*plus\s*[A-Z0-9])\b/i);
+
+  if (!isComplexOrSoftware && shortcutMatch) {
+    const shortcutText = shortcutMatch[0];
+    return {
+      cameraAndLighting: `Medium shot of presenter at workstation, stable framing with crisp focal depth. ${params.lightingVariation}. Large readable on-screen shortcut text "${shortcutText}" rendered clearly on studio back wall and floating hologram.`,
+      sceneVisualAndProps: `Mode B (Presenter + Screen): ${params.presenter} stays on screen. The shortcut "${shortcutText}" is shown as large readable text on the back wall above/behind the presenter and on a crisp hologram screen in front of the presenter.`
+    };
+  }
+
+  // Extract command name if present for large on-screen text
+  const cmdMatch = combined.match(/(cleanmgr[^\s,."']+|compact\.exe[^\s,."']+|dism\.exe[^\s,."']+|powercfg[^\s,."']+|[a-z0-9_-]+\.exe[^\s,."']*)/i);
+  const extractedCmd = cmdMatch ? cmdMatch[0] : '';
+
+  // Mode A: camera direction describes actual scene action (Run box zoom, checkbox ticking, progress bar, File Explorer)
+  if (/run box|run dialog|win\s*\+\s*r|win\s*plus\s*r/i.test(lower)) {
+    return {
+      cameraAndLighting: `Screen capture showing full desktop briefly for context, then camera zooms in smoothly to focus tightly on the Run dialog box so it fills the frame and is easy to read. High-contrast focus on text input cursor. ${params.lightingVariation}.`,
+      sceneVisualAndProps: `Mode A (Screen only): Presenter is NOT visible (voiceover only). Full-screen desktop briefly for context, then camera zooms in and focuses on the Run box filling the frame. Visible cursor types "${extractedCmd || 'command'}" with separate large readable on-screen command text.`
+    };
+  }
+
+  if (/checkbox|temporary files|update cleanup|thumbnails|tick|ticking/i.test(lower)) {
+    return {
+      cameraAndLighting: `Macro screen recording executing a tight zoom on the configuration dialog checkbox list. Camera follows the cursor ticking each option in sequence with vibrant highlight focus. ${params.lightingVariation}.`,
+      sceneVisualAndProps: `Mode A (Screen only): Presenter is NOT visible (voiceover only). Configuration dialog filling frame. Visible cursor ticks each required checkbox with clear highlight borders, then clicks OK. One action executed cleanly.`
+    };
+  }
+
+  if (/progress bar|sagerun|purging|purge|cleaning|clean|freeing/i.test(lower)) {
+    return {
+      cameraAndLighting: `High-contrast screen recording focusing directly on the active execution progress bar and system status indicators as the cleanup executes smoothly in real-time. ${params.lightingVariation}.`,
+      sceneVisualAndProps: `Mode A (Screen only): Presenter is NOT visible (voiceover only). Run dialog and active progress bar purging accumulated system cache. Large readable on-screen command text "${extractedCmd || 'Executing cleanup'}" with visible status indicators.`
+    };
+  }
+
+  if (/file explorer|this pc|storage bar|c-drive|c drive|proof|result|before vs after|gb free/i.test(lower)) {
+    return {
+      cameraAndLighting: `Screen capture focused directly on File Explorer and the C-Drive storage capacity bar, tracking the bar as it transitions from red to healthy cyan with large legible freed-capacity readout. ${params.lightingVariation}.`,
+      sceneVisualAndProps: `Mode A (Screen only): Presenter is NOT visible (voiceover only). File Explorer window displaying This PC. Camera zooms in on the C-Drive storage bar showing verified freed capacity and healthy cyan status indicator.`
+    };
+  }
+
+  if (/storage sense|settings >|system > storage|toggle switch/i.test(lower)) {
+    return {
+      cameraAndLighting: `Clean Windows Settings screen capture with smooth cursor tracking. Camera zooms in on the Storage Sense toggle switch and cleanup interval dropdown with crisp focus. ${params.lightingVariation}.`,
+      sceneVisualAndProps: `Mode A (Screen only): Presenter is NOT visible (voiceover only). Windows Settings Storage page. Visible cursor toggles Storage Sense to ON and sets cleanup frequency with clear highlight border.`
+    };
+  }
+
+  if (/terminal|cmd|command prompt|admin/i.test(lower)) {
+    return {
+      cameraAndLighting: `Terminal window zoomed in to fill the frame for maximum legibility. High-contrast focus on text cursor and command input line. ${params.lightingVariation}.`,
+      sceneVisualAndProps: `Mode A (Screen only): Presenter is NOT visible (voiceover only). Windows Terminal interface filling frame. Visible cursor enters "${extractedCmd || 'command'}" with separate large readable on-screen command text.`
+    };
+  }
+
+  if (/folder|context menu|right click|god mode|guid/i.test(lower)) {
+    return {
+      cameraAndLighting: `High-resolution desktop screen recording. Camera zooms in tightly on the context menu and newly created folder icon, focusing sharply as the folder name text field is edited. ${params.lightingVariation}.`,
+      sceneVisualAndProps: `Mode A (Screen only): Presenter is NOT visible (voiceover only). Desktop screencast showing right-click context menu and folder creation. Visible cursor pastes code with large on-screen text overlay.`
+    };
+  }
+
+  return {
+    cameraAndLighting: `Full-screen screen recording with smooth cursor movement tracking the exact action on screen. Camera zooms in on active UI element so it fills the frame and is easy to read. ${params.lightingVariation}.`,
+    sceneVisualAndProps: `Mode A (Screen only): Presenter is NOT visible (voiceover only). Full-screen interface showing the real step clearly with visible cursor and highlight on the item being clicked or configured. Large readable on-screen text for the command.`
+  };
+}
+
+/**
  * Builds a clean, category-specific Flow script for a single scene without any boilerplate.
  * Incorporates camera, lighting_and_set, presenter_action, and hologram from category rules.
  */
@@ -311,20 +400,34 @@ export function buildCategoryFlowScript(params: {
       } else if (isCTA) {
         cameraAndLighting = `Medium eye-level shot at workstation. ${lightingVariation}.`;
         presenterAction = `${tag} (${presenter}) gives confident thumbs-up with next part teaser.`;
-      } else {
-        const cat4CameraShots = [
-          `Over-shoulder angle at Windows 11 desktop. ${lightingVariation}. Smooth glide towards Run dialog.`,
-          `Tight macro zoom on terminal and command input field with magnified text cursor.`,
-          `Focused 15-degree side view of configuration dialog checkboxes being selected in sequence.`,
-          `Full-screen screen recording with smooth cursor movement tracking the execution command.`,
-          `Split before-and-after view of C-Drive storage capacity bar turning from red to cyan.`,
-          `Crisp frontal framing highlighting the taskbar shortcut and quick-launch pinning.`,
-          `Steady macro camera focusing on safe system rollback boundaries and restore points.`,
-          `Wide workstation pullback showing clean desktop and responsive system performance.`
-        ];
-        cameraAndLighting = cat4CameraShots[(sceneNum - 2) % cat4CameraShots.length];
+      } else if (/Demo\s*[1-3]|Proof/i.test(beatPurpose) || (sceneNum >= 4 && sceneNum <= 7)) {
+        const demoPlan = resolveTutorialDemoVisualAndCamera({
+          sceneNum,
+          beatPurpose,
+          visual: sceneVisualAndProps,
+          dialogue,
+          lightingVariation,
+          presenter
+        });
+        cameraAndLighting = demoPlan.cameraAndLighting;
+        sceneVisualAndProps = demoPlan.sceneVisualAndProps;
         presenterAction = `Full-screen Windows walkthrough with authoritative ${tag} voiceover. Clear pace, careful safety guidance.`;
-        sceneVisualAndProps = `Windows Interface: ${sceneVisualAndProps} Live execution shown step-by-step with zero fluff.`;
+      } else if (sceneNum === 2 || /problem/i.test(beatPurpose)) {
+        cameraAndLighting = `Over-shoulder angle at Windows 11 desktop. ${lightingVariation}. Smooth glide towards screen highlighting lag or bottleneck.`;
+        presenterAction = `${tag} (${presenter}) points to system lag with concerned expression.`;
+        sceneVisualAndProps = `Problem & Bottleneck: ${sceneVisualAndProps}`;
+      } else if (sceneNum === 3 || /reveal/i.test(beatPurpose)) {
+        cameraAndLighting = `Dynamic focal transition from workspace to high-contrast desktop reveal. ${lightingVariation}.`;
+        presenterAction = `${tag} (${presenter}) gestures toward the screen with confident reveal posture.`;
+        sceneVisualAndProps = `Reveal: ${sceneVisualAndProps}`;
+      } else if (sceneNum === 8 || /benefit/i.test(beatPurpose)) {
+        cameraAndLighting = `Clean workstation camera framing with responsive performance metrics overlay. ${lightingVariation}.`;
+        presenterAction = `${tag} (${presenter}) smiles with satisfied expression at workstation.`;
+        sceneVisualAndProps = `Benefit & Speedup: ${sceneVisualAndProps}`;
+      } else {
+        cameraAndLighting = `Medium shot at creator desk with glowing shortcut graphic on side. ${lightingVariation}.`;
+        presenterAction = `${tag} (${presenter}) gestures with curiosity toward next trick.`;
+        sceneVisualAndProps = `Curiosity Loop: ${sceneVisualAndProps}`;
       }
       break;
 

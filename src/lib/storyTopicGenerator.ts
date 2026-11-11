@@ -8,6 +8,7 @@
 
 import type { GeneratedStory, StoryScene } from '../components/StoryPackageView';
 import { applyCinematicDirecting } from './cinematicDirector';
+import { buildCategoryFlowScript } from './categoryStoryModules';
 import { applyPhoneticFixes } from './phoneticDictionaryStore';
 import { validateAndRepairDialogue } from './dialogueCompleteness';
 import {
@@ -311,22 +312,22 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
         },
         {
           purpose: 'Demo 1',
-          visual: 'Keyboard pressing Win + X, selecting Terminal Admin, running compact.exe /compactos:always.',
+          visual: 'Mode A (Screen only): Full-screen desktop briefly for context, then camera zooms in and focuses tightly on Terminal Admin window filling the frame. Visible cursor runs compact.exe /compactos:always with large readable on-screen command text.',
           dialogue: 'Step 1: Win plus X daba kar Terminal Admin kholein aur compact.exe slash compactos always enter karein.'
         },
         {
           purpose: 'Demo 2',
-          visual: 'Typing dism.exe /online /cleanup-image /startcomponentcleanup /resetbase into terminal.',
+          visual: 'Mode A (Screen only): Terminal window zoomed in for high legibility. Visible cursor executes dism.exe /online /cleanup-image /startcomponentcleanup /resetbase with large on-screen command banner.',
           dialogue: 'Step 2: DISM cleanup command chalayein jo tamam expire ho chuki update files ko permanently delete karti hai.'
         },
         {
           purpose: 'Demo 3',
-          visual: 'Desktop screen showing powercfg -h off command, instantly wiping dormant hiberfil file.',
+          visual: 'Mode A (Screen only): Terminal zoomed in executing powercfg -h off with large readable on-screen command text, wiping dormant hiberfil file.',
           dialogue: 'Step 3: Desktop users powercfg minus h off dabayein taake unused hibernation ghost file khatam ho jaye.'
         },
         {
           purpose: 'Proof + Result',
-          visual: 'File Explorer refreshing: C-Drive storage bar transforms from warning red to healthy cyan with 35GB free space.',
+          visual: 'Mode A (Screen only): File Explorer window opening to This PC. Camera zooms in on C-Drive storage capacity bar as it turns from red to cyan with 35GB free space.',
           dialogue: 'Nateeja dekhein! C-Drive ka red bar blue ho chuka hai aur 30 GB se zyada clean space ready hai.'
         },
         {
@@ -373,22 +374,22 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
         },
         {
           purpose: 'Demo 1',
-          visual: 'Toggling Storage Sense switch to ON and configuring automatic cleanup intervals.',
+          visual: 'Mode A (Screen only): Windows Settings Storage page. Visible cursor toggles Storage Sense switch to ON and sets cleanup frequency with clear highlight.',
           dialogue: 'Step 1: Storage Sense ko on karein aur cleanup frequency ko Every Week par set karein taake junk auto delete hota rahe.'
         },
         {
           purpose: 'Demo 2',
-          visual: 'Clicking Run Storage Sense Now button, releasing temporary cache.',
+          visual: 'Mode A (Screen only): Screen zooms in on "Run Storage Sense Now" button. Visible cursor clicks the button as active cleanup progress bar frees temporary cache.',
           dialogue: 'Step 2: Ab Run Storage Sense dabayein taake temporary junk files baghair kisi error ke saaf ho jayein.'
         },
         {
           purpose: 'Demo 3',
-          visual: 'Task Manager startup tab: Disabling unnecessary background apps.',
+          visual: 'Mode A (Screen only): Task Manager Startup Apps tab zoomed in for high legibility. Visible cursor highlights and disables unnecessary background apps.',
           dialogue: 'Step 3: Task Manager mein Startup Apps par ja kar faltu software disable karein taake boot time aadha reh jaye.'
         },
         {
           purpose: 'Proof + Result',
-          visual: 'Task Manager disk and CPU drop from 95% down to 3%, green checkmark appears.',
+          visual: 'Mode A (Screen only): Task Manager performance graph. Camera zooms in on disk and CPU usage dropping from 95% to 3% with green verification checkmark.',
           dialogue: 'Nateeja dekhein! System load foran normal ho gaya aur applications bina kisi delay ke instant open ho rahi hain.'
         },
         {
@@ -435,22 +436,22 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
       },
       {
         purpose: 'Demo 1',
-        visual: 'Desktop par right click context menu se New Folder create karna.',
+        visual: 'Mode A (Screen only): Desktop screen with visible cursor right-clicking empty space and selecting New -> Folder from context menu.',
         dialogue: 'Step 1: Desktop par khali jagah right click karein aur aik naya folder banayein.'
       },
       {
         purpose: 'Demo 2',
-        visual: 'Pasting "GodMode.{ED7BA470-8E54-465E-825C-99712043E01C}" into folder name.',
+        visual: 'Mode A (Screen only): Camera zooms in on folder rename field. Visible cursor pastes "GodMode.{ED7BA470-8E54-465E-825C-99712043E01C}" with large readable on-screen text overlay.',
         dialogue: 'Step 2: Folder ka naam rename karke exact GodMode GUID code paste karein jo screen par dikh raha hai.'
       },
       {
         purpose: 'Demo 3',
-        visual: 'Folder opens revealing categorized list of 206 master settings in one window.',
+        visual: 'Mode A (Screen only): Folder window opening and zooming to fill frame, displaying categorized list of 206 master settings with visible cursor scrolling through tools.',
         dialogue: 'Step 3: Enter dabayein aur is folder ko open karein, tamam control panel options aik jagah ready hain.'
       },
       {
         purpose: 'Proof + Result',
-        visual: 'Search bar filtering instant 1-click access to advanced power plan and security toggles.',
+        visual: 'Mode A (Screen only): All 206 control panel applets verified accessible in single folder view without lag or system crashes.',
         dialogue: 'Nateeja dekhein! Yahan Power, Display aur User Accounts ki 200 settings aik click par access ho rahi hain.'
       },
       {
@@ -628,22 +629,22 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
             },
             {
               purpose: 'Demo 1',
-              visual: s1.visualDescription || `Screencast executing ${s1.exactPathOrCommand} in ${tool}.`,
+              visual: s1.visualDescription || `Mode A (Screen only): Screencast executing ${s1.exactPathOrCommand} in ${tool}. Visible cursor highlights the action with large readable on-screen command text.`,
               dialogue: s1.dialogueFocus || `Step 1: ${s1.exactPathOrCommand} open karein jesa screen par dikh raha hai.`
             },
             {
               purpose: 'Demo 2',
-              visual: s2.visualDescription || `Screencast applying ${s2.exactPathOrCommand} with clear cursor highlight.`,
+              visual: s2.visualDescription || `Mode A (Screen only): Screencast applying ${s2.exactPathOrCommand} with clear cursor highlight and large on-screen parameter text.`,
               dialogue: s2.dialogueFocus || `Step 2: ${s2.exactPathOrCommand} configure karein.`
             },
             {
               purpose: 'Demo 3',
-              visual: s3.visualDescription || `Live verification screen executing ${s3.exactPathOrCommand}.`,
+              visual: s3.visualDescription || `Mode A (Screen only): Live screen executing ${s3.exactPathOrCommand} with progress indicators and visible cursor.`,
               dialogue: s3.dialogueFocus || `Step 3: Ab ${s3.actionTitle} run karein aur final settings save karein.`
             },
             {
               purpose: 'Proof + Result',
-              visual: `Live verification screen confirming ${s3.expectedResult}.`,
+              visual: `Mode A (Screen only): Live verification screen confirming ${s3.expectedResult}. Camera zooms in on output readout with large on-screen verification text.`,
               dialogue: `Nateeja dekhein! Screen par verified output ready hai aur har calculation bilkul accurate hai.`
             },
             {
@@ -674,8 +675,18 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     const validated = validateAndRepairDialogue(beat.dialogue, sceneNum, beat.purpose);
     const phoneticDialogue = applyPhoneticFixes(validated.dialogue);
     const words = phoneticDialogue.split(/\s+/).filter(Boolean).length;
-    const rawScript = `${charTag} — anchor studio presentation.\nDialogue (Roman Urdu): "${phoneticDialogue}"\nVisual details: ${beat.visual}`;
-    const directedScript = applyCinematicDirecting(sceneNum, rawScript, undefined, beat.purpose);
+    const flowScript = buildCategoryFlowScript({
+      categoryId: params.categoryId || 1,
+      sceneNum,
+      totalScenes: rawBeats.length,
+      beatPurpose: beat.purpose,
+      visual: beat.visual,
+      dialogue: phoneticDialogue,
+      tag: charTag,
+      presenter,
+      seedTopic: rawTitle,
+    });
+    const directedScript = applyCinematicDirecting(sceneNum, flowScript, undefined, beat.purpose);
 
     return {
       num: sceneNum,

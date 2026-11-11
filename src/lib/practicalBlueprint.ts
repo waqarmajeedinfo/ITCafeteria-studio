@@ -670,7 +670,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         uiLocation: 'Windows Run Dialog / Disk Cleanup Preset Configuration',
         expectedResult: 'Disk Cleanup Settings window opens. Note: this phase only saves your cleanup profile; it does NOT delete any files yet.',
         safetyOrUndo: 'Cancel dialog at any time; no changes are committed until profile is saved',
-        visualDescription: 'Win+R Run box typing the exact cleanmgr /sageset:1 command with clear caption explaining this is configuration phase only.',
+        visualDescription: 'Mode A (Screen only): Desktop shown briefly for context, then camera zooms in on Win+R Run dialog window filling the frame. Visible cursor types "cleanmgr /sageset:1" with large readable on-screen command text.',
         dialogueFocus: 'Step 1: Win plus R dabayein aur cleanmgr /sageset:1 run karein. Yaad rahe yeh sirf settings save karta hai, files delete nahi karta.'
       },
       {
@@ -680,7 +680,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         uiLocation: 'Disk Cleanup Configuration Checkbox List',
         expectedResult: 'Cleanup preset #1 is safely stored in Windows Registry under StateFlags0001',
         safetyOrUndo: 'Checkboxes can be unticked before clicking OK',
-        visualDescription: 'Screencast highlighting Temporary Files, Thumbnails and Windows Update Cleanup checkboxes, clicking OK.',
+        visualDescription: 'Mode A (Screen only): Disk Cleanup settings window with visible cursor ticking Temporary Files, Thumbnails and Windows Update Cleanup checkboxes with clear highlight, then clicking OK.',
         dialogueFocus: 'Step 2: Temporary files aur update cache tick karein aur OK dabayein taake aapka preset profile registry mein save ho jaye.'
       },
       {
@@ -690,7 +690,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         uiLocation: 'Windows Run Dialog / System Process Execution',
         expectedResult: 'Disk Cleanup runs autonomously in background and purges all previously selected junk files',
         safetyOrUndo: 'Progress bar completes automatically; user files in Documents/Desktop remain 100% untouched',
-        visualDescription: 'Run box executing cleanmgr /sagerun:1 with animated progress bar actively purging accumulated system cache.',
+        visualDescription: 'Mode A (Screen only): Run box zoomed in executing "cleanmgr /sagerun:1" with large readable command text, transitioning to animated progress bar actively purging accumulated system cache.',
         dialogueFocus: 'Step 3: Ab asal safai chalane ke liye Win plus R mein cleanmgr /sagerun:1 enter karein. Ab junk files delete hona shuru hongi.'
       },
       {
@@ -700,7 +700,7 @@ function generateDemonstrationSteps(topic: string, tool: string, catId: number):
         uiLocation: 'This PC Storage Drive Bar',
         expectedResult: 'C-Drive storage bar shows freed capacity without rebooting',
         safetyOrUndo: 'Always verify important downloads before running system cleanups',
-        visualDescription: 'Before vs after C-Drive bar comparison showing reclaimed storage capacity.',
+        visualDescription: 'Mode A (Screen only): File Explorer opening to This PC. Camera zooms in on C-Drive storage capacity bar as it transitions from red to healthy cyan with verified freed space.',
         dialogueFocus: 'Step 4: File Explorer open karke check karein, C-Drive ka extra space kamyabi se free ho chuka hai.'
       }
     ];
