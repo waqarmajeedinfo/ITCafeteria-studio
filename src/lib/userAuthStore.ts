@@ -556,8 +556,30 @@ class UserAuthManager {
     return result;
   }
 
-  // Request password reset token via email or username
-  public async requestPasswordReset(identifier: string): Promise<{ ok: boolean; resetToken: string; email: string; message: string }> {
+  // Super Admin: Toggle Active / Inactive Status
+  public async toggleUserActive(targetUsername: string, isActive: boolean): Promise<any> {
+    if (!this.currentToken) throw new Error('Admin authentication token required');
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(targetUsername)}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-token': this.currentToken
+      },
+      body: JSON.stringify({ isActive })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Status update failed');
+    this.logSessionActivity(
+      isActive ? 'User Account Activated' : 'User Account Deactivated',
+      `Super Admin set active status to ${isActive ? 'Active' : 'Inactive'} for @${targetUsername}`,
+      'AUTH',
+      'SUCCESS'
+    );
+    return result;
+  }
+
+  // Request password reset token via email or username (Token dispatched to email only)
+  public async requestPasswordReset(identifier: string): Promise<{ ok: boolean; email: string; message: string; expiresInMinutes?: number }> {
     const res = await fetch('/api/auth/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -565,7 +587,7 @@ class UserAuthManager {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Password reset request failed');
-    this.logSessionActivity('Password Reset Requested', `Reset code generated for ${identifier}`, 'AUTH', 'SUCCESS');
+    this.logSessionActivity('Password Reset Requested', `Reset code dispatched to email for ${identifier}`, 'AUTH', 'SUCCESS');
     return data;
   }
 

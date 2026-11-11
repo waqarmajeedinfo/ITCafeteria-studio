@@ -570,15 +570,15 @@ export function registerMultiUserRoutes(app: Express) {
       const newUser: UserAccount = {
         id: `user-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`,
         username: cleanUsername,
-        displayName: displayName?.trim() || cleanUsername,
+        displayName: cleanUsername, // Display Name is Username itself
         email: email?.trim() || `${cleanUsername}@user.itcafeteria.studio`,
         role: 'standard', // New self-registered users are strictly standard
         salt,
         passwordHash: hashPassword(password, salt),
         createdAt: new Date().toISOString(),
         lastLogin: new Date().toISOString(),
-        isActive: true,
-        isApproved: false, // User Requirement: Must be approved by Admin before login!
+        isActive: false, // Inactive by default until Admin approves!
+        isApproved: false, // Pending Admin Approval by default!
         dedicatedRepoPath: `user-data/${cleanUsername}`,
         permissions: { ...DEFAULT_STANDARD_PERMISSIONS }
       };
@@ -599,6 +599,7 @@ export function registerMultiUserRoutes(app: Express) {
       res.status(201).json({
         ok: true,
         pendingApproval: true,
+        isActive: false,
         message: 'Account kamyabi se ban gaya hai! Admin ki approval ke baad aap login kar sakenge.',
         user: {
           id: newUser.id,
@@ -606,6 +607,7 @@ export function registerMultiUserRoutes(app: Express) {
           displayName: newUser.displayName,
           email: newUser.email,
           role: newUser.role,
+          isActive: false,
           isApproved: false,
           dedicatedRepoPath: newUser.dedicatedRepoPath
         }
@@ -642,24 +644,24 @@ export function registerMultiUserRoutes(app: Express) {
         return res.status(401).json({ error: 'Ghalat username ya password.' });
       }
 
-      if (!user.isActive) {
-        return res.status(403).json({ error: 'Aapka account disabled hai. Admin se rabta karein.' });
-      }
-
-      // User Requirement: Check Admin approval for standard users!
-      if (user.role === 'standard' && user.isApproved === false) {
+      // User Requirement: Check Admin approval and activation for standard users!
+      if (user.role === 'standard' && (user.isApproved === false || !user.isActive)) {
         await logAuditEvent(
           user,
           'LOGIN_BLOCKED_PENDING_APPROVAL',
-          `Standard user @${user.username} login blocked: Account is awaiting Super Admin approval.`,
+          `Standard user @${user.username} login blocked: Account is Inactive or awaiting Super Admin approval.`,
           user.dedicatedRepoPath,
           req.ip || '127.0.0.1'
         );
         return res.status(403).json({
           error: 'Account Pending Admin Approval',
           pendingApproval: true,
-          message: 'Aapka account abhi Admin ki approval ka muntazir hai. Super Admin (Waqar Majeed) ke approve karne ke baad aap login kar sakenge.'
+          message: 'Aapka account filhal Inactive hai aur Admin ki approval ka muntazir hai. Super Admin (Waqar Majeed) ke approve karne ke baad aap sign in kar sakenge.'
         });
+      }
+
+      if (!user.isActive) {
+        return res.status(403).json({ error: 'Aapka account disabled/inactive hai. Admin se rabta karein.' });
       }
 
       user.lastLogin = new Date().toISOString();
@@ -752,23 +754,56 @@ export function registerMultiUserRoutes(app: Express) {
         email: user.email
       });
 
+      // Record email dispatch in simulated outbox log
+      try {
+        const outboxDir = path.join(process.cwd(), 'data', 'logs');
+        if (!fs.existsSync(outboxDir)) {
+          fs.mkdirSync(outboxDir, { recursive: true });
+        }
+        const outboxFile = path.join(outboxDir, 'simulated-email-outbox.json');
+        let outbox: any[] = [];
+        if (fs.existsSync(outboxFile)) {
+          try {
+            outbox = JSON.parse(fs.readFileSync(outboxFile, 'utf8'));
+          } catch {}
+        }
+        outbox.unshift({
+          timestamp: new Date().toISOString(),
+          to: user.email,
+          username: user.username,
+          subject: 'IT Cafeteria Studio - Password Reset Verification Code',
+          resetToken,
+          expiresAt: new Date(expiresAt).toISOString()
+        });
+        if (outbox.length > 100) outbox = outbox.slice(0, 100);
+        fs.writeFileSync(outboxFile, JSON.stringify(outbox, null, 2), 'utf8');
+      } catch (err) {
+        console.warn('[Auth] Could not write to email outbox log:', err);
+      }
+
       await logAuditEvent(
         user,
         'PASSWORD_RESET_REQUESTED',
-        `Password reset requested for @${user.username} (${user.email}). Reset token: ${resetToken}`,
+        `Password reset requested for @${user.username} (${user.email}). Verification code dispatched to email.`,
         user.dedicatedRepoPath,
         req.ip || '127.0.0.1'
       );
 
-      console.info(`[Auth] Password reset token for ${user.username} (${user.email}): ${resetToken}`);
+      console.info(`[Auth] Password reset email dispatched for @${user.username} (${user.email}). Token: ${resetToken}`);
 
+      // Mask email for user privacy (e.g., noo***@domain.com)
+      const emailParts = (user.email || '').split('@');
+      const maskedEmail = emailParts.length === 2
+        ? `${emailParts[0].slice(0, Math.min(3, emailParts[0].length))}***@${emailParts[1]}`
+        : user.email;
+
+      // STRICT SECURITY: Do NOT return resetToken in client JSON payload.
+      // User must retrieve the token from their email inbox!
       res.json({
         ok: true,
-        resetToken,
-        email: user.email,
-        username: user.username,
+        email: maskedEmail,
         expiresInMinutes: 15,
-        message: `Password reset token generated successfully. Code: ${resetToken}`
+        message: `8-character password recovery code aapke registered email (${maskedEmail}) par bhej diya gaya hai. Meharbani farma kar apna email check karein aur verification code yahan enter karein.`
       });
     } catch (e: any) {
       res.status(500).json({ error: 'Forgot password request failed', details: e?.message });
@@ -952,7 +987,7 @@ export function registerMultiUserRoutes(app: Express) {
     res.json({ ok: true, users: list });
   });
 
-  // 7a. ADMIN ONLY: Approve or Reject Standard User Account
+  // 7a. ADMIN ONLY: Approve or Reject Standard User Account (Super Admin Waqar Majeed authority)
   app.put('/api/admin/users/:username/approval', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
     try {
       const adminActor = (req as any).user as UserAccount;
@@ -964,24 +999,66 @@ export function registerMultiUserRoutes(app: Express) {
       }
 
       const { isApproved } = req.body;
-      user.isApproved = Boolean(isApproved);
+      const approvalBool = Boolean(isApproved);
+      user.isApproved = approvalBool;
+      // Approving activates the account; unapproving deactivates the account
+      user.isActive = approvalBool;
       saveUsersRegistry();
 
       await logAuditEvent(
         adminActor,
         user.isApproved ? 'USER_APPROVED' : 'USER_UNAPPROVED',
-        `Super Admin Waqar Majeed set approval status to ${user.isApproved} for @${user.username}`,
+        `Super Admin Waqar Majeed set approval status to ${user.isApproved} (isActive=${user.isActive}) for @${user.username}`,
         user.dedicatedRepoPath,
         req.ip || '127.0.0.1'
       );
 
       res.json({
         ok: true,
-        message: `User @${user.username} ka status "${user.isApproved ? 'Approved (Manzoor Shuda)' : 'Pending Approval'}" ho gaya.`,
-        isApproved: user.isApproved
+        message: `User @${user.username} ka status "${user.isApproved ? 'Approved & Active (Manzoor Shuda)' : 'Pending Approval & Inactive'}" ho gaya.`,
+        isApproved: user.isApproved,
+        isActive: user.isActive
       });
     } catch (e: any) {
       res.status(500).json({ error: 'Approval update failed', details: e?.message });
+    }
+  });
+
+  // 7a-2. ADMIN ONLY: Toggle User Active / Inactive Status
+  app.put('/api/admin/users/:username/status', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const adminActor = (req as any).user as UserAccount;
+      const targetUsername = req.params.username.toLowerCase();
+      const user = usersRegistry.find((u) => u.username === targetUsername);
+
+      if (!user) {
+        return res.status(404).json({ error: 'User nahi mila.' });
+      }
+
+      if (user.role === 'admin' && user.username === 'waqarmajeed') {
+        return res.status(400).json({ error: 'Super Admin Waqar Majeed account ko deactivate nahi kiya ja sakta.' });
+      }
+
+      const { isActive } = req.body;
+      user.isActive = Boolean(isActive);
+      saveUsersRegistry();
+
+      await logAuditEvent(
+        adminActor,
+        user.isActive ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+        `Super Admin Waqar Majeed set active status to ${user.isActive} for @${user.username}`,
+        user.dedicatedRepoPath,
+        req.ip || '127.0.0.1'
+      );
+
+      res.json({
+        ok: true,
+        message: `User @${user.username} ab "${user.isActive ? 'Active' : 'Inactive'}" hai.`,
+        isActive: user.isActive,
+        isApproved: user.isApproved
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: 'Status update failed', details: e?.message });
     }
   });
 

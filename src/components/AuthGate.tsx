@@ -28,7 +28,6 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT'>('LOGIN');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
 
   // Forgot Password interactive flow state
@@ -37,11 +36,16 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
   const [resetTokenInput, setResetTokenInput] = useState('');
   const [newPasswordInput, setNewPasswordInput] = useState('');
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
-  const [generatedResetToken, setGeneratedResetToken] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Awaiting Admin Approval state after registration
+  const [awaitingApproval, setAwaitingApproval] = useState<{
+    username: string;
+    email: string;
+  } | null>(null);
 
   // Email Verification Flow State
   const [pendingVerification, setPendingVerification] = useState<{
@@ -70,14 +74,21 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
           setIsLoading(false);
           return;
         }
+        const cleanUser = username.trim().toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '');
+        if (cleanUser.length < 3) {
+          setError('Username must be at least 3 characters.');
+          setIsLoading(false);
+          return;
+        }
+        // Unified: Display Name is the Username itself
         setPendingVerification({
-          username,
-          displayName: displayName || username,
-          email,
+          username: cleanUser,
+          displayName: cleanUser,
+          email: email.trim(),
           password,
           isVerified: false
         });
-        setSuccess(`Verification email sent to ${email}. Please confirm to activate your account.`);
+        setSuccess(`Verification email sent to ${email.trim()}. Please confirm your email below.`);
       }
     } catch (err: any) {
       setError(err?.message || 'Authentication error. Please check your credentials.');
@@ -98,10 +109,10 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
 
     try {
       const res = await userAuthManager.requestPasswordReset(forgotIdentifier.trim());
-      setGeneratedResetToken(res.resetToken);
-      setResetTokenInput(res.resetToken);
+      // STRICT REQUIREMENT: Token is sent to email only. Never auto-fill on screen!
+      setResetTokenInput('');
       setForgotStep('RESET');
-      setSuccess(`Secure reset code generated! Code: ${res.resetToken} (Notification dispatched to ${res.email})`);
+      setSuccess(`8-character verification reset code aapke registered email (${res.email}) par send kar diya gaya hai. Meharbani farma kar apna email check karein aur code yahan enter karein.`);
     } catch (err: any) {
       setError(err?.message || 'Could not find an account with that username or email.');
     } finally {
@@ -112,7 +123,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
   const handleConfirmPasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resetTokenInput.trim()) {
-      setError('Reset token is required.');
+      setError('Reset token is required. Please check your email and enter the 8-character code.');
       return;
     }
     if (newPasswordInput.length < 6) {
@@ -145,21 +156,21 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
     setError(null);
 
     try {
-      const res = await userAuthManager.register(
+      await userAuthManager.register(
         pendingVerification.username,
         pendingVerification.password,
         pendingVerification.displayName,
         pendingVerification.email
       );
+      const registeredUser = pendingVerification.username;
+      const registeredEmail = pendingVerification.email;
       setPendingVerification(null);
-      // If user requires Admin approval, show clear instructions
-      if ((res as any)?.isApproved === false || !userAuthManager.getUser()) {
-        setSuccess(`Account kamyabi se register ho gaya hai! Super Admin (Waqar Majeed) ki approval ke baad aap login kar sakenge.`);
-        setMode('LOGIN');
-      } else {
-        setSuccess(`Account registered successfully! Welcome to IT Cafeteria Studio.`);
-        setTimeout(() => onAuthenticated(res), 400);
-      }
+      // New users start as Inactive & Pending Admin Approval
+      setAwaitingApproval({
+        username: registeredUser,
+        email: registeredEmail
+      });
+      setSuccess(`Account kamyabi se ban gaya hai! Filhal Inactive hai aur Super Admin (Waqar Majeed) ki approval ka muntazir hai.`);
     } catch (err: any) {
       setError(err?.message || 'Registration error. Please check your details.');
     } finally {
@@ -236,9 +247,17 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
 
           {/* Feedback Toasts */}
           {error && (
-            <div className="p-3 bg-rose-950/80 border border-rose-500/50 rounded-xl text-rose-200 text-xs flex items-center gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>{error}</span>
+            <div className={`p-3 rounded-xl text-xs flex items-center gap-2.5 animate-in fade-in ${
+              error.includes('Admin ki approval') || error.includes('Inactive')
+                ? 'bg-amber-950/90 border border-amber-500/50 text-amber-200'
+                : 'bg-rose-950/80 border border-rose-500/50 text-rose-200'
+            }`}>
+              {error.includes('Admin ki approval') || error.includes('Inactive') ? (
+                <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              )}
+              <span className="leading-snug">{error}</span>
             </div>
           )}
 
@@ -249,15 +268,52 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
             </div>
           )}
 
-          {/* Pending Verification Flow */}
-          {pendingVerification ? (
+          {/* Awaiting Admin Approval View */}
+          {awaitingApproval ? (
+            <div className="p-5 bg-amber-950/30 border border-amber-500/40 rounded-2xl space-y-4 text-center animate-in fade-in duration-300">
+              <div className="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mx-auto text-amber-400">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">
+                  Account Created — Pending Admin Approval
+                </h3>
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Status: Inactive / Pending Approval
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed max-w-xs mx-auto">
+                Shukriya <strong className="text-white font-mono">@{awaitingApproval.username}</strong>! Aapka account ban chuka hai lekin filhal <strong>Inactive</strong> hai.
+                <br /><br />
+                Super Admin <strong className="text-amber-300">Waqar Majeed</strong> ke account approve aur activate karne ke baad aap apne Username aur Password se Sign In kar sakenge.
+              </p>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAwaitingApproval(null);
+                    setMode('LOGIN');
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="w-full py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Go to Sign In Screen</span>
+                </button>
+              </div>
+            </div>
+          ) : pendingVerification ? (
             <div className="p-4 bg-cyan-950/60 border border-cyan-500/50 rounded-xl space-y-3.5 animate-in fade-in duration-300">
               <div className="flex items-center gap-2 text-cyan-300 font-bold text-xs">
                 <Mail className="w-4 h-4 text-cyan-400 animate-pulse" />
                 <span>Verify Your Email Address</span>
               </div>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Registration details confirmed for <strong className="text-white font-mono">{pendingVerification.email}</strong>. Click below to verify and directly enter the studio.
+                Registration details confirmed for <strong className="text-white font-mono">{pendingVerification.email}</strong>. Click below to verify and complete account registration.
               </p>
 
               <div className="space-y-2 pt-1">
@@ -270,12 +326,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                   {isCheckingVerification ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin text-white" />
-                      <span>Activating Account...</span>
+                      <span>Saving Account...</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>Confirm Verification &amp; Enter Studio</span>
+                      <span>Confirm Verification &amp; Submit Account</span>
                     </>
                   )}
                 </button>
@@ -307,8 +363,8 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                 </h3>
                 <p className="text-[11px] text-slate-400">
                   {forgotStep === 'REQUEST'
-                    ? 'Enter your registered username or email to generate an instant reset token.'
-                    : 'Enter the reset code and your new password to restore account access immediately.'}
+                    ? 'Enter your registered username or email to send a reset verification code.'
+                    : 'Check your email inbox, enter the 8-character reset code, and set your new password.'}
                 </p>
               </div>
 
@@ -341,12 +397,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                       {isLoading ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin text-white" />
-                          <span>Generating Secure Token...</span>
+                          <span>Dispatching Code to Email...</span>
                         </>
                       ) : (
                         <>
                           <KeyRound className="w-4 h-4" />
-                          <span>Generate Reset Token &amp; Notify Email</span>
+                          <span>Send Reset Code to Email</span>
                         </>
                       )}
                     </button>
@@ -366,18 +422,15 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                 </form>
               ) : (
                 <form onSubmit={handleConfirmPasswordReset} className="space-y-3.5">
-                  {generatedResetToken && (
-                    <div className="p-3 bg-cyan-950/70 border border-cyan-500/40 rounded-xl space-y-1">
-                      <div className="text-[10px] text-cyan-300 font-semibold uppercase tracking-wider flex items-center justify-between">
-                        <span>Instant On-Screen Reset Token</span>
-                        <span className="text-[9px] text-emerald-400 font-mono">Active (15m)</span>
-                      </div>
-                      <div className="font-mono text-sm font-bold text-white tracking-widest bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center justify-between">
-                        <span className="text-cyan-300">{generatedResetToken}</span>
-                        <span className="text-[10px] text-slate-400 font-sans font-normal">Auto-applied</span>
-                      </div>
+                  <div className="p-3.5 bg-cyan-950/40 border border-cyan-500/30 rounded-xl space-y-1.5 text-xs">
+                    <div className="flex items-center gap-2 text-cyan-300 font-semibold">
+                      <Mail className="w-4 h-4 text-cyan-400" />
+                      <span>Verification Code Dispatched to Email</span>
                     </div>
-                  )}
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Humne 8-character verification reset code aapke registered email par send kar diya hai. Meharbani farma kar apna email inbox/spam folder check karein, code copy karein aur neeche paste karein.
+                    </p>
+                  </div>
 
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-300 mb-1">
@@ -386,11 +439,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="e.g. A1B2C3D4"
+                        placeholder="e.g. Enter 8-character code from email"
                         value={resetTokenInput}
                         onChange={(e) => setResetTokenInput(e.target.value.toUpperCase())}
                         className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono tracking-wider focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
                         required
+                        autoFocus
                       />
                       <KeyRound className="w-4 h-4 text-cyan-400 absolute left-3 top-3 pointer-events-none" />
                     </div>
@@ -468,7 +522,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
             <form onSubmit={handleSubmit} className="space-y-3.5 animate-in fade-in duration-300">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  Username
+                  Username {mode === 'SIGNUP' && <span className="text-slate-400 font-normal">(Yeh hi aapka Display Name hoga)</span>}
                 </label>
                 <div className="relative">
                   <input
@@ -484,37 +538,22 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
               </div>
 
               {mode === 'SIGNUP' && (
-                <>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                      Display Name
-                    </label>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                    Email Address (Verification Required)
+                  </label>
+                  <div className="relative">
                     <input
-                      type="text"
-                      placeholder="e.g. Creator Full Name"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 transition-colors"
+                      type="email"
+                      placeholder="e.g. creator@domain.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
+                      required
                     />
+                    <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
                   </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                      Email Address (Verification Required)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="email"
-                        placeholder="e.g. creator@domain.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400 pl-9 transition-colors"
-                        required
-                      />
-                      <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3 pointer-events-none" />
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
 
               <div>

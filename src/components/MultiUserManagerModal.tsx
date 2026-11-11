@@ -536,6 +536,21 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
     }
   };
 
+  const handleAdminToggleActive = async (targetUsername: string, currentActiveStatus: boolean) => {
+    setIsLoading(true);
+    setAuthError(null);
+    try {
+      await userAuthManager.toggleUserActive(targetUsername, !currentActiveStatus);
+      setAuthSuccess(`@${targetUsername} status set to ${!currentActiveStatus ? 'Active' : 'Inactive'}!`);
+      const res = await userAuthManager.fetchAdminUsers();
+      if (res?.users) setAdminUsers(res.users);
+    } catch (err: any) {
+      setAuthError(err?.message || 'Status change karne mein error aaya');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   const handleAdminSavePermissions = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1188,7 +1203,7 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                                   : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
                               }`}>
-                                {u.isActive !== false ? 'Active' : 'Suspended'}
+                                {u.isActive !== false ? 'Active' : 'Inactive'}
                               </span>
 
                               {/* Admin Approval Status Badge */}
@@ -1210,19 +1225,35 @@ export const MultiUserManagerModal: React.FC<MultiUserManagerModalProps> = ({ is
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {/* Admin Account Approval Action */}
                             {!isSuperAdminAccount && (
-                              <button
-                                type="button"
-                                onClick={() => handleAdminToggleApproval(u.username, u.isApproved !== false)}
-                                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-colors ${
-                                  u.isApproved !== false
-                                    ? 'bg-amber-950/60 border-amber-500/40 hover:bg-amber-900/60 text-amber-300'
-                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950'
-                                }`}
-                                title={u.isApproved !== false ? 'Account ko pending status par set karein' : 'Naye user ko approve karein taake woh login kar sake'}
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>{u.isApproved !== false ? 'Revoke Approval' : 'Approve User'}</span>
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAdminToggleApproval(u.username, u.isApproved !== false)}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-colors ${
+                                    u.isApproved !== false
+                                      ? 'bg-amber-950/60 border-amber-500/40 hover:bg-amber-900/60 text-amber-300'
+                                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950'
+                                  }`}
+                                  title={u.isApproved !== false ? 'Account ko pending status par set karein' : 'Naye user ko approve karein taake woh login kar sake'}
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>{u.isApproved !== false ? 'Revoke Approval' : 'Approve User'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleAdminToggleActive(u.username, u.isActive !== false)}
+                                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${
+                                    u.isActive !== false
+                                      ? 'bg-slate-800 border-slate-700 hover:bg-rose-950/40 hover:border-rose-500/40 text-slate-300 hover:text-rose-300'
+                                      : 'bg-emerald-950/60 border-emerald-500/40 hover:bg-emerald-900/60 text-emerald-300'
+                                  }`}
+                                  title={u.isActive !== false ? 'Account ko Inactive karein' : 'Account ko Active karein'}
+                                >
+                                  {u.isActive !== false ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                                  <span>{u.isActive !== false ? 'Deactivate' : 'Activate'}</span>
+                                </button>
+                              </>
                             )}
 
                             <button
