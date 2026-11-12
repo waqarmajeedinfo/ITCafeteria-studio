@@ -2282,12 +2282,20 @@ Return STRICT valid JSON only, no markdown fences:
             ? 'Warm approachable eye-level medium shot. Friendly direct eye contact with camera, smooth pull-out with floating animated subscribe bell icon.'
             : 'Dynamic tracking camera with eye-level perspective, 3/4 angle, balanced 5600K studio fill light, high-end visual tech demonstration.';
 
+          const effectiveTag = tag && tag.startsWith('@') ? tag : `@${tag || 'WM25-1'}`;
+          const continuityLock = `CONTINUITY LOCK: Use the character selected in Flow for tag ${effectiveTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
+
           script = `[DIRECTOR CAMERA & LIGHTING]: ${cameraDir} Duration: 10s.
 [SCENE VISUAL & PROPS]: ${visual}
-[PRESENTER & ACTION]: ${tag} (${presenter}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence.
+[PRESENTER & ACTION]: ${tag} (${presenter}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence. ${continuityLock}
 DIALOGUE: "${dialogue}"`;
         } else {
           script = applyPhoneticFixes(script);
+          if (!script.includes('CONTINUITY LOCK:')) {
+            const effectiveTag = tag && tag.startsWith('@') ? tag : `@${tag || 'WM25-1'}`;
+            const lockText = `CONTINUITY LOCK: Use the character selected in Flow for tag ${effectiveTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
+            script = script.replace(/(\[PRESENTER & ACTION\]:[\s\S]*?)(?=\nDIALOGUE:|\n\[|$)/i, (m) => `${m.trimEnd()} ${lockText}`);
+          }
         }
         const computedWords = dialogue ? dialogue.split(/\s+/).filter(Boolean).length : 0;
         return {
@@ -2434,7 +2442,7 @@ Task:
 3. Each scene's "script" MUST be a master cinematic Google Flow prompt with 4 parts:
    [DIRECTOR CAMERA & LIGHTING]: Detailed camera direction (dynamic zoom-in, 15-degree side angle, 3/4 isometric screencast, or snap-zoom), 9:16 vertical 4K setup, cyber dark studio lighting with neon cyan and amber rim lights.
    [SCENE VISUAL & PROPS]: Detailed visual action with props (3D holographic elements, glowing UI, physical props).
-   [PRESENTER & ACTION]: ${story.characterTag || '@WM25-1'} (${story.presenter || 'Waqar Majeed'}) in studio with natural hand gestures and conversational tech cadence.
+   [PRESENTER & ACTION]: ${story.characterTag || '@WM25-1'} (${story.presenter || 'Waqar Majeed'}) in studio with natural hand gestures and conversational tech cadence. CONTINUITY LOCK: Use the character selected in Flow for tag ${story.characterTag || '@WM25-1'} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.
    DIALOGUE: "<exact dialogue in double quotes>"
 4. Update title, hook, description, and thumbnail if improved by directives.
 
@@ -2490,12 +2498,19 @@ Return STRICT valid JSON only with NO markdown fences:
       const visual = safeString(scene.visual);
       let script = safeString(scene.script);
       if (!script.includes('[DIRECTOR') || !script.includes('DIALOGUE:')) {
+        const charTag = story.characterTag || '@WM25-1';
+        const continuityLock = `CONTINUITY LOCK: Use the character selected in Flow for tag ${charTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
         script = `[DIRECTOR CAMERA & LIGHTING]: Master Cinematic 9:16 vertical 4K direction. Dynamic camera angle with dramatic zoom and neon cyan-amber cyber studio rim lights. Duration: 10s.
 [SCENE VISUAL & PROPS]: ${visual}
-[PRESENTER & ACTION]: ${story.characterTag || '@WM25-1'} (${story.presenter || 'Waqar Majeed'}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence.
+[PRESENTER & ACTION]: ${charTag} (${story.presenter || 'Waqar Majeed'}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence. ${continuityLock}
 DIALOGUE: "${dialogue}"`;
       } else {
         script = applyPhoneticFixes(script);
+        if (!script.includes('CONTINUITY LOCK:')) {
+          const charTag = story.characterTag || '@WM25-1';
+          const lockText = `CONTINUITY LOCK: Use the character selected in Flow for tag ${charTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
+          script = script.replace(/(\[PRESENTER & ACTION\]:[\s\S]*?)(?=\nDIALOGUE:|\n\[|$)/i, (m) => `${m.trimEnd()} ${lockText}`);
+        }
       }
       return {
         num: index + 1,

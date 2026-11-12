@@ -33,7 +33,17 @@
       "Tags (about 500 characters)",
       "TikTok title + hashtags",
       "Thumbnail prompt as text"
-    ]
+    ],
+    "continuity_lock_rules": {
+      "fixed_line_format": "CONTINUITY LOCK: Use the character selected in Flow for tag @WM25-X exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.",
+      "placement": "Appended to [PRESENTER & ACTION] block in every scene's Flow script without modifying existing presenter text",
+      "rule_1_tag": "@WM25-X must be the actual selected character tag of that story (e.g. @WM25-5 or @WM25-1). Never mix tags inside one story.",
+      "rule_2_locked_elements": "The three locked elements are: (a) studio look, (b) character face and wardrobe, (c) character voice. These must never change from scene to scene.",
+      "rule_3_scene_visual_props": "Story-based variation is allowed ONLY inside the [SCENE VISUAL & PROPS] block, and only as a change of environment inside the same studio, for example: show the demonstration on the back wall, on the left wall, on a hologram screen in front of the presenter, or change props on the desk. The room itself, its style and lighting must stay the same.",
+      "rule_4_director_camera_lighting": "The [DIRECTOR CAMERA & LIGHTING] block must not describe a different room or a different lighting setup than the locked studio. Camera angle and movement may vary, the studio look may not.",
+      "rule_5_mode_a_voice": "Mode A (screen-only) scenes: keep the same voice-over character voice. No new voice.",
+      "rule_6_preservation": "Do NOT edit or rename the Presenter block itself. Only append the CONTINUITY LOCK line."
+    }
   },
   "anti_repetition": {
     "visual_signature_fields": [

@@ -10,6 +10,7 @@ import type { StoryScene, GeneratedStory } from '../components/StoryPackageView'
 import {
   buildCategoryFlowScript,
   getCategoryModule,
+  getContinuityLockText,
   processAndEnforceCategoryStory,
   resolveEffectiveCategory
 } from './categoryStoryModules';
@@ -81,10 +82,21 @@ export function ensureFlowCinematicScript(
   const stripped = stripLegacyBoilerplate(scene.script || '');
 
   if (isAlreadyCinematicFlowScript(stripped)) {
-    const normalizedScript = stripped
+    let normalizedScript = stripped
       .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
       .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+
+    const rawTag = (context.characterTag || '@WM25-1').trim();
+    const effectiveTag = rawTag.startsWith('@') ? rawTag : `@${rawTag}`;
+    const continuityLock = getContinuityLockText(effectiveTag);
+
+    if (!normalizedScript.includes('CONTINUITY LOCK:')) {
+      normalizedScript = normalizedScript.replace(
+        /(\[PRESENTER & ACTION\]:[\s\S]*?)(?=\nDIALOGUE:|\n\[|$)/i,
+        (match) => `${match.trimEnd()} ${continuityLock}`
+      );
+    }
 
     return {
       ...scene,

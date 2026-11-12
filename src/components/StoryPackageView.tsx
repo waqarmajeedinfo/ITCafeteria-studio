@@ -26,6 +26,7 @@ import {
 import { resolveThumbnailSpec } from '../lib/thumbnailMaster';
 import { StoryThumbnailPanel } from './StoryThumbnailPanel';
 import { applyCinematicDirecting } from '../lib/cinematicDirector';
+import { getContinuityLockText } from '../lib/categoryStoryModules';
 import {
   upsertPendingStoryRecord,
   deletePendingStoryRecord,
@@ -218,7 +219,16 @@ export function buildStoryPackageText(rawStory: GeneratedStory): string {
     // Enforce strictly 0-10s duration and @tag
     directedScript = (directedScript || '')
       .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
+      .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+
+    if (!directedScript.includes('CONTINUITY LOCK:')) {
+      const lockText = getContinuityLockText(normTag);
+      directedScript = directedScript.replace(
+        /(\[PRESENTER & ACTION\]:[\s\S]*?)(?=\nDIALOGUE:|\n\[|$)/i,
+        (m) => `${m.trimEnd()} ${lockText}`
+      );
+    }
 
     const sceneStart = (scene.num - 1) * 10;
     const sceneEnd = scene.num * 10;
@@ -276,7 +286,16 @@ export function buildScenesOnlyText(rawStory: GeneratedStory): string {
     let directedScript = applyCinematicDirecting(scene.num, scene.script, story.customCinematicDirection, scene.purpose);
     directedScript = (directedScript || '')
       .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
+      .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+
+    if (!directedScript.includes('CONTINUITY LOCK:')) {
+      const lockText = getContinuityLockText(normTag);
+      directedScript = directedScript.replace(
+        /(\[PRESENTER & ACTION\]:[\s\S]*?)(?=\nDIALOGUE:|\n\[|$)/i,
+        (m) => `${m.trimEnd()} ${lockText}`
+      );
+    }
 
     const sceneStart = (scene.num - 1) * 10;
     const sceneEnd = scene.num * 10;
@@ -457,6 +476,15 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
       .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
       .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
 
+    const normTag = formatCharacterTag(story.characterTag);
+    if (!directed.includes('CONTINUITY LOCK:')) {
+      const lockText = getContinuityLockText(normTag);
+      directed = directed.replace(
+        /(\[PRESENTER & ACTION\]:[\s\S]*?)(?=\nDIALOGUE:|\n\[|$)/i,
+        (m) => `${m.trimEnd()} ${lockText}`
+      );
+    }
+
     navigator.clipboard.writeText(directed);
     setCopiedScene(scene.num);
     setTimeout(() => setCopiedScene(null), 2000);
@@ -471,7 +499,16 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
     let s = scene.script;
     if (s) {
       s = s.replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1');
+      s = s.replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1');
       s = s.replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+      const normTag = formatCharacterTag(story.characterTag);
+      if (!s.includes('CONTINUITY LOCK:')) {
+        const lockText = getContinuityLockText(normTag);
+        s = s.replace(
+          /(\[PRESENTER & ACTION\]:[\s\S]*?)(?=\nDIALOGUE:|\n\[|$)/i,
+          (m) => `${m.trimEnd()} ${lockText}`
+        );
+      }
     }
     setSceneEditScript(s);
   };
@@ -871,6 +908,15 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
             .replace(/\[PRESENTER & ACTION\]:\s*WM25-(\d+)/g, '[PRESENTER & ACTION]: @WM25-$1')
             .replace(/\[PRESENTER & ACTION\]:\s*MZ22-(\d)/g, '[PRESENTER & ACTION]: @MZ22-$1')
             .replace(/Duration:\s*[\d\w\s-]+[.]/i, 'Duration: 0-10s.');
+
+          const normTag = formatCharacterTag(story.characterTag);
+          if (!directedScript.includes('CONTINUITY LOCK:')) {
+            const lockText = getContinuityLockText(normTag);
+            directedScript = directedScript.replace(
+              /(\[PRESENTER & ACTION\]:[\s\S]*?)(?=\nDIALOGUE:|\n\[|$)/i,
+              (m) => `${m.trimEnd()} ${lockText}`
+            );
+          }
 
           return (
             <div

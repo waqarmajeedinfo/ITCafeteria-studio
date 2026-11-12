@@ -46,6 +46,23 @@ export interface GlobalStoryRules {
   free_first: string;
   ai_disclosure: string;
   upload_package_after_final_scene: string[];
+  continuity_lock_rules?: Record<string, any>;
+}
+
+/**
+ * Returns the exact fixed CONTINUITY LOCK prompt text for the selected character tag.
+ */
+export function getContinuityLockText(characterTag?: string): string {
+  const rawTag = (characterTag || '@WM25-1').trim();
+  const effectiveTag = rawTag.startsWith('@') ? rawTag : `@${rawTag}`;
+  return `CONTINUITY LOCK: Use the character selected in Flow for tag ${effectiveTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
+}
+
+export function appendContinuityLockToPresenterAction(presenterAction: string, characterTag?: string): string {
+  if (!presenterAction) return '';
+  if (presenterAction.includes('CONTINUITY LOCK:')) return presenterAction;
+  const lock = getContinuityLockText(characterTag);
+  return `${presenterAction.trim()} ${lock}`;
 }
 
 export interface VisualSignature {
@@ -479,10 +496,17 @@ export function buildCategoryFlowScript(params: {
       break;
   }
 
-  // Final assembly - STRICTLY compliant with Google Flow format, NO old boilerplate sentence
+  // Final assembly - STRICTLY compliant with Google Flow format with CONTINUITY LOCK
+  const rawTag = (tag || '@WM25-1').trim();
+  const effectiveTag = rawTag.startsWith('@') ? rawTag : `@${rawTag}`;
+  const continuityLock = getContinuityLockText(effectiveTag);
+  const fullPresenterAction = presenterAction.includes('CONTINUITY LOCK:')
+    ? presenterAction
+    : `${presenterAction.trim()} ${continuityLock}`;
+
   return `[DIRECTOR CAMERA & LIGHTING]: ${cameraAndLighting} Duration: 0-10s.
 [SCENE VISUAL & PROPS]: ${sceneVisualAndProps}
-[PRESENTER & ACTION]: ${presenterAction}
+[PRESENTER & ACTION]: ${fullPresenterAction}
 DIALOGUE: "${dialogue.trim()}"`;
 }
 

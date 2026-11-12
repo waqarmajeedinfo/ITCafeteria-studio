@@ -249,7 +249,7 @@ var CHANNEL_PROFILES = {
       },
       4: {
         title: "PC & Windows Hacks Rule",
-        instructions: "IT Cafeteria Script Rule (Cat 4 \u2014 Windows & PC Hacks): Ongoing part-by-part series (Part 1, Part 2...) for Windows optimization, troubleshooting & command-line tricks. Structure: 1) Shocking PC lag/error hook with Part number (0-10s), 2) Root cause of why Windows slows down/breaks, 3) Hidden tool/setting or PowerShell/CMD trick reveal, 4) Step 1 exact command or hotkey (Win+R, Win+V, CMD), 5) Step 2 verification, 6) Instant benchmark test & RAM/CPU drop proof, 7) Safety disclaimer & restore point tip, 8) Advanced power-user tweak, 9) Part summary & next episode teaser, 10) Subscribe for daily PC hacks CTA. 9:16 high-contrast desktop screencast with zoomed cursor keys and Waqar Majeed cutaways.",
+        instructions: "IT Cafeteria Script Rule (Cat 4 \u2014 Windows & PC Hacks): Standalone complete-in-one-video tutorial. Structure: 1) Hook (0-10s), 2) Problem + Agitate (show problem, last line shows cost of ignoring it), 3) Reveal, 4) Demo 1 (Step 1 exact action), 5) Demo 2 (Step 2 exact action), 6) Demo 3 (Step 3 exact action), 7) Proof + Result, 8) Benefit, 9) Curiosity Loop, 10) Conclusion + Save CTA. Never promise next part or episode. 9:16 desktop screencast with zoomed cursor keys.",
         defaultRatio: "9:16"
       },
       5: {
@@ -638,7 +638,7 @@ function buildPracticalBlueprint(params) {
         uiLocation: `${toolName || "Tool"} Dashboard & Practice Workspace`,
         expectedResult: "Confidence in core operations without spending money upfront",
         visualDescription: `Clean modern workspace showing ${toolName} interface with free tier indicator active.`,
-        dialogueFocus: `Pehla step: Kisi paid course par paisa zaya mat karein. Is free tool par 2 din practice karke core skill samjhein.`
+        dialogueFocus: `Step 1: Kisi paid course par paisa zaya mat karein. Is free tool par 2 din practice karke core skill samjhein.`
       },
       {
         stepNumber: 2,
@@ -647,7 +647,7 @@ function buildPracticalBlueprint(params) {
         uiLocation: "Portfolio Presentation / Notion Page / PDF Deck",
         expectedResult: "Concrete proof of capability to show prospective clients",
         visualDescription: `Split screen showing before vs after sample project ready to share with international or local clients.`,
-        dialogueFocus: `Doosra step: Real clients dhoondne se pehle 3 authentic portfolio samples banayein jese screen par dikh rahe hain.`
+        dialogueFocus: `Step 2: Real clients dhoondne se pehle 3 authentic portfolio samples banayein jese screen par dikh rahe hain.`
       },
       {
         stepNumber: 3,
@@ -850,7 +850,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
           expectedResult: 'A new folder named "New folder" is created on the desktop',
           safetyOrUndo: "Can be safely deleted anytime like any standard folder",
           visualDescription: "Clean 9:16 Windows 11 desktop screencast showing right-click context menu and New Folder selection.",
-          dialogueFocus: "Pehla step: Desktop par khali jagah right-click karein aur aik new folder create karein."
+          dialogueFocus: "Step 1: Desktop par khali jagah right-click karein aur aik new folder create karein."
         },
         {
           stepNumber: 2,
@@ -860,7 +860,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
           expectedResult: "Folder icon instantly transforms into the blue Control Panel icon with no extension",
           safetyOrUndo: "Rename back or press Shift+Delete to remove",
           visualDescription: "Zoomed-in cursor typing the exact GUID string into folder name, icon changing into Control Panel.",
-          dialogueFocus: "Doosra step: Folder ka naam rename karke yeh exact GUID code paste karein jo description mein diya hai."
+          dialogueFocus: "Step 2: Folder ka naam rename karke yeh exact GUID code paste karein jo description mein diya hai."
         },
         {
           stepNumber: 3,
@@ -870,7 +870,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
           expectedResult: "All 200+ hidden system settings organized alphabetically in one single searchable window",
           safetyOrUndo: "No system files are altered until a setting is clicked",
           visualDescription: "God Mode window opening, displaying instant search bar and categorized system administrative tools.",
-          dialogueFocus: "Teesra step: Ab isay open karein aur tamam 200+ hidden Windows settings aik jagah access karein!"
+          dialogueFocus: "Step 3: Ab isay open karein aur tamam 200+ hidden Windows settings aik jagah access karein!"
         }
       ];
     }
@@ -884,7 +884,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
           expectedResult: "Clipboard History flyout menu pops up in bottom right",
           safetyOrUndo: "Press Esc to dismiss flyout",
           visualDescription: "Hands pressing Win + V on backlit mechanical keyboard, animated HUD flyout appearing on desktop.",
-          dialogueFocus: "Pehla step: Keyboard se Windows button ke sath V dabayein."
+          dialogueFocus: "Step 1: Keyboard se Windows button ke sath V dabayein."
         },
         {
           stepNumber: 2,
@@ -894,7 +894,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
           expectedResult: 'Clipboard history activation status turns to "On"',
           safetyOrUndo: "Toggle off in Settings -> System -> Clipboard anytime",
           visualDescription: "Cursor clicking the Turn On toggle button with cyan glow confirming activation.",
-          dialogueFocus: "Doosra step: Agar pehli bar use kar rahe hain to Turn On par click karke activate karein."
+          dialogueFocus: "Step 2: Agar pehli bar use kar rahe hain to Turn On par click karke activate karein."
         },
         {
           stepNumber: 3,
@@ -904,7 +904,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
           expectedResult: "Text copied 2 hours ago is instantly pasted into active document",
           safetyOrUndo: "Click Clear all to empty unpinned history",
           visualDescription: "User selecting a snippet copied an hour ago and pinning critical passwords/notes.",
-          dialogueFocus: "Teesra step: Ab ghanton pehle copy kiye text par click karein aur foran paste karein!"
+          dialogueFocus: "Step 3: Ab ghanton pehle copy kiye text par click karein aur foran paste karein!"
         }
       ];
     }
@@ -916,8 +916,8 @@ function generateDemonstrationSteps(topic, tool, catId) {
         uiLocation: "Windows Run Dialog / Disk Cleanup Preset Configuration",
         expectedResult: "Disk Cleanup Settings window opens. Note: this phase only saves your cleanup profile; it does NOT delete any files yet.",
         safetyOrUndo: "Cancel dialog at any time; no changes are committed until profile is saved",
-        visualDescription: "Win+R Run box typing the exact cleanmgr /sageset:1 command with clear caption explaining this is configuration phase only.",
-        dialogueFocus: "Pehla step: Win plus R dabayein aur cleanmgr /sageset:1 run karein. Yaad rahe yeh sirf settings save karta hai, files delete nahi karta."
+        visualDescription: 'Mode A (Screen only): Desktop shown briefly for context, then camera zooms in on Win+R Run dialog window filling the frame. Visible cursor types "cleanmgr /sageset:1" with large readable on-screen command text.',
+        dialogueFocus: "Step 1: Win plus R dabayein aur cleanmgr /sageset:1 run karein. Yaad rahe yeh sirf settings save karta hai, files delete nahi karta."
       },
       {
         stepNumber: 2,
@@ -926,8 +926,8 @@ function generateDemonstrationSteps(topic, tool, catId) {
         uiLocation: "Disk Cleanup Configuration Checkbox List",
         expectedResult: "Cleanup preset #1 is safely stored in Windows Registry under StateFlags0001",
         safetyOrUndo: "Checkboxes can be unticked before clicking OK",
-        visualDescription: "Screencast highlighting Temporary Files, Thumbnails and Windows Update Cleanup checkboxes, clicking OK.",
-        dialogueFocus: "Doosra step: Temporary files aur update cache tick karein aur OK dabayein taake aapka preset profile registry mein save ho jaye."
+        visualDescription: "Mode A (Screen only): Disk Cleanup settings window with visible cursor ticking Temporary Files, Thumbnails and Windows Update Cleanup checkboxes with clear highlight, then clicking OK.",
+        dialogueFocus: "Step 2: Temporary files aur update cache tick karein aur OK dabayein taake aapka preset profile registry mein save ho jaye."
       },
       {
         stepNumber: 3,
@@ -936,8 +936,8 @@ function generateDemonstrationSteps(topic, tool, catId) {
         uiLocation: "Windows Run Dialog / System Process Execution",
         expectedResult: "Disk Cleanup runs autonomously in background and purges all previously selected junk files",
         safetyOrUndo: "Progress bar completes automatically; user files in Documents/Desktop remain 100% untouched",
-        visualDescription: "Run box executing cleanmgr /sagerun:1 with animated progress bar actively purging accumulated system cache.",
-        dialogueFocus: "Teesra step: Ab asal safai chalane ke liye Win plus R mein cleanmgr /sagerun:1 enter karein. Ab junk files delete hona shuru hongi."
+        visualDescription: 'Mode A (Screen only): Run box zoomed in executing "cleanmgr /sagerun:1" with large readable command text, transitioning to animated progress bar actively purging accumulated system cache.',
+        dialogueFocus: "Step 3: Ab asal safai chalane ke liye Win plus R mein cleanmgr /sagerun:1 enter karein. Ab junk files delete hona shuru hongi."
       },
       {
         stepNumber: 4,
@@ -946,8 +946,8 @@ function generateDemonstrationSteps(topic, tool, catId) {
         uiLocation: "This PC Storage Drive Bar",
         expectedResult: "C-Drive storage bar shows freed capacity without rebooting",
         safetyOrUndo: "Always verify important downloads before running system cleanups",
-        visualDescription: "Before vs after C-Drive bar comparison showing reclaimed storage capacity.",
-        dialogueFocus: "Chautha step: File Explorer open karke check karein, C-Drive ka extra space kamyabi se free ho chuka hai."
+        visualDescription: "Mode A (Screen only): File Explorer opening to This PC. Camera zooms in on C-Drive storage capacity bar as it transitions from red to healthy cyan with verified freed space.",
+        dialogueFocus: "Step 4: File Explorer open karke check karein, C-Drive ka extra space kamyabi se free ho chuka hai."
       }
     ];
   }
@@ -962,7 +962,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
           expectedResult: "WhatsApp settings menu opens",
           safetyOrUndo: "Press back arrow to exit",
           visualDescription: "Smartphone screen showing WhatsApp chats tab, finger tapping 3 dots and selecting Settings.",
-          dialogueFocus: "Pehla step: WhatsApp open karein, 3 dots par tap karke Settings mein jayein."
+          dialogueFocus: "Step 1: WhatsApp open karein, 3 dots par tap karke Settings mein jayein."
         },
         {
           stepNumber: 2,
@@ -972,7 +972,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
           expectedResult: "Read receipts switch changes from green ON to gray OFF",
           safetyOrUndo: "Toggle back to ON at any time",
           visualDescription: "Screen sliding down to Read Receipts toggle, tapping switch to turn it off.",
-          dialogueFocus: "Doosra step: Privacy par click karein aur Read Receipts ka toggle band kar dein."
+          dialogueFocus: "Step 2: Privacy par click karein aur Read Receipts ka toggle band kar dein."
         },
         {
           stepNumber: 3,
@@ -982,7 +982,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
           expectedResult: "Sender only sees 2 grey ticks; blue double-ticks never appear",
           safetyOrUndo: "Sender group chats may still show info receipts",
           visualDescription: "Split test showing phone A reading message while phone B sender screen stays on grey ticks.",
-          dialogueFocus: "Teesra step: Ab aap kisi ka bhi message open karke parhein, unhein blue tick nahi dikhega!"
+          dialogueFocus: "Step 3: Ab aap kisi ka bhi message open karke parhein, unhein blue tick nahi dikhega!"
         }
       ];
     }
@@ -995,7 +995,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
         expectedResult: "Hidden options menu unfolds",
         safetyOrUndo: "No changes until switch is pressed",
         visualDescription: `Clear mobile phone capture showing ${tool} navigation path with glowing touch circles.`,
-        dialogueFocus: `Pehla step: ${tool} ki settings mein yeh specific menu open karein.`
+        dialogueFocus: `Step 1: ${tool} ki settings mein yeh specific menu open karein.`
       },
       {
         stepNumber: 2,
@@ -1005,7 +1005,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
         expectedResult: "New capability icon appears in status bar or action sheet",
         safetyOrUndo: "Toggle back to default anytime",
         visualDescription: `Finger tapping the exact toggle button on the mobile screen with cyan pulse animation.`,
-        dialogueFocus: `Doosra step: Yeh unadvertised toggle on karein jese screen par highlighted hai.`
+        dialogueFocus: `Step 2: Yeh unadvertised toggle on karein jese screen par highlighted hai.`
       },
       {
         stepNumber: 3,
@@ -1014,7 +1014,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
         uiLocation: `${tool} Working Screen`,
         expectedResult: "Immediate practical feature activation with zero delay",
         visualDescription: `Real-time split comparison confirming the feature working seamlessly.`,
-        dialogueFocus: `Teesra step: Ab iska live test dekhein \u2014 kaam bina kisi rukawat ke mukammal hai!`
+        dialogueFocus: `Step 3: Ab iska live test dekhein \u2014 kaam bina kisi rukawat ke mukammal hai!`
       }
     ];
   }
@@ -1027,7 +1027,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
       expectedResult: "Clean workspace ready for execution",
       safetyOrUndo: "Free tier requires no credit card",
       visualDescription: `Browser interface showing ${tool} clean homepage and free sign-in dashboard.`,
-      dialogueFocus: `Pehla step: ${tool} ki official website par jayein aur free workspace open karein.`
+      dialogueFocus: `Step 1: ${tool} ki official website par jayein aur free workspace open karein.`
     },
     {
       stepNumber: 2,
@@ -1037,7 +1037,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
       expectedResult: "Parameter configured with green status badge",
       safetyOrUndo: "Reset parameters via Reset button",
       visualDescription: `Close-up screencast of the specific setting parameter toggle with clear pointer highlight.`,
-      dialogueFocus: `Doosra step: Sidebar mein yeh specific parameter set karein jesa screen par dikh raha hai.`
+      dialogueFocus: `Step 2: Sidebar mein yeh specific parameter set karein jesa screen par dikh raha hai.`
     },
     {
       stepNumber: 3,
@@ -1047,7 +1047,7 @@ function generateDemonstrationSteps(topic, tool, catId) {
       expectedResult: "Instant production-ready result generated on screen",
       safetyOrUndo: "Re-run or export output to disk",
       visualDescription: `Result appearing on screen with green checkmarks confirming high-accuracy output.`,
-      dialogueFocus: `Teesra step: Run dabayein aur live result dekhein jo seedha kaam ke liye tayyar hai.`
+      dialogueFocus: `Step 3: Run dabayein aur live result dekhein jo seedha kaam ke liye tayyar hai.`
     }
   ];
 }
@@ -2711,7 +2711,8 @@ function registerMultiUserRoutes(app2) {
       const newUser = {
         id: `user-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
         username: cleanUsername,
-        displayName: displayName?.trim() || cleanUsername,
+        displayName: cleanUsername,
+        // Display Name is Username itself
         email: email?.trim() || `${cleanUsername}@user.itcafeteria.studio`,
         role: "standard",
         // New self-registered users are strictly standard
@@ -2719,9 +2720,10 @@ function registerMultiUserRoutes(app2) {
         passwordHash: hashPassword(password, salt),
         createdAt: (/* @__PURE__ */ new Date()).toISOString(),
         lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
-        isActive: true,
+        isActive: false,
+        // Inactive by default until Admin approves!
         isApproved: false,
-        // User Requirement: Must be approved by Admin before login!
+        // Pending Admin Approval by default!
         dedicatedRepoPath: `user-data/${cleanUsername}`,
         permissions: { ...DEFAULT_STANDARD_PERMISSIONS }
       };
@@ -2738,6 +2740,7 @@ function registerMultiUserRoutes(app2) {
       res.status(201).json({
         ok: true,
         pendingApproval: true,
+        isActive: false,
         message: "Account kamyabi se ban gaya hai! Admin ki approval ke baad aap login kar sakenge.",
         user: {
           id: newUser.id,
@@ -2745,6 +2748,7 @@ function registerMultiUserRoutes(app2) {
           displayName: newUser.displayName,
           email: newUser.email,
           role: newUser.role,
+          isActive: false,
           isApproved: false,
           dedicatedRepoPath: newUser.dedicatedRepoPath
         }
@@ -2775,22 +2779,22 @@ function registerMultiUserRoutes(app2) {
         );
         return res.status(401).json({ error: "Ghalat username ya password." });
       }
-      if (!user.isActive) {
-        return res.status(403).json({ error: "Aapka account disabled hai. Admin se rabta karein." });
-      }
-      if (user.role === "standard" && user.isApproved === false) {
+      if (user.role === "standard" && (user.isApproved === false || !user.isActive)) {
         await logAuditEvent(
           user,
           "LOGIN_BLOCKED_PENDING_APPROVAL",
-          `Standard user @${user.username} login blocked: Account is awaiting Super Admin approval.`,
+          `Standard user @${user.username} login blocked: Account is Inactive or awaiting Super Admin approval.`,
           user.dedicatedRepoPath,
           req.ip || "127.0.0.1"
         );
         return res.status(403).json({
           error: "Account Pending Admin Approval",
           pendingApproval: true,
-          message: "Aapka account abhi Admin ki approval ka muntazir hai. Super Admin (Waqar Majeed) ke approve karne ke baad aap login kar sakenge."
+          message: "Aapka account filhal Inactive hai aur Admin ki approval ka muntazir hai. Super Admin (Waqar Majeed) ke approve karne ke baad aap sign in kar sakenge."
         });
+      }
+      if (!user.isActive) {
+        return res.status(403).json({ error: "Aapka account disabled/inactive hai. Admin se rabta karein." });
       }
       user.lastLogin = (/* @__PURE__ */ new Date()).toISOString();
       saveUsersRegistry();
@@ -2866,21 +2870,47 @@ function registerMultiUserRoutes(app2) {
         username: user.username,
         email: user.email
       });
+      try {
+        const outboxDir = path.join(process.cwd(), "data", "logs");
+        if (!fs.existsSync(outboxDir)) {
+          fs.mkdirSync(outboxDir, { recursive: true });
+        }
+        const outboxFile = path.join(outboxDir, "simulated-email-outbox.json");
+        let outbox = [];
+        if (fs.existsSync(outboxFile)) {
+          try {
+            outbox = JSON.parse(fs.readFileSync(outboxFile, "utf8"));
+          } catch {
+          }
+        }
+        outbox.unshift({
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          to: user.email,
+          username: user.username,
+          subject: "IT Cafeteria Studio - Password Reset Verification Code",
+          resetToken,
+          expiresAt: new Date(expiresAt).toISOString()
+        });
+        if (outbox.length > 100) outbox = outbox.slice(0, 100);
+        fs.writeFileSync(outboxFile, JSON.stringify(outbox, null, 2), "utf8");
+      } catch (err) {
+        console.warn("[Auth] Could not write to email outbox log:", err);
+      }
       await logAuditEvent(
         user,
         "PASSWORD_RESET_REQUESTED",
-        `Password reset requested for @${user.username} (${user.email}). Reset token: ${resetToken}`,
+        `Password reset requested for @${user.username} (${user.email}). Verification code dispatched to email.`,
         user.dedicatedRepoPath,
         req.ip || "127.0.0.1"
       );
-      console.info(`[Auth] Password reset token for ${user.username} (${user.email}): ${resetToken}`);
+      console.info(`[Auth] Password reset email dispatched for @${user.username} (${user.email}). Token: ${resetToken}`);
+      const emailParts = (user.email || "").split("@");
+      const maskedEmail = emailParts.length === 2 ? `${emailParts[0].slice(0, Math.min(3, emailParts[0].length))}***@${emailParts[1]}` : user.email;
       res.json({
         ok: true,
-        resetToken,
-        email: user.email,
-        username: user.username,
+        email: maskedEmail,
         expiresInMinutes: 15,
-        message: `Password reset token generated successfully. Code: ${resetToken}`
+        message: `8-character password recovery code aapke registered email (${maskedEmail}) par bhej diya gaya hai. Meharbani farma kar apna email check karein aur verification code yahan enter karein.`
       });
     } catch (e) {
       res.status(500).json({ error: "Forgot password request failed", details: e?.message });
@@ -3038,22 +3068,56 @@ function registerMultiUserRoutes(app2) {
         return res.status(404).json({ error: "User nahi mila." });
       }
       const { isApproved } = req.body;
-      user.isApproved = Boolean(isApproved);
+      const approvalBool = Boolean(isApproved);
+      user.isApproved = approvalBool;
+      user.isActive = approvalBool;
       saveUsersRegistry();
       await logAuditEvent(
         adminActor,
         user.isApproved ? "USER_APPROVED" : "USER_UNAPPROVED",
-        `Super Admin Waqar Majeed set approval status to ${user.isApproved} for @${user.username}`,
+        `Super Admin Waqar Majeed set approval status to ${user.isApproved} (isActive=${user.isActive}) for @${user.username}`,
         user.dedicatedRepoPath,
         req.ip || "127.0.0.1"
       );
       res.json({
         ok: true,
-        message: `User @${user.username} ka status "${user.isApproved ? "Approved (Manzoor Shuda)" : "Pending Approval"}" ho gaya.`,
-        isApproved: user.isApproved
+        message: `User @${user.username} ka status "${user.isApproved ? "Approved & Active (Manzoor Shuda)" : "Pending Approval & Inactive"}" ho gaya.`,
+        isApproved: user.isApproved,
+        isActive: user.isActive
       });
     } catch (e) {
       res.status(500).json({ error: "Approval update failed", details: e?.message });
+    }
+  });
+  app2.put("/api/admin/users/:username/status", authenticateToken, requireAdmin, async (req, res) => {
+    try {
+      const adminActor = req.user;
+      const targetUsername = req.params.username.toLowerCase();
+      const user = usersRegistry.find((u) => u.username === targetUsername);
+      if (!user) {
+        return res.status(404).json({ error: "User nahi mila." });
+      }
+      if (user.role === "admin" && user.username === "waqarmajeed") {
+        return res.status(400).json({ error: "Super Admin Waqar Majeed account ko deactivate nahi kiya ja sakta." });
+      }
+      const { isActive } = req.body;
+      user.isActive = Boolean(isActive);
+      saveUsersRegistry();
+      await logAuditEvent(
+        adminActor,
+        user.isActive ? "USER_ACTIVATED" : "USER_DEACTIVATED",
+        `Super Admin Waqar Majeed set active status to ${user.isActive} for @${user.username}`,
+        user.dedicatedRepoPath,
+        req.ip || "127.0.0.1"
+      );
+      res.json({
+        ok: true,
+        message: `User @${user.username} ab "${user.isActive ? "Active" : "Inactive"}" hai.`,
+        isActive: user.isActive,
+        isApproved: user.isApproved
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Status update failed", details: e?.message });
     }
   });
   app2.post("/api/admin/users", authenticateToken, requireAdmin, async (req, res) => {
@@ -5915,12 +5979,19 @@ Return STRICT valid JSON only, no markdown fences:
       let script = safeString(scene.script);
       if (!script.includes("[DIRECTOR") || !script.includes("DIALOGUE:")) {
         const cameraDir = index === 0 ? "Master Cinematic 9:16 vertical 4K direction. Dynamic medium-close front angle with a smooth 10s dramatic slow push-in zoom (0.8x to 1.1x). Cyber dark navy studio background with vibrant neon cyan and amber volumetric rim lights." : index === rawScenes.length - 1 ? "Warm approachable eye-level medium shot. Friendly direct eye contact with camera, smooth pull-out with floating animated subscribe bell icon." : "Dynamic tracking camera with eye-level perspective, 3/4 angle, balanced 5600K studio fill light, high-end visual tech demonstration.";
+        const effectiveTag = tag && tag.startsWith("@") ? tag : `@${tag || "WM25-1"}`;
+        const continuityLock = `CONTINUITY LOCK: Use the character selected in Flow for tag ${effectiveTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
         script = `[DIRECTOR CAMERA & LIGHTING]: ${cameraDir} Duration: 10s.
 [SCENE VISUAL & PROPS]: ${visual}
-[PRESENTER & ACTION]: ${tag} (${presenter}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence.
+[PRESENTER & ACTION]: ${tag} (${presenter}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence. ${continuityLock}
 DIALOGUE: "${dialogue}"`;
       } else {
         script = applyPhoneticFixes(script);
+        if (!script.includes("CONTINUITY LOCK:")) {
+          const effectiveTag = tag && tag.startsWith("@") ? tag : `@${tag || "WM25-1"}`;
+          const lockText = `CONTINUITY LOCK: Use the character selected in Flow for tag ${effectiveTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
+          script = script.replace(/(\[PRESENTER & ACTION\]:[\s\S]*?)(?=\nDIALOGUE:|\n\[|$)/i, (m) => `${m.trimEnd()} ${lockText}`);
+        }
       }
       const computedWords = dialogue ? dialogue.split(/\s+/).filter(Boolean).length : 0;
       return {
@@ -6038,7 +6109,7 @@ Task:
 3. Each scene's "script" MUST be a master cinematic Google Flow prompt with 4 parts:
    [DIRECTOR CAMERA & LIGHTING]: Detailed camera direction (dynamic zoom-in, 15-degree side angle, 3/4 isometric screencast, or snap-zoom), 9:16 vertical 4K setup, cyber dark studio lighting with neon cyan and amber rim lights.
    [SCENE VISUAL & PROPS]: Detailed visual action with props (3D holographic elements, glowing UI, physical props).
-   [PRESENTER & ACTION]: ${story.characterTag || "@WM25-1"} (${story.presenter || "Waqar Majeed"}) in studio with natural hand gestures and conversational tech cadence.
+   [PRESENTER & ACTION]: ${story.characterTag || "@WM25-1"} (${story.presenter || "Waqar Majeed"}) in studio with natural hand gestures and conversational tech cadence. CONTINUITY LOCK: Use the character selected in Flow for tag ${story.characterTag || "@WM25-1"} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.
    DIALOGUE: "<exact dialogue in double quotes>"
 4. Update title, hook, description, and thumbnail if improved by directives.
 
@@ -6091,12 +6162,19 @@ Return STRICT valid JSON only with NO markdown fences:
       const visual = safeString(scene.visual);
       let script = safeString(scene.script);
       if (!script.includes("[DIRECTOR") || !script.includes("DIALOGUE:")) {
+        const charTag = story.characterTag || "@WM25-1";
+        const continuityLock = `CONTINUITY LOCK: Use the character selected in Flow for tag ${charTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
         script = `[DIRECTOR CAMERA & LIGHTING]: Master Cinematic 9:16 vertical 4K direction. Dynamic camera angle with dramatic zoom and neon cyan-amber cyber studio rim lights. Duration: 10s.
 [SCENE VISUAL & PROPS]: ${visual}
-[PRESENTER & ACTION]: ${story.characterTag || "@WM25-1"} (${story.presenter || "Waqar Majeed"}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence.
+[PRESENTER & ACTION]: ${charTag} (${story.presenter || "Waqar Majeed"}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence. ${continuityLock}
 DIALOGUE: "${dialogue}"`;
       } else {
         script = applyPhoneticFixes(script);
+        if (!script.includes("CONTINUITY LOCK:")) {
+          const charTag = story.characterTag || "@WM25-1";
+          const lockText = `CONTINUITY LOCK: Use the character selected in Flow for tag ${charTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
+          script = script.replace(/(\[PRESENTER & ACTION\]:[\s\S]*?)(?=\nDIALOGUE:|\n\[|$)/i, (m) => `${m.trimEnd()} ${lockText}`);
+        }
       }
       return {
         num: index + 1,
