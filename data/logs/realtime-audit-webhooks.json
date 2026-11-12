@@ -1,5 +1,41 @@
 [
   {
+    "id": "audit-1794452332324-01b176",
+    "timestamp": "2026-11-12T02:58:52.324Z",
+    "userId": "user-std-01",
+    "username": "noorwahid",
+    "role": "standard",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: standard",
+    "targetFile": "user-data/noorwahid",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1794452327723-4bc706",
+    "timestamp": "2026-11-12T02:58:47.723Z",
+    "userId": "user-std-01",
+    "username": "noorwahid",
+    "role": "standard",
+    "action": "PASSWORD_RESET_COMPLETED",
+    "details": "Password was successfully reset for user @noorwahid",
+    "targetFile": "user-data/noorwahid",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
+    "id": "audit-1794452322312-15d18a",
+    "timestamp": "2026-11-12T02:58:42.312Z",
+    "userId": "user-std-01",
+    "username": "noorwahid",
+    "role": "standard",
+    "action": "PASSWORD_RESET_REQUESTED",
+    "details": "Password reset requested for @noorwahid (noorwahid1016@gmail.com). Verification code dispatched to email.",
+    "targetFile": "user-data/noorwahid",
+    "ip": "127.0.0.1",
+    "status": "LOCAL_LOGGED"
+  },
+  {
     "id": "audit-1794370745048-249012",
     "timestamp": "2026-11-11T04:19:05.048Z",
     "userId": "user-admin-info-01",

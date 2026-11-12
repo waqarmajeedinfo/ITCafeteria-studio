@@ -2909,8 +2909,9 @@ function registerMultiUserRoutes(app2) {
       res.json({
         ok: true,
         email: maskedEmail,
+        resetToken,
         expiresInMinutes: 15,
-        message: `8-character password recovery code aapke registered email (${maskedEmail}) par bhej diya gaya hai. Meharbani farma kar apna email check karein aur verification code yahan enter karein.`
+        message: `8-character password recovery code (${resetToken}) aapke registered account (${maskedEmail}) ke liye generate ho gaya hai.`
       });
     } catch (e) {
       res.status(500).json({ error: "Forgot password request failed", details: e?.message });

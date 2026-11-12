@@ -28,10 +28,10 @@
     "displayName": "Noor Wahid (Standard)",
     "email": "noorwahid1016@gmail.com",
     "role": "standard",
-    "salt": "9d59b8c33078347cfdb737d1a5e29dc6",
-    "passwordHash": "78098d4a62b8025c296139359db74509e5ab1066e5eb72f79eebd03cc72aeec2216a6455d6c10db9d4da73cea1491e718a992ee103afde20e85d9b576432f47b",
+    "salt": "6a0236329fed4f354e0d5a2fbbb05548",
+    "passwordHash": "7212403904e1da7e3aac6656e567732c5fd30b1f77904d7326a0f3b2d9c2a8533a9b76f38e2d5c325b64828905810fd6a5e073a15ee866ee4ff0a94cc612dffe",
     "createdAt": "2026-11-04T01:06:46.534Z",
-    "lastLogin": "2026-11-04T01:32:45.537Z",
+    "lastLogin": "2026-11-12T02:58:52.323Z",
     "isActive": true,
     "dedicatedRepoPath": "user-data/noorwahid",
     "permissions": {

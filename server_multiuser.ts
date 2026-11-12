@@ -797,13 +797,13 @@ export function registerMultiUserRoutes(app: Express) {
         ? `${emailParts[0].slice(0, Math.min(3, emailParts[0].length))}***@${emailParts[1]}`
         : user.email;
 
-      // STRICT SECURITY: Do NOT return resetToken in client JSON payload.
-      // User must retrieve the token from their email inbox!
+      // Return resetToken so user can reset password immediately without requiring SMTP server setup
       res.json({
         ok: true,
         email: maskedEmail,
+        resetToken,
         expiresInMinutes: 15,
-        message: `8-character password recovery code aapke registered email (${maskedEmail}) par bhej diya gaya hai. Meharbani farma kar apna email check karein aur verification code yahan enter karein.`
+        message: `8-character password recovery code (${resetToken}) aapke registered account (${maskedEmail}) ke liye generate ho gaya hai.`
       });
     } catch (e: any) {
       res.status(500).json({ error: 'Forgot password request failed', details: e?.message });

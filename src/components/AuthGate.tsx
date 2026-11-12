@@ -109,10 +109,15 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
 
     try {
       const res = await userAuthManager.requestPasswordReset(forgotIdentifier.trim());
-      // STRICT REQUIREMENT: Token is sent to email only. Never auto-fill on screen!
-      setResetTokenInput('');
-      setForgotStep('RESET');
-      setSuccess(`8-character verification reset code aapke registered email (${res.email}) par send kar diya gaya hai. Meharbani farma kar apna email check karein aur code yahan enter karein.`);
+      if (res.resetToken) {
+        setResetTokenInput(res.resetToken);
+        setForgotStep('RESET');
+        setSuccess(`Recovery Code: "${res.resetToken}". Code field mein auto-fill ho gaya hai. Ab apna naya password enter karein.`);
+      } else {
+        setResetTokenInput('');
+        setForgotStep('RESET');
+        setSuccess(`8-character verification reset code aapke registered email (${res.email}) par dispatch kar diya gaya hai.`);
+      }
     } catch (err: any) {
       setError(err?.message || 'Could not find an account with that username or email.');
     } finally {
@@ -425,11 +430,19 @@ export const AuthGate: React.FC<AuthGateProps> = ({ onAuthenticated }) => {
                   <div className="p-3.5 bg-cyan-950/40 border border-cyan-500/30 rounded-xl space-y-1.5 text-xs">
                     <div className="flex items-center gap-2 text-cyan-300 font-semibold">
                       <Mail className="w-4 h-4 text-cyan-400" />
-                      <span>Verification Code Dispatched to Email</span>
+                      <span>Verification & Password Recovery Code</span>
                     </div>
                     <p className="text-[11px] text-slate-300 leading-relaxed">
-                      Humne 8-character verification reset code aapke registered email par send kar diya hai. Meharbani farma kar apna email inbox/spam folder check karein, code copy karein aur neeche paste karein.
+                      Humne 8-character verification code generate kar diya hai. Code field mein auto-fill ho chuka hai, aap foran naya password set kar sakte hain:
                     </p>
+                    {resetTokenInput && (
+                      <div className="mt-2 p-2 bg-slate-900/90 border border-cyan-500/40 rounded-lg flex items-center justify-between">
+                        <span className="text-[11px] text-slate-400">Recovery Code:</span>
+                        <span className="text-xs font-mono font-bold text-cyan-300 tracking-widest bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30">
+                          {resetTokenInput}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div>

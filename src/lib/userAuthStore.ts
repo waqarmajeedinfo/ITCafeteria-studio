@@ -578,8 +578,8 @@ class UserAuthManager {
     return result;
   }
 
-  // Request password reset token via email or username (Token dispatched to email only)
-  public async requestPasswordReset(identifier: string): Promise<{ ok: boolean; email: string; message: string; expiresInMinutes?: number }> {
+  // Request password reset token via email or username (Returns resetToken for direct recovery)
+  public async requestPasswordReset(identifier: string): Promise<{ ok: boolean; email: string; message: string; expiresInMinutes?: number; resetToken?: string }> {
     const res = await fetch('/api/auth/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
