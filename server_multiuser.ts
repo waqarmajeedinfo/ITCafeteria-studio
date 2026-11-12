@@ -198,7 +198,7 @@ function initDefaultUsers(): UserAccount[] {
             email: 'waqarmajeedinfo@itcafeteria.studio',
             role: 'admin',
             salt: adminInfoSalt,
-            passwordHash: hashPassword('WM2info$', adminInfoSalt),
+            passwordHash: hashPassword('WM2info', adminInfoSalt),
             createdAt: new Date().toISOString(),
             lastLogin: new Date().toISOString(),
             isActive: true,
