@@ -317,6 +317,165 @@ main tbody tr:hover {
   animation: floatBob 4s ease-in-out infinite;
 }
 
+/* ============================================================================
+   DYNAMIC CURSOR GLOW: Localized Radial Highlight on Interactive & Static Elements
+   Driven by --cursor-x / --cursor-y / --glow-size from useCursorGlow.ts
+   ============================================================================ */
+.app-shell-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: var(--global-cursor-active, 0);
+  transition: opacity 280ms ease;
+  background: radial-gradient(
+    540px circle at var(--global-cursor-x, -999px) var(--global-cursor-y, -999px),
+    rgba(34, 211, 238, 0.06),
+    rgba(99, 102, 241, 0.025) 44%,
+    transparent 72%
+  );
+}
+
+[data-cursor-rel="true"] {
+  position: relative;
+}
+
+[data-cursor-glow]::before,
+[data-cursor-glow]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 1px Localized Radial Border Spotlight */
+[data-cursor-glow]::before {
+  padding: 1px;
+  z-index: 2;
+  background: radial-gradient(
+    calc(var(--glow-size, 220px) * 0.85) circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    rgba(34, 211, 238, 0.65),
+    rgba(99, 102, 241, 0.32) 45%,
+    transparent 74%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+/* Localized Radial Interior Surface Glow */
+[data-cursor-glow]::after {
+  z-index: 1;
+  background: radial-gradient(
+    var(--glow-size, 220px) circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    rgba(34, 211, 238, 0.14),
+    rgba(56, 189, 248, 0.05) 46%,
+    transparent 74%
+  );
+}
+
+/* Interactive Controls Receive Stronger Crisp Highlight */
+[data-cursor-glow="interactive"]::before {
+  background: radial-gradient(
+    calc(var(--glow-size, 180px) * 0.9) circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    rgba(34, 211, 238, 0.85),
+    rgba(59, 130, 246, 0.4) 48%,
+    transparent 76%
+  );
+}
+
+[data-cursor-glow="interactive"]::after {
+  background: radial-gradient(
+    var(--glow-size, 180px) circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    rgba(34, 211, 238, 0.22),
+    rgba(56, 189, 248, 0.08) 46%,
+    transparent 75%
+  );
+}
+
+/* Static Containers & Typography Blocks Receive Refined Ambient Sheen */
+[data-cursor-glow="static"]::before {
+  background: radial-gradient(
+    calc(var(--glow-size, 260px) * 0.9) circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    rgba(56, 189, 248, 0.52),
+    rgba(99, 102, 241, 0.22) 45%,
+    transparent 74%
+  );
+}
+
+[data-cursor-glow="static"]::after {
+  background: radial-gradient(
+    var(--glow-size, 260px) circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    rgba(34, 211, 238, 0.1),
+    rgba(99, 102, 241, 0.04) 48%,
+    transparent 75%
+  );
+}
+
+[data-cursor-glow][data-cursor-glow-active="true"]::before,
+[data-cursor-glow][data-cursor-glow-active="true"]::after {
+  opacity: 1;
+}
+
+/* Unboxed Headings Receive Soft Radial Aura Without Rectangular Border Box */
+h1[data-cursor-glow]::before,
+h2[data-cursor-glow]::before,
+h3[data-cursor-glow]::before {
+  display: none !important;
+  content: none !important;
+}
+
+h1[data-cursor-glow]::after,
+h2[data-cursor-glow]::after,
+h3[data-cursor-glow]::after {
+  border-radius: 12px;
+  background: radial-gradient(
+    180px circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    rgba(34, 211, 238, 0.08),
+    transparent 70%
+  );
+}
+
+/* Replaced Form Elements & Table Rows (Do not rely on ::before / ::after) */
+input[data-cursor-glow]::before,
+input[data-cursor-glow]::after,
+select[data-cursor-glow]::before,
+select[data-cursor-glow]::after,
+textarea[data-cursor-glow]::before,
+textarea[data-cursor-glow]::after,
+tr[data-cursor-glow]::before,
+tr[data-cursor-glow]::after {
+  display: none !important;
+  content: none !important;
+}
+
+input[data-cursor-glow][data-cursor-glow-active="true"],
+select[data-cursor-glow][data-cursor-glow-active="true"],
+textarea[data-cursor-glow][data-cursor-glow-active="true"] {
+  background-image: radial-gradient(
+    180px circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    rgba(34, 211, 238, 0.14),
+    rgba(56, 189, 248, 0.04) 50%,
+    transparent 78%
+  );
+  border-color: rgba(34, 211, 238, 0.55) !important;
+  box-shadow: 0 0 18px -6px rgba(34, 211, 238, 0.35);
+}
+
+tr[data-cursor-glow][data-cursor-glow-active="true"] {
+  background-image: radial-gradient(
+    360px circle at var(--cursor-x, 50%) var(--cursor-y, 50%),
+    rgba(34, 211, 238, 0.13),
+    rgba(56, 189, 248, 0.04) 48%,
+    transparent 74%
+  );
+}
+
 /* Respect accessibility preference for reduced motion */
 @media (prefers-reduced-motion: reduce) {
   button:not(:disabled):hover,
@@ -335,6 +494,11 @@ main tbody tr:hover {
   [data-scroll-reveal] {
     opacity: 1 !important;
     transform: none !important;
+    transition: none !important;
+  }
+
+  [data-cursor-glow]::before,
+  [data-cursor-glow]::after {
     transition: none !important;
   }
 
