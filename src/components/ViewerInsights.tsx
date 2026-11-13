@@ -205,39 +205,70 @@ export const ViewerInsights: React.FC = () => {
 
               {/* Stroke Line */}
               {retentionMode === 'standard' ? (
-                <path
-                  d="M 0 0 Q 35 67.6 140 77 T 280 88 T 420 98.4 T 560 109.2 T 630 118 T 700 136"
-                  fill="none"
-                  stroke="#22d3ee"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                />
+                <>
+                  <path
+                    d="M 0 0 Q 35 67.6 140 77 T 280 88 T 420 98.4 T 560 109.2 T 630 118 T 700 136"
+                    fill="none"
+                    stroke="#0e7490"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M 0 0 Q 35 67.6 140 77 T 280 88 T 420 98.4 T 560 109.2 T 630 118 T 700 136"
+                    fill="none"
+                    stroke="#22d3ee"
+                    strokeWidth="3.2"
+                    strokeLinecap="round"
+                    className="animate-energy-flow-fast"
+                  />
+                </>
               ) : (
-                <path
-                  d="M 0 0 Q 35 23 175 36 T 350 43.2 T 525 48 T 630 31 T 700 -9"
-                  fill="none"
-                  stroke="#fbbf24"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                />
+                <>
+                  <path
+                    d="M 0 0 Q 35 23 175 36 T 350 43.2 T 525 48 T 630 31 T 700 -9"
+                    fill="none"
+                    stroke="#92400e"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M 0 0 Q 35 23 175 36 T 350 43.2 T 525 48 T 630 31 T 700 -9"
+                    fill="none"
+                    stroke="#fbbf24"
+                    strokeWidth="3.2"
+                    strokeLinecap="round"
+                    className="animate-energy-flow-fast"
+                  />
+                </>
               )}
 
-              {/* Data points */}
+              {/* Data points with continuous pulsing halo */}
               {activeRetentionData.map((pt, idx) => {
                 const x = (idx / (activeRetentionData.length - 1)) * 700;
-                const y = 200 - (pt.pct / 110) * 200;
+                const y = Math.max(10, 200 - (pt.pct / 110) * 200);
                 return (
-                  <circle
-                    key={idx}
-                    cx={x}
-                    cy={Math.max(10, y)}
-                    r={hoveredRetentionSec === pt.sec ? 7 : 4.5}
-                    fill={retentionMode === 'standard' ? '#22d3ee' : '#f59e0b'}
-                    stroke="#070a13"
-                    strokeWidth="2"
-                    className="cursor-pointer transition-all hover:scale-150"
-                    onMouseEnter={() => setHoveredRetentionSec(pt.sec)}
-                  />
+                  <g key={idx}>
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={9}
+                      fill="none"
+                      stroke={retentionMode === 'standard' ? '#22d3ee' : '#fbbf24'}
+                      strokeOpacity="0.45"
+                      strokeWidth="1.5"
+                      className="animate-beacon-pulse"
+                    />
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={hoveredRetentionSec === pt.sec ? 7 : 4.5}
+                      fill={retentionMode === 'standard' ? '#22d3ee' : '#f59e0b'}
+                      stroke="#070a13"
+                      strokeWidth="2"
+                      className="cursor-pointer transition-all hover:scale-150"
+                      onMouseEnter={() => setHoveredRetentionSec(pt.sec)}
+                    />
+                  </g>
                 );
               })}
             </svg>

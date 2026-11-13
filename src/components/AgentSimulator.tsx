@@ -37,6 +37,7 @@ import { TagManagerModal } from './TagManagerModal';
 import { loadAllChannels, getEngineConfigForChannel, filterTagsByAspectRatio, type ExtendedChannelProfile } from '../lib/channelStore';
 import { TopicResearchPanel } from './TopicResearchPanel';
 import { loadProfileTopicBank, type TopicCard } from '../lib/profileStore';
+import { ScrollReveal, AutopilotPipelineDiagram } from './MotionPrimitives';
 
 export const IT_CAFETERIA_LONG_FORM_TAGS = ['@WM25-1', '@WM25-2', '@WM25-3', '@WM25-4', '@WM25-5'];
 export const IT_CAFETERIA_SHORT_FORM_TAGS = ['@WM25-1', '@WM25-2', '@WM25-3', '@WM25-5', '@WM25-6', '@WM25-7', '@WM25-8', '@WM25-9'];
@@ -536,6 +537,11 @@ export const AgentSimulator: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Living Script & Continuity Pipeline Diagram */}
+      <ScrollReveal direction="down" delay={0.03}>
+        <AutopilotPipelineDiagram title="Agent Simulator Execution & Flow Continuity Pipeline" />
+      </ScrollReveal>
+
       {/* Simulation Controls Header */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">

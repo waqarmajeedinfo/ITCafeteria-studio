@@ -110,6 +110,7 @@ import { MultiUserManagerModal } from './components/MultiUserManagerModal';
 import { AgentManagementModal } from './components/AgentManagementModal';
 import { userAuthManager, USER_AUTH_UPDATED_EVENT, type UserSessionProfile } from './lib/userAuthStore';
 import { AuthGate } from './components/AuthGate';
+import { useGlobalScrollReveal } from './lib/useGlobalScrollReveal';
 
 
 type TabType = 
@@ -349,6 +350,8 @@ export default function App() {
   const [showTopicBankModal, setShowTopicBankModal] = useState(false);
   const [showAgentManagement, setShowAgentManagement] = useState(false);
   const [liveElapsedSeconds, setLiveElapsedSeconds] = useState(0);
+
+  useGlobalScrollReveal([activeTab, Boolean(currentUserProfile)]);
 
   // Live Co-Pilot Session Timer Effect
   useEffect(() => {

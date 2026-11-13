@@ -15,6 +15,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { YT_AUTOMATION_ROADMAP, PHONETIC_DICTIONARY } from '../data/channelData';
+import { ScrollReveal, RoadmapOrbitalDiagram } from './MotionPrimitives';
 
 export const UpscalingRoadmap: React.FC = () => {
   const [expandedSection, setExpandedSection] = useState<number | null>(1);
@@ -151,13 +152,22 @@ Roadmap status updated in Channel_Insights.md section 9. Ready to generate Chapt
         </div>
       </div>
 
+      {/* Living Roadmap Orbital Diagram */}
+      <ScrollReveal direction="up" delay={0.05}>
+        <RoadmapOrbitalDiagram />
+      </ScrollReveal>
+
       {/* Enhancements Accordion List */}
       <div className="space-y-4">
-        {enhancements.map((enh) => {
+        {enhancements.map((enh, enhIdx) => {
           const isExpanded = expandedSection === enh.id;
           return (
-            <div 
+            <ScrollReveal
               key={enh.id}
+              direction={enhIdx % 2 === 0 ? 'left' : 'right'}
+              delay={Math.min(enhIdx * 0.05, 0.2)}
+            >
+            <div 
               className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition-all duration-200 hover:border-slate-700"
             >
               <button
@@ -229,6 +239,7 @@ Roadmap status updated in Channel_Insights.md section 9. Ready to generate Chapt
                 </div>
               )}
             </div>
+            </ScrollReveal>
           );
         })}
       </div>

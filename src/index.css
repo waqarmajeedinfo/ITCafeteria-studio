@@ -90,4 +90,262 @@ body.modal-open {
   scrollbar-width: none;
 }
 
+/* ============================================================================
+   INTERACTIVE HOVER POLISH: Buttons, Links, & Interactive Blocks
+   GPU-composited properties only (transform, opacity, box-shadow, border-color)
+   ============================================================================ */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    transition:
+      transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 200ms ease,
+      background-color 200ms ease,
+      color 180ms ease;
+    will-change: transform;
+  }
 
+  button:not(:disabled):not(.w-full):hover,
+  [role="button"]:not([aria-disabled="true"]):not(.w-full):hover {
+    transform: translateY(-2px) scale(1.025);
+    box-shadow:
+      0 10px 24px -8px rgba(6, 182, 212, 0.34),
+      0 4px 10px -4px rgba(2, 6, 23, 0.55);
+  }
+
+  button.w-full:not(:disabled):hover,
+  [role="button"].w-full:not([aria-disabled="true"]):hover,
+  summary:hover {
+    transform: translateY(-1.5px) scale(1.006);
+    box-shadow:
+      0 10px 24px -10px rgba(6, 182, 212, 0.28),
+      0 4px 12px -4px rgba(2, 6, 23, 0.5);
+  }
+
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active {
+    transform: translateY(0) scale(0.975);
+  }
+
+  a[href] {
+    display: inline-flex;
+    align-items: center;
+    transition:
+      transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+      color 180ms ease,
+      text-shadow 200ms ease;
+  }
+
+  a[href]:hover {
+    transform: translateY(-1.5px) scale(1.03);
+    text-shadow: 0 0 14px rgba(34, 211, 238, 0.45);
+  }
+}
+
+/* Interactive Blocks & Dashboard Cards */
+.interactive-block,
+main .grid > div[class*="rounded"]:not(.fixed),
+main section[class*="rounded"],
+main > div > div[class*="rounded-2xl"],
+main > div > div > div[class*="rounded-2xl"],
+header .rounded-xl[class*="border"] {
+  transition:
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 220ms ease;
+}
+
+.interactive-block:hover,
+main .grid > div[class*="rounded"]:not(.fixed):hover,
+main section[class*="rounded"]:hover,
+main > div > div[class*="rounded-2xl"]:hover,
+main > div > div > div[class*="rounded-2xl"]:hover,
+header .rounded-xl[class*="border"]:hover {
+  transform: translateY(-4px) scale(1.008);
+  box-shadow:
+    0 20px 38px -14px rgba(6, 182, 212, 0.22),
+    0 8px 20px -8px rgba(2, 6, 23, 0.72);
+  border-color: rgba(34, 211, 238, 0.42);
+}
+
+/* Subtle row highlight lift on data table rows */
+main tbody tr {
+  transition:
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 180ms ease;
+}
+
+main tbody tr:hover {
+  transform: translateX(3px);
+}
+
+/* ============================================================================
+   SCROLL-TRIGGERED DIRECTIONAL FLOAT-IN SYSTEM
+   ============================================================================ */
+[data-scroll-reveal] {
+  opacity: 0;
+  transition:
+    transform 620ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 540ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 540ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--sr-delay, 0ms);
+  will-change: transform, opacity;
+}
+
+[data-scroll-reveal="left"] {
+  transform: translate3d(-38px, 0, 0) scale(0.985);
+}
+
+[data-scroll-reveal="right"] {
+  transform: translate3d(38px, 0, 0) scale(0.985);
+}
+
+[data-scroll-reveal="up"] {
+  transform: translate3d(0, 32px, 0) scale(0.985);
+}
+
+[data-scroll-reveal="down"] {
+  transform: translate3d(0, -32px, 0) scale(0.985);
+}
+
+[data-scroll-reveal][data-scroll-visible="true"] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+/* ============================================================================
+   CONTINUOUS ILLUSTRATIVE DIAGRAM MICRO-ANIMATIONS
+   ============================================================================ */
+@keyframes energyFlow {
+  0% {
+    stroke-dashoffset: 120;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes energyFlowReverse {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 120;
+  }
+}
+
+@keyframes orbitSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbitSpinReverse {
+  0% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes pulseBeacon {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes floatBob {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-energy-flow {
+  stroke-dasharray: 10 8;
+  animation: energyFlow 2.6s linear infinite;
+}
+
+.animate-energy-flow-fast {
+  stroke-dasharray: 8 10;
+  animation: energyFlow 1.5s linear infinite;
+}
+
+.animate-energy-flow-reverse {
+  stroke-dasharray: 9 7;
+  animation: energyFlowReverse 2.8s linear infinite;
+}
+
+.animate-orbit-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbitSpin 18s linear infinite;
+}
+
+.animate-orbit-spin-slow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbitSpin 28s linear infinite;
+}
+
+.animate-orbit-spin-reverse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbitSpinReverse 14s linear infinite;
+}
+
+.animate-beacon-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulseBeacon 2.8s ease-in-out infinite;
+}
+
+.animate-float-bob {
+  animation: floatBob 4s ease-in-out infinite;
+}
+
+/* Respect accessibility preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled):hover,
+  [role="button"]:not([aria-disabled="true"]):hover,
+  a[href]:hover,
+  .interactive-block:hover,
+  main .grid > div[class*="rounded"]:not(.fixed):hover,
+  main section[class*="rounded"]:hover,
+  main > div > div[class*="rounded-2xl"]:hover,
+  main > div > div > div[class*="rounded-2xl"]:hover,
+  header .rounded-xl[class*="border"]:hover,
+  main tbody tr:hover {
+    transform: none !important;
+  }
+
+  [data-scroll-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .animate-energy-flow,
+  .animate-energy-flow-fast,
+  .animate-energy-flow-reverse,
+  .animate-orbit-spin,
+  .animate-orbit-spin-slow,
+  .animate-orbit-spin-reverse,
+  .animate-beacon-pulse,
+  .animate-float-bob {
+    animation: none !important;
+  }
+}

@@ -18,6 +18,7 @@ import {
 import { GrowthSignals } from './GrowthSignals';
 import { EngagementHeatmap } from './EngagementHeatmap';
 import { ViewerInsights } from './ViewerInsights';
+import { ScrollReveal, TrafficEngineDiagram } from './MotionPrimitives';
 
 export const ChannelAnalytics: React.FC = () => {
   const [subView, setSubView] = useState<'diagnostics' | 'insights' | 'heatmap' | 'signals'>('diagnostics');
@@ -25,6 +26,7 @@ export const ChannelAnalytics: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner / Summary */}
+      <ScrollReveal direction="down">
       <div className="bg-gradient-to-r from-blue-950/60 via-slate-900 to-indigo-950/60 border border-blue-500/30 rounded-2xl p-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
@@ -58,8 +60,10 @@ export const ChannelAnalytics: React.FC = () => {
           </div>
         </div>
       </div>
+      </ScrollReveal>
 
       {/* Sub-view Navigation Toggle */}
+      <ScrollReveal direction="left" delay={0.05}>
       <div className="flex flex-wrap items-center gap-2 p-1 bg-slate-900 border border-slate-800 rounded-xl w-fit">
         <button
           onClick={() => setSubView('diagnostics')}
@@ -118,6 +122,7 @@ export const ChannelAnalytics: React.FC = () => {
           </span>
         </button>
       </div>
+      </ScrollReveal>
 
       {subView === 'signals' ? (
         <GrowthSignals />
@@ -127,10 +132,16 @@ export const ChannelAnalytics: React.FC = () => {
         <EngagementHeatmap />
       ) : (
         <>
+          {/* Living Channel Distribution Diagram */}
+          <ScrollReveal direction="up" delay={0.08}>
+            <TrafficEngineDiagram />
+          </ScrollReveal>
+
           {/* Two Critical Leaks Identified */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Leak 1: Traffic Source Disparity */}
-        <div className="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-5 relative overflow-hidden">
+        <ScrollReveal direction="left" delay={0.06}>
+        <div className="h-full bg-slate-900/90 border border-amber-500/30 rounded-2xl p-5 relative overflow-hidden">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
@@ -186,9 +197,11 @@ export const ChannelAnalytics: React.FC = () => {
             </p>
           </div>
         </div>
+        </ScrollReveal>
 
         {/* Leak 2: Returning Audience Deficit */}
-        <div className="bg-slate-900/90 border border-rose-500/30 rounded-2xl p-5 relative overflow-hidden">
+        <ScrollReveal direction="right" delay={0.12}>
+        <div className="h-full bg-slate-900/90 border border-rose-500/30 rounded-2xl p-5 relative overflow-hidden">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 bg-rose-500/20 text-rose-400 rounded-xl border border-rose-500/30">
@@ -247,12 +260,14 @@ export const ChannelAnalytics: React.FC = () => {
             </p>
           </div>
         </div>
+        </ScrollReveal>
       </div>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* Stayed to watch */}
-        <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+        <ScrollReveal direction="left" delay={0.04}>
+        <div className="h-full bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
             <span>Viewed vs Swiped</span>
             <Eye className="w-4 h-4 text-emerald-400" />
@@ -263,9 +278,11 @@ export const ChannelAnalytics: React.FC = () => {
           </div>
           <div className="text-[11px] text-slate-500 mt-0.5">Swiped away: 33.8%</div>
         </div>
+        </ScrollReveal>
 
         {/* Audience Retention Avg */}
-        <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+        <ScrollReveal direction="up" delay={0.08}>
+        <div className="h-full bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
             <span>Avg View Duration</span>
             <Clock className="w-4 h-4 text-blue-400" />
@@ -274,9 +291,11 @@ export const ChannelAnalytics: React.FC = () => {
           <div className="text-xs text-blue-400 mt-1">Average across all Shorts</div>
           <div className="text-[11px] text-slate-500 mt-0.5">Top video (Voice Mode): 1:06s (104%)</div>
         </div>
+        </ScrollReveal>
 
         {/* Mobile Dominance */}
-        <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+        <ScrollReveal direction="down" delay={0.12}>
+        <div className="h-full bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
             <span>Device Type</span>
             <Smartphone className="w-4 h-4 text-purple-400" />
@@ -285,9 +304,11 @@ export const ChannelAnalytics: React.FC = () => {
           <div className="text-xs text-purple-400 mt-1">Mobile Phone view time</div>
           <div className="text-[11px] text-slate-500 mt-0.5">Desktop: 29.1% | TV: 1.3%</div>
         </div>
+        </ScrollReveal>
 
         {/* Geographic Split */}
-        <div className="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+        <ScrollReveal direction="right" delay={0.16}>
+        <div className="h-full bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
             <span>Top Geography</span>
             <Globe2 className="w-4 h-4 text-cyan-400" />
@@ -296,15 +317,21 @@ export const ChannelAnalytics: React.FC = () => {
           <div className="text-xs text-cyan-400 mt-1">Pakistan: 7.0%</div>
           <div className="text-[11px] text-slate-500 mt-0.5">Pak avg watch: 0:49 vs India 0:32</div>
         </div>
+        </ScrollReveal>
       </div>
 
       {/* Graphical Viewer Insights Component (Retention, Hourly Peaks, Geography) */}
-      <ViewerInsights />
+      <ScrollReveal direction="up" delay={0.05}>
+        <ViewerInsights />
+      </ScrollReveal>
 
       {/* Visual Engagement Heatmap Component */}
-      <EngagementHeatmap />
+      <ScrollReveal direction="left" delay={0.05}>
+        <EngagementHeatmap />
+      </ScrollReveal>
 
       {/* Top 6 Performing Content Matrix */}
+      <ScrollReveal direction="right" delay={0.05}>
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -392,8 +419,10 @@ export const ChannelAnalytics: React.FC = () => {
           </table>
         </div>
       </div>
+      </ScrollReveal>
 
       {/* Strategic Takeaways Box */}
+      <ScrollReveal direction="up" delay={0.06}>
       <div className="bg-gradient-to-br from-slate-900 to-blue-950/40 border border-blue-500/20 rounded-2xl p-5">
         <h4 className="text-white font-semibold text-sm flex items-center gap-2 mb-3">
           <Zap className="w-4 h-4 text-cyan-400" />
@@ -420,6 +449,7 @@ export const ChannelAnalytics: React.FC = () => {
           </div>
           </div>
         </div>
+      </ScrollReveal>
         </>
       )}
     </div>

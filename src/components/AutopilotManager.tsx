@@ -87,6 +87,7 @@ import { AutopilotConfigModal } from './AutopilotConfigModal';
 import { DiagnosticMessageBox } from './DiagnosticMessageBox';
 import { selfHealingEngine } from '../lib/selfHealingEngine';
 import type { TabType } from '../App';
+import { ScrollReveal, AutopilotPipelineDiagram } from './MotionPrimitives';
 
 // --- Task & Queue Types ---
 
@@ -1371,6 +1372,11 @@ export const AutopilotManager: React.FC<AutopilotManagerProps> = ({ onNavigateTa
 
   return (
     <div className="space-y-6">
+      {/* Living Autonomous Production Pipeline Diagram */}
+      <ScrollReveal direction="down" delay={0.04}>
+        <AutopilotPipelineDiagram title="Autopilot Autonomous Production & Continuity Pipeline" />
+      </ScrollReveal>
+
       {/* Top Banner: Autonomous Logic Layer Control Center */}
       <div className="relative rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border border-indigo-500/30 p-5 sm:p-6 overflow-hidden shadow-2xl space-y-4">
         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />

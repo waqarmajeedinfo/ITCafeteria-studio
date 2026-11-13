@@ -346,6 +346,17 @@ function ScoreCard({ result, provider }: { result: GrowthScoreResult; provider: 
       <div className="flex flex-col sm:flex-row items-center gap-5 mt-5">
         <div className="relative w-36 h-36 shrink-0">
           <svg viewBox="0 0 140 140" className="w-36 h-36 -rotate-90">
+            <circle
+              cx="70"
+              cy="70"
+              r={radius + 11}
+              stroke={TONE_HEX[result.tone]}
+              strokeOpacity="0.35"
+              strokeWidth="1.5"
+              strokeDasharray="6 6"
+              fill="none"
+              className="animate-orbit-spin-slow"
+            />
             <circle cx="70" cy="70" r={radius} stroke="#1e293b" strokeWidth="12" fill="none" />
             <circle
               cx="70"
@@ -821,7 +832,16 @@ function ViewsChart({ data, derived }: { data: YouTubeInsights; derived: YouTube
             <path d={linePath(previous)} fill="none" stroke="#64748b" strokeWidth="1.5" strokeDasharray="5 5" />
           )}
           <path d={areaPath} fill="url(#liveYtArea)" />
-          <path d={linePath(current)} fill="none" stroke="#22d3ee" strokeWidth="2.5" strokeLinejoin="round" />
+          <path d={linePath(current)} fill="none" stroke="#0891b2" strokeWidth="3" strokeLinejoin="round" />
+          <path
+            d={linePath(current)}
+            fill="none"
+            stroke="#67e8f9"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            className="animate-energy-flow-fast"
+          />
           {labelIndexes.map((index) => (
             <text
               key={index}

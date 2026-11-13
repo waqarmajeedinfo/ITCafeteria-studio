@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Target
 } from 'lucide-react';
+import { ScrollReveal, SignalOrbitDiagram } from './MotionPrimitives';
 
 interface GrowthSignal {
   id: string;
@@ -157,6 +158,11 @@ export const GrowthSignals: React.FC<{ onNavigateTab?: (tab: string) => void }> 
         </div>
       )}
 
+      {/* Living Viral Signal Radar Diagram */}
+      <ScrollReveal direction="up" delay={0.05}>
+        <SignalOrbitDiagram viralScore={viralScore} />
+      </ScrollReveal>
+
       {/* Flagged Signals & Anomalies Feed */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -168,9 +174,13 @@ export const GrowthSignals: React.FC<{ onNavigateTab?: (tab: string) => void }> 
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          {signals.map((sig) => (
-            <div 
+          {signals.map((sig, sigIdx) => (
+            <ScrollReveal
               key={sig.id}
+              direction={sigIdx % 2 === 0 ? 'left' : 'right'}
+              delay={Math.min(sigIdx * 0.05, 0.2)}
+            >
+            <div 
               className={`p-5 rounded-2xl border transition-all ${
                 sig.severity === 'positive' 
                   ? 'bg-slate-900/90 border-emerald-500/30 hover:border-emerald-500/50' 
@@ -231,6 +241,7 @@ export const GrowthSignals: React.FC<{ onNavigateTab?: (tab: string) => void }> 
                 </div>
               </div>
             </div>
+            </ScrollReveal>
           ))}
         </div>
       </div>
