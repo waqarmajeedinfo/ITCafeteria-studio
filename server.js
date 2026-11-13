@@ -1,7 +1,7 @@
 // server.ts
 import express from "express";
-import fs4 from "fs";
-import path4 from "path";
+import fs5 from "fs";
+import path5 from "path";
 import { fileURLToPath as fileURLToPath3 } from "url";
 import { timingSafeEqual as timingSafeEqual2 } from "crypto";
 import dotenv from "dotenv";
@@ -2298,23 +2298,518 @@ function registerIntegrationRoutes(app2) {
 }
 
 // server_multiuser.ts
-import fs from "fs";
-import path from "path";
+import fs2 from "fs";
+import path2 from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
-var __filename = fileURLToPath(import.meta.url);
-var __dirname = path.dirname(__filename);
-var DATA_ROOT = path.resolve(__dirname, "data");
-var USERS_DIR = path.resolve(DATA_ROOT, "users");
-var USER_STORAGE_DIR = path.resolve(DATA_ROOT, "user-storage");
-var GITHUB_MIRROR_DIR = path.resolve(__dirname, "user-data");
-var LOGS_DIR = path.resolve(DATA_ROOT, "logs");
-var USERS_FILE = path.resolve(USERS_DIR, "users-registry.json");
-var AUDIT_LOG_FILE = path.resolve(LOGS_DIR, "realtime-audit-webhooks.json");
-var WEBHOOK_CONFIG_FILE = path.resolve(DATA_ROOT, "webhook-config.json");
-[DATA_ROOT, USERS_DIR, USER_STORAGE_DIR, GITHUB_MIRROR_DIR, LOGS_DIR].forEach((dir) => {
+
+// server_github_sync.ts
+import fs from "fs";
+import path from "path";
+var STUDIO_STATE_FILE = path.resolve(process.cwd(), "data", "studio", "studio-state.json");
+var GITHUB_SYNC_META_FILE = path.resolve(process.cwd(), "data", "studio", "github-sync-meta.json");
+var GITHUB_REPO_MIRROR_ROOT = path.resolve(process.cwd(), "data", "github-repo-mirror");
+function getGitHubConfig() {
+  const token = (process.env.GITHUB_TOKEN || "").trim();
+  const repo = (process.env.GITHUB_REPO || "waqarmajeedinfo/ITCafeteria-studio").trim();
+  const branch = (process.env.GITHUB_BRANCH || "main").trim() || "main";
+  return {
+    token,
+    repo,
+    branch,
+    remoteConfigured: Boolean(token && repo.includes("/"))
+  };
+}
+function ensureDirForFile(filePath) {
+  const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
+  }
+}
+function loadStudioState() {
+  try {
+    if (fs.existsSync(STUDIO_STATE_FILE)) {
+      const raw = fs.readFileSync(STUDIO_STATE_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return {
+          version: Number(parsed.version) || 1,
+          updatedAt: parsed.updatedAt || (/* @__PURE__ */ new Date()).toISOString(),
+          lastSyncedAt: parsed.lastSyncedAt || null,
+          lastCommitSha: parsed.lastCommitSha || null,
+          lastSyncReason: parsed.lastSyncReason || null,
+          ...parsed
+        };
+      }
+    }
+  } catch (err) {
+    console.error("[GitHubSync] Error reading studio state:", err);
+  }
+  const initial = {
+    version: 1,
+    updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    lastSyncedAt: null,
+    lastCommitSha: null,
+    lastSyncReason: "initial_bootstrap"
+  };
+  saveStudioState(initial);
+  return initial;
+}
+function saveStudioState(state) {
+  try {
+    ensureDirForFile(STUDIO_STATE_FILE);
+    fs.writeFileSync(STUDIO_STATE_FILE, JSON.stringify(state, null, 2), "utf-8");
+    const mirrorFile = path.resolve(GITHUB_REPO_MIRROR_ROOT, "data/studio/studio-state.json");
+    ensureDirForFile(mirrorFile);
+    fs.writeFileSync(mirrorFile, JSON.stringify(state, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[GitHubSync] Error writing studio state:", err);
+  }
+}
+function mergeStudioStatePatch(patch, reason = "studio_update") {
+  const current = loadStudioState();
+  const next = {
+    ...current,
+    ...patch,
+    banner: patch.banner ? { ...current.banner || {}, ...patch.banner } : current.banner,
+    profileLibraries: patch.profileLibraries ? { ...current.profileLibraries || {}, ...patch.profileLibraries } : current.profileLibraries,
+    agentGeneratedData: patch.agentGeneratedData ? { ...current.agentGeneratedData || {}, ...patch.agentGeneratedData } : current.agentGeneratedData,
+    version: (Number(current.version) || 1) + 1,
+    updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    lastSyncReason: reason
+  };
+  saveStudioState(next);
+  return next;
+}
+function loadSyncMeta() {
+  const cfg = getGitHubConfig();
+  try {
+    if (fs.existsSync(GITHUB_SYNC_META_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(GITHUB_SYNC_META_FILE, "utf-8"));
+      if (parsed && typeof parsed === "object") {
+        return {
+          repo: cfg.repo,
+          branch: cfg.branch,
+          lastSyncedAt: parsed.lastSyncedAt || null,
+          lastCommitSha: parsed.lastCommitSha || null,
+          lastSyncError: parsed.lastSyncError || null,
+          recentCommits: Array.isArray(parsed.recentCommits) ? parsed.recentCommits : []
+        };
+      }
+    }
+  } catch {
+  }
+  return {
+    repo: cfg.repo,
+    branch: cfg.branch,
+    lastSyncedAt: null,
+    lastCommitSha: null,
+    lastSyncError: null,
+    recentCommits: []
+  };
+}
+function saveSyncMeta(meta) {
+  try {
+    ensureDirForFile(GITHUB_SYNC_META_FILE);
+    fs.writeFileSync(GITHUB_SYNC_META_FILE, JSON.stringify(meta, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[GitHubSync] Meta save error:", err);
+  }
+}
+function normalizeTarget(input) {
+  if (typeof input === "string") {
+    const cleanRel = input.replace(/^\/+/, "");
+    return {
+      localPath: path.resolve(process.cwd(), cleanRel),
+      repoPath: cleanRel
+    };
+  }
+  return {
+    localPath: path.isAbsolute(input.localPath) ? input.localPath : path.resolve(process.cwd(), input.localPath),
+    repoPath: input.repoPath.replace(/^\/+/, "")
+  };
+}
+function mirrorTargetsToLocalRepoMirror(targets) {
+  for (const t of targets) {
+    try {
+      if (fs.existsSync(t.localPath)) {
+        const dest = path.resolve(GITHUB_REPO_MIRROR_ROOT, t.repoPath);
+        ensureDirForFile(dest);
+        fs.copyFileSync(t.localPath, dest);
+      }
+    } catch (err) {
+      console.warn(`[GitHubSync] Mirror copy skipped for ${t.repoPath}:`, err);
+    }
+  }
+}
+async function githubApiFetch(url, token, init = {}) {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "ITCafeteria-Studio-Sync/1.0",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...init.headers || {}
+    }
+  });
+  return res;
+}
+async function commitTargetsToGitHub(targets, commitMessage) {
+  const cfg = getGitHubConfig();
+  mirrorTargetsToLocalRepoMirror(targets);
+  const validFiles = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const t of targets) {
+    if (seen.has(t.repoPath)) continue;
+    seen.add(t.repoPath);
+    if (fs.existsSync(t.localPath) && fs.statSync(t.localPath).isFile()) {
+      try {
+        const content = fs.readFileSync(t.localPath, "utf-8");
+        validFiles.push({ repoPath: t.repoPath, content });
+      } catch {
+      }
+    }
+  }
+  if (validFiles.length === 0) {
+    return { committed: false, error: "No valid local files found to sync.", filesCount: 0 };
+  }
+  if (!cfg.remoteConfigured) {
+    return {
+      committed: false,
+      error: "GITHUB_TOKEN environment variable not configured (local mirror & live server state updated).",
+      filesCount: validFiles.length
+    };
+  }
+  const [owner, repoName] = cfg.repo.split("/");
+  const apiBase = `https://api.github.com/repos/${owner}/${repoName}`;
+  const attemptCommit = async () => {
+    const refRes = await githubApiFetch(`${apiBase}/git/ref/heads/${encodeURIComponent(cfg.branch)}`, cfg.token);
+    if (!refRes.ok) {
+      const txt = await refRes.text();
+      throw new Error(`GitHub ref lookup failed (${refRes.status}): ${txt.slice(0, 180)}`);
+    }
+    const refJson = await refRes.json();
+    const headSha = refJson?.object?.sha;
+    if (!headSha) throw new Error("Missing GitHub branch head SHA");
+    const commitRes = await githubApiFetch(`${apiBase}/git/commits/${headSha}`, cfg.token);
+    if (!commitRes.ok) {
+      const txt = await commitRes.text();
+      throw new Error(`GitHub commit lookup failed (${commitRes.status}): ${txt.slice(0, 180)}`);
+    }
+    const commitJson = await commitRes.json();
+    const baseTreeSha = commitJson?.tree?.sha;
+    if (!baseTreeSha) throw new Error("Missing GitHub base tree SHA");
+    const treeRes = await githubApiFetch(`${apiBase}/git/trees`, cfg.token, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        base_tree: baseTreeSha,
+        tree: validFiles.map((f) => ({
+          path: f.repoPath,
+          mode: "100644",
+          type: "blob",
+          content: f.content
+        }))
+      })
+    });
+    if (!treeRes.ok) {
+      const txt = await treeRes.text();
+      throw new Error(`GitHub tree create failed (${treeRes.status}): ${txt.slice(0, 180)}`);
+    }
+    const treeJson = await treeRes.json();
+    const newCommitRes = await githubApiFetch(`${apiBase}/git/commits`, cfg.token, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: commitMessage,
+        tree: treeJson.sha,
+        parents: [headSha]
+      })
+    });
+    if (!newCommitRes.ok) {
+      const txt = await newCommitRes.text();
+      throw new Error(`GitHub commit create failed (${newCommitRes.status}): ${txt.slice(0, 180)}`);
+    }
+    const newCommitJson = await newCommitRes.json();
+    const patchRes = await githubApiFetch(`${apiBase}/git/refs/heads/${encodeURIComponent(cfg.branch)}`, cfg.token, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sha: newCommitJson.sha,
+        force: false
+      })
+    });
+    if (!patchRes.ok) {
+      const txt = await patchRes.text();
+      throw new Error(`GitHub ref update failed (${patchRes.status}): ${txt.slice(0, 180)}`);
+    }
+    return {
+      sha: newCommitJson.sha,
+      url: newCommitJson.html_url || `https://github.com/${cfg.repo}/commit/${newCommitJson.sha}`
+    };
+  };
+  try {
+    let result;
+    try {
+      result = await attemptCommit();
+    } catch (firstErr) {
+      if (/409|422/.test(String(firstErr?.message || ""))) {
+        result = await attemptCommit();
+      } else {
+        throw firstErr;
+      }
+    }
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const meta = loadSyncMeta();
+    meta.lastSyncedAt = now;
+    meta.lastCommitSha = result.sha;
+    meta.lastSyncError = null;
+    meta.recentCommits = [
+      {
+        sha: result.sha,
+        message: commitMessage,
+        timestamp: now,
+        filesCount: validFiles.length,
+        url: result.url
+      },
+      ...meta.recentCommits
+    ].slice(0, 20);
+    saveSyncMeta(meta);
+    const state = loadStudioState();
+    state.lastSyncedAt = now;
+    state.lastCommitSha = result.sha;
+    saveStudioState(state);
+    return { committed: true, sha: result.sha, url: result.url, filesCount: validFiles.length };
+  } catch (err) {
+    const errMsg = err?.message || "GitHub push error";
+    const meta = loadSyncMeta();
+    meta.lastSyncError = errMsg;
+    saveSyncMeta(meta);
+    return { committed: false, error: errMsg, filesCount: validFiles.length };
+  }
+}
+var pendingTargetMap = /* @__PURE__ */ new Map();
+var pendingMessages = [];
+var debounceTimer = null;
+var syncChain = Promise.resolve();
+function scheduleGitHubSync(targets, commitMessage = "chore(studio): sync studio state and agent data") {
+  const normalized = targets.map(normalizeTarget);
+  mirrorTargetsToLocalRepoMirror(normalized);
+  for (const t of normalized) {
+    pendingTargetMap.set(t.repoPath, t);
+  }
+  if (commitMessage && !pendingMessages.includes(commitMessage)) {
+    pendingMessages.push(commitMessage);
+  }
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    const batchTargets = Array.from(pendingTargetMap.values());
+    const msg = pendingMessages.length === 1 ? pendingMessages[0] : `chore(studio): batch sync (${batchTargets.length} files)`;
+    pendingTargetMap.clear();
+    pendingMessages.length = 0;
+    debounceTimer = null;
+    syncChain = syncChain.then(async () => {
+      await commitTargetsToGitHub(batchTargets, msg);
+    }).catch((err) => {
+      console.error("[GitHubSync] Background batch error:", err);
+    });
+  }, 450);
+}
+function collectAllSyncableFiles() {
+  const candidates = [
+    "data/studio/studio-state.json",
+    "data/agent/agent-registry.json",
+    "data/agent/companion-memory.json",
+    "data/agent/competitor-intelligence.json",
+    "data/agent/phonetic-dictionary.json",
+    "data/users/users-registry.json"
+  ];
+  const userStorageRoot = path.resolve(process.cwd(), "data", "user-storage");
+  if (fs.existsSync(userStorageRoot)) {
+    try {
+      for (const username of fs.readdirSync(userStorageRoot)) {
+        const userDir = path.resolve(userStorageRoot, username);
+        if (fs.statSync(userDir).isDirectory()) {
+          for (const file of fs.readdirSync(userDir)) {
+            const full = path.resolve(userDir, file);
+            if (fs.statSync(full).isFile() && file.endsWith(".json")) {
+              candidates.push({
+                localPath: full,
+                repoPath: `user-data/${username}/${file}`
+              });
+            }
+          }
+        }
+      }
+    } catch {
+    }
+  }
+  return candidates.map(normalizeTarget).filter((t) => fs.existsSync(t.localPath) && fs.statSync(t.localPath).isFile());
+}
+async function pullStudioStateFromGitHub() {
+  const localState = loadStudioState();
+  const cfg = getGitHubConfig();
+  if (!cfg.remoteConfigured) {
+    return {
+      pulled: false,
+      updatedLocal: false,
+      state: localState,
+      error: "GITHUB_TOKEN not configured; serving live server studio-state."
+    };
+  }
+  try {
+    const [owner, repoName] = cfg.repo.split("/");
+    const url = `https://api.github.com/repos/${owner}/${repoName}/contents/data/studio/studio-state.json?ref=${encodeURIComponent(cfg.branch)}`;
+    const res = await githubApiFetch(url, cfg.token, {
+      headers: { Accept: "application/vnd.github.raw+json" }
+    });
+    if (!res.ok) {
+      return {
+        pulled: false,
+        updatedLocal: false,
+        state: localState,
+        error: `GitHub pull returned HTTP ${res.status}`
+      };
+    }
+    const remoteState = await res.json();
+    if (remoteState && remoteState.updatedAt && new Date(remoteState.updatedAt).getTime() > new Date(localState.updatedAt || 0).getTime()) {
+      saveStudioState(remoteState);
+      return { pulled: true, updatedLocal: true, state: remoteState };
+    }
+    return { pulled: true, updatedLocal: false, state: localState };
+  } catch (err) {
+    return {
+      pulled: false,
+      updatedLocal: false,
+      state: localState,
+      error: err?.message || "Pull failed"
+    };
+  }
+}
+function getPublicSyncStatus() {
+  const cfg = getGitHubConfig();
+  const meta = loadSyncMeta();
+  const state = loadStudioState();
+  return {
+    repo: cfg.repo,
+    branch: cfg.branch,
+    remoteConfigured: cfg.remoteConfigured,
+    liveCrossDeviceActive: true,
+    stateVersion: state.version,
+    stateUpdatedAt: state.updatedAt,
+    lastSyncedAt: meta.lastSyncedAt || state.lastSyncedAt,
+    lastCommitSha: meta.lastCommitSha || state.lastCommitSha,
+    lastSyncError: meta.lastSyncError,
+    pendingFiles: pendingTargetMap.size,
+    recentCommits: meta.recentCommits.slice(0, 8)
+  };
+}
+function registerGitHubSyncRoutes(app2) {
+  app2.get("/api/studio-state", async (req, res) => {
+    try {
+      if (req.query.pull === "1") {
+        await pullStudioStateFromGitHub();
+      }
+      const state = loadStudioState();
+      res.json({
+        ok: true,
+        state,
+        syncStatus: getPublicSyncStatus()
+      });
+    } catch (err) {
+      res.status(500).json({ error: err?.message || "Failed to read studio state" });
+    }
+  });
+  const handleStateUpdate = (req, res) => {
+    try {
+      const body = req.body || {};
+      const patch = body.patch && typeof body.patch === "object" ? body.patch : body;
+      const reason = typeof body.reason === "string" ? body.reason : "ui_state_updated";
+      const cleanPatch = {};
+      const allowedKeys = [
+        "menuConfig",
+        "themeConfig",
+        "banner",
+        "pendingQueue",
+        "publishedLibrary",
+        "profileLibraries",
+        "channels",
+        "latestStory",
+        "agentGeneratedData"
+      ];
+      for (const k of allowedKeys) {
+        if (patch[k] !== void 0) {
+          cleanPatch[k] = patch[k];
+        }
+      }
+      const updated = mergeStudioStatePatch(cleanPatch, reason);
+      scheduleGitHubSync(
+        ["data/studio/studio-state.json"],
+        `chore(studio): sync ${reason}`
+      );
+      res.json({
+        ok: true,
+        state: updated,
+        syncStatus: getPublicSyncStatus()
+      });
+    } catch (err) {
+      res.status(500).json({ error: err?.message || "Failed to update studio state" });
+    }
+  };
+  app2.put("/api/studio-state", handleStateUpdate);
+  app2.post("/api/studio-state", handleStateUpdate);
+  app2.get("/api/github/status", (_req, res) => {
+    res.json({
+      ok: true,
+      ...getPublicSyncStatus()
+    });
+  });
+  app2.post("/api/github/sync-now", async (req, res) => {
+    try {
+      const reason = String(req.body?.reason || "Manual Studio & Agent Full Sync");
+      const targets = collectAllSyncableFiles();
+      const result = await commitTargetsToGitHub(
+        targets,
+        `chore(studio): ${reason} (${targets.length} files)`
+      );
+      res.json({
+        ok: true,
+        ...result,
+        syncStatus: getPublicSyncStatus()
+      });
+    } catch (err) {
+      res.status(500).json({ error: err?.message || "GitHub sync-now failed" });
+    }
+  });
+  app2.post("/api/github/pull-state", async (_req, res) => {
+    try {
+      const result = await pullStudioStateFromGitHub();
+      res.json({
+        ok: true,
+        ...result,
+        syncStatus: getPublicSyncStatus()
+      });
+    } catch (err) {
+      res.status(500).json({ error: err?.message || "GitHub pull failed" });
+    }
+  });
+}
+
+// server_multiuser.ts
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = path2.dirname(__filename);
+var DATA_ROOT = path2.resolve(__dirname, "data");
+var USERS_DIR = path2.resolve(DATA_ROOT, "users");
+var USER_STORAGE_DIR = path2.resolve(DATA_ROOT, "user-storage");
+var GITHUB_MIRROR_DIR = path2.resolve(__dirname, "user-data");
+var LOGS_DIR = path2.resolve(DATA_ROOT, "logs");
+var USERS_FILE = path2.resolve(USERS_DIR, "users-registry.json");
+var AUDIT_LOG_FILE = path2.resolve(LOGS_DIR, "realtime-audit-webhooks.json");
+var WEBHOOK_CONFIG_FILE = path2.resolve(DATA_ROOT, "webhook-config.json");
+[DATA_ROOT, USERS_DIR, USER_STORAGE_DIR, GITHUB_MIRROR_DIR, LOGS_DIR].forEach((dir) => {
+  if (!fs2.existsSync(dir)) {
+    fs2.mkdirSync(dir, { recursive: true });
   }
 });
 var DEFAULT_ADMIN_PERMISSIONS = {
@@ -2382,9 +2877,9 @@ function generateToken() {
   return crypto.randomBytes(32).toString("hex");
 }
 function initDefaultUsers() {
-  if (fs.existsSync(USERS_FILE)) {
+  if (fs2.existsSync(USERS_FILE)) {
     try {
-      const data = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+      const data = JSON.parse(fs2.readFileSync(USERS_FILE, "utf-8"));
       if (Array.isArray(data) && data.length > 0) {
         const users2 = data.map((u) => ({
           ...u,
@@ -2408,14 +2903,14 @@ function initDefaultUsers() {
             permissions: { ...DEFAULT_ADMIN_PERMISSIONS }
           };
           users2.push(adminInfoUser2);
-          fs.writeFileSync(USERS_FILE, JSON.stringify(users2, null, 2), "utf-8");
+          fs2.writeFileSync(USERS_FILE, JSON.stringify(users2, null, 2), "utf-8");
         } else {
           const salt = users2[adminInfoIndex].salt || crypto.randomBytes(16).toString("hex");
           users2[adminInfoIndex].salt = salt;
           users2[adminInfoIndex].passwordHash = hashPassword("WM2info$", salt);
           users2[adminInfoIndex].role = "admin";
           users2[adminInfoIndex].isActive = true;
-          fs.writeFileSync(USERS_FILE, JSON.stringify(users2, null, 2), "utf-8");
+          fs2.writeFileSync(USERS_FILE, JSON.stringify(users2, null, 2), "utf-8");
         }
         return users2;
       }
@@ -2469,21 +2964,21 @@ function initDefaultUsers() {
     permissions: { ...DEFAULT_ADMIN_PERMISSIONS }
   };
   const users = [adminUser, stdUser, adminInfoUser];
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+  fs2.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
   return users;
 }
 var usersRegistry = initDefaultUsers();
 function saveUsersRegistry() {
   try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(usersRegistry, null, 2), "utf-8");
+    fs2.writeFileSync(USERS_FILE, JSON.stringify(usersRegistry, null, 2), "utf-8");
   } catch (e) {
     console.error("[MultiUser] Failed to save users registry:", e);
   }
 }
 function getWebhookConfig() {
-  if (fs.existsSync(WEBHOOK_CONFIG_FILE)) {
+  if (fs2.existsSync(WEBHOOK_CONFIG_FILE)) {
     try {
-      return JSON.parse(fs.readFileSync(WEBHOOK_CONFIG_FILE, "utf-8"));
+      return JSON.parse(fs2.readFileSync(WEBHOOK_CONFIG_FILE, "utf-8"));
     } catch {
     }
   }
@@ -2496,17 +2991,17 @@ function getWebhookConfig() {
 }
 function saveWebhookConfig(cfg) {
   try {
-    fs.writeFileSync(WEBHOOK_CONFIG_FILE, JSON.stringify(cfg, null, 2), "utf-8");
+    fs2.writeFileSync(WEBHOOK_CONFIG_FILE, JSON.stringify(cfg, null, 2), "utf-8");
   } catch (e) {
     console.error("[MultiUser] Failed to save webhook config:", e);
   }
 }
 function ensureUserStorage(username) {
   const safeUser = username.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
-  const userDir = path.resolve(USER_STORAGE_DIR, safeUser);
-  const repoMirrorDir = path.resolve(GITHUB_MIRROR_DIR, safeUser);
+  const userDir = path2.resolve(USER_STORAGE_DIR, safeUser);
+  const repoMirrorDir = path2.resolve(GITHUB_MIRROR_DIR, safeUser);
   [userDir, repoMirrorDir].forEach((d) => {
-    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+    if (!fs2.existsSync(d)) fs2.mkdirSync(d, { recursive: true });
   });
   const files = [
     {
@@ -2548,12 +3043,12 @@ function ensureUserStorage(username) {
     }
   ];
   files.forEach((f) => {
-    const filePath = path.resolve(userDir, f.name);
-    const mirrorPath = path.resolve(repoMirrorDir, f.name);
-    if (!fs.existsSync(filePath)) {
+    const filePath = path2.resolve(userDir, f.name);
+    const mirrorPath = path2.resolve(repoMirrorDir, f.name);
+    if (!fs2.existsSync(filePath)) {
       const data = JSON.stringify(f.content, null, 2);
-      fs.writeFileSync(filePath, data, "utf-8");
-      fs.writeFileSync(mirrorPath, data, "utf-8");
+      fs2.writeFileSync(filePath, data, "utf-8");
+      fs2.writeFileSync(mirrorPath, data, "utf-8");
     }
   });
   return { userDir, repoMirrorDir };
@@ -2625,9 +3120,9 @@ async function logAuditEvent(user, action, details, targetFile, reqIp = "127.0.0
   }
   try {
     let existingLogs = [];
-    if (fs.existsSync(AUDIT_LOG_FILE)) {
+    if (fs2.existsSync(AUDIT_LOG_FILE)) {
       try {
-        const raw = fs.readFileSync(AUDIT_LOG_FILE, "utf-8");
+        const raw = fs2.readFileSync(AUDIT_LOG_FILE, "utf-8");
         existingLogs = JSON.parse(raw);
         if (!Array.isArray(existingLogs)) existingLogs = [];
       } catch {
@@ -2648,7 +3143,7 @@ async function logAuditEvent(user, action, details, targetFile, reqIp = "127.0.0
       webhookPayloadPreview: entry.webhookPayloadPreview ? { ...entry.webhookPayloadPreview } : void 0
     };
     existingLogs.unshift(cleanEntry);
-    fs.writeFileSync(AUDIT_LOG_FILE, JSON.stringify(existingLogs.slice(0, 500), null, 2), "utf-8");
+    fs2.writeFileSync(AUDIT_LOG_FILE, JSON.stringify(existingLogs.slice(0, 500), null, 2), "utf-8");
   } catch (err) {
     console.error("[MultiUser] Failed to write audit log:", err);
   }
@@ -2871,15 +3366,15 @@ function registerMultiUserRoutes(app2) {
         email: user.email
       });
       try {
-        const outboxDir = path.join(process.cwd(), "data", "logs");
-        if (!fs.existsSync(outboxDir)) {
-          fs.mkdirSync(outboxDir, { recursive: true });
+        const outboxDir = path2.join(process.cwd(), "data", "logs");
+        if (!fs2.existsSync(outboxDir)) {
+          fs2.mkdirSync(outboxDir, { recursive: true });
         }
-        const outboxFile = path.join(outboxDir, "simulated-email-outbox.json");
+        const outboxFile = path2.join(outboxDir, "simulated-email-outbox.json");
         let outbox = [];
-        if (fs.existsSync(outboxFile)) {
+        if (fs2.existsSync(outboxFile)) {
           try {
-            outbox = JSON.parse(fs.readFileSync(outboxFile, "utf8"));
+            outbox = JSON.parse(fs2.readFileSync(outboxFile, "utf8"));
           } catch {
           }
         }
@@ -2892,7 +3387,7 @@ function registerMultiUserRoutes(app2) {
           expiresAt: new Date(expiresAt).toISOString()
         });
         if (outbox.length > 100) outbox = outbox.slice(0, 100);
-        fs.writeFileSync(outboxFile, JSON.stringify(outbox, null, 2), "utf8");
+        fs2.writeFileSync(outboxFile, JSON.stringify(outbox, null, 2), "utf8");
       } catch (err) {
         console.warn("[Auth] Could not write to email outbox log:", err);
       }
@@ -2981,11 +3476,11 @@ function registerMultiUserRoutes(app2) {
     const user = req.user;
     const { userDir, repoMirrorDir } = ensureUserStorage(user.username);
     try {
-      const fileNames = fs.readdirSync(userDir);
+      const fileNames = fs2.readdirSync(userDir);
       const filesSummary = {};
       fileNames.forEach((file) => {
         try {
-          const content = fs.readFileSync(path.resolve(userDir, file), "utf-8");
+          const content = fs2.readFileSync(path2.resolve(userDir, file), "utf-8");
           filesSummary[file] = JSON.parse(content);
         } catch {
           filesSummary[file] = null;
@@ -3010,13 +3505,13 @@ function registerMultiUserRoutes(app2) {
     }
     const safeFileName = fileKey.replace(/[^a-zA-Z0-9_.-]/g, "");
     const { userDir, repoMirrorDir } = ensureUserStorage(user.username);
-    const targetPath = path.resolve(userDir, safeFileName);
-    const mirrorPath = path.resolve(repoMirrorDir, safeFileName);
+    const targetPath = path2.resolve(userDir, safeFileName);
+    const mirrorPath = path2.resolve(repoMirrorDir, safeFileName);
     try {
       const jsonContent = JSON.stringify(data, null, 2);
-      fs.writeFileSync(targetPath, jsonContent, "utf-8");
-      fs.writeFileSync(mirrorPath, jsonContent, "utf-8");
-      const syncStatusPath = path.resolve(userDir, "github-sync.json");
+      fs2.writeFileSync(targetPath, jsonContent, "utf-8");
+      fs2.writeFileSync(mirrorPath, jsonContent, "utf-8");
+      const syncStatusPath = path2.resolve(userDir, "github-sync.json");
       const syncStatus = {
         lastCommitHash: `commit-${Date.now().toString(36)}`,
         lastSyncTimestamp: (/* @__PURE__ */ new Date()).toISOString(),
@@ -3025,8 +3520,15 @@ function registerMultiUserRoutes(app2) {
         directory: `user-data/${user.username}`,
         lastModifiedFile: safeFileName
       };
-      fs.writeFileSync(syncStatusPath, JSON.stringify(syncStatus, null, 2), "utf-8");
-      fs.writeFileSync(path.resolve(repoMirrorDir, "github-sync.json"), JSON.stringify(syncStatus, null, 2), "utf-8");
+      fs2.writeFileSync(syncStatusPath, JSON.stringify(syncStatus, null, 2), "utf-8");
+      fs2.writeFileSync(path2.resolve(repoMirrorDir, "github-sync.json"), JSON.stringify(syncStatus, null, 2), "utf-8");
+      scheduleGitHubSync(
+        [
+          { localPath: targetPath, repoPath: `user-data/${user.username}/${safeFileName}` },
+          { localPath: syncStatusPath, repoPath: `user-data/${user.username}/github-sync.json` }
+        ],
+        `chore(user-data): @${user.username} updated ${safeFileName}`
+      );
       const auditLog = await logAuditEvent(
         user,
         "DATA_ADDITION_SAVED",
@@ -3278,11 +3780,11 @@ function registerMultiUserRoutes(app2) {
       return res.status(404).json({ error: "User nahi mila." });
     }
     const { userDir } = ensureUserStorage(user.username);
-    const files = fs.readdirSync(userDir);
+    const files = fs2.readdirSync(userDir);
     const contentMap = {};
     files.forEach((f) => {
       try {
-        contentMap[f] = JSON.parse(fs.readFileSync(path.resolve(userDir, f), "utf-8"));
+        contentMap[f] = JSON.parse(fs2.readFileSync(path2.resolve(userDir, f), "utf-8"));
       } catch {
         contentMap[f] = null;
       }
@@ -3298,8 +3800,8 @@ function registerMultiUserRoutes(app2) {
     const user = req.user;
     try {
       let logs = [];
-      if (fs.existsSync(AUDIT_LOG_FILE)) {
-        logs = JSON.parse(fs.readFileSync(AUDIT_LOG_FILE, "utf-8"));
+      if (fs2.existsSync(AUDIT_LOG_FILE)) {
+        logs = JSON.parse(fs2.readFileSync(AUDIT_LOG_FILE, "utf-8"));
       }
       if (user.role !== "admin") {
         logs = logs.filter((l) => l.username === user.username);
@@ -3360,10 +3862,22 @@ function registerMultiUserRoutes(app2) {
       user: user.username,
       repoDirectory: `user-data/${user.username}`,
       syncedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      filesCount: fs.readdirSync(userDir).length,
+      filesCount: fs2.readdirSync(userDir).length,
       status: "SUCCESS_SYNCED_TO_GIT_REPO"
     };
-    fs.writeFileSync(path.resolve(repoMirrorDir, "sync-meta.json"), JSON.stringify(syncMeta, null, 2), "utf-8");
+    fs2.writeFileSync(path2.resolve(repoMirrorDir, "sync-meta.json"), JSON.stringify(syncMeta, null, 2), "utf-8");
+    const userSyncTargets = fs2.readdirSync(userDir).filter((f) => fs2.statSync(path2.resolve(userDir, f)).isFile()).map((f) => ({
+      localPath: path2.resolve(userDir, f),
+      repoPath: `user-data/${user.username}/${f}`
+    }));
+    userSyncTargets.push({
+      localPath: path2.resolve(repoMirrorDir, "sync-meta.json"),
+      repoPath: `user-data/${user.username}/sync-meta.json`
+    });
+    scheduleGitHubSync(
+      userSyncTargets,
+      `chore(user-data): sync @${user.username} directory (${userSyncTargets.length} files)`
+    );
     await logAuditEvent(
       user,
       "GITHUB_REPO_SYNC",
@@ -3380,13 +3894,13 @@ function registerMultiUserRoutes(app2) {
   app2.get("/api/user-storage/sync-logs", (_req, res) => {
     try {
       const userFolders = [];
-      if (fs.existsSync(GITHUB_MIRROR_DIR)) {
-        const dirs = fs.readdirSync(GITHUB_MIRROR_DIR);
+      if (fs2.existsSync(GITHUB_MIRROR_DIR)) {
+        const dirs = fs2.readdirSync(GITHUB_MIRROR_DIR);
         dirs.forEach((d) => {
-          const fullPath = path.resolve(GITHUB_MIRROR_DIR, d);
-          if (fs.statSync(fullPath).isDirectory()) {
-            const files = fs.readdirSync(fullPath);
-            const mtime = fs.statSync(fullPath).mtime.toISOString();
+          const fullPath = path2.resolve(GITHUB_MIRROR_DIR, d);
+          if (fs2.statSync(fullPath).isDirectory()) {
+            const files = fs2.readdirSync(fullPath);
+            const mtime = fs2.statSync(fullPath).mtime.toISOString();
             userFolders.push({ username: d, files, lastModified: mtime });
           }
         });
@@ -3416,17 +3930,17 @@ function registerMultiUserRoutes(app2) {
 }
 
 // server_topic_research.ts
-import fs2 from "fs";
-import path2 from "path";
+import fs3 from "fs";
+import path3 from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { GoogleGenAI } from "@google/genai";
 var __filename2 = fileURLToPath2(import.meta.url);
-var __dirname2 = path2.dirname(__filename2);
-var PROFILES_DATA_DIR = path2.resolve(__dirname2, "data", "profiles");
-var BACKUPS_DIR = path2.resolve(__dirname2, "data", "backups");
+var __dirname2 = path3.dirname(__filename2);
+var PROFILES_DATA_DIR = path3.resolve(__dirname2, "data", "profiles");
+var BACKUPS_DIR = path3.resolve(__dirname2, "data", "backups");
 function ensureDirectories() {
-  if (!fs2.existsSync(PROFILES_DATA_DIR)) fs2.mkdirSync(PROFILES_DATA_DIR, { recursive: true });
-  if (!fs2.existsSync(BACKUPS_DIR)) fs2.mkdirSync(BACKUPS_DIR, { recursive: true });
+  if (!fs3.existsSync(PROFILES_DATA_DIR)) fs3.mkdirSync(PROFILES_DATA_DIR, { recursive: true });
+  if (!fs3.existsSync(BACKUPS_DIR)) fs3.mkdirSync(BACKUPS_DIR, { recursive: true });
 }
 function getAiClient() {
   const apiKey = (process.env.GEMINI_API_KEY || "").trim();
@@ -3529,8 +4043,8 @@ function registerTopicResearchRoutes(app2) {
   });
   app2.get("/api/backup/download-full", (_req, res) => {
     try {
-      const backupPath = path2.resolve(BACKUPS_DIR, "safety_backup_published_library_and_settings.json");
-      if (fs2.existsSync(backupPath)) {
+      const backupPath = path3.resolve(BACKUPS_DIR, "safety_backup_published_library_and_settings.json");
+      if (fs3.existsSync(backupPath)) {
         res.setHeader("Content-Disposition", 'attachment; filename="itcafeteria_safety_backup.json"');
         res.setHeader("Content-Type", "application/json");
         return res.sendFile(backupPath);
@@ -3546,9 +4060,9 @@ function registerTopicResearchRoutes(app2) {
       let { stories } = req.body || {};
       if (!Array.isArray(stories) || stories.length === 0) {
         try {
-          const backupPath = path2.resolve(process.cwd(), "data/backups/safety_backup_published_library_and_settings.json");
-          if (fs2.existsSync(backupPath)) {
-            const raw = fs2.readFileSync(backupPath, "utf8");
+          const backupPath = path3.resolve(process.cwd(), "data/backups/safety_backup_published_library_and_settings.json");
+          if (fs3.existsSync(backupPath)) {
+            const raw = fs3.readFileSync(backupPath, "utf8");
             const parsed = JSON.parse(raw);
             stories = parsed.publishedVideos || [];
           }
@@ -4070,9 +4584,9 @@ function generateFallbackTopics(channelId, categoryId, aspectRatio, excluded) {
 }
 
 // server_agent_management.ts
-import fs3 from "fs";
-import path3 from "path";
-var REGISTRY_FILE = path3.resolve(process.cwd(), "data", "agent", "agent-registry.json");
+import fs4 from "fs";
+import path4 from "path";
+var REGISTRY_FILE = path4.resolve(process.cwd(), "data", "agent", "agent-registry.json");
 function buildDefaultFunctions() {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   return [
@@ -4338,8 +4852,8 @@ function buildDefaultFunctions() {
 }
 function loadRegistry() {
   try {
-    if (fs3.existsSync(REGISTRY_FILE)) {
-      const raw = fs3.readFileSync(REGISTRY_FILE, "utf-8");
+    if (fs4.existsSync(REGISTRY_FILE)) {
+      const raw = fs4.readFileSync(REGISTRY_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.functions)) {
         return {
@@ -4362,10 +4876,14 @@ function loadRegistry() {
 }
 function saveRegistry(store) {
   try {
-    const dir = path3.dirname(REGISTRY_FILE);
-    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
+    const dir = path4.dirname(REGISTRY_FILE);
+    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
     store.lastUpdated = (/* @__PURE__ */ new Date()).toISOString();
-    fs3.writeFileSync(REGISTRY_FILE, JSON.stringify(store, null, 2), "utf-8");
+    fs4.writeFileSync(REGISTRY_FILE, JSON.stringify(store, null, 2), "utf-8");
+    scheduleGitHubSync(
+      ["data/agent/agent-registry.json"],
+      "chore(agent): update agent functions & execution logs"
+    );
   } catch (err) {
     console.error("[AgentManagement] Save error:", err);
   }
@@ -4573,7 +5091,7 @@ function registerAgentManagementRoutes(app2, getPort) {
 // server.ts
 dotenv.config({ override: true });
 var __filename3 = fileURLToPath3(import.meta.url);
-var __dirname3 = path4.dirname(__filename3);
+var __dirname3 = path5.dirname(__filename3);
 var port = process.env.DEFAULT_APP_PORT ? Number(process.env.DEFAULT_APP_PORT) : process.env.PORT ? Number(process.env.PORT) : 3e3;
 var app = express();
 app.set("trust proxy", 1);
@@ -4758,11 +5276,11 @@ var CHAT_FALLBACK_ORDER = [
   "gemini-3.8-flash",
   "gemini-flash-latest"
 ];
-var COMPANION_MEMORY_FILE = path4.resolve(__dirname3, "data", "agent", "companion-memory.json");
+var COMPANION_MEMORY_FILE = path5.resolve(__dirname3, "data", "agent", "companion-memory.json");
 function getCompanionMemory() {
   try {
-    if (fs4.existsSync(COMPANION_MEMORY_FILE)) {
-      const raw = fs4.readFileSync(COMPANION_MEMORY_FILE, "utf-8");
+    if (fs5.existsSync(COMPANION_MEMORY_FILE)) {
+      const raw = fs5.readFileSync(COMPANION_MEMORY_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.activeDirectives)) return parsed;
     }
@@ -4787,16 +5305,26 @@ function getCompanionMemory() {
 }
 function saveCompanionMemory(data, username = "waqarmajeedinfo") {
   try {
-    const dir = path4.dirname(COMPANION_MEMORY_FILE);
-    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
-    fs4.writeFileSync(COMPANION_MEMORY_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const dir = path5.dirname(COMPANION_MEMORY_FILE);
+    if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
+    fs5.writeFileSync(COMPANION_MEMORY_FILE, JSON.stringify(data, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path4.resolve(__dirname3, "user-data", targetUser);
-    if (!fs4.existsSync(userRepoDir)) fs4.mkdirSync(userRepoDir, { recursive: true });
-    fs4.writeFileSync(path4.resolve(userRepoDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
-    const userStorageDir = path4.resolve(__dirname3, "data", "user-storage", targetUser);
-    if (!fs4.existsSync(userStorageDir)) fs4.mkdirSync(userStorageDir, { recursive: true });
-    fs4.writeFileSync(path4.resolve(userStorageDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userRepoDir = path5.resolve(__dirname3, "user-data", targetUser);
+    if (!fs5.existsSync(userRepoDir)) fs5.mkdirSync(userRepoDir, { recursive: true });
+    fs5.writeFileSync(path5.resolve(userRepoDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userStorageDir = path5.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs5.existsSync(userStorageDir)) fs5.mkdirSync(userStorageDir, { recursive: true });
+    fs5.writeFileSync(path5.resolve(userStorageDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
+    scheduleGitHubSync(
+      [
+        "data/agent/companion-memory.json",
+        {
+          localPath: path5.resolve(userRepoDir, "companion-memory.json"),
+          repoPath: `user-data/${targetUser}/companion-memory.json`
+        }
+      ],
+      `chore(memory): sync companion memory for @${targetUser}`
+    );
   } catch (err) {
     console.error("[CompanionMemory] Save error:", err);
   }
@@ -4991,11 +5519,11 @@ app.post("/api/agent/copilot/live-session", async (req, res) => {
     res.status(500).json({ error: err?.message || "Live session failed" });
   }
 });
-var COMPETITOR_INTEL_FILE = path4.resolve(__dirname3, "data", "agent", "competitor-intelligence.json");
+var COMPETITOR_INTEL_FILE = path5.resolve(__dirname3, "data", "agent", "competitor-intelligence.json");
 function getCompetitorIntelligence() {
   try {
-    if (fs4.existsSync(COMPETITOR_INTEL_FILE)) {
-      const raw = fs4.readFileSync(COMPETITOR_INTEL_FILE, "utf-8");
+    if (fs5.existsSync(COMPETITOR_INTEL_FILE)) {
+      const raw = fs5.readFileSync(COMPETITOR_INTEL_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.trackedCompetitors)) return parsed;
     }
@@ -5014,16 +5542,16 @@ function getCompetitorIntelligence() {
 }
 function saveCompetitorIntelligence(data, username = "waqarmajeedinfo") {
   try {
-    const dir = path4.dirname(COMPETITOR_INTEL_FILE);
-    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
-    fs4.writeFileSync(COMPETITOR_INTEL_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const dir = path5.dirname(COMPETITOR_INTEL_FILE);
+    if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
+    fs5.writeFileSync(COMPETITOR_INTEL_FILE, JSON.stringify(data, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path4.resolve(__dirname3, "user-data", targetUser);
-    if (!fs4.existsSync(userRepoDir)) fs4.mkdirSync(userRepoDir, { recursive: true });
-    fs4.writeFileSync(path4.resolve(userRepoDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
-    const userStorageDir = path4.resolve(__dirname3, "data", "user-storage", targetUser);
-    if (!fs4.existsSync(userStorageDir)) fs4.mkdirSync(userStorageDir, { recursive: true });
-    fs4.writeFileSync(path4.resolve(userStorageDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userRepoDir = path5.resolve(__dirname3, "user-data", targetUser);
+    if (!fs5.existsSync(userRepoDir)) fs5.mkdirSync(userRepoDir, { recursive: true });
+    fs5.writeFileSync(path5.resolve(userRepoDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userStorageDir = path5.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs5.existsSync(userStorageDir)) fs5.mkdirSync(userStorageDir, { recursive: true });
+    fs5.writeFileSync(path5.resolve(userStorageDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
   } catch (err) {
     console.error("[CompetitorIntel] Save error:", err);
   }
@@ -5048,6 +5576,19 @@ app.post("/api/agent/competitors/scan", async (req, res) => {
     companion.interactionHistory = [scanLog, ...companion.interactionHistory || []].slice(0, 50);
     saveCompanionMemory(companion, "waqarmajeedinfo");
     saveCompetitorIntelligence(current, "waqarmajeedinfo");
+    mergeStudioStatePatch(
+      {
+        agentGeneratedData: {
+          competitorScan: current,
+          lastGeneratedAt: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      },
+      "agent_competitor_scan"
+    );
+    scheduleGitHubSync(
+      ["data/agent/competitor-intelligence.json", "data/studio/studio-state.json"],
+      "chore(agent): sync competitor intelligence scan"
+    );
     res.json({
       ok: true,
       lastSurveillanceScan: current.lastSurveillanceScan,
@@ -5090,11 +5631,11 @@ app.post("/api/agent/competitors/generate-strategy", async (req, res) => {
     res.status(500).json({ error: err?.message || "Strategy generation failed" });
   }
 });
-var PHONETIC_DICT_FILE = path4.resolve(__dirname3, "data", "agent", "phonetic-dictionary.json");
+var PHONETIC_DICT_FILE = path5.resolve(__dirname3, "data", "agent", "phonetic-dictionary.json");
 function getStoredPhoneticRules() {
   try {
-    if (fs4.existsSync(PHONETIC_DICT_FILE)) {
-      const raw = fs4.readFileSync(PHONETIC_DICT_FILE, "utf-8");
+    if (fs5.existsSync(PHONETIC_DICT_FILE)) {
+      const raw = fs5.readFileSync(PHONETIC_DICT_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
@@ -5105,16 +5646,26 @@ function getStoredPhoneticRules() {
 }
 function saveStoredPhoneticRules(rules, username = "waqarmajeedinfo") {
   try {
-    const dir = path4.dirname(PHONETIC_DICT_FILE);
-    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
-    fs4.writeFileSync(PHONETIC_DICT_FILE, JSON.stringify(rules, null, 2), "utf-8");
+    const dir = path5.dirname(PHONETIC_DICT_FILE);
+    if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
+    fs5.writeFileSync(PHONETIC_DICT_FILE, JSON.stringify(rules, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userStorageDir = path4.resolve(__dirname3, "data", "user-storage", targetUser);
-    if (!fs4.existsSync(userStorageDir)) fs4.mkdirSync(userStorageDir, { recursive: true });
-    fs4.writeFileSync(path4.resolve(userStorageDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
-    const userRepoDir = path4.resolve(__dirname3, "user-data", targetUser);
-    if (!fs4.existsSync(userRepoDir)) fs4.mkdirSync(userRepoDir, { recursive: true });
-    fs4.writeFileSync(path4.resolve(userRepoDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
+    const userStorageDir = path5.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs5.existsSync(userStorageDir)) fs5.mkdirSync(userStorageDir, { recursive: true });
+    fs5.writeFileSync(path5.resolve(userStorageDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
+    const userRepoDir = path5.resolve(__dirname3, "user-data", targetUser);
+    if (!fs5.existsSync(userRepoDir)) fs5.mkdirSync(userRepoDir, { recursive: true });
+    fs5.writeFileSync(path5.resolve(userRepoDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
+    scheduleGitHubSync(
+      [
+        "data/agent/phonetic-dictionary.json",
+        {
+          localPath: path5.resolve(userRepoDir, "phonetic-dictionary.json"),
+          repoPath: `user-data/${targetUser}/phonetic-dictionary.json`
+        }
+      ],
+      `chore(phonetic): sync phonetic rules for @${targetUser}`
+    );
   } catch (err) {
     console.error("[PhoneticDictionary] Save error:", err);
   }
@@ -5898,11 +6449,11 @@ Return STRICT valid JSON only with NO markdown fences, matching this structure:
     });
   }
 });
-var FOCUS_LINKS_FILE = path4.resolve(__dirname3, "data", "agent", "focus-links.json");
+var FOCUS_LINKS_FILE = path5.resolve(__dirname3, "data", "agent", "focus-links.json");
 function getFocusLinks() {
   try {
-    if (fs4.existsSync(FOCUS_LINKS_FILE)) {
-      const raw = fs4.readFileSync(FOCUS_LINKS_FILE, "utf-8");
+    if (fs5.existsSync(FOCUS_LINKS_FILE)) {
+      const raw = fs5.readFileSync(FOCUS_LINKS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
     }
@@ -5912,16 +6463,16 @@ function getFocusLinks() {
 }
 function saveFocusLinks(links, username) {
   try {
-    const dir = path4.dirname(FOCUS_LINKS_FILE);
-    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
-    fs4.writeFileSync(FOCUS_LINKS_FILE, JSON.stringify(links, null, 2), "utf-8");
+    const dir = path5.dirname(FOCUS_LINKS_FILE);
+    if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
+    fs5.writeFileSync(FOCUS_LINKS_FILE, JSON.stringify(links, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path4.resolve(__dirname3, "user-data", targetUser);
-    if (!fs4.existsSync(userRepoDir)) fs4.mkdirSync(userRepoDir, { recursive: true });
-    fs4.writeFileSync(path4.resolve(userRepoDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
-    const userStorageDir = path4.resolve(__dirname3, "data", "user-storage", targetUser);
-    if (!fs4.existsSync(userStorageDir)) fs4.mkdirSync(userStorageDir, { recursive: true });
-    fs4.writeFileSync(path4.resolve(userStorageDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
+    const userRepoDir = path5.resolve(__dirname3, "user-data", targetUser);
+    if (!fs5.existsSync(userRepoDir)) fs5.mkdirSync(userRepoDir, { recursive: true });
+    fs5.writeFileSync(path5.resolve(userRepoDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
+    const userStorageDir = path5.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs5.existsSync(userStorageDir)) fs5.mkdirSync(userStorageDir, { recursive: true });
+    fs5.writeFileSync(path5.resolve(userStorageDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
   } catch (err) {
     console.error("[FocusLinks] Failed to save focus links:", err);
   }
@@ -5978,11 +6529,11 @@ app.delete("/api/agent/focus-links/:id", (req, res) => {
   saveFocusLinks(links, username);
   res.json({ ok: true, remaining: links.length, links });
 });
-var GROUND_CRITERIA_FILE = path4.resolve(__dirname3, "data", "agent", "ground-search-criteria.json");
+var GROUND_CRITERIA_FILE = path5.resolve(__dirname3, "data", "agent", "ground-search-criteria.json");
 function getGroundCriteria() {
   try {
-    if (fs4.existsSync(GROUND_CRITERIA_FILE)) {
-      const raw = fs4.readFileSync(GROUND_CRITERIA_FILE, "utf-8");
+    if (fs5.existsSync(GROUND_CRITERIA_FILE)) {
+      const raw = fs5.readFileSync(GROUND_CRITERIA_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.sources)) return parsed;
     }
@@ -6001,16 +6552,16 @@ function getGroundCriteria() {
 }
 function saveGroundCriteria(data, username = "waqarmajeedinfo") {
   try {
-    const dir = path4.dirname(GROUND_CRITERIA_FILE);
-    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
-    fs4.writeFileSync(GROUND_CRITERIA_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const dir = path5.dirname(GROUND_CRITERIA_FILE);
+    if (!fs5.existsSync(dir)) fs5.mkdirSync(dir, { recursive: true });
+    fs5.writeFileSync(GROUND_CRITERIA_FILE, JSON.stringify(data, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path4.resolve(__dirname3, "user-data", targetUser);
-    if (!fs4.existsSync(userRepoDir)) fs4.mkdirSync(userRepoDir, { recursive: true });
-    fs4.writeFileSync(path4.resolve(userRepoDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
-    const userStorageDir = path4.resolve(__dirname3, "data", "user-storage", targetUser);
-    if (!fs4.existsSync(userStorageDir)) fs4.mkdirSync(userStorageDir, { recursive: true });
-    fs4.writeFileSync(path4.resolve(userStorageDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userRepoDir = path5.resolve(__dirname3, "user-data", targetUser);
+    if (!fs5.existsSync(userRepoDir)) fs5.mkdirSync(userRepoDir, { recursive: true });
+    fs5.writeFileSync(path5.resolve(userRepoDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userStorageDir = path5.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs5.existsSync(userStorageDir)) fs5.mkdirSync(userStorageDir, { recursive: true });
+    fs5.writeFileSync(path5.resolve(userStorageDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
   } catch (err) {
     console.error("[GroundCriteria] Save error:", err);
   }
@@ -6556,7 +7107,7 @@ DIALOGUE: "${dialogue}"`;
         }
       });
     }
-    res.json({
+    const generatedStoryPayload = {
       title,
       hook: safeString(data.hook) || safeString(idea.hook) || "Reveal",
       thumbnailLine1,
@@ -6576,7 +7127,21 @@ DIALOGUE: "${dialogue}"`;
       modelUsed,
       practicalBlueprint,
       consistencyReport
-    });
+    };
+    mergeStudioStatePatch(
+      {
+        latestStory: generatedStoryPayload,
+        agentGeneratedData: {
+          lastGeneratedAt: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      },
+      "agent_story_generated"
+    );
+    scheduleGitHubSync(
+      ["data/studio/studio-state.json"],
+      `feat(agent): sync generated story "${title.slice(0, 60)}"`
+    );
+    res.json(generatedStoryPayload);
   } catch (err) {
     console.error("Story generation error:", err);
     res.status(500).json({ error: friendlyGeminiError(err, "Story generate nahi ho saki. Dobara try karein.") });
@@ -6705,6 +7270,19 @@ DIALOGUE: "${dialogue}"`;
       tiktokCaption: safeString(parsed.tiktokCaption) || story.tiktokCaption,
       seriesPlan: safeString(parsed.seriesPlan) || story.seriesPlan
     };
+    mergeStudioStatePatch(
+      {
+        latestStory: refreshedStory,
+        agentGeneratedData: {
+          lastGeneratedAt: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      },
+      "agent_story_refreshed"
+    );
+    scheduleGitHubSync(
+      ["data/studio/studio-state.json"],
+      `feat(agent): sync refreshed story "${String(refreshedStory.title || "").slice(0, 60)}"`
+    );
     res.json({ story: refreshedStory });
   } catch (err) {
     console.error("Story refresh error:", err);
@@ -6854,10 +7432,11 @@ registerIntegrationRoutes(app);
 registerMultiUserRoutes(app);
 registerTopicResearchRoutes(app);
 registerAgentManagementRoutes(app, () => port);
+registerGitHubSyncRoutes(app);
 async function startServer() {
   let viteServer = null;
-  const distPath = path4.resolve(__dirname3, "dist");
-  const hasDist = fs4.existsSync(path4.resolve(distPath, "index.html"));
+  const distPath = path5.resolve(__dirname3, "dist");
+  const hasDist = fs5.existsSync(path5.resolve(distPath, "index.html"));
   const isProd = process.env.NODE_ENV === "production" || !process.env.DEFAULT_APP_PORT && hasDist;
   if (!isProd) {
     const { createServer: createViteServer } = await import("vite");
@@ -6872,9 +7451,9 @@ async function startServer() {
     app.use("*", async (req, res, next) => {
       const url = req.originalUrl;
       try {
-        const indexPath = path4.resolve(__dirname3, "index.html");
-        if (fs4.existsSync(indexPath)) {
-          let template = fs4.readFileSync(indexPath, "utf-8");
+        const indexPath = path5.resolve(__dirname3, "index.html");
+        if (fs5.existsSync(indexPath)) {
+          let template = fs5.readFileSync(indexPath, "utf-8");
           template = await viteServer.transformIndexHtml(url, template);
           res.status(200).set({ "Content-Type": "text/html" }).end(template);
         } else {
@@ -6890,8 +7469,8 @@ async function startServer() {
   } else {
     app.use(express.static(distPath, { maxAge: "1h", index: false }));
     app.get("*", (_req, res) => {
-      const indexPath = path4.resolve(distPath, "index.html");
-      if (fs4.existsSync(indexPath)) {
+      const indexPath = path5.resolve(distPath, "index.html");
+      if (fs5.existsSync(indexPath)) {
         res.sendFile(indexPath);
       } else {
         res.status(404).send("Application bundle index.html not found. Please run npm run build.");

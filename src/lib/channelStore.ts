@@ -1,4 +1,5 @@
 import { CHANNEL_PROFILES, CATEGORIES_IT_CAFETERIA, type ChannelProfile, type ChannelTagVariant } from '../data/channelData';
+import { pushStudioStatePatch, isHydratingRemoteState } from './studioSyncStore';
 
 const STORAGE_KEY = 'itcafeteria_channels_store_v2';
 const HISTORY_KEY = 'itcafeteria_channels_history_v2';
@@ -249,6 +250,9 @@ export function saveAllChannels(channels: Record<string, ExtendedChannelProfile>
       localStorage.setItem(HISTORY_KEY, raw);
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(channels));
+    if (!isHydratingRemoteState()) {
+      pushStudioStatePatch({ channels }, 'channels_updated');
+    }
   } catch (e) {
     console.error('Error saving channels', e);
   }

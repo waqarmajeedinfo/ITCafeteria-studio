@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { Express, Request, Response } from 'express';
+import { scheduleGitHubSync } from './server_github_sync';
 
 export interface AgentFunctionRecord {
   id: string;
@@ -346,6 +347,10 @@ function saveRegistry(store: AgentRegistryStore) {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     store.lastUpdated = new Date().toISOString();
     fs.writeFileSync(REGISTRY_FILE, JSON.stringify(store, null, 2), 'utf-8');
+    scheduleGitHubSync(
+      ['data/agent/agent-registry.json'],
+      'chore(agent): update agent functions & execution logs'
+    );
   } catch (err) {
     console.error('[AgentManagement] Save error:', err);
   }

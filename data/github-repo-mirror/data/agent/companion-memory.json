@@ -1,0 +1,205 @@
+{
+  "companionName": "IT Cafeteria AI Companion & Adaptive Memory",
+  "owner": "Waqar Majeed (@waqarmajeedinfo)",
+  "studioTitle": "IT Cafeteria Studio",
+  "lastUpdated": "2026-11-06T09:23:00Z",
+  "pricingAndTrainingInfo": {
+    "isFree": true,
+    "cost": "$0.00 (100% Free)",
+    "noSubscriptionNeeded": true,
+    "apiKeyTier": "Google AI Studio Gemini API Free Tier (15 RPM / 1,500 RPD free forever)",
+    "howLearningWorks": "Adaptive persistent memory engine on disk & GitHub synced with Gemini systemInstruction. Automatically logs interactions, learns user habits over time, and provides proactive guidance."
+  },
+  "learnedPreferences": {
+    "preferredLanguage": "Pure Roman Urdu (Strict zero Urdu/Arabic font script in UI)",
+    "tone": "Respectful, proactive senior software engineer & co-pilot partner (addresses as Waqar Bhai)",
+    "uiScrollLaw": "max-height: 80vh; overflow-y: auto; overscroll-behavior: contain;",
+    "searchWindowHours": 48,
+    "minimumGroundSources": 10,
+    "scriptStyle": "High retention viral hooks in first 3 seconds, under 50 seconds for Shorts, clear technical payoff",
+    "targetAudience": "Pakistani and global South Asian developer community, tech learners, and automation creators",
+    "roleSecurity": "Quick switch strictly Super Admin only; standard users get explicit privilege checkboxes",
+    "liveBroadcastingStyle": "Conversational, highly engaging, proactive topic suggestions, zero awkward pauses"
+  },
+  "activeDirectives": [
+    {
+      "id": "dir-scroll-rule",
+      "category": "UI & Layout Formula",
+      "title": "Universal Scrolling & Modal Containment",
+      "formula": "max-height: 80vh; overflow-y: auto; overscroll-behavior: contain;",
+      "enforced": true,
+      "dateAdded": "2026-11-06",
+      "description": "Applies strictly to all modals, popups, submenus, and scrollable panels. Guarantees no page bouncing, clean 80vh max-height, and contained overscroll."
+    },
+    {
+      "id": "dir-submenu-reorder",
+      "category": "Navigation Law",
+      "title": "Submenu Up/Down & Slot Customization",
+      "formula": "Up/Down Arrows + Slot Number Pickers (#1, #2, #3...)",
+      "enforced": true,
+      "dateAdded": "2026-11-06",
+      "description": "All submenus in the Menu Bar Handler must have vertical Up/Down repositioning controls and direct numerical slot assignment."
+    },
+    {
+      "id": "dir-ground-search",
+      "category": "Agent Search Engine",
+      "title": "48-Hour Ground Search Across 10+ Sources",
+      "formula": "timeWindowHours: 48, minGroundSources: 10",
+      "enforced": true,
+      "dateAdded": "2026-11-06",
+      "description": "When AI searches for stories/topics, it must operate strictly within a 48-hour recency window across at least 10 high-authority tech websites."
+    },
+    {
+      "id": "dir-rbac-admin-only-switch",
+      "category": "Security & Multi-User",
+      "title": "Quick Role Switch Strictly Admin Only",
+      "formula": "isAdmin ? renderQuickSwitch() : null",
+      "enforced": true,
+      "dateAdded": "2026-11-06",
+      "description": "Standard users must NEVER see the quick switch role switcher or be able to escalate privileges themselves. Only Super Admin can switch roles or assign privileges via granular checkboxes."
+    },
+    {
+      "id": "dir-clean-typography",
+      "category": "Typography & Language",
+      "title": "Zero Urdu Script in UI",
+      "formula": "All UI elements in clean English / Roman Urdu",
+      "enforced": true,
+      "dateAdded": "2026-11-06",
+      "description": "All buttons, headers, tooltips, and badges must use clean English / Roman Urdu, never Urdu/Arabic script."
+    },
+    {
+      "id": "dir-ai-companion-thinking",
+      "category": "AI Companion Persona",
+      "title": "Waqar Majeed's Senior Tech Companion",
+      "formula": "Roman Urdu communication, Senior Engineer mindset, Proactive, Zero Slop",
+      "enforced": true,
+      "dateAdded": "2026-11-06",
+      "description": "The assistant acts as Waqar Majeed's personal software engineering partner and friend, understanding his YouTube tech channel vision, creator workflows, and technical standards."
+    }
+  ],
+  "customMemories": [
+    {
+      "id": "mem-1",
+      "title": "IT Cafeteria Brand Identity",
+      "content": "Leading Urdu/Hindi tech tutorial channel focusing on AI tools, automation, full-stack engineering, and developer productivity.",
+      "dateAdded": "2026-11-06"
+    },
+    {
+      "id": "mem-2",
+      "title": "Communication Preference",
+      "content": "User prefers pure Roman Urdu communication in all conversational exchanges.",
+      "dateAdded": "2026-11-06"
+    }
+  ],
+  "interactionHistory": [
+    {
+      "id": "int-1794592155638",
+      "timestamp": "2026-11-13T17:49:15.638Z",
+      "type": "competitor_surveillance",
+      "summary": "Executed 24h Competitor Intelligence Surveillance & Transcript Ingestion",
+      "learnedTakeaway": "Decoded latest competitor pacing (145-175 WPM) vs IT Cafeteria (135 WPM). Identified 3-second hook gap in Shorts Feed.",
+      "category": "Competitor Intelligence"
+    },
+    {
+      "id": "int-1794591253099",
+      "timestamp": "2026-11-13T17:34:13.099Z",
+      "type": "competitor_surveillance",
+      "summary": "Executed 24h Competitor Intelligence Surveillance & Transcript Ingestion",
+      "learnedTakeaway": "Decoded latest competitor pacing (145-175 WPM) vs IT Cafeteria (135 WPM). Identified 3-second hook gap in Shorts Feed.",
+      "category": "Competitor Intelligence"
+    },
+    {
+      "id": "dialogue-1794068530355",
+      "timestamp": "2026-11-07T16:22:10.355Z",
+      "type": "live_voice_dialogue",
+      "summary": "Host: \"Doosra test, ab batao kya karna hai?\" -> Co-Pilot Response provided",
+      "learnedTakeaway": "Host queried during live broadcast. Maintained continuous interactive dialogue in Roman Urdu.",
+      "category": "Continuous Live Dialogue"
+    },
+    {
+      "id": "dialogue-1794068530281",
+      "timestamp": "2026-11-07T16:22:10.281Z",
+      "type": "live_voice_dialogue",
+      "summary": "Host: \"Salam Co-pilot, pehla test\" -> Co-Pilot Response provided",
+      "learnedTakeaway": "Host queried during live broadcast. Maintained continuous interactive dialogue in Roman Urdu.",
+      "category": "Continuous Live Dialogue"
+    },
+    {
+      "id": "dialogue-1794066075965",
+      "timestamp": "2026-11-07T15:41:15.965Z",
+      "type": "live_voice_dialogue",
+      "summary": "Host: \"Kevin Stratvert ka Windows 11 secret features video ka hook aur pacing kya hai?\" -> Co-Pilot Response provided",
+      "learnedTakeaway": "Host queried during live broadcast. Maintained continuous interactive dialogue in Roman Urdu.",
+      "category": "Continuous Live Dialogue"
+    },
+    {
+      "id": "live-1793986090469",
+      "timestamp": "2026-11-06T17:28:10.469Z",
+      "type": "live_session",
+      "summary": "Started Live Co-Pilot on: Test Topic",
+      "learnedTakeaway": "Waqar Bhai initiated live broadcasting/recording for topic 'Test Topic'. Pacing & hook assistance activated.",
+      "category": "Live Broadcasting"
+    },
+    {
+      "id": "int-101",
+      "timestamp": "2026-11-06T08:15:00Z",
+      "type": "architectural_rule",
+      "summary": "Submenu Up/Down repositioning and slot ordering",
+      "learnedTakeaway": "User requires precise visual hierarchy control over submenus with Up/Down buttons and slot assignment.",
+      "category": "Navigation UX"
+    },
+    {
+      "id": "int-102",
+      "timestamp": "2026-11-06T08:30:00Z",
+      "type": "content_strategy",
+      "summary": "48-Hour Ground Search across 10+ Sources",
+      "learnedTakeaway": "Agent story search must enforce a hard 48h recency filter grounded across TechCrunch, Verge, Hacker News, GitHub Trending, etc.",
+      "category": "Content Research"
+    },
+    {
+      "id": "int-103",
+      "timestamp": "2026-11-06T09:10:00Z",
+      "type": "layout_law",
+      "summary": "Universal Scrolling 80vh & Overscroll Containment",
+      "learnedTakeaway": "Non-negotiable UI law: All modals and scrollable elements must strictly use max-height: 80vh; overflow-y: auto; overscroll-behavior: contain;.",
+      "category": "UI Layout"
+    },
+    {
+      "id": "int-104",
+      "timestamp": "2026-11-06T09:20:00Z",
+      "type": "live_copilot",
+      "summary": "Go Live Co-Pilot in Top Navigation",
+      "learnedTakeaway": "User needs real-time adaptive co-pilot guidance during live recordings and broadcasting with instant start/stop controls.",
+      "category": "Live Streaming"
+    }
+  ],
+  "proactiveInsights": [
+    {
+      "id": "ins-1",
+      "title": "Trending 48h Ground Breakthrough",
+      "insight": "Open-source autonomous agent tools surging +180% on GitHub Trending today. A 45s Shorts breakdown comparing local vs cloud LLMs will yield high CTR.",
+      "actionableRecommendation": "Trigger Autopilot Simulator with seed 'Local Autonomous Agent Frameworks' to generate Google Flow prompts.",
+      "priority": "high",
+      "category": "Content Opportunity",
+      "generatedAt": "2026-11-06T09:20:00Z"
+    },
+    {
+      "id": "ins-2",
+      "title": "Phonetic Pronunciation Reminder",
+      "insight": "Roman Urdu word 'Karein' is often pronounced flat by standard TTS engines unless mapped to 'Karain' in Section 7 living list.",
+      "actionableRecommendation": "Verify phonetic dictionary sync before rendering speech in Video Studio.",
+      "priority": "medium",
+      "category": "Voice Quality",
+      "generatedAt": "2026-11-06T09:20:00Z"
+    },
+    {
+      "id": "ins-3",
+      "title": "UI Viewport Hygiene",
+      "insight": "All modals currently comply with the 80vh containment formula. Zero page jumping detected across tested viewports.",
+      "actionableRecommendation": "Maintain this rule for any future submenus or channel profile dialogs.",
+      "priority": "normal",
+      "category": "UI Architecture",
+      "generatedAt": "2026-11-06T09:20:00Z"
+    }
+  ]
+}

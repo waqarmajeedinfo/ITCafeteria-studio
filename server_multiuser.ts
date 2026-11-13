@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { scheduleGitHubSync } from './server_github_sync';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -949,6 +950,14 @@ export function registerMultiUserRoutes(app: Express) {
       fs.writeFileSync(syncStatusPath, JSON.stringify(syncStatus, null, 2), 'utf-8');
       fs.writeFileSync(path.resolve(repoMirrorDir, 'github-sync.json'), JSON.stringify(syncStatus, null, 2), 'utf-8');
 
+      scheduleGitHubSync(
+        [
+          { localPath: targetPath, repoPath: `user-data/${user.username}/${safeFileName}` },
+          { localPath: syncStatusPath, repoPath: `user-data/${user.username}/github-sync.json` },
+        ],
+        `chore(user-data): @${user.username} updated ${safeFileName}`
+      );
+
       // Trigger Webhook and Audit log for data integrity
       const auditLog = await logAuditEvent(
         user,
@@ -1367,6 +1376,22 @@ export function registerMultiUserRoutes(app: Express) {
     };
 
     fs.writeFileSync(path.resolve(repoMirrorDir, 'sync-meta.json'), JSON.stringify(syncMeta, null, 2), 'utf-8');
+
+    const userSyncTargets = fs
+      .readdirSync(userDir)
+      .filter((f) => fs.statSync(path.resolve(userDir, f)).isFile())
+      .map((f) => ({
+        localPath: path.resolve(userDir, f),
+        repoPath: `user-data/${user.username}/${f}`,
+      }));
+    userSyncTargets.push({
+      localPath: path.resolve(repoMirrorDir, 'sync-meta.json'),
+      repoPath: `user-data/${user.username}/sync-meta.json`,
+    });
+    scheduleGitHubSync(
+      userSyncTargets,
+      `chore(user-data): sync @${user.username} directory (${userSyncTargets.length} files)`
+    );
 
     await logAuditEvent(
       user,

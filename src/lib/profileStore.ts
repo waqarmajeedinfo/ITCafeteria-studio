@@ -6,6 +6,7 @@
 
 import { PUBLISHED_VIDEOS, type PublishedVideo, type ChannelProfile } from '../data/channelData';
 import type { GeneratedStory } from '../components/StoryPackageView';
+import { pushStudioStatePatch, isHydratingRemoteState } from './studioSyncStore';
 
 export interface ProblemSignature {
   viewerProblem: string;      // e.g. "Low disk space on C-Drive from Windows update and temp cache"
@@ -694,6 +695,9 @@ export function saveProfileLibrary(channelId: string, stories: DynamicPublishedS
   try {
     localStorage.setItem(key, JSON.stringify(stories));
     window.dispatchEvent(new CustomEvent(PROFILE_LIBRARY_UPDATED_EVENT, { detail: { channelId, stories } }));
+    if (!isHydratingRemoteState()) {
+      pushStudioStatePatch({ profileLibraries: { [channelId]: stories } }, `profile_library_${channelId}_updated`);
+    }
   } catch (e) {
     console.error(`Error saving profile library for ${channelId}:`, e);
   }

@@ -7,7 +7,7 @@
  */
 
 import { PUBLISHED_VIDEOS, type PublishedVideo } from '../data/channelData';
-import { loadPendingQueue, type PendingStoryRecord } from './pendingQueueStore';
+import { loadPendingQueue, savePendingQueue, type PendingStoryRecord } from './pendingQueueStore';
 import type { GeneratedStory } from '../components/StoryPackageView';
 import {
   loadProfileLibrary,
@@ -17,6 +17,7 @@ import {
   checkSmarterDuplicate,
   type DuplicateCheckResult
 } from './profileStore';
+import { pushStudioStatePatch, isHydratingRemoteState } from './studioSyncStore';
 
 export const PUBLISHED_LIBRARY_STORAGE_KEY = 'itcafeteria_published_library_v1';
 export const LIBRARY_UPDATED_EVENT = 'itcafeteria_published_library_updated';
@@ -56,6 +57,9 @@ export function saveCustomPublishedStories(stories: DynamicPublishedStory[]): vo
   try {
     localStorage.setItem(PUBLISHED_LIBRARY_STORAGE_KEY, JSON.stringify(stories));
     window.dispatchEvent(new CustomEvent(LIBRARY_UPDATED_EVENT, { detail: stories }));
+    if (!isHydratingRemoteState()) {
+      pushStudioStatePatch({ publishedLibrary: stories }, 'published_library_updated');
+    }
   } catch (e) {
     console.error('Error saving custom published stories', e);
   }
@@ -215,9 +219,7 @@ export function publishStoryDirectly(
     } else {
       nextQueue = [pendingRecord, ...currentQueue];
     }
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('itcafeteria_pending_queue_v2', JSON.stringify(nextQueue));
-    }
+    savePendingQueue(nextQueue);
   } catch (e) {
     console.error('Error syncing direct publish into pending queue', e);
   }

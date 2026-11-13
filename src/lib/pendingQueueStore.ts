@@ -8,6 +8,7 @@
 import type { GeneratedStory } from '../components/StoryPackageView';
 import { upgradeStoryScenesToCinematic } from './flowPromptBuilder';
 import { generateTopicAccurateStoryPackage, isStoryPackageMismatched } from './storyTopicGenerator';
+import { pushStudioStatePatch, isHydratingRemoteState } from './studioSyncStore';
 
 export type StoryPublishStatus = 'pending' | 'published' | 'draft' | 'overdue';
 
@@ -588,6 +589,9 @@ export function savePendingQueue(queue: PendingStoryRecord[]): void {
       localStorage.setItem(PENDING_QUEUE_STORAGE_KEY, JSON.stringify(queue));
       window.dispatchEvent(new CustomEvent('itcafeteria_pending_queue_updated', { detail: queue }));
       window.dispatchEvent(new CustomEvent('storage'));
+      if (!isHydratingRemoteState()) {
+        pushStudioStatePatch({ pendingQueue: queue }, 'pending_queue_updated');
+      }
     }
   } catch (e) {
     console.error('Error saving pending queue', e);

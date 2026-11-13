@@ -39,7 +39,6 @@ import {
   RotateCcw,
   Upload,
   Clock,
-  ArrowUp,
   FolderTree,
   Plus,
   Trash2,
@@ -97,7 +96,9 @@ import {
   MenuBarCustomizerModal,
   loadMenuConfig,
   DEFAULT_MENU_STATE,
-  type MenuCustomizerState
+  DEFAULT_BUTTON_LABELS,
+  type MenuCustomizerState,
+  type ButtonLabelsConfig
 } from './components/MenuBarCustomizerModal';
 import { dirtyManager, type DirtyRecord } from './lib/dirtyStore';
 import { UnsavedChangesModal } from './components/UnsavedChangesModal';
@@ -111,6 +112,13 @@ import { AgentManagementModal } from './components/AgentManagementModal';
 import { userAuthManager, USER_AUTH_UPDATED_EVENT, type UserSessionProfile } from './lib/userAuthStore';
 import { AuthGate } from './components/AuthGate';
 import { useGlobalScrollReveal } from './lib/useGlobalScrollReveal';
+import {
+  fetchRemoteStudioState,
+  pushStudioStatePatch,
+  isHydratingRemoteState,
+  STUDIO_SYNC_UPDATED_EVENT,
+  type StudioRemoteState
+} from './lib/studioSyncStore';
 
 
 type TabType = 
@@ -418,6 +426,9 @@ export default function App() {
     setBannerUrl(url);
     if (typeof window !== 'undefined') {
       localStorage.setItem('itc_custom_banner', url);
+      if (!isHydratingRemoteState()) {
+        pushStudioStatePatch({ banner: { url } }, 'banner_url_updated');
+      }
     }
   };
 
@@ -425,6 +436,9 @@ export default function App() {
     setBannerOverlayStyle(style);
     if (typeof window !== 'undefined') {
       localStorage.setItem('itc_banner_overlay', style);
+      if (!isHydratingRemoteState()) {
+        pushStudioStatePatch({ banner: { overlayStyle: style } }, 'banner_overlay_updated');
+      }
     }
   };
 
@@ -432,6 +446,9 @@ export default function App() {
     setBannerHeight(height);
     if (typeof window !== 'undefined') {
       localStorage.setItem('itc_banner_height', height);
+      if (!isHydratingRemoteState()) {
+        pushStudioStatePatch({ banner: { height } }, 'banner_height_updated');
+      }
     }
   };
 
@@ -460,6 +477,9 @@ export default function App() {
     setThemeConfig(updated);
     if (typeof window !== 'undefined') {
       localStorage.setItem('itc_studio_theme_config', JSON.stringify(updated));
+      if (!isHydratingRemoteState()) {
+        pushStudioStatePatch({ themeConfig: updated }, 'theme_config_updated');
+      }
     }
     updateHoloTheme(updated.holoTheme);
     updateHoloOpacity(updated.holoOpacity);
@@ -591,6 +611,44 @@ export default function App() {
     };
     window.addEventListener('itcafeteria_channels_updated', handleChannelsUpdated);
 
+    const handleStudioSynced = (e: any) => {
+      const remote: StudioRemoteState | undefined = e?.detail;
+      if (!remote) return;
+      if (remote.menuConfig) {
+        setMenuConfig(loadMenuConfig());
+      }
+      if (remote.themeConfig && typeof remote.themeConfig === 'object') {
+        setThemeConfig((prev) => ({ ...prev, ...remote.themeConfig }));
+        if (remote.themeConfig.holoTheme) setHoloTheme(remote.themeConfig.holoTheme);
+        if (remote.themeConfig.holoOpacity !== undefined) setHoloOpacity(remote.themeConfig.holoOpacity);
+        if (remote.themeConfig.holoSpeed !== undefined) setHoloSpeed(remote.themeConfig.holoSpeed);
+      }
+      if (remote.banner) {
+        if (remote.banner.url) setBannerUrl(remote.banner.url);
+        if (remote.banner.overlayStyle) setBannerOverlayStyle(remote.banner.overlayStyle as any);
+        if (remote.banner.height) setBannerHeight(remote.banner.height as any);
+      }
+      if (remote.latestStory?.title) {
+        setDecisionNote({
+          title: String(remote.latestStory.title).slice(0, 48),
+          hook: remote.latestStory.hook ? String(remote.latestStory.hook).slice(0, 36) + '...' : 'Verified',
+          confidence: '94%'
+        });
+      }
+      setPublishedCount(getAllPublishedVideos().length);
+    };
+    window.addEventListener(STUDIO_SYNC_UPDATED_EVENT, handleStudioSynced);
+
+    // Cross-device live sync: fetch on mount, window focus, and every 25s
+    fetchRemoteStudioState(false);
+    const handleFocusSync = () => {
+      fetchRemoteStudioState(false);
+    };
+    window.addEventListener('focus', handleFocusSync);
+    const syncPollInterval = setInterval(() => {
+      fetchRemoteStudioState(false);
+    }, 25000);
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
@@ -601,6 +659,9 @@ export default function App() {
       window.removeEventListener('itcafeteria_menu_customizer_updated', handleMenuCustomizerUpdated);
       window.removeEventListener('itcafeteria_diagnostic_highlight', handleDiagnosticHighlight);
       window.removeEventListener('itcafeteria_channels_updated', handleChannelsUpdated);
+      window.removeEventListener(STUDIO_SYNC_UPDATED_EVENT, handleStudioSynced);
+      window.removeEventListener('focus', handleFocusSync);
+      clearInterval(syncPollInterval);
     };
   }, []);
 
@@ -672,8 +733,9 @@ export default function App() {
     return () => cancelAnimationFrame(rafId);
   }, [activeTab]);
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const getButtonLabel = (key: keyof ButtonLabelsConfig): string => {
+    const custom = menuConfig.buttonLabels?.[key];
+    return custom && custom.trim() ? custom : DEFAULT_BUTTON_LABELS[key];
   };
 
   type TabGroup = string;
@@ -892,7 +954,7 @@ export default function App() {
           <div className="absolute top-0 inset-x-0 z-20 bg-gradient-to-b from-slate-950/98 via-slate-950/90 to-transparent px-3 sm:px-6 py-2.5 sm:py-3 border-b border-slate-800/60 backdrop-blur-md">
             <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start justify-between gap-3">
               
-              {/* Top Left: Phonetic Rules Dictionary, Manage Channels, Topic Bank, Go Live */}
+              {/* Top Left: Phonetic Rules Dictionary, Manage Channels, Topic Bank, Go Live, Agent Management, 48h Search, AI Memory */}
               <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto">
                 {/* 1. Phonetic Rules Dictionary */}
                 <button
@@ -900,7 +962,7 @@ export default function App() {
                   className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
                 >
                   <BookOpen className="w-4 h-4 text-cyan-400 shrink-0" />
-                  <span>Phonetic Rules Dictionary</span>
+                  <span>{getButtonLabel('phoneticDictionary')}</span>
                 </button>
 
                 {/* 2. Manage Channels */}
@@ -909,7 +971,7 @@ export default function App() {
                   className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
                 >
                   <Plus className="w-4 h-4 text-cyan-400 shrink-0" />
-                  <span>Manage Channels</span>
+                  <span>{getButtonLabel('manageChannels')}</span>
                 </button>
 
                 {/* 3. Topic Bank */}
@@ -919,7 +981,7 @@ export default function App() {
                   title="Profile Topic Bank, Backfill Covered Points, & Smarter Duplicate Radar"
                 >
                   <Database className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Topic Bank</span>
+                  <span>{getButtonLabel('topicBank')}</span>
                 </button>
 
                 {/* 4. Go Live */}
@@ -933,7 +995,7 @@ export default function App() {
                   title="Go Live Co-Pilot with Real-Time Adaptive Guidance"
                 >
                   <Radio className={`w-4 h-4 shrink-0 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
-                  <span>{isLiveActive ? '🔴 On Air (Live)' : 'Go Live'}</span>
+                  <span>{isLiveActive ? '🔴 On Air (Live)' : getButtonLabel('goLive')}</span>
                   {isLiveActive && (
                     <span className="text-[10px] font-mono px-1.5 py-0.5 bg-rose-600 text-white rounded font-bold">
                       {Math.floor(liveElapsedSeconds / 60)}:{(liveElapsedSeconds % 60).toString().padStart(2, '0')}
@@ -948,7 +1010,27 @@ export default function App() {
                   title="Review, edit, monitor, modify, delete, or add functions and actions for the back-end agent"
                 >
                   <Terminal className="w-4 h-4 text-cyan-400 shrink-0" />
-                  <span>Agent Management</span>
+                  <span>{getButtonLabel('agentManagement')}</span>
+                </button>
+
+                {/* 6. 48h Search (Moved next to Agent Management) */}
+                <button
+                  onClick={() => setShowGroundCriteriaModal(true)}
+                  className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-cyan-500/40 hover:border-cyan-400 text-xs sm:text-sm font-medium text-cyan-200 hover:text-white transition-all cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
+                  title="48-Hour Ground-Level Search Criteria & Sources Dashboard"
+                >
+                  <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>{getButtonLabel('search48h')}</span>
+                </button>
+
+                {/* 7. AI Memory (Moved next to Agent Management) */}
+                <button
+                  onClick={() => setShowCompanionMemoryModal(true)}
+                  className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-purple-500/40 hover:border-purple-400 text-xs sm:text-sm font-medium text-purple-200 hover:text-white transition-all cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
+                  title="AI Companion Permanent Memory & Rules Engine"
+                >
+                  <Brain className="w-4 h-4 text-purple-400 shrink-0" />
+                  <span>{getButtonLabel('aiMemory')}</span>
                 </button>
               </div>
 
@@ -962,7 +1044,7 @@ export default function App() {
                     title="Customize Banner, Height & Image"
                   >
                     <Camera className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Edit Banner</span>
+                    <span>{getButtonLabel('editBanner')}</span>
                   </button>
 
                   {/* Theme Customizer */}
@@ -972,7 +1054,7 @@ export default function App() {
                     title="Theme & Studio Customizer"
                   >
                     <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Theme</span>
+                    <span>{getButtonLabel('theme')}</span>
                   </button>
 
                   {/* Holo BG */}
@@ -982,7 +1064,7 @@ export default function App() {
                     title="Cycle Holographic Moving Background"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Holo BG</span>
+                    <span>{getButtonLabel('holoBg')}</span>
                   </button>
 
                   {/* Multi-User Profile & RBAC Switcher */}
@@ -1028,7 +1110,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Sticky Main Menu Navigation (Takes over top position on scroll, remains locked while scrolling) */}
+      {/* Sticky Main Menu Navigation (Contains ONLY the 4 Dropdown Menus and Settings button) */}
       <nav
         ref={navRef}
         className={`sticky top-0 z-50 transition-all duration-300 border-b ${
@@ -1038,7 +1120,7 @@ export default function App() {
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Desktop Navbar with 4 Interactive Dropdown Menus + Clean Unified Action Cluster */}
+          {/* Desktop Navbar: ONLY the 4 Dropdown Menus on Left + Settings Button on Right */}
           <div className="hidden md:flex items-center justify-between gap-3 py-0.5">
             {/* Left: 4 Group Dropdown Menus with Precise Uniform Dimensions */}
             <div className="flex items-center gap-2 shrink-0">
@@ -1100,105 +1182,37 @@ export default function App() {
               })}
             </div>
 
-            {/* Right: Unified Navigation Controls Cluster (Single precise baseline & height) */}
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Active Tab Indicator (Precise h-10 with truncated label) */}
-              <div className="h-10 px-3 rounded-xl bg-slate-900/90 border border-slate-800/90 flex items-center gap-2 shadow-inner whitespace-nowrap shrink-0">
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold hidden xl:inline">Open:</span>
-                <span className="shrink-0">{activeTabMeta?.icon}</span>
-                <span className="font-semibold text-xs text-cyan-300 whitespace-nowrap max-w-[130px] sm:max-w-[160px] truncate">
-                  {activeTabMeta?.label}
-                </span>
-              </div>
-
-              {/* Unified Quick Actions Group (Exact same height h-10, rounded-xl, balanced alignment) */}
-              <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-950/60 border border-slate-800/80 shadow-sm shrink-0">
-                {/* Menu Bar Settings */}
-                <button
-                  onClick={() => setShowMenuCustomizer(true)}
-                  className="h-9 px-2.5 sm:px-3 rounded-lg bg-slate-900/80 hover:bg-slate-850 hover:border-slate-700 border border-slate-800/60 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-all shadow-sm group shrink-0"
-                  title="Menu Settings (Rename, Shift/Move Items, Lock/Unlock)"
-                >
-                  <FolderTree className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform shrink-0" />
-                  <span className="hidden sm:inline">Settings</span>
-                </button>
-
-                {/* 48-Hour Ground Search Criteria Dashboard */}
-                <button
-                  onClick={() => setShowGroundCriteriaModal(true)}
-                  className="h-9 px-2.5 sm:px-3 rounded-lg bg-slate-900/80 hover:bg-slate-850 hover:border-cyan-500/40 border border-slate-800/60 text-cyan-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-all shadow-sm group shrink-0"
-                  title="48-Hour Ground-Level Search Criteria & Sources Dashboard"
-                >
-                  <Globe className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-12 transition-transform shrink-0" />
-                  <span className="hidden sm:inline">48h Search</span>
-                </button>
-
-                {/* AI Companion Memory */}
-                <button
-                  onClick={() => setShowCompanionMemoryModal(true)}
-                  className="h-9 px-2.5 sm:px-3 rounded-lg bg-slate-900/80 hover:bg-slate-850 hover:border-purple-500/40 border border-slate-800/60 text-purple-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-all shadow-sm group shrink-0"
-                  title="AI Companion Permanent Memory & Rules Engine"
-                >
-                  <Brain className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform shrink-0" />
-                  <span className="hidden sm:inline">AI Memory</span>
-                </button>
-
-                {/* Topic Bank */}
-                <button
-                  onClick={() => setShowTopicBankModal(true)}
-                  className="h-9 px-2.5 sm:px-3 rounded-lg bg-slate-900/80 hover:bg-slate-850 hover:border-emerald-500/40 border border-slate-800/60 text-emerald-200 hover:text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-all shadow-sm group shrink-0"
-                  title="Topic Bank & Smarter Duplicate Radar"
-                >
-                  <Database className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
-                  <span className="hidden sm:inline">Topic Bank</span>
-                </button>
-
-                {/* Scroll To Top Jump Button */}
-                {isScrolled && (
-                  <button
-                    onClick={scrollToTop}
-                    className="h-9 px-2 rounded-lg bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-400 hover:text-cyan-300 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all shadow-sm group shrink-0"
-                    title="Upar Jayein / Header Dekhein"
-                  >
-                    <ArrowUp className="w-3.5 h-3.5 group-hover:-translate-y-0.5 transition-transform shrink-0" />
-                    <span className="hidden sm:inline text-[11px]">Top</span>
-                  </button>
-                )}
-              </div>
+            {/* Right: Settings Button Only */}
+            <div className="flex items-center shrink-0">
+              <button
+                onClick={() => setShowMenuCustomizer(true)}
+                className="h-10 px-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-850 hover:border-cyan-500/50 border border-slate-800 text-slate-200 hover:text-white text-xs sm:text-sm font-semibold flex items-center gap-2 whitespace-nowrap cursor-pointer transition-all shadow-sm group shrink-0"
+                title="Menu & Button Settings (Rename any button, shift/move items, lock/unlock, GitHub sync)"
+              >
+                <FolderTree className="w-4 h-4 text-cyan-400 group-hover:rotate-12 transition-transform shrink-0" />
+                <span>{getButtonLabel('settings')}</span>
+              </button>
             </div>
           </div>
 
-          {/* Mobile Menu Bar */}
+          {/* Mobile Menu Bar: Dropdown Toggle + Settings Only */}
           <div className="md:hidden flex items-center justify-between py-2 text-xs">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200 cursor-pointer"
             >
               <Menu className="w-4 h-4 text-cyan-400" />
-              <span>Navigation Menu</span>
+              <span>{getButtonLabel('mobileMenu')}</span>
               <ChevronDown className={`w-3 h-3 transition-transform ${mobileMenuOpen ? 'rotate-180' : ''}`} />
             </button>
-            <div className="flex items-center gap-2">
-              <span className="text-cyan-300 font-medium truncate max-w-[36vw] flex items-center gap-1.5">
-                {activeTabMeta?.icon} {activeTabMeta?.label}
-              </span>
-              <button
-                onClick={() => setShowMenuCustomizer(true)}
-                className="p-1 rounded-md bg-slate-900 border border-slate-700 text-cyan-400 hover:text-white cursor-pointer"
-                title="Menu Settings"
-              >
-                <FolderTree className="w-3.5 h-3.5" />
-              </button>
-              {isScrolled && (
-                <button
-                  onClick={scrollToTop}
-                  className="p-1 rounded-md bg-slate-900 border border-slate-700 text-cyan-400 cursor-pointer"
-                  title="Scroll to Top"
-                >
-                  <ArrowUp className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
+            <button
+              onClick={() => setShowMenuCustomizer(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-cyan-300 hover:text-white cursor-pointer font-semibold"
+              title="Menu & Button Settings"
+            >
+              <FolderTree className="w-3.5 h-3.5 text-cyan-400" />
+              <span>{getButtonLabel('settings')}</span>
+            </button>
           </div>
 
           {/* Mobile Expanded Panel */}

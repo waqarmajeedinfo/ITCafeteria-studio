@@ -17,6 +17,11 @@ import { INTEGRATION_PUBLIC_PATHS, registerIntegrationRoutes } from './integrati
 import { registerMultiUserRoutes } from './server_multiuser';
 import { registerTopicResearchRoutes } from './server_topic_research';
 import { registerAgentManagementRoutes } from './server_agent_management';
+import {
+  registerGitHubSyncRoutes,
+  scheduleGitHubSync,
+  mergeStudioStatePatch,
+} from './server_github_sync';
 
 dotenv.config({ override: true });
 
@@ -285,6 +290,17 @@ function saveCompanionMemory(data: any, username: string = 'waqarmajeedinfo') {
     const userStorageDir = path.resolve(__dirname, 'data', 'user-storage', targetUser);
     if (!fs.existsSync(userStorageDir)) fs.mkdirSync(userStorageDir, { recursive: true });
     fs.writeFileSync(path.resolve(userStorageDir, 'companion-memory.json'), JSON.stringify(data, null, 2), 'utf-8');
+
+    scheduleGitHubSync(
+      [
+        'data/agent/companion-memory.json',
+        {
+          localPath: path.resolve(userRepoDir, 'companion-memory.json'),
+          repoPath: `user-data/${targetUser}/companion-memory.json`,
+        },
+      ],
+      `chore(memory): sync companion memory for @${targetUser}`
+    );
   } catch (err) {
     console.error('[CompanionMemory] Save error:', err);
   }
@@ -589,6 +605,19 @@ app.post('/api/agent/competitors/scan', async (req, res) => {
     saveCompanionMemory(companion, 'waqarmajeedinfo');
 
     saveCompetitorIntelligence(current, 'waqarmajeedinfo');
+    mergeStudioStatePatch(
+      {
+        agentGeneratedData: {
+          competitorScan: current,
+          lastGeneratedAt: new Date().toISOString(),
+        },
+      },
+      'agent_competitor_scan'
+    );
+    scheduleGitHubSync(
+      ['data/agent/competitor-intelligence.json', 'data/studio/studio-state.json'],
+      'chore(agent): sync competitor intelligence scan'
+    );
     res.json({
       ok: true,
       lastSurveillanceScan: current.lastSurveillanceScan,
@@ -666,6 +695,17 @@ function saveStoredPhoneticRules(rules: any[], username: string = 'waqarmajeedin
     const userRepoDir = path.resolve(__dirname, 'user-data', targetUser);
     if (!fs.existsSync(userRepoDir)) fs.mkdirSync(userRepoDir, { recursive: true });
     fs.writeFileSync(path.resolve(userRepoDir, 'phonetic-dictionary.json'), JSON.stringify(rules, null, 2), 'utf-8');
+
+    scheduleGitHubSync(
+      [
+        'data/agent/phonetic-dictionary.json',
+        {
+          localPath: path.resolve(userRepoDir, 'phonetic-dictionary.json'),
+          repoPath: `user-data/${targetUser}/phonetic-dictionary.json`,
+        },
+      ],
+      `chore(phonetic): sync phonetic rules for @${targetUser}`
+    );
   } catch (err) {
     console.error('[PhoneticDictionary] Save error:', err);
   }
@@ -2383,7 +2423,7 @@ DIALOGUE: "${dialogue}"`;
       });
     }
 
-    res.json({
+    const generatedStoryPayload = {
       title,
       hook: safeString(data.hook) || safeString(idea.hook) || 'Reveal',
       thumbnailLine1,
@@ -2405,7 +2445,23 @@ DIALOGUE: "${dialogue}"`;
       modelUsed,
       practicalBlueprint,
       consistencyReport
-    });
+    };
+
+    mergeStudioStatePatch(
+      {
+        latestStory: generatedStoryPayload,
+        agentGeneratedData: {
+          lastGeneratedAt: new Date().toISOString(),
+        },
+      },
+      'agent_story_generated'
+    );
+    scheduleGitHubSync(
+      ['data/studio/studio-state.json'],
+      `feat(agent): sync generated story "${title.slice(0, 60)}"`
+    );
+
+    res.json(generatedStoryPayload);
   } catch (err: any) {
     console.error('Story generation error:', err);
     res.status(500).json({ error: friendlyGeminiError(err, 'Story generate nahi ho saki. Dobara try karein.') });
@@ -2541,6 +2597,20 @@ DIALOGUE: "${dialogue}"`;
       tiktokCaption: safeString(parsed.tiktokCaption) || story.tiktokCaption,
       seriesPlan: safeString(parsed.seriesPlan) || story.seriesPlan,
     };
+
+    mergeStudioStatePatch(
+      {
+        latestStory: refreshedStory,
+        agentGeneratedData: {
+          lastGeneratedAt: new Date().toISOString(),
+        },
+      },
+      'agent_story_refreshed'
+    );
+    scheduleGitHubSync(
+      ['data/studio/studio-state.json'],
+      `feat(agent): sync refreshed story "${String(refreshedStory.title || '').slice(0, 60)}"`
+    );
 
     res.json({ story: refreshedStory });
   } catch (err: any) {
@@ -2726,6 +2796,7 @@ registerIntegrationRoutes(app);
 registerMultiUserRoutes(app);
 registerTopicResearchRoutes(app);
 registerAgentManagementRoutes(app, () => port);
+registerGitHubSyncRoutes(app);
 
 // Setup Vite middleware in dev or static files in prod
 async function startServer() {

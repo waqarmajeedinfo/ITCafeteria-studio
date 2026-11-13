@@ -1,0 +1,22 @@
+[
+  { "word": "waqt", "fix": "waq-t", "reason": "Hyphen breaks consonant cluster preventing rushed slur", "isCustom": false, "source": "base" },
+  { "word": "aksar", "fix": "ak-sr", "reason": "aksar and ak-sar failed; ak-sr delivers natural Pakistani pronunciation", "isCustom": false, "source": "base" },
+  { "word": "turant", "fix": "usi waqt", "reason": "Hindi loanword; strict prohibition, use native Urdu equivalent 'usi waqt'", "isCustom": false, "source": "base" },
+  { "word": "Aisi / aisi", "fix": "aesi", "reason": "Prevents English word confusion and vowel-stretching", "isCustom": false, "source": "base" },
+  { "word": "aise / Aise", "fix": "aesy", "reason": "Prevents English word confusion and vowel-stretching", "isCustom": false, "source": "base" },
+  { "word": "zaya", "fix": "ze-ya", "reason": "Natural Urdu speech cadence without flat vowel", "isCustom": false, "source": "base" },
+  { "word": "Fikar / fikar", "fix": "Fikr", "reason": "Prevents elongation into extra syllable 'fi-kar'", "isCustom": false, "source": "base" },
+  { "word": "sahi", "fix": "theek", "reason": "Always comes out stretched 'saaahi'; permanent replacement", "isCustom": false, "source": "base" },
+  { "word": "Chat", "fix": "Chat-G-P-T", "reason": "Standalone 'Chat' slurs as 'cheet'; use hyphenated brand", "isCustom": false, "source": "base" },
+  { "word": "bara / bade", "fix": "barra", "reason": "Double 'rr' forces crisp flap consonant instead of soft vowel", "isCustom": false, "source": "base" },
+  { "word": "bari / badi", "fix": "barri", "reason": "Double 'rr' forces crisp flap consonant instead of soft vowel", "isCustom": false, "source": "base" },
+  { "word": "baray / badey / bary", "fix": "barray", "reason": "Double 'rr' forces crisp flap consonant instead of soft vowel", "isCustom": false, "source": "base" },
+  { "word": "qaid", "fix": "limit", "reason": "Permanent replacement: 'kisi experience ki limit nahi'", "isCustom": false, "source": "base" },
+  { "word": "ghaanton", "fix": "ghanton", "reason": "Single 'a' prevents over-drawn vowel sound", "isCustom": false, "source": "base" },
+  { "word": "hal", "fix": "tareeqa", "reason": "Flow reads 'hal' as 'haal' (condition); use 'tareeqa' (method)", "isCustom": false, "source": "base" },
+  { "word": "pare / pade", "fix": "parre", "reason": "Double 'rr' prevents soft retroflex slur", "isCustom": false, "source": "base" },
+  { "word": "Gemini", "fix": "Jemini", "reason": "Forces natural J sound preventing robotic stutter", "isCustom": false, "source": "base" },
+  { "word": "dhoondna", "fix": "talaash karna", "reason": "Repeat-prone words under test to stop stutter in first frame", "isCustom": false, "source": "base" },
+  { "word": "ghalati", "fix": "ghalti", "reason": "Flow pronounces ghalati with unnatural pause; ghalti sounds fluent", "isCustom": false, "source": "base" },
+  { "word": "fastly", "fix": "tezi se", "reason": "Proper Urdu cadence instead of broken English suffix", "isCustom": false, "source": "base" }
+]

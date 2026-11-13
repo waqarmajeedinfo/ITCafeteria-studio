@@ -21,10 +21,20 @@ import {
   ChevronDown,
   ArrowUpDown,
   CheckCircle2,
-  Shield
+  Shield,
+  GitBranch,
+  RefreshCw
 } from 'lucide-react';
 import type { TabType } from '../App';
 import { dirtyManager } from '../lib/dirtyStore';
+import {
+  pushStudioStatePatch,
+  isHydratingRemoteState,
+  getGitHubSyncStatus,
+  triggerGitHubSyncNow,
+  GITHUB_SYNC_STATUS_EVENT,
+  type GitHubSyncStatusInfo
+} from '../lib/studioSyncStore';
 
 
 export interface MenuGroupConfig {
@@ -41,9 +51,59 @@ export interface MenuItemConfig {
   roleVisibility?: 'all' | 'admin' | 'standard';
 }
 
+export interface ButtonLabelsConfig {
+  phoneticDictionary: string;
+  manageChannels: string;
+  topicBank: string;
+  goLive: string;
+  agentManagement: string;
+  search48h: string;
+  aiMemory: string;
+  editBanner: string;
+  theme: string;
+  holoBg: string;
+  settings: string;
+  mobileMenu: string;
+}
+
+export const DEFAULT_BUTTON_LABELS: ButtonLabelsConfig = {
+  phoneticDictionary: 'Phonetic Rules Dictionary',
+  manageChannels: 'Manage Channels',
+  topicBank: 'Topic Bank',
+  goLive: 'Go Live',
+  agentManagement: 'Agent Management',
+  search48h: '48h Search',
+  aiMemory: 'AI Memory',
+  editBanner: 'Edit Banner',
+  theme: 'Theme',
+  holoBg: 'Holo BG',
+  settings: 'Settings',
+  mobileMenu: 'Navigation Menu',
+};
+
+export const BUTTON_LABEL_META: Array<{
+  key: keyof ButtonLabelsConfig;
+  location: string;
+  defaultLabel: string;
+}> = [
+  { key: 'phoneticDictionary', location: 'Top Bar Left', defaultLabel: 'Phonetic Rules Dictionary' },
+  { key: 'manageChannels', location: 'Top Bar Left', defaultLabel: 'Manage Channels' },
+  { key: 'topicBank', location: 'Top Bar Left', defaultLabel: 'Topic Bank' },
+  { key: 'goLive', location: 'Top Bar Left', defaultLabel: 'Go Live' },
+  { key: 'agentManagement', location: 'Top Bar Left', defaultLabel: 'Agent Management' },
+  { key: 'search48h', location: 'Top Bar (Next to Agent Mgmt)', defaultLabel: '48h Search' },
+  { key: 'aiMemory', location: 'Top Bar (Next to Agent Mgmt)', defaultLabel: 'AI Memory' },
+  { key: 'editBanner', location: 'Top Bar Right', defaultLabel: 'Edit Banner' },
+  { key: 'theme', location: 'Top Bar Right', defaultLabel: 'Theme' },
+  { key: 'holoBg', location: 'Top Bar Right', defaultLabel: 'Holo BG' },
+  { key: 'settings', location: 'Bottom Menu Bar Right', defaultLabel: 'Settings' },
+  { key: 'mobileMenu', location: 'Mobile Menu Toggle', defaultLabel: 'Navigation Menu' },
+];
+
 export interface MenuCustomizerState {
   groups: MenuGroupConfig[];
   items: MenuItemConfig[];
+  buttonLabels?: ButtonLabelsConfig;
 }
 
 export const DEFAULT_MENU_STATE: MenuCustomizerState = {
@@ -80,7 +140,8 @@ export const DEFAULT_MENU_STATE: MenuCustomizerState = {
     { id: 'transcribe', label: 'Voice Dictation', groupId: 'ai', isLocked: true, roleVisibility: 'all' },
     { id: 'music', label: 'Music Generator', groupId: 'ai', isLocked: true, roleVisibility: 'all' },
     { id: '3d', label: '3D Virtual Studio', groupId: 'ai', isLocked: true, roleVisibility: 'all' },
-  ]
+  ],
+  buttonLabels: { ...DEFAULT_BUTTON_LABELS },
 };
 
 const STORAGE_KEY = 'itcafeteria_menu_customizer_config';
@@ -101,7 +162,14 @@ export function loadMenuConfig(): MenuCustomizerState {
             roleVisibility: it.roleVisibility || 'all'
           };
         });
-        return { ...parsed, items: sanitizedItems };
+        return {
+          ...parsed,
+          items: sanitizedItems,
+          buttonLabels: {
+            ...DEFAULT_BUTTON_LABELS,
+            ...(parsed.buttonLabels || {}),
+          },
+        };
       }
     }
   } catch (e) {
@@ -112,9 +180,19 @@ export function loadMenuConfig(): MenuCustomizerState {
 
 export function saveMenuConfig(config: MenuCustomizerState) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    const normalized: MenuCustomizerState = {
+      ...config,
+      buttonLabels: {
+        ...DEFAULT_BUTTON_LABELS,
+        ...(config.buttonLabels || {}),
+      },
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('itcafeteria_menu_customizer_updated', { detail: config }));
+      window.dispatchEvent(new CustomEvent('itcafeteria_menu_customizer_updated', { detail: normalized }));
+      if (!isHydratingRemoteState()) {
+        pushStudioStatePatch({ menuConfig: normalized }, 'menu_and_button_labels_updated');
+      }
     }
   } catch (e) {
     console.error('Failed to save menu config', e);
@@ -136,13 +214,20 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
   onSave,
   onReset
 }) => {
-  const [localConfig, setLocalConfig] = useState<MenuCustomizerState>(config);
+  const [localConfig, setLocalConfig] = useState<MenuCustomizerState>(() => ({
+    ...config,
+    buttonLabels: { ...DEFAULT_BUTTON_LABELS, ...(config.buttonLabels || {}) },
+  }));
   const [selectedItemId, setSelectedItemId] = useState<TabType | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<TabType | null>(null);
   const [tempLabel, setTempLabel] = useState<string>('');
   const [lockWarning, setLockWarning] = useState<string | null>(null);
   const [saveToast, setSaveToast] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<GitHubSyncStatusInfo | null>(null);
+  const [isSyncingNow, setIsSyncingNow] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   const tempLabelRef = useRef<string>('');
   const editingItemIdRef = useRef<TabType | null>(null);
@@ -164,10 +249,13 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     dirtyManager.setDirty({
       id: 'menu_customizer',
       title: 'Menu Bar Customizer',
-      description: 'Menu layout aur role visibility ki tabdeeliyaan ghair mehfooz hain.',
+      description: 'Menu layout, button labels aur role visibility ki tabdeeliyaan ghair mehfooz hain.',
       onSave: () => handleApply(newConfig),
       onDiscard: () => {
-        setLocalConfig(config);
+        setLocalConfig({
+          ...config,
+          buttonLabels: { ...DEFAULT_BUTTON_LABELS, ...(config.buttonLabels || {}) },
+        });
         dirtyManager.clearDirty('menu_customizer');
       }
     });
@@ -175,10 +263,23 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setLocalConfig(config);
+      setLocalConfig({
+        ...config,
+        buttonLabels: { ...DEFAULT_BUTTON_LABELS, ...(config.buttonLabels || {}) },
+      });
+      setConfirmReset(false);
+      setSyncFeedback(null);
+      getGitHubSyncStatus().then((st) => {
+        if (st) setSyncStatus(st);
+      });
+      const onSyncStatus = (e: any) => {
+        if (e.detail) setSyncStatus(e.detail);
+      };
+      window.addEventListener(GITHUB_SYNC_STATUS_EVENT, onSyncStatus);
       document.documentElement.classList.add('modal-open');
       document.body.classList.add('modal-open');
       return () => {
+        window.removeEventListener(GITHUB_SYNC_STATUS_EVENT, onSyncStatus);
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');
         dirtyManager.clearDirty('menu_customizer');
@@ -409,9 +510,74 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     }
   };
 
+  const handleButtonLabelChange = (key: keyof ButtonLabelsConfig, value: string) => {
+    const next: MenuCustomizerState = {
+      ...localConfig,
+      buttonLabels: {
+        ...DEFAULT_BUTTON_LABELS,
+        ...(localConfig.buttonLabels || {}),
+        [key]: value,
+      },
+    };
+    setLocalConfig(next);
+    markDirty(next);
+  };
+
+  const toggleAllLocks = (locked: boolean) => {
+    const next: MenuCustomizerState = {
+      ...localConfig,
+      groups: localConfig.groups.map((g) => ({ ...g, isLocked: locked })),
+      items: localConfig.items.map((i) => ({ ...i, isLocked: locked })),
+    };
+    setLockWarning(null);
+    setLocalConfig(next);
+    markDirty(next);
+  };
+
+  const handleSyncToGitHubNow = async () => {
+    setIsSyncingNow(true);
+    setSyncFeedback(null);
+    const sanitizedLabels: ButtonLabelsConfig = {
+      ...DEFAULT_BUTTON_LABELS,
+      ...(localConfig.buttonLabels || {}),
+    };
+    (Object.keys(DEFAULT_BUTTON_LABELS) as Array<keyof ButtonLabelsConfig>).forEach((k) => {
+      if (!sanitizedLabels[k] || !sanitizedLabels[k].trim()) {
+        sanitizedLabels[k] = DEFAULT_BUTTON_LABELS[k];
+      } else {
+        sanitizedLabels[k] = sanitizedLabels[k].trim();
+      }
+    });
+    const toSave = { ...localConfig, buttonLabels: sanitizedLabels };
+    saveMenuConfig(toSave);
+    onSave(toSave);
+    const res = await triggerGitHubSyncNow('Manual Sync from Menu & Button Customizer');
+    setIsSyncingNow(false);
+    if (res?.committed) {
+      setSyncFeedback(`GitHub repo mein commit ho gaya (${String(res.sha || '').slice(0, 7)})`);
+    } else if (res?.ok) {
+      setSyncFeedback('Live studio state server par mehfooz ho gayi (all devices synced).');
+    } else {
+      setSyncFeedback(res?.error || 'Sync complete with warning.');
+    }
+  };
+
   const handleApply = (overrideConfig?: MenuCustomizerState) => {
     const base = overrideConfig || localConfig;
-    let finalConfig = { ...base };
+    const rawLabels = {
+      ...DEFAULT_BUTTON_LABELS,
+      ...(base.buttonLabels || {}),
+    };
+    const sanitizedLabels: ButtonLabelsConfig = { ...rawLabels };
+    (Object.keys(DEFAULT_BUTTON_LABELS) as Array<keyof ButtonLabelsConfig>).forEach((k) => {
+      const val = (sanitizedLabels[k] || '').trim();
+      sanitizedLabels[k] = val || DEFAULT_BUTTON_LABELS[k];
+    });
+
+    let finalConfig: MenuCustomizerState = {
+      ...base,
+      buttonLabels: sanitizedLabels,
+    };
 
     const activeItemId = editingItemIdRef.current || editingItemId;
     const activeGroupId = editingGroupIdRef.current || editingGroupId;
@@ -442,17 +608,22 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
     setTimeout(() => {
       setSaveToast(false);
       onClose();
-    }, 400);
+    }, 350);
   };
 
   const handleResetDefaults = () => {
-    if (window.confirm('Kya aap menu bar ko default settings par reset karna chahte hain?')) {
-      onReset();
-      setLocalConfig(DEFAULT_MENU_STATE);
-      saveMenuConfig(DEFAULT_MENU_STATE);
-      dirtyManager.clearDirty('menu_customizer');
+    if (!confirmReset) {
+      setConfirmReset(true);
+      return;
     }
+    setConfirmReset(false);
+    onReset();
+    setLocalConfig(DEFAULT_MENU_STATE);
+    saveMenuConfig(DEFAULT_MENU_STATE);
+    dirtyManager.clearDirty('menu_customizer');
   };
+
+  const allAnyLocked = localConfig.groups.some((g) => g.isLocked) || localConfig.items.some((i) => i.isLocked);
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overscroll-contain overflow-y-auto animate-in fade-in duration-200">
@@ -462,31 +633,47 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
       >
 
         {/* Header */}
-        <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-cyan-500/20 text-cyan-400 rounded-xl border border-cyan-500/30">
+        <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 bg-cyan-500/20 text-cyan-400 rounded-xl border border-cyan-500/30 shrink-0">
               <FolderTree className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-white text-base">Menu Bar Handler &amp; Role Visibility</h3>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-white text-base">Menu, Button Renamer &amp; Live GitHub Sync</h3>
                 <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full font-mono">
-                  RBAC Menu Access
+                  All Buttons Editable
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                Menus ko rename karein, items ko shift karein, aur har item ke liye 'Role Visibility' (Admin Only / Standard / All) configure karein.
+              <p className="text-xs text-slate-400 truncate">
+                Har button aur menu ko rename karein — sabhi tabdeeliyaan live sab devices aur GitHub repo par sync hoti hain.
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Band Karein"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => toggleAllLocks(!allAnyLocked)}
+              className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                allAnyLocked
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
+                  : 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
+              }`}
+              title={allAnyLocked ? 'Rename ke liye sab menus unlock karein' : 'Sab menus dubara lock karein'}
+            >
+              {allAnyLocked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{allAnyLocked ? 'Unlock All' : 'Lock All'}</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              title="Band Karein"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Lock Warning Toast / Notice */}
@@ -518,11 +705,57 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
           </div>
         )}
 
-        {/* Content Body — Interactive Grid of Menu Categories */}
+        {/* Content Body — Top Bar & Action Buttons + Interactive Grid of Menu Categories */}
         <div
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll p-4 sm:p-5 space-y-4"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain custom-modal-scroll p-4 sm:p-5 space-y-5"
           style={{ overscrollBehavior: 'contain' }}
         >
+          {/* Section 1: Rename Every Top-Bar & Action Button */}
+          <div className="border border-cyan-500/30 bg-slate-950/75 rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-cyan-400" />
+                <h4 className="font-bold text-sm text-white">Top Bar &amp; Action Buttons (Rename Any Button)</h4>
+              </div>
+              <span className="text-[11px] text-slate-400 font-mono">
+                {BUTTON_LABEL_META.length} Global Buttons
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {BUTTON_LABEL_META.map((btnMeta) => {
+                const currentVal = localConfig.buttonLabels?.[btnMeta.key] ?? btnMeta.defaultLabel;
+                return (
+                  <div
+                    key={btnMeta.key}
+                    className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/40 transition-colors flex flex-col gap-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-1 text-[10px]">
+                      <span className="text-cyan-300 font-semibold truncate">{btnMeta.location}</span>
+                      {currentVal !== btnMeta.defaultLabel && (
+                        <button
+                          type="button"
+                          onClick={() => handleButtonLabelChange(btnMeta.key, btnMeta.defaultLabel)}
+                          className="text-slate-400 hover:text-amber-300 cursor-pointer shrink-0"
+                          title={`Reset to "${btnMeta.defaultLabel}"`}
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={currentVal}
+                      onChange={(e) => handleButtonLabelChange(btnMeta.key, e.target.value)}
+                      placeholder={btnMeta.defaultLabel}
+                      className="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white focus:outline-none"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {localConfig.groups.map((group, groupIndex) => {
               const groupItems = localConfig.items.filter((i) => i.groupId === group.id);
@@ -822,18 +1055,62 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between shrink-0">
-          <button
-            type="button"
-            onClick={handleResetDefaults}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer text-xs"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Defaults</span>
-          </button>
+        {/* Footer with GitHub Cross-Device Sync */}
+        <div className="px-5 py-3.5 bg-slate-950 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            {confirmReset ? (
+              <div className="flex items-center gap-1.5 bg-rose-950/70 border border-rose-500/40 px-2.5 py-1 rounded-xl text-xs">
+                <span className="text-rose-200 font-medium">Confirm reset?</span>
+                <button
+                  type="button"
+                  onClick={handleResetDefaults}
+                  className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-semibold cursor-pointer"
+                >
+                  Haan, Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmReset(false)}
+                  className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResetDefaults}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer text-xs"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Defaults</span>
+              </button>
+            )}
 
-          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSyncToGitHubNow}
+              disabled={isSyncingNow}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+              title={syncStatus?.repo ? `Sync to ${syncStatus.repo} (${syncStatus.branch})` : 'Sync all studio & agent data'}
+            >
+              {isSyncingNow ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <GitBranch className="w-3.5 h-3.5" />}
+              <span>{isSyncingNow ? 'Syncing...' : 'Sync GitHub'}</span>
+            </button>
+
+            {(syncFeedback || syncStatus?.lastCommitSha) && (
+              <span className="text-[11px] text-slate-400 font-mono truncate max-w-[220px]">
+                {syncFeedback || `Commit ${String(syncStatus?.lastCommitSha || '').slice(0, 7)}`}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 justify-end">
+            {saveToast && (
+              <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Saved
+              </span>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -847,7 +1124,7 @@ export const MenuBarCustomizerModal: React.FC<MenuBarCustomizerModalProps> = ({
               className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-semibold text-xs shadow-lg shadow-cyan-950 cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
-              <span>Save Menu Layout</span>
+              <span>Save Menu &amp; Buttons</span>
             </button>
           </div>
         </div>
