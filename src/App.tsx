@@ -47,7 +47,8 @@ import {
   Globe,
   Brain,
   Edit3,
-  Database
+  Database,
+  Terminal
 } from 'lucide-react';
 
 import { ChannelAnalytics } from './components/ChannelAnalytics';
@@ -106,6 +107,7 @@ import { loadAllChannels, type ExtendedChannelProfile } from './lib/channelStore
 import { getAllPublishedVideos } from './lib/publishedLibraryStore';
 import { CATEGORIES_IT_CAFETERIA, CHANNEL_PROFILES } from './data/channelData';
 import { MultiUserManagerModal } from './components/MultiUserManagerModal';
+import { AgentManagementModal } from './components/AgentManagementModal';
 import { userAuthManager, USER_AUTH_UPDATED_EVENT, type UserSessionProfile } from './lib/userAuthStore';
 import { AuthGate } from './components/AuthGate';
 
@@ -345,6 +347,7 @@ export default function App() {
   const [showCompanionMemoryModal, setShowCompanionMemoryModal] = useState(false);
   const [showLiveCoPilotModal, setShowLiveCoPilotModal] = useState(false);
   const [showTopicBankModal, setShowTopicBankModal] = useState(false);
+  const [showAgentManagement, setShowAgentManagement] = useState(false);
   const [liveElapsedSeconds, setLiveElapsedSeconds] = useState(0);
 
   // Live Co-Pilot Session Timer Effect
@@ -933,6 +936,16 @@ export default function App() {
                       {Math.floor(liveElapsedSeconds / 60)}:{(liveElapsedSeconds % 60).toString().padStart(2, '0')}
                     </span>
                   )}
+                </button>
+
+                {/* 5. Agent Management */}
+                <button
+                  onClick={() => setShowAgentManagement(true)}
+                  className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-cyan-500/40 hover:border-cyan-400 text-xs sm:text-sm font-medium text-cyan-200 hover:text-white transition-all cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
+                  title="Review, edit, monitor, modify, delete, or add functions and actions for the back-end agent"
+                >
+                  <Terminal className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>Agent Management</span>
                 </button>
               </div>
 
@@ -2030,6 +2043,12 @@ export default function App() {
         }}
       />
 
+      {/* Back-End Agent Management Modal */}
+      <AgentManagementModal
+        isOpen={showAgentManagement}
+        onClose={() => setShowAgentManagement(false)}
+        currentUserRole={currentUserProfile?.role}
+      />
 
       <DiagnosticMessageBox />
 

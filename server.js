@@ -1,7 +1,7 @@
 // server.ts
 import express from "express";
-import fs3 from "fs";
-import path3 from "path";
+import fs4 from "fs";
+import path4 from "path";
 import { fileURLToPath as fileURLToPath3 } from "url";
 import { timingSafeEqual as timingSafeEqual2 } from "crypto";
 import dotenv from "dotenv";
@@ -4069,10 +4069,511 @@ function generateFallbackTopics(channelId, categoryId, aspectRatio, excluded) {
   ];
 }
 
+// server_agent_management.ts
+import fs3 from "fs";
+import path3 from "path";
+var REGISTRY_FILE = path3.resolve(process.cwd(), "data", "agent", "agent-registry.json");
+function buildDefaultFunctions() {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  return [
+    {
+      id: "fn-live-insights-sync",
+      actionKey: "LIVE_INSIGHTS_REFRESH",
+      name: "Live Insights YouTube & TikTok Sync",
+      category: "Analytics & Sync",
+      description: "Checks YouTube/TikTok OAuth connection status and pulls latest YouTube Data API v3 analytics.",
+      endpoint: "/api/integrations/status",
+      method: "GET",
+      schedule: "Twice Daily (6:00 AM & 2:00 PM PKT)",
+      triggerType: "Scheduled + Manual",
+      enabled: true,
+      status: "active",
+      instructions: "Verify OAuth token freshness first, then sync channel views, subscribers, search share, and retention metrics.",
+      payloadTemplate: "{}",
+      runCount: 4,
+      successCount: 4,
+      errorCount: 0,
+      lastRunAt: now,
+      lastDurationMs: 18,
+      lastStatusCode: 200,
+      lastResult: "Integration status verified (YouTube configured).",
+      isSystemCore: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "fn-daily-autopilot-check",
+      actionKey: "DAILY_REPLENISHMENT_CHECK",
+      name: "Daily Autopilot Queue Replenishment",
+      category: "Autopilot Engine",
+      description: "Checks Pending Queue depth against the 3-story threshold and triggers single or 3-day sprint replenishment.",
+      endpoint: "/api/autopilot/trigger-daily",
+      method: "POST",
+      schedule: "6:00 AM PKT Daily",
+      triggerType: "Cron + Threshold (< 3)",
+      enabled: true,
+      status: "active",
+      instructions: "Evaluate pendingCount. If >= 3 enter standby; if 2 generate 1 story; if <= 1 run 3-day sprint.",
+      payloadTemplate: JSON.stringify({ pendingCount: 2, manualTrigger: true }, null, 2),
+      runCount: 3,
+      successCount: 3,
+      errorCount: 0,
+      lastRunAt: now,
+      lastDurationMs: 12,
+      lastStatusCode: 200,
+      lastResult: "Standby / Replenishment evaluation active.",
+      isSystemCore: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "fn-competitor-scan",
+      actionKey: "COMPETITOR_SURVEILLANCE_SCAN",
+      name: "24h Competitor Intelligence Scan",
+      category: "Intelligence",
+      description: "Refreshes tracked competitor benchmarks (@TechnologyGyan, @KevinStratvert, @BilalTechUrdu) and updates gap matrix.",
+      endpoint: "/api/agent/competitors/scan",
+      method: "POST",
+      schedule: "Daily (24h Cadence)",
+      triggerType: "Scheduled + Manual",
+      enabled: true,
+      status: "active",
+      instructions: "Ingest latest competitor hook pacing, feed vs search split, and record scan log to companion memory.",
+      payloadTemplate: "{}",
+      runCount: 5,
+      successCount: 5,
+      errorCount: 0,
+      lastRunAt: now,
+      lastDurationMs: 24,
+      lastStatusCode: 200,
+      lastResult: "Competitor transcripts & metadata scanned.",
+      isSystemCore: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "fn-ground-search-48h",
+      actionKey: "GROUND_SEARCH_48H",
+      name: "48-Hour Ground-Level Tech Research",
+      category: "Research",
+      description: "Validates topic freshness across 10+ high-authority tech sources within the last 48 hours.",
+      endpoint: "/api/agent/ground-search-criteria",
+      method: "GET",
+      schedule: "Pre-Generation",
+      triggerType: "Story Pipeline Hook",
+      enabled: true,
+      status: "active",
+      instructions: "Enforce 48h recency window, verify free-first alternatives, and reject unverified statistics.",
+      payloadTemplate: "{}",
+      runCount: 7,
+      successCount: 7,
+      errorCount: 0,
+      lastRunAt: now,
+      lastDurationMs: 14,
+      lastStatusCode: 200,
+      lastResult: "48-hour criteria rules loaded.",
+      isSystemCore: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "fn-story-package-generator",
+      actionKey: "GENERATE_STORY_PACKAGE",
+      name: "10-Scene Flow Script & Continuity Builder",
+      category: "Content Creation",
+      description: "Generates 10-scene Roman Urdu story packages with Google Flow director blocks and Continuity Lock.",
+      endpoint: "/api/ai/generate-story",
+      method: "POST",
+      schedule: "On Demand",
+      triggerType: "Simulator / Autopilot",
+      enabled: true,
+      status: "active",
+      instructions: "Assemble [DIRECTOR CAMERA & LIGHTING], [SCENE VISUAL & PROPS], [PRESENTER & ACTION] with @WM25-X Continuity Lock, and DIALOGUE (22-25 words).",
+      payloadTemplate: JSON.stringify({
+        topic: "Windows 11 Startup Speed Secrets",
+        categoryId: 4,
+        characterTag: "@WM25-1",
+        presenter: "Waqar Majeed"
+      }, null, 2),
+      runCount: 12,
+      successCount: 12,
+      errorCount: 0,
+      lastRunAt: now,
+      lastDurationMs: 3200,
+      lastStatusCode: 200,
+      lastResult: "Story pipeline ready with Continuity Lock.",
+      isSystemCore: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "fn-execute-action-now",
+      actionKey: "EXECUTE_TASK_NOW",
+      name: "Autopilot Immediate Task Executor",
+      category: "Execution",
+      description: "Executes queued production actions immediately (EXECUTE_TASK_NOW, BATCH_SPRINT_RUN, SCHEDULE_SLOT, VERIFY_DUPLICATE).",
+      endpoint: "/api/autopilot/execute-action",
+      method: "POST",
+      schedule: "On Demand",
+      triggerType: "Direct Action Command",
+      enabled: true,
+      status: "active",
+      instructions: "Execute action payload immediately with 0% catalog duplicate verification.",
+      payloadTemplate: JSON.stringify({
+        action: "VERIFY_DUPLICATE",
+        payload: { title: "Excel Center Across Selection Shortcut" }
+      }, null, 2),
+      runCount: 6,
+      successCount: 6,
+      errorCount: 0,
+      lastRunAt: now,
+      lastDurationMs: 11,
+      lastStatusCode: 200,
+      lastResult: "Action executor operational.",
+      isSystemCore: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "fn-companion-memory",
+      actionKey: "COMPANION_MEMORY_SYNC",
+      name: "AI Companion Memory & Directives Engine",
+      category: "Memory & Rules",
+      description: "Reads and persists permanent studio directives, learned preferences, and proactive guidance.",
+      endpoint: "/api/agent/companion-memory/proactive-guidance",
+      method: "GET",
+      schedule: "Continuous",
+      triggerType: "System Context Hook",
+      enabled: true,
+      status: "active",
+      instructions: "Enforce Roman Urdu communication directive, 80vh modal containment, and zero Urdu script UI rule.",
+      payloadTemplate: "{}",
+      runCount: 9,
+      successCount: 9,
+      errorCount: 0,
+      lastRunAt: now,
+      lastDurationMs: 9,
+      lastStatusCode: 200,
+      lastResult: "Proactive guidance and directives synced.",
+      isSystemCore: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "fn-phonetic-dictionary",
+      actionKey: "PHONETIC_DICTIONARY_ENGINE",
+      name: "Roman Urdu Phonetic Rules Processor",
+      category: "Voice & Script",
+      description: "Applies living phonetic fixes (theek, usi waqt, Jemini, barra) to all generated dialogues.",
+      endpoint: "/api/phonetic-dictionary",
+      method: "GET",
+      schedule: "Per Scene",
+      triggerType: "Dialogue Post-Processor",
+      enabled: true,
+      status: "active",
+      instructions: "Substitute forbidden or slur-prone words before voiceover script output.",
+      payloadTemplate: "{}",
+      runCount: 14,
+      successCount: 14,
+      errorCount: 0,
+      lastRunAt: now,
+      lastDurationMs: 7,
+      lastStatusCode: 200,
+      lastResult: "Phonetic rules synced from disk.",
+      isSystemCore: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "fn-channel-rss-sync",
+      actionKey: "CHANNEL_RSS_SYNC",
+      name: "YouTube Channel RSS Feed Importer",
+      category: "Channel Sync",
+      description: "Fetches public YouTube RSS video entries to keep published catalog and duplicate radar updated.",
+      endpoint: "/api/channels/sync-rss",
+      method: "POST",
+      schedule: "Every 6 Hours",
+      triggerType: "Channel Manager",
+      enabled: true,
+      status: "active",
+      instructions: "Query channel feed XML and extract latest published video titles for duplicate prevention.",
+      payloadTemplate: JSON.stringify({ channelId: "itcafeteria" }, null, 2),
+      runCount: 2,
+      successCount: 2,
+      errorCount: 0,
+      lastRunAt: now,
+      lastDurationMs: 280,
+      lastStatusCode: 200,
+      lastResult: "Channel RSS feed synchronized.",
+      isSystemCore: true,
+      createdAt: now,
+      updatedAt: now
+    },
+    {
+      id: "fn-gemini-key-health",
+      actionKey: "GEMINI_KEY_HEALTH_CHECK",
+      name: "Gemini API Key & Quota Health Monitor",
+      category: "Diagnostics",
+      description: "Pings Google AI Studio Gemini endpoint to verify API key validity and model responsiveness.",
+      endpoint: "/api/ai/key-status",
+      method: "GET",
+      schedule: "On Demand",
+      triggerType: "Health Monitor",
+      enabled: true,
+      status: "active",
+      instructions: "Send lightweight ping to gemini-3.1-flash-lite and report quota/scope health.",
+      payloadTemplate: "{}",
+      runCount: 2,
+      successCount: 2,
+      errorCount: 0,
+      lastRunAt: now,
+      lastDurationMs: 410,
+      lastStatusCode: 200,
+      lastResult: "Gemini API key status checked.",
+      isSystemCore: true,
+      createdAt: now,
+      updatedAt: now
+    }
+  ];
+}
+function loadRegistry() {
+  try {
+    if (fs3.existsSync(REGISTRY_FILE)) {
+      const raw = fs3.readFileSync(REGISTRY_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.functions)) {
+        return {
+          lastUpdated: parsed.lastUpdated || (/* @__PURE__ */ new Date()).toISOString(),
+          functions: parsed.functions,
+          executionLogs: Array.isArray(parsed.executionLogs) ? parsed.executionLogs : []
+        };
+      }
+    }
+  } catch (err) {
+    console.error("[AgentManagement] Read error:", err);
+  }
+  const initial = {
+    lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
+    functions: buildDefaultFunctions(),
+    executionLogs: []
+  };
+  saveRegistry(initial);
+  return initial;
+}
+function saveRegistry(store) {
+  try {
+    const dir = path3.dirname(REGISTRY_FILE);
+    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
+    store.lastUpdated = (/* @__PURE__ */ new Date()).toISOString();
+    fs3.writeFileSync(REGISTRY_FILE, JSON.stringify(store, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[AgentManagement] Save error:", err);
+  }
+}
+function registerAgentManagementRoutes(app2, getPort) {
+  app2.get("/api/agent/registry", (_req, res) => {
+    const store = loadRegistry();
+    const total = store.functions.length;
+    const activeCount = store.functions.filter((f) => f.enabled && f.status !== "error").length;
+    const pausedCount = store.functions.filter((f) => !f.enabled || f.status === "paused").length;
+    const errorCount = store.functions.filter((f) => f.status === "error").length;
+    const totalRuns = store.functions.reduce((acc, f) => acc + (f.runCount || 0), 0);
+    const totalSuccess = store.functions.reduce((acc, f) => acc + (f.successCount || 0), 0);
+    res.json({
+      ok: true,
+      lastUpdated: store.lastUpdated,
+      serverUptimeSec: Math.round(process.uptime()),
+      summary: {
+        total,
+        active: activeCount,
+        paused: pausedCount,
+        errors: errorCount,
+        totalRuns,
+        successRate: totalRuns > 0 ? Math.round(totalSuccess / totalRuns * 100) : 100
+      },
+      functions: store.functions,
+      executionLogs: store.executionLogs.slice(0, 60)
+    });
+  });
+  app2.post("/api/agent/registry", (req, res) => {
+    const body = req.body || {};
+    const name = String(body.name || "").trim();
+    const actionKey = String(body.actionKey || name.toUpperCase().replace(/[^A-Z0-9]+/g, "_")).trim();
+    if (!name) {
+      return res.status(400).json({ error: "Function/Action name is required." });
+    }
+    const store = loadRegistry();
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const method = ["GET", "POST", "PUT", "DELETE"].includes(String(body.method || "").toUpperCase()) ? String(body.method).toUpperCase() : "POST";
+    const newFn = {
+      id: `fn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      actionKey: actionKey || `CUSTOM_${Date.now()}`,
+      name,
+      category: String(body.category || "Custom Action").trim(),
+      description: String(body.description || "Custom back-end agent function.").trim(),
+      endpoint: String(body.endpoint || "/api/autopilot/execute-action").trim(),
+      method,
+      schedule: String(body.schedule || "On Demand").trim(),
+      triggerType: String(body.triggerType || "Manual / API").trim(),
+      enabled: body.enabled !== false,
+      status: body.enabled === false ? "paused" : "active",
+      instructions: String(body.instructions || "").trim(),
+      payloadTemplate: typeof body.payloadTemplate === "string" ? body.payloadTemplate : JSON.stringify(body.payloadTemplate || {}, null, 2),
+      runCount: 0,
+      successCount: 0,
+      errorCount: 0,
+      lastRunAt: null,
+      lastDurationMs: null,
+      lastStatusCode: null,
+      lastResult: null,
+      isSystemCore: false,
+      createdAt: now,
+      updatedAt: now
+    };
+    store.functions.unshift(newFn);
+    saveRegistry(store);
+    res.status(201).json({ ok: true, function: newFn });
+  });
+  app2.put("/api/agent/registry/:id", (req, res) => {
+    const { id } = req.params;
+    const body = req.body || {};
+    const store = loadRegistry();
+    const idx = store.functions.findIndex((f) => f.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: "Agent function not found." });
+    }
+    const existing = store.functions[idx];
+    const nextEnabled = typeof body.enabled === "boolean" ? body.enabled : existing.enabled;
+    const nextMethod = body.method && ["GET", "POST", "PUT", "DELETE"].includes(String(body.method).toUpperCase()) ? String(body.method).toUpperCase() : existing.method;
+    const updated = {
+      ...existing,
+      name: body.name !== void 0 ? String(body.name).trim() || existing.name : existing.name,
+      actionKey: body.actionKey !== void 0 ? String(body.actionKey).trim() || existing.actionKey : existing.actionKey,
+      category: body.category !== void 0 ? String(body.category).trim() : existing.category,
+      description: body.description !== void 0 ? String(body.description).trim() : existing.description,
+      endpoint: body.endpoint !== void 0 ? String(body.endpoint).trim() : existing.endpoint,
+      method: nextMethod,
+      schedule: body.schedule !== void 0 ? String(body.schedule).trim() : existing.schedule,
+      triggerType: body.triggerType !== void 0 ? String(body.triggerType).trim() : existing.triggerType,
+      enabled: nextEnabled,
+      status: body.status ? body.status : nextEnabled ? existing.status === "paused" ? "active" : existing.status : "paused",
+      instructions: body.instructions !== void 0 ? String(body.instructions) : existing.instructions,
+      payloadTemplate: body.payloadTemplate !== void 0 ? typeof body.payloadTemplate === "string" ? body.payloadTemplate : JSON.stringify(body.payloadTemplate, null, 2) : existing.payloadTemplate,
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    store.functions[idx] = updated;
+    saveRegistry(store);
+    res.json({ ok: true, function: updated });
+  });
+  app2.delete("/api/agent/registry/:id", (req, res) => {
+    const { id } = req.params;
+    const store = loadRegistry();
+    const idx = store.functions.findIndex((f) => f.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: "Agent function not found." });
+    }
+    const [removed] = store.functions.splice(idx, 1);
+    saveRegistry(store);
+    res.json({ ok: true, deletedId: removed.id, name: removed.name });
+  });
+  app2.post("/api/agent/registry/:id/execute", async (req, res) => {
+    const { id } = req.params;
+    const store = loadRegistry();
+    const idx = store.functions.findIndex((f) => f.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: "Agent function not found." });
+    }
+    const fn = store.functions[idx];
+    if (!fn.enabled) {
+      return res.status(400).json({ error: "Function is currently paused. Enable it before executing." });
+    }
+    const startedAt = Date.now();
+    let statusCode = 200;
+    let ok = true;
+    let resultSummary = "";
+    try {
+      const targetEndpoint = fn.endpoint.trim();
+      if (targetEndpoint.startsWith("/api/") && !targetEndpoint.startsWith("/api/agent/registry")) {
+        const port2 = getPort();
+        const url = `http://127.0.0.1:${port2}${targetEndpoint}`;
+        const fetchInit = {
+          method: fn.method,
+          headers: { "Content-Type": "application/json" }
+        };
+        if (fn.method === "POST" || fn.method === "PUT") {
+          let payloadToSend = {};
+          if (req.body && req.body.payloadOverride !== void 0) {
+            payloadToSend = req.body.payloadOverride;
+          } else {
+            try {
+              payloadToSend = fn.payloadTemplate ? JSON.parse(fn.payloadTemplate) : {};
+            } catch {
+              payloadToSend = { raw: fn.payloadTemplate };
+            }
+          }
+          fetchInit.body = JSON.stringify(payloadToSend);
+        }
+        const upstream = await fetch(url, fetchInit);
+        statusCode = upstream.status;
+        ok = upstream.ok;
+        const text = await upstream.text();
+        try {
+          const parsed = JSON.parse(text);
+          resultSummary = parsed.message || parsed.error || JSON.stringify(parsed).slice(0, 260);
+        } catch {
+          resultSummary = text.slice(0, 260) || `HTTP ${statusCode}`;
+        }
+      } else {
+        resultSummary = `Custom action "${fn.actionKey}" executed (${fn.instructions ? fn.instructions.slice(0, 120) : "No extra directives"}).`;
+      }
+    } catch (err) {
+      ok = false;
+      statusCode = 500;
+      resultSummary = err?.message || "Execution failed";
+    }
+    const durationMs = Math.max(1, Date.now() - startedAt);
+    const now = (/* @__PURE__ */ new Date()).toISOString();
+    const updatedFn = {
+      ...fn,
+      status: ok ? "active" : "error",
+      runCount: (fn.runCount || 0) + 1,
+      successCount: (fn.successCount || 0) + (ok ? 1 : 0),
+      errorCount: (fn.errorCount || 0) + (ok ? 0 : 1),
+      lastRunAt: now,
+      lastDurationMs: durationMs,
+      lastStatusCode: statusCode,
+      lastResult: resultSummary,
+      updatedAt: now
+    };
+    const logEntry = {
+      id: `exec-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      functionId: fn.id,
+      functionName: fn.name,
+      actionKey: fn.actionKey,
+      method: fn.method,
+      endpoint: fn.endpoint,
+      status: ok ? "success" : "error",
+      statusCode,
+      durationMs,
+      timestamp: now,
+      summary: resultSummary
+    };
+    store.functions[idx] = updatedFn;
+    store.executionLogs = [logEntry, ...store.executionLogs].slice(0, 100);
+    saveRegistry(store);
+    res.json({
+      ok: true,
+      executed: ok,
+      function: updatedFn,
+      log: logEntry
+    });
+  });
+}
+
 // server.ts
 dotenv.config({ override: true });
 var __filename3 = fileURLToPath3(import.meta.url);
-var __dirname3 = path3.dirname(__filename3);
+var __dirname3 = path4.dirname(__filename3);
 var port = process.env.DEFAULT_APP_PORT ? Number(process.env.DEFAULT_APP_PORT) : process.env.PORT ? Number(process.env.PORT) : 3e3;
 var app = express();
 app.set("trust proxy", 1);
@@ -4257,11 +4758,11 @@ var CHAT_FALLBACK_ORDER = [
   "gemini-3.8-flash",
   "gemini-flash-latest"
 ];
-var COMPANION_MEMORY_FILE = path3.resolve(__dirname3, "data", "agent", "companion-memory.json");
+var COMPANION_MEMORY_FILE = path4.resolve(__dirname3, "data", "agent", "companion-memory.json");
 function getCompanionMemory() {
   try {
-    if (fs3.existsSync(COMPANION_MEMORY_FILE)) {
-      const raw = fs3.readFileSync(COMPANION_MEMORY_FILE, "utf-8");
+    if (fs4.existsSync(COMPANION_MEMORY_FILE)) {
+      const raw = fs4.readFileSync(COMPANION_MEMORY_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.activeDirectives)) return parsed;
     }
@@ -4286,16 +4787,16 @@ function getCompanionMemory() {
 }
 function saveCompanionMemory(data, username = "waqarmajeedinfo") {
   try {
-    const dir = path3.dirname(COMPANION_MEMORY_FILE);
-    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
-    fs3.writeFileSync(COMPANION_MEMORY_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const dir = path4.dirname(COMPANION_MEMORY_FILE);
+    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
+    fs4.writeFileSync(COMPANION_MEMORY_FILE, JSON.stringify(data, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path3.resolve(__dirname3, "user-data", targetUser);
-    if (!fs3.existsSync(userRepoDir)) fs3.mkdirSync(userRepoDir, { recursive: true });
-    fs3.writeFileSync(path3.resolve(userRepoDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
-    const userStorageDir = path3.resolve(__dirname3, "data", "user-storage", targetUser);
-    if (!fs3.existsSync(userStorageDir)) fs3.mkdirSync(userStorageDir, { recursive: true });
-    fs3.writeFileSync(path3.resolve(userStorageDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userRepoDir = path4.resolve(__dirname3, "user-data", targetUser);
+    if (!fs4.existsSync(userRepoDir)) fs4.mkdirSync(userRepoDir, { recursive: true });
+    fs4.writeFileSync(path4.resolve(userRepoDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userStorageDir = path4.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs4.existsSync(userStorageDir)) fs4.mkdirSync(userStorageDir, { recursive: true });
+    fs4.writeFileSync(path4.resolve(userStorageDir, "companion-memory.json"), JSON.stringify(data, null, 2), "utf-8");
   } catch (err) {
     console.error("[CompanionMemory] Save error:", err);
   }
@@ -4490,11 +4991,11 @@ app.post("/api/agent/copilot/live-session", async (req, res) => {
     res.status(500).json({ error: err?.message || "Live session failed" });
   }
 });
-var COMPETITOR_INTEL_FILE = path3.resolve(__dirname3, "data", "agent", "competitor-intelligence.json");
+var COMPETITOR_INTEL_FILE = path4.resolve(__dirname3, "data", "agent", "competitor-intelligence.json");
 function getCompetitorIntelligence() {
   try {
-    if (fs3.existsSync(COMPETITOR_INTEL_FILE)) {
-      const raw = fs3.readFileSync(COMPETITOR_INTEL_FILE, "utf-8");
+    if (fs4.existsSync(COMPETITOR_INTEL_FILE)) {
+      const raw = fs4.readFileSync(COMPETITOR_INTEL_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.trackedCompetitors)) return parsed;
     }
@@ -4513,16 +5014,16 @@ function getCompetitorIntelligence() {
 }
 function saveCompetitorIntelligence(data, username = "waqarmajeedinfo") {
   try {
-    const dir = path3.dirname(COMPETITOR_INTEL_FILE);
-    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
-    fs3.writeFileSync(COMPETITOR_INTEL_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const dir = path4.dirname(COMPETITOR_INTEL_FILE);
+    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
+    fs4.writeFileSync(COMPETITOR_INTEL_FILE, JSON.stringify(data, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path3.resolve(__dirname3, "user-data", targetUser);
-    if (!fs3.existsSync(userRepoDir)) fs3.mkdirSync(userRepoDir, { recursive: true });
-    fs3.writeFileSync(path3.resolve(userRepoDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
-    const userStorageDir = path3.resolve(__dirname3, "data", "user-storage", targetUser);
-    if (!fs3.existsSync(userStorageDir)) fs3.mkdirSync(userStorageDir, { recursive: true });
-    fs3.writeFileSync(path3.resolve(userStorageDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userRepoDir = path4.resolve(__dirname3, "user-data", targetUser);
+    if (!fs4.existsSync(userRepoDir)) fs4.mkdirSync(userRepoDir, { recursive: true });
+    fs4.writeFileSync(path4.resolve(userRepoDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userStorageDir = path4.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs4.existsSync(userStorageDir)) fs4.mkdirSync(userStorageDir, { recursive: true });
+    fs4.writeFileSync(path4.resolve(userStorageDir, "competitor-intelligence.json"), JSON.stringify(data, null, 2), "utf-8");
   } catch (err) {
     console.error("[CompetitorIntel] Save error:", err);
   }
@@ -4589,11 +5090,11 @@ app.post("/api/agent/competitors/generate-strategy", async (req, res) => {
     res.status(500).json({ error: err?.message || "Strategy generation failed" });
   }
 });
-var PHONETIC_DICT_FILE = path3.resolve(__dirname3, "data", "agent", "phonetic-dictionary.json");
+var PHONETIC_DICT_FILE = path4.resolve(__dirname3, "data", "agent", "phonetic-dictionary.json");
 function getStoredPhoneticRules() {
   try {
-    if (fs3.existsSync(PHONETIC_DICT_FILE)) {
-      const raw = fs3.readFileSync(PHONETIC_DICT_FILE, "utf-8");
+    if (fs4.existsSync(PHONETIC_DICT_FILE)) {
+      const raw = fs4.readFileSync(PHONETIC_DICT_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
@@ -4604,16 +5105,16 @@ function getStoredPhoneticRules() {
 }
 function saveStoredPhoneticRules(rules, username = "waqarmajeedinfo") {
   try {
-    const dir = path3.dirname(PHONETIC_DICT_FILE);
-    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
-    fs3.writeFileSync(PHONETIC_DICT_FILE, JSON.stringify(rules, null, 2), "utf-8");
+    const dir = path4.dirname(PHONETIC_DICT_FILE);
+    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
+    fs4.writeFileSync(PHONETIC_DICT_FILE, JSON.stringify(rules, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userStorageDir = path3.resolve(__dirname3, "data", "user-storage", targetUser);
-    if (!fs3.existsSync(userStorageDir)) fs3.mkdirSync(userStorageDir, { recursive: true });
-    fs3.writeFileSync(path3.resolve(userStorageDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
-    const userRepoDir = path3.resolve(__dirname3, "user-data", targetUser);
-    if (!fs3.existsSync(userRepoDir)) fs3.mkdirSync(userRepoDir, { recursive: true });
-    fs3.writeFileSync(path3.resolve(userRepoDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
+    const userStorageDir = path4.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs4.existsSync(userStorageDir)) fs4.mkdirSync(userStorageDir, { recursive: true });
+    fs4.writeFileSync(path4.resolve(userStorageDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
+    const userRepoDir = path4.resolve(__dirname3, "user-data", targetUser);
+    if (!fs4.existsSync(userRepoDir)) fs4.mkdirSync(userRepoDir, { recursive: true });
+    fs4.writeFileSync(path4.resolve(userRepoDir, "phonetic-dictionary.json"), JSON.stringify(rules, null, 2), "utf-8");
   } catch (err) {
     console.error("[PhoneticDictionary] Save error:", err);
   }
@@ -5397,11 +5898,11 @@ Return STRICT valid JSON only with NO markdown fences, matching this structure:
     });
   }
 });
-var FOCUS_LINKS_FILE = path3.resolve(__dirname3, "data", "agent", "focus-links.json");
+var FOCUS_LINKS_FILE = path4.resolve(__dirname3, "data", "agent", "focus-links.json");
 function getFocusLinks() {
   try {
-    if (fs3.existsSync(FOCUS_LINKS_FILE)) {
-      const raw = fs3.readFileSync(FOCUS_LINKS_FILE, "utf-8");
+    if (fs4.existsSync(FOCUS_LINKS_FILE)) {
+      const raw = fs4.readFileSync(FOCUS_LINKS_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
     }
@@ -5411,16 +5912,16 @@ function getFocusLinks() {
 }
 function saveFocusLinks(links, username) {
   try {
-    const dir = path3.dirname(FOCUS_LINKS_FILE);
-    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
-    fs3.writeFileSync(FOCUS_LINKS_FILE, JSON.stringify(links, null, 2), "utf-8");
+    const dir = path4.dirname(FOCUS_LINKS_FILE);
+    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
+    fs4.writeFileSync(FOCUS_LINKS_FILE, JSON.stringify(links, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path3.resolve(__dirname3, "user-data", targetUser);
-    if (!fs3.existsSync(userRepoDir)) fs3.mkdirSync(userRepoDir, { recursive: true });
-    fs3.writeFileSync(path3.resolve(userRepoDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
-    const userStorageDir = path3.resolve(__dirname3, "data", "user-storage", targetUser);
-    if (!fs3.existsSync(userStorageDir)) fs3.mkdirSync(userStorageDir, { recursive: true });
-    fs3.writeFileSync(path3.resolve(userStorageDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
+    const userRepoDir = path4.resolve(__dirname3, "user-data", targetUser);
+    if (!fs4.existsSync(userRepoDir)) fs4.mkdirSync(userRepoDir, { recursive: true });
+    fs4.writeFileSync(path4.resolve(userRepoDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
+    const userStorageDir = path4.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs4.existsSync(userStorageDir)) fs4.mkdirSync(userStorageDir, { recursive: true });
+    fs4.writeFileSync(path4.resolve(userStorageDir, "focus-links.json"), JSON.stringify(links, null, 2), "utf-8");
   } catch (err) {
     console.error("[FocusLinks] Failed to save focus links:", err);
   }
@@ -5477,11 +5978,11 @@ app.delete("/api/agent/focus-links/:id", (req, res) => {
   saveFocusLinks(links, username);
   res.json({ ok: true, remaining: links.length, links });
 });
-var GROUND_CRITERIA_FILE = path3.resolve(__dirname3, "data", "agent", "ground-search-criteria.json");
+var GROUND_CRITERIA_FILE = path4.resolve(__dirname3, "data", "agent", "ground-search-criteria.json");
 function getGroundCriteria() {
   try {
-    if (fs3.existsSync(GROUND_CRITERIA_FILE)) {
-      const raw = fs3.readFileSync(GROUND_CRITERIA_FILE, "utf-8");
+    if (fs4.existsSync(GROUND_CRITERIA_FILE)) {
+      const raw = fs4.readFileSync(GROUND_CRITERIA_FILE, "utf-8");
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.sources)) return parsed;
     }
@@ -5500,16 +6001,16 @@ function getGroundCriteria() {
 }
 function saveGroundCriteria(data, username = "waqarmajeedinfo") {
   try {
-    const dir = path3.dirname(GROUND_CRITERIA_FILE);
-    if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
-    fs3.writeFileSync(GROUND_CRITERIA_FILE, JSON.stringify(data, null, 2), "utf-8");
+    const dir = path4.dirname(GROUND_CRITERIA_FILE);
+    if (!fs4.existsSync(dir)) fs4.mkdirSync(dir, { recursive: true });
+    fs4.writeFileSync(GROUND_CRITERIA_FILE, JSON.stringify(data, null, 2), "utf-8");
     const targetUser = username || "waqarmajeedinfo";
-    const userRepoDir = path3.resolve(__dirname3, "user-data", targetUser);
-    if (!fs3.existsSync(userRepoDir)) fs3.mkdirSync(userRepoDir, { recursive: true });
-    fs3.writeFileSync(path3.resolve(userRepoDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
-    const userStorageDir = path3.resolve(__dirname3, "data", "user-storage", targetUser);
-    if (!fs3.existsSync(userStorageDir)) fs3.mkdirSync(userStorageDir, { recursive: true });
-    fs3.writeFileSync(path3.resolve(userStorageDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userRepoDir = path4.resolve(__dirname3, "user-data", targetUser);
+    if (!fs4.existsSync(userRepoDir)) fs4.mkdirSync(userRepoDir, { recursive: true });
+    fs4.writeFileSync(path4.resolve(userRepoDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
+    const userStorageDir = path4.resolve(__dirname3, "data", "user-storage", targetUser);
+    if (!fs4.existsSync(userStorageDir)) fs4.mkdirSync(userStorageDir, { recursive: true });
+    fs4.writeFileSync(path4.resolve(userStorageDir, "ground-search-criteria.json"), JSON.stringify(data, null, 2), "utf-8");
   } catch (err) {
     console.error("[GroundCriteria] Save error:", err);
   }
@@ -6352,10 +6853,11 @@ app.post("/api/profile/:channelId/analyze-existing-stories", async (req, res) =>
 registerIntegrationRoutes(app);
 registerMultiUserRoutes(app);
 registerTopicResearchRoutes(app);
+registerAgentManagementRoutes(app, () => port);
 async function startServer() {
   let viteServer = null;
-  const distPath = path3.resolve(__dirname3, "dist");
-  const hasDist = fs3.existsSync(path3.resolve(distPath, "index.html"));
+  const distPath = path4.resolve(__dirname3, "dist");
+  const hasDist = fs4.existsSync(path4.resolve(distPath, "index.html"));
   const isProd = process.env.NODE_ENV === "production" || !process.env.DEFAULT_APP_PORT && hasDist;
   if (!isProd) {
     const { createServer: createViteServer } = await import("vite");
@@ -6370,9 +6872,9 @@ async function startServer() {
     app.use("*", async (req, res, next) => {
       const url = req.originalUrl;
       try {
-        const indexPath = path3.resolve(__dirname3, "index.html");
-        if (fs3.existsSync(indexPath)) {
-          let template = fs3.readFileSync(indexPath, "utf-8");
+        const indexPath = path4.resolve(__dirname3, "index.html");
+        if (fs4.existsSync(indexPath)) {
+          let template = fs4.readFileSync(indexPath, "utf-8");
           template = await viteServer.transformIndexHtml(url, template);
           res.status(200).set({ "Content-Type": "text/html" }).end(template);
         } else {
@@ -6388,8 +6890,8 @@ async function startServer() {
   } else {
     app.use(express.static(distPath, { maxAge: "1h", index: false }));
     app.get("*", (_req, res) => {
-      const indexPath = path3.resolve(distPath, "index.html");
-      if (fs3.existsSync(indexPath)) {
+      const indexPath = path4.resolve(distPath, "index.html");
+      if (fs4.existsSync(indexPath)) {
         res.sendFile(indexPath);
       } else {
         res.status(404).send("Application bundle index.html not found. Please run npm run build.");

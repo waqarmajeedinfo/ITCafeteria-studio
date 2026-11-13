@@ -16,6 +16,7 @@ import {
 import { INTEGRATION_PUBLIC_PATHS, registerIntegrationRoutes } from './integrations';
 import { registerMultiUserRoutes } from './server_multiuser';
 import { registerTopicResearchRoutes } from './server_topic_research';
+import { registerAgentManagementRoutes } from './server_agent_management';
 
 dotenv.config({ override: true });
 
@@ -2724,6 +2725,7 @@ app.post('/api/profile/:channelId/analyze-existing-stories', async (req, res) =>
 registerIntegrationRoutes(app);
 registerMultiUserRoutes(app);
 registerTopicResearchRoutes(app);
+registerAgentManagementRoutes(app, () => port);
 
 // Setup Vite middleware in dev or static files in prod
 async function startServer() {
