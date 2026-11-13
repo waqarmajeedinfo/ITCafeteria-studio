@@ -93,6 +93,14 @@
   ],
   "interactionHistory": [
     {
+      "id": "int-1794591253099",
+      "timestamp": "2026-11-13T17:34:13.099Z",
+      "type": "competitor_surveillance",
+      "summary": "Executed 24h Competitor Intelligence Surveillance & Transcript Ingestion",
+      "learnedTakeaway": "Decoded latest competitor pacing (145-175 WPM) vs IT Cafeteria (135 WPM). Identified 3-second hook gap in Shorts Feed.",
+      "category": "Competitor Intelligence"
+    },
+    {
       "id": "dialogue-1794068530355",
       "timestamp": "2026-11-07T16:22:10.355Z",
       "type": "live_voice_dialogue",

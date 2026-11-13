@@ -2,7 +2,7 @@
   "agentTitle": "Chief Competitor Intelligence & Content Strategist",
   "channelOwner": "Waqar Majeed (@waqarmajeedinfo)",
   "channelTitle": "IT Cafeteria",
-  "lastSurveillanceScan": "2026-11-07T07:16:00Z",
+  "lastSurveillanceScan": "2026-11-13T17:34:13.099Z",
   "surveillanceCadence": "Daily (24h Automated Ingestion)",
   "executiveSummary": "IT Cafeteria possesses a 79.0% search moat on technical evergreen queries (Windows, Excel, AI setup). Competitors rely on 70-80% algorithmic Shorts Feed impulse clicks with high swipe-away rates (38-42%). By adopting a 1.5-second visual pattern interrupt hook and pairing it with IT Cafeteria's superior technical depth in Roman Urdu, IT Cafeteria can out-rank both Indian mainstream creators and Western English tutorials.",
   "trackedCompetitors": [
@@ -15,7 +15,11 @@
       "weeklyShortsCadence": 7,
       "avgShortDurationSec": 28,
       "stayedToWatchPct": 74.5,
-      "feedVsSearchSplit": { "feed": 78.0, "search": 16.0, "other": 6.0 },
+      "feedVsSearchSplit": {
+        "feed": 78,
+        "search": 16,
+        "other": 6
+      },
       "pacingWordsPerMinute": 175,
       "sceneCutIntervalSec": 2.2,
       "hookDecoded": {
@@ -44,8 +48,12 @@
       "subscribers": "4.2M",
       "weeklyShortsCadence": 4,
       "avgShortDurationSec": 42,
-      "stayedToWatchPct": 68.0,
-      "feedVsSearchSplit": { "feed": 24.0, "search": 71.0, "other": 5.0 },
+      "stayedToWatchPct": 68,
+      "feedVsSearchSplit": {
+        "feed": 24,
+        "search": 71,
+        "other": 5
+      },
       "pacingWordsPerMinute": 145,
       "sceneCutIntervalSec": 3.8,
       "hookDecoded": {
@@ -74,8 +82,12 @@
       "subscribers": "320K",
       "weeklyShortsCadence": 2.5,
       "avgShortDurationSec": 31,
-      "stayedToWatchPct": 61.0,
-      "feedVsSearchSplit": { "feed": 62.0, "search": 30.0, "other": 8.0 },
+      "stayedToWatchPct": 61,
+      "feedVsSearchSplit": {
+        "feed": 62,
+        "search": 30,
+        "other": 8
+      },
       "pacingWordsPerMinute": 130,
       "sceneCutIntervalSec": 4.5,
       "hookDecoded": {
