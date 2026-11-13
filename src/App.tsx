@@ -882,46 +882,110 @@ export default function App() {
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent pointer-events-none" />
           )}
 
-          {/* Top Bar Floating Header: Clean Horizontal Aligned Analytics Bar (Eliminated duplicate Agent bar) */}
+          {/* Top Bar Floating Header */}
           <div className="absolute top-0 inset-x-0 z-20 bg-gradient-to-b from-slate-950/98 via-slate-950/90 to-transparent px-3 sm:px-6 py-2.5 sm:py-3 border-b border-slate-800/60 backdrop-blur-md">
-            <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-3">
+            <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start justify-between gap-3">
               
-              {/* Left / Center: Channel Identity & Live Dynamic Analytic Metrics in One Horizontal Sequence */}
+              {/* Top Left: Phonetic Rules Dictionary, Manage Channels, Topic Bank, Go Live */}
               <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto">
-                {/* Interactive Channel Selector & Profile Badge */}
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700 shadow-sm shrink-0">
-                  <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                  <select
-                    value={activeChannelId}
-                    onChange={(e) => {
-                      const nextId = e.target.value;
-                      setActiveChannelId(nextId);
-                      const ch = channels[nextId];
-                      if (ch) {
-                        setCharacterTag(ch.defaultTag || (ch.tags && ch.tags[0]?.value) || '@Active');
-                        setActiveCategoryId(ch.defaultCategoryId || 1);
-                      }
-                    }}
-                    className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer pr-1"
-                    title="Active Channel aur iska Engine switch karein"
+                {/* 1. Phonetic Rules Dictionary */}
+                <button
+                  onClick={() => setShowDictionary(true)}
+                  className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
+                >
+                  <BookOpen className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>Phonetic Rules Dictionary</span>
+                </button>
+
+                {/* 2. Manage Channels */}
+                <button
+                  onClick={() => setShowChannelManager(true)}
+                  className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
+                >
+                  <Plus className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>Manage Channels</span>
+                </button>
+
+                {/* 3. Topic Bank */}
+                <button
+                  onClick={() => setShowTopicBankModal(true)}
+                  className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-emerald-500/40 hover:border-emerald-400 text-xs sm:text-sm font-medium text-emerald-200 hover:text-white transition-all cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
+                  title="Profile Topic Bank, Backfill Covered Points, & Smarter Duplicate Radar"
+                >
+                  <Database className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Topic Bank</span>
+                </button>
+
+                {/* 4. Go Live */}
+                <button
+                  onClick={() => setShowLiveCoPilotModal(true)}
+                  className={`h-9 px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                    isLiveActive
+                      ? 'bg-gradient-to-r from-rose-950/90 via-slate-900 to-rose-950/90 border border-rose-500/70 text-rose-300 shadow-rose-950/50 animate-pulse'
+                      : 'bg-slate-900/85 hover:bg-slate-800 border border-rose-500/40 hover:border-rose-400 text-slate-200 hover:text-white'
+                  }`}
+                  title="Go Live Co-Pilot with Real-Time Adaptive Guidance"
+                >
+                  <Radio className={`w-4 h-4 shrink-0 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
+                  <span>{isLiveActive ? '🔴 On Air (Live)' : 'Go Live'}</span>
+                  {isLiveActive && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 bg-rose-600 text-white rounded font-bold">
+                      {Math.floor(liveElapsedSeconds / 60)}:{(liveElapsedSeconds % 60).toString().padStart(2, '0')}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Right Side: Top Administrative Buttons + Statistics Box Directly Below */}
+              <div className="flex flex-col items-end gap-2 shrink-0 self-end lg:self-start">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {/* Edit Banner */}
+                  <button
+                    onClick={() => setShowBannerModal(true)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
+                    title="Customize Banner, Height & Image"
                   >
-                    {Object.values(channels).map((ch) => (
-                      <option key={ch.id} value={ch.id} className="bg-slate-900 text-white">
-                        {ch.name} ({ch.presenter})
-                      </option>
-                    ))}
-                  </select>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    liveAnalytics.isLinked
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                  }`}>
-                    {liveAnalytics.isLinked ? '● Live Linked' : '● Verified Engine'}
-                  </span>
+                    <Camera className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Edit Banner</span>
+                  </button>
+
+                  {/* Theme Customizer */}
+                  <button
+                    onClick={() => setShowThemeCustomizer(true)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
+                    title="Theme & Studio Customizer"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Theme</span>
+                  </button>
+
+                  {/* Holo BG */}
+                  <button
+                    onClick={cycleNextHoloTheme}
+                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-xs font-semibold text-cyan-300 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-300"
+                    title="Cycle Holographic Moving Background"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Holo BG</span>
+                  </button>
+
+                  {/* Multi-User Profile & RBAC Switcher */}
+                  <button
+                    onClick={() => setShowMultiUserModal(true)}
+                    className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold backdrop-blur-md shadow-md transition-all cursor-pointer ${
+                      currentUserProfile?.role === 'admin'
+                        ? 'bg-purple-950/80 border-purple-500/50 text-purple-200 hover:border-purple-300'
+                        : 'bg-cyan-950/80 border-cyan-500/50 text-cyan-200 hover:border-cyan-300'
+                    }`}
+                    title="Multi-User Profiles, RBAC & Dedicated Directory GitHub Sync"
+                  >
+                    <User className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{currentUserProfile?.role === 'admin' ? '👑 Admin' : '👤 User'}: {currentUserProfile?.username || 'Profile'}</span>
+                  </button>
                 </div>
 
-                {/* Horizontal Live Metric Chips (Aligned, Dynamic, Single-Line) */}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                {/* Statistics Box Directly Below Administrative Buttons */}
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   <div className="px-3 py-1.5 rounded-xl bg-slate-900/85 border border-slate-800/80 shadow-sm flex items-center gap-2">
                     <span className="text-[10px] text-slate-400">Published:</span>
                     <span className="text-xs font-bold text-cyan-300 font-mono">{publishedCount}+ Videos</span>
@@ -943,124 +1007,6 @@ export default function App() {
                   </div>
                 </div>
               </div>
-
-              {/* Right Side: Grouped Action Buttons in Same Horizontal Sequence */}
-              <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
-                {/* Edit Banner */}
-                <button
-                  onClick={() => setShowBannerModal(true)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
-                  title="Customize Banner, Height & Image"
-                >
-                  <Camera className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Edit Banner</span>
-                </button>
-
-                {/* Theme Customizer */}
-                <button
-                  onClick={() => setShowThemeCustomizer(true)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-400/60 hover:text-cyan-300"
-                  title="Theme & Studio Customizer"
-                >
-                  <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Theme</span>
-                </button>
-
-                {/* Holo BG */}
-                <button
-                  onClick={cycleNextHoloTheme}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-xs font-semibold text-cyan-300 backdrop-blur-md shadow-md transition-all cursor-pointer hover:border-cyan-300"
-                  title="Cycle Holographic Moving Background"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Holo BG</span>
-                </button>
-
-                {/* Multi-User Profile & RBAC Switcher */}
-                <button
-                  onClick={() => setShowMultiUserModal(true)}
-                  className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold backdrop-blur-md shadow-md transition-all cursor-pointer ${
-                    currentUserProfile?.role === 'admin'
-                      ? 'bg-purple-950/80 border-purple-500/50 text-purple-200 hover:border-purple-300'
-                      : 'bg-cyan-950/80 border-cyan-500/50 text-cyan-200 hover:border-cyan-300'
-                  }`}
-                  title="Multi-User Profiles, RBAC & Dedicated Directory GitHub Sync"
-                >
-                  <User className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>{currentUserProfile?.role === 'admin' ? '👑 Admin' : '👤 User'}: {currentUserProfile?.username || 'Profile'}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Sub-Header Action Bar — Go Live button completely removed */}
-        {/* Sub-Header Action Bar */}
-        <div className="w-full bg-slate-950/95 border-b border-slate-800/80 backdrop-blur-md py-2 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar py-0.5">
-              {/* 1. Channel Button */}
-              <a
-                href="https://www.youtube.com/@itcafeteria"
-                target="_blank"
-                rel="noreferrer"
-                className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
-              >
-                <Youtube className="w-4 h-4 text-red-500 shrink-0" />
-                <span>YouTube Channel</span>
-              </a>
-
-              {/* 2. Phonetic Rules Dictionary */}
-              <button
-                onClick={() => setShowDictionary(true)}
-                className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
-              >
-                <BookOpen className="w-4 h-4 text-cyan-400 shrink-0" />
-                <span>Phonetic Rules Dictionary</span>
-              </button>
-
-              {/* 3. Manage Channels Shortcut */}
-              <button
-                onClick={() => setShowChannelManager(true)}
-                className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 text-xs sm:text-sm font-medium text-slate-200 hover:text-white transition-colors cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
-              >
-                <Plus className="w-4 h-4 text-cyan-400 shrink-0" />
-                <span>Manage Channels</span>
-              </button>
-
-              {/* 3b. Topic Bank Hub */}
-              <button
-                onClick={() => setShowTopicBankModal(true)}
-                className="h-9 px-3.5 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-emerald-500/40 hover:border-emerald-400 text-xs sm:text-sm font-medium text-emerald-200 hover:text-white transition-all cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0"
-                title="Profile Topic Bank, Backfill Covered Points, & Smarter Duplicate Radar"
-              >
-                <Database className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Topic Bank</span>
-              </button>
-
-              {/* 4. Go Live Co-Pilot Button alongside Phonetic Dictionary & Manage Channels */}
-              <button
-                onClick={() => setShowLiveCoPilotModal(true)}
-                className={`h-9 px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer backdrop-blur-md shadow-sm flex items-center gap-2 whitespace-nowrap shrink-0 ${
-                  isLiveActive
-                    ? 'bg-gradient-to-r from-rose-950/90 via-slate-900 to-rose-950/90 border border-rose-500/70 text-rose-300 shadow-rose-950/50 animate-pulse'
-                    : 'bg-slate-900/85 hover:bg-slate-800 border border-rose-500/40 hover:border-rose-400 text-slate-200 hover:text-white'
-                }`}
-                title="Go Live Co-Pilot with Real-Time Adaptive Guidance"
-              >
-                <Radio className={`w-4 h-4 shrink-0 ${isLiveActive ? 'text-rose-400 animate-pulse' : 'text-rose-500'}`} />
-                <span>{isLiveActive ? '🔴 On Air (Live)' : 'Go Live'}</span>
-                {isLiveActive && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 bg-rose-600 text-white rounded font-bold">
-                    {Math.floor(liveElapsedSeconds / 60)}:{(liveElapsedSeconds % 60).toString().padStart(2, '0')}
-                  </span>
-                )}
-              </button>
-            </div>
-
-            <div className="text-[11px] text-slate-400 hidden md:flex items-center gap-2 shrink-0 whitespace-nowrap">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-              <span>Full-Stack Roman Urdu Autonomous Engine Active</span>
             </div>
           </div>
         </div>

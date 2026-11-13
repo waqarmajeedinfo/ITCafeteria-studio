@@ -2400,7 +2400,7 @@ function initDefaultUsers() {
             email: "waqarmajeedinfo@itcafeteria.studio",
             role: "admin",
             salt: adminInfoSalt2,
-            passwordHash: hashPassword("WM2info$", adminInfoSalt2),
+            passwordHash: hashPassword("WM2info", adminInfoSalt2),
             createdAt: (/* @__PURE__ */ new Date()).toISOString(),
             lastLogin: (/* @__PURE__ */ new Date()).toISOString(),
             isActive: true,
@@ -6425,7 +6425,12 @@ async function startServer() {
   process.on("SIGTERM", gracefulShutdown);
   process.on("SIGINT", gracefulShutdown);
 }
+var server_default = app;
 startServer();
+export {
+  app,
+  server_default as default
+};
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0

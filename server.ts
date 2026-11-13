@@ -2805,5 +2805,6 @@ async function startServer() {
   process.on('SIGTERM', gracefulShutdown);
   process.on('SIGINT', gracefulShutdown);
 }
-export {app};
+export { app };
+export default app;
 startServer();
