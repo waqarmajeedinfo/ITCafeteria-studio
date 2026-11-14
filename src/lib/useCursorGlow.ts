@@ -191,11 +191,11 @@ export function useCursorGlow(deps: unknown[] = []) {
           }
         }
 
-        const localX = clientX - rect.left;
-        const localY = clientY - rect.top;
+        const localX = rect.width/2;
+        const localY = rect.height/2;
         const glowRadius = Math.max(
-          150,
-          Math.min(30, Math.round(Math.max(rect.width, rect.height) * 0.85))
+          50,
+          Math.min(30, Math.round(Math.max(rect.width, rect.height) * 0.5))
         );
 
         el.style.setProperty('--cursor-x', `${localX.toFixed(1)}px`);
