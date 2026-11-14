@@ -191,8 +191,8 @@ export function useCursorGlow(deps: unknown[] = []) {
           }
         }
 
-        const localX = rect.width/2;
-        const localY = rect.height/2;
+        const localX = clientX - rect.left;
+        const localY = clientY - rect.top;
         const glowRadius = Math.max(
           50,
           Math.min(30, Math.round(Math.max(rect.width, rect.height) * 0.5))
