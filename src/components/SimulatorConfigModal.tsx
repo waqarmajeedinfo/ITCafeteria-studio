@@ -400,7 +400,7 @@ export const DEFAULT_SIMULATOR_CONFIG: SimulatorConfig = {
   baselineTag: 'Active',
   defaultSceneCount: 10,
   duplicateStrictness: 'deep',
-  dialectTone: 'workshop',
+  dialectTone: 'lahori_conversational',
   lockPersonaAcrossScenes: true,
   autoQueueSync: true,
   flowPromptFormat: 'split_screen',

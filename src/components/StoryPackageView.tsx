@@ -92,6 +92,15 @@ export interface GeneratedStory {
   practicalBlueprint?: any;
   consistencyReport?: any;
   duplicateReport?: any;
+  scriptPattern?: {
+    id: string;
+    order: number;
+    name: string;
+    isDemo: boolean;
+    tone: string;
+    angle: string;
+  };
+  scriptPatternName?: string;
 }
 
 /**
@@ -743,6 +752,11 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
               <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                 Presenter: {effectivePresenter}
               </span>
+              {(story.scriptPattern?.name || story.scriptPatternName) && (
+                <span className="px-2 py-0.5 rounded-full bg-indigo-950/80 text-indigo-200 border border-indigo-500/40 font-semibold">
+                  Pattern #{story.scriptPattern?.order || ''}: {story.scriptPattern?.name || story.scriptPatternName}
+                </span>
+              )}
               <span className="text-slate-500">{story.dateLabel}</span>
             </div>
             <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight mt-2">

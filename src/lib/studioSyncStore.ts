@@ -42,6 +42,7 @@ export interface StudioRemoteState {
   profileLibraries?: Record<string, any[]>;
   channels?: Record<string, any>;
   latestStory?: any;
+  scriptRotationState?: any;
   agentGeneratedData?: {
     stories?: any[];
     competitorScan?: any;
@@ -143,6 +144,11 @@ export function applyRemoteStudioState(remote: StudioRemoteState): boolean {
 
     if (remote.latestStory && typeof remote.latestStory === 'object') {
       localStorage.setItem('itcafeteria_latest_story', JSON.stringify(remote.latestStory));
+      appliedAny = true;
+    }
+
+    if (remote.scriptRotationState && typeof remote.scriptRotationState === 'object') {
+      localStorage.setItem('itcafeteria_script_pattern_rotation_v1', JSON.stringify(remote.scriptRotationState));
       appliedAny = true;
     }
 

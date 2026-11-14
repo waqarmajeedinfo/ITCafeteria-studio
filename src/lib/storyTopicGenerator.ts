@@ -18,6 +18,21 @@ import {
   isConcreteTopic,
   type PracticalBlueprint
 } from './practicalBlueprint';
+import {
+  SCRIPT_PATTERNS_12,
+  loadLocalScriptRotationState,
+  saveLocalScriptRotationState,
+  selectNextPatternFromState,
+  recordPatternUsageInState,
+  enforcePatternAndUniquenessOnStory,
+  buildUniquePatternOpeningDialogue,
+  buildMidStoryRetentionSpikeDialogue,
+  buildUniquePatternCTADialogue,
+  isDemoScriptPattern,
+  isDialogueTooSimilarToRecent,
+  getPatternByIndex
+} from './scriptPatternRotation';
+import { pushStudioStatePatch, isHydratingRemoteState } from './studioSyncStore';
 
 export interface GenerateStoryParams {
   id?: string;
@@ -30,6 +45,7 @@ export interface GenerateStoryParams {
   sceneCount?: number;
   channelName?: string;
   presenter?: string;
+  scriptPatternId?: string;
 }
 
 /**
@@ -666,8 +682,139 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
         })();
   }
 
+  const rotationState = loadLocalScriptRotationState();
+  const { pattern: activePattern } = selectNextPatternFromState(rotationState, params.scriptPatternId);
+  const recentStories = rotationState.recentStories || [];
+
+  const practicalBlueprint = buildPracticalBlueprint({
+    topic: titleClean,
+    categoryName: category,
+    categoryId: params.categoryId || 1,
+    channelId: channelName.toLowerCase().includes('beauty') ? 'beautyhub' : 'itcafeteria'
+  });
+  const blueprintTool = practicalBlueprint.namedToolOrApp || titleClean.split(/[:\-—|]+/)[0].trim();
+
+  // Align Scene 1, Scene 2 transition, and Final CTA with the active sequential Script Pattern
+  if (rawBeats.length > 0) {
+    const isDemo = isDemoScriptPattern(activePattern);
+    const currentS1 = rawBeats[0]?.dialogue || '';
+    const shouldCustomizeOpening =
+      isDemo ||
+      activePattern.order !== 1 ||
+      isDialogueTooSimilarToRecent(currentS1, recentStories, 0.42);
+
+    if (shouldCustomizeOpening) {
+      const patternOpening = buildUniquePatternOpeningDialogue({
+        pattern: activePattern,
+        topic: titleClean,
+        toolName: blueprintTool,
+        categoryName: category,
+        variantIndex: rotationState.totalGenerated,
+        recentStories
+      });
+      rawBeats[0] = {
+        ...rawBeats[0],
+        purpose: isDemo
+          ? `Topic-Identifying Hook (${activePattern.name})`
+          : activePattern.beatProgression[0] || rawBeats[0].purpose,
+        dialogue: patternOpening
+      };
+      hook = patternOpening;
+    }
+
+    if (rawBeats.length > 2) {
+      if (isDemo) {
+        rawBeats[1] = {
+          ...rawBeats[1],
+          purpose: activePattern.beatProgression[1] || 'Direct Hands-On Demo Start',
+          dialogue: `Ab baghair kisi intezar ke seedha live screen par ${blueprintTool} ka pehla practical step dekhein aur saath note karein.`
+        };
+      } else if (activePattern.id === 'before_after') {
+        rawBeats[1] = {
+          ...rawBeats[1],
+          purpose: 'Before State: Why Old Method Fails',
+          dialogue: `Pehle purane tareeqay mein ${blueprintTool} ke bina ghanton zaya hote the aur natija bhi adhora rehta tha.`
+        };
+      } else if (activePattern.id === 'chhupe_hue_secrets') {
+        rawBeats[1] = {
+          ...rawBeats[1],
+          purpose: 'Hidden Menu Proof',
+          dialogue: `Zahir par yeh aam menu lagta hai, magar ${blueprintTool} ke andar ek chhupa option poora kaam badal deta hai.`
+        };
+      } else if (activePattern.id === 'lecturrar_pattern') {
+        rawBeats[1] = {
+          ...rawBeats[1],
+          purpose: 'Core Principle Breakdown',
+          dialogue: `Pehle buniyadi logic samjhein mere bhai: ${blueprintTool} background mein kis usool par kaam karta hai taake ghalti na ho.`
+        };
+      } else if (activePattern.id === 'myth_vs_reality') {
+        rawBeats[1] = {
+          ...rawBeats[1],
+          purpose: 'Why The Myth Spreads',
+          dialogue: `Log aksar suni sunayi baat par yaqeen kar ke ${blueprintTool} ka asli aur asan rasta nazar andaz kar dete hain.`
+        };
+      } else if (activePattern.id === 'ghalti_alert') {
+        rawBeats[1] = {
+          ...rawBeats[1],
+          purpose: 'Costly Mistake Exposure',
+          dialogue: `Yaar dekhein, jab hum ${blueprintTool} mein default setting chhor dete hain to poora kaam slow ya error se bhar jata hai.`
+        };
+      } else if (activePattern.id === 'live_showdown') {
+        rawBeats[1] = {
+          ...rawBeats[1],
+          purpose: 'Showdown Rules & Setup',
+          dialogue: `Aaj dono tareeqon ko ek hi ${blueprintTool} task par check karenge taake saaf pata chale konsa zyada tez aur clean hai.`
+        };
+      } else if (activePattern.id === 'desi_case_study') {
+        rawBeats[1] = {
+          ...rawBeats[1],
+          purpose: 'Real Bottleneck Moment',
+          dialogue: `Masla bilkul aam tha: deadline sirf adhay ghantay door thi aur ${blueprintTool} ka kaam manual tareeqe se atak gaya tha.`
+        };
+      } else if (activePattern.id === 'zero_to_hero_roadmap') {
+        rawBeats[1] = {
+          ...rawBeats[1],
+          purpose: 'Level 1: Clean Foundation',
+          dialogue: `Level 1 bilkul seedha hai: sab se pehle ${blueprintTool} ki buniyadi screen aur clean settings set karein jese yahan dikh raha hai.`
+        };
+      }
+    }
+
+    // Mid-story Retention / Interesting Factor Curiosity Spike around Scene 5
+    if (rawBeats.length >= 7) {
+      const midIdx = 4; // Scene 5
+      const spikeLead = buildMidStoryRetentionSpikeDialogue({
+        pattern: activePattern,
+        topic: titleClean,
+        toolName: blueprintTool,
+        variantIndex: rotationState.totalGenerated
+      });
+      const existingMid = rawBeats[midIdx]?.dialogue || '';
+      const combinedMid = existingMid.length > 90
+        ? spikeLead
+        : `${spikeLead.split('—')[0].trim()} — ${existingMid}`;
+      rawBeats[midIdx] = {
+        ...rawBeats[midIdx],
+        purpose: activePattern.beatProgression[4] || rawBeats[midIdx].purpose,
+        dialogue: combinedMid
+      };
+    }
+
+    const lastIdx = rawBeats.length - 1;
+    rawBeats[lastIdx] = {
+      ...rawBeats[lastIdx],
+      purpose: activePattern.beatProgression[9] || rawBeats[lastIdx].purpose,
+      dialogue: buildUniquePatternCTADialogue({
+        pattern: activePattern,
+        topic: titleClean,
+        channelName,
+        variantIndex: rotationState.totalGenerated
+      })
+    };
+  }
+
   // Construct scenes with dialogue completeness defense, cinematic directing & living phonetic dictionary rules
-  const scenes: StoryScene[] = rawBeats.map((beat, idx) => {
+  let scenes: StoryScene[] = rawBeats.map((beat, idx) => {
     const sceneNum = idx + 1;
     const isCTA = sceneNum === rawBeats.length;
 
@@ -685,6 +832,7 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
       tag: charTag,
       presenter,
       seedTopic: rawTitle,
+      variationIndex: rotationState.totalGenerated % 5,
     });
     const directedScript = applyCinematicDirecting(sceneNum, flowScript, undefined, beat.purpose);
 
@@ -700,12 +848,42 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     };
   });
 
-  const practicalBlueprint = buildPracticalBlueprint({
+  // Final guard: guarantee Demo Opening Question/Hook & uniqueness against recent stories
+  const enforced = enforcePatternAndUniquenessOnStory({
+    scenes,
+    hook,
     topic: titleClean,
+    toolName: blueprintTool,
     categoryName: category,
-    categoryId: params.categoryId || 1,
-    channelId: channelName.toLowerCase().includes('beauty') ? 'beautyhub' : 'itcafeteria'
+    channelName,
+    pattern: activePattern,
+    recentStories,
+    variantIndex: rotationState.totalGenerated
   });
+  scenes = enforced.scenes.map((sc) => {
+    const fixedDialogue = applyPhoneticFixes(sc.dialogue);
+    return {
+      ...sc,
+      dialogue: fixedDialogue,
+      words: fixedDialogue.split(/\s+/).filter(Boolean).length,
+      script: applyPhoneticFixes(sc.script)
+    };
+  });
+  const finalHook = applyPhoneticFixes(enforced.hook);
+
+  // Advance sequential 8-pattern rotation state and record dialogue fingerprint
+  const nextRotationState = recordPatternUsageInState(rotationState, activePattern, {
+    title: rawTitle,
+    topic: titleClean,
+    hook: finalHook,
+    scene1Dialogue: scenes[0]?.dialogue || finalHook,
+    scene2Dialogue: scenes[1]?.dialogue || '',
+    ctaDialogue: scenes[scenes.length - 1]?.dialogue || ''
+  });
+  saveLocalScriptRotationState(nextRotationState);
+  if (typeof window !== 'undefined' && !isHydratingRemoteState()) {
+    pushStudioStatePatch({ scriptRotationState: nextRotationState }, 'script_pattern_rotated');
+  }
 
   // Calculate dynamic scene mapping for practical demonstration steps (Scenes 4, 5, 6, 7...)
   const sceneMapping: Record<number, number> = {};
@@ -718,20 +896,20 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     blueprint: practicalBlueprint,
     presenter,
     channelName,
-    hook: applyPhoneticFixes(hook),
+    hook: finalHook,
     sceneMapping
   });
 
   const consistencyReport = runConsistencyGate({
     title: rawTitle,
-    hook: applyPhoneticFixes(hook),
+    hook: finalHook,
     description: structuredDescription,
     scenes
   }, practicalBlueprint);
 
   return {
     title: rawTitle,
-    hook: applyPhoneticFixes(hook),
+    hook: finalHook,
     channelName,
     presenter,
     categoryName: category,
@@ -751,14 +929,14 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     thumbnailHologram: `a glowing 3D visual showcase representing "${titleClean}" with branding elements of ${channelName}`,
     thumbnailPrompt: `Vertical 9:16 high-impact YouTube Shorts thumbnail cover for ${channelName}. Bold 3D embossed text "${thumbnailHeadline}". Ultra-sharp 8k cinematic render, vibrant focal lighting, modern digital studio aesthetics.`,
     seriesPlan: 'Daily Episode Sequence',
-    memoryBlock: `MEM-${Date.now()}`,
+    memoryBlock: `MEM-${Date.now()} • Pattern ${activePattern.order}/${SCRIPT_PATTERNS_12.length} (${activePattern.name})`,
     idea: {
       title: titleClean,
-      hook,
-      angle: 'High-Retention Practical Workflow',
-      points: `Authentic Roman Urdu demonstration for ${titleClean}`
+      hook: finalHook,
+      angle: `${activePattern.name}: ${activePattern.angle}`,
+      points: `Authentic Lahori Roman Urdu demonstration for ${titleClean}`
     },
-    discussionNotes: `Tailored 10-scene sequence specifically crafted for ${titleClean}. Strictly 10s per scene, 22-25 words per dialogue.`,
+    discussionNotes: `Pattern ${activePattern.order}/${SCRIPT_PATTERNS_12.length} (${activePattern.name}) — Lahori Pakistani Punjab Tone. ${activePattern.tone} Tailored 10-scene sequence for ${titleClean}. Strictly 10s per scene, 22-25 words per dialogue.`,
     practicalSteps: practicalBlueprint.steps.map(s => `${s.stepNumber}. ${s.actionTitle}: ${s.exactPathOrCommand}`),
     outsourcedLinks: practicalBlueprint.sourceLinks,
     demoPrompt: practicalBlueprint.improvedPrompt || (isGoogleSheets
@@ -769,7 +947,16 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
       ? `Create a multi-agent webhook router that classifies incoming inquiries into Support, Sales, or Booking with zero code.`
       : `Complete hands-on demonstration of ${titleClean} in Roman Urdu.`),
     practicalBlueprint,
-    consistencyReport
+    consistencyReport,
+    scriptPattern: {
+      id: activePattern.id,
+      order: activePattern.order,
+      name: activePattern.name,
+      isDemo: activePattern.isDemo,
+      tone: activePattern.tone,
+      angle: activePattern.angle
+    },
+    scriptPatternName: activePattern.name
   };
 }
 
@@ -878,49 +1065,54 @@ const CREATIVE_REWRITE_ANGLES = [
  * fresh visual hooks, varied Flow camera angles, and creative phrasing while preserving the core topic.
  */
 export function rewriteCompleteStoryPackage(currentStory: GeneratedStory, preferredAngleIndex?: number): GeneratedStory {
+  const rotationState = loadLocalScriptRotationState();
+  const currentOrder = currentStory.scriptPattern?.order;
+  const pattern = preferredAngleIndex !== undefined
+    ? getPatternByIndex(preferredAngleIndex)
+    : currentOrder
+    ? getPatternByIndex(currentOrder) // advances to next sequential pattern
+    : selectNextPatternFromState(rotationState).pattern;
+
   const angleIdx = preferredAngleIndex !== undefined
     ? preferredAngleIndex % CREATIVE_REWRITE_ANGLES.length
-    : Math.floor(Math.random() * CREATIVE_REWRITE_ANGLES.length);
+    : (pattern.order - 1) % CREATIVE_REWRITE_ANGLES.length;
   const chosenAngle = CREATIVE_REWRITE_ANGLES[angleIdx];
 
   const todayLabel = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   const presenter = currentStory.presenter || 'Waqar Majeed';
   const charTag = currentStory.characterTag || '@WM25-1';
   const cleanTitle = currentStory.title.replace(/#\S+/g, '').replace(/@\S+/g, '').trim();
+  const recentStories = rotationState.recentStories || [];
 
-  // Fresh hooks based on topic keywords and angle
-  const altHooks = [
-    `${chosenAngle.hookPrefix}${cleanTitle}! Ab dekhein live practical demonstration.`,
-    `Aapke computer aur workflow ko 10x behtar banane ka seedha aur asaan tareeqa: ${cleanTitle}.`,
-    `Agar aapko lagta tha ke ${cleanTitle} mushkil hai, to yeh 60 seconds aapki soch badal denge!`,
-    `Notice karein ke expert log kaise ${cleanTitle} ko smart tareeqe se use karte hain.`
-  ];
-  const freshHook = altHooks[Math.floor(Math.random() * altHooks.length)];
+  const freshOpening = buildUniquePatternOpeningDialogue({
+    pattern,
+    topic: cleanTitle,
+    toolName: currentStory.practicalBlueprint?.namedToolOrApp,
+    categoryName: currentStory.categoryName,
+    variantIndex: rotationState.totalGenerated + pattern.order,
+    recentStories
+  });
 
   // Fresh alternative dialogues & visuals per beat
   const alternativeBeatVariations: Record<number, { visual: string; dialogue: string }[]> = {
     1: [
       {
-        visual: `${charTag} leans intently toward the ultra-wide 4K monitor, raising one hand in a firm stop gesture as HUD graphics pulse.`,
-        dialogue: 'Agar aap bhi is masle mein phans kar apna waqt zaya kar rahe hain, to agle 50 seconds dhyan se dekhein!'
-      },
-      {
-        visual: `Dynamic camera snap-zoom on ${charTag} pointing straight at the red flashing warning indicator on screen.`,
-        dialogue: 'Rukein! Aksar log yeh basic ghalti bar bar dohrate hain jis ki wajah se unka result kabhi clean nahi aata.'
-      },
-      {
-        visual: `High-energy neon studio background, ${charTag} reveals a comparison split-screen between the slow old way and the instant new trick.`,
-        dialogue: 'Purana aur thaka dene wala tareeqa chhorein, yeh latest hack aapke kaam ko lightning fast bana dega!'
+        visual: `${charTag} leans intently toward the ultra-wide 4K monitor, framing the exact topic hook with confident gesture.`,
+        dialogue: freshOpening
       }
     ],
     2: [
       {
         visual: 'Screen capture zooming into the exact menu option and hidden toggle with animated neon cyan arrow pointing directly at it.',
-        dialogue: 'Asal problem yeh hai ke software ke andar yeh option default tor par chhipi hoti hai jise log active nahi karte.'
+        dialogue: isDemoScriptPattern(pattern)
+          ? `Chalein ab baghair waq-t zaya kiye seedha live screen par ${cleanTitle.split(/\s+/).slice(0, 4).join(' ')} ka pehla practical step dekhein.`
+          : 'Asal problem yeh hai ke software ke andar yeh option default tor par chhipi hoti hai jise log active nahi karte.'
       },
       {
         visual: 'Split screen showing cluttered desktop vs clean isolated workspace with animated red cross over manual repetitive work.',
-        dialogue: 'Log manual tareeqe se ek ek step repeat karte hain, jab ke system ke andar one-click shortcut pehle se mojood hai.'
+        dialogue: isDemoScriptPattern(pattern)
+          ? `Live screen par dekhein ke pehle step mein konsi exact setting open karni hai aur farq usi waqt nazar aayega.`
+          : 'Log manual tareeqe se ek ek step repeat karte hain, jab ke system ke andar one-click shortcut pehle se mojood hai.'
       }
     ],
     3: [
@@ -946,39 +1138,47 @@ export function rewriteCompleteStoryPackage(currentStory: GeneratedStory, prefer
     5: [
       {
         visual: 'Real-time performance benchmark gauge soaring from red 20% to vibrant emerald green 100% capacity.',
-        dialogue: 'Aur yeh dekhein live result! Speed aur efficiency foran double ho gayi aur workflow 100 fisad smooth ban gaya.'
+        dialogue: 'Aur yeh dekhein live result! Speed aur efficiency usi waqt double ho gayi aur workflow 100 fisad smooth ban gaya.'
       },
       {
-        visual: 'Side-by-side rendering render finish bar popping with celebration particles and green verified shield icon.',
-        dialogue: 'Result aapki aankhon ke samne hai! Jo kaam pehle adhay ghante mein hota tha, woh sirf 5 seconds mein complete ho gaya.'
+        visual: 'Side-by-side rendering finish bar popping with celebration particles and green verified shield icon.',
+        dialogue: 'Result aapki aankhon ke samne hai! Jo kaam pehle bohot waq-t leta tha, woh ab bilkul tezi se complete ho gaya.'
       }
     ],
     6: [
       {
-        visual: `${charTag} smiling confidently in studio lighting, pointing toward the IT Cafeteria subscribe button and notification bell.`,
-        dialogue: 'Aisi mazeed daily practical tech hacks ke liye IT Cafeteria ko abhi follow karein aur yeh video apne dost ko share karein!'
-      },
-      {
-        visual: `${charTag} giving a firm thumbs up with holographic channel logo and animated bookmark indicator glowing bright cyan.`,
-        dialogue: 'Is tip ko foran save karein taake baad mein zaroorat ke waqt kaam aaye, aur channel ko zaroor subscribe karein!'
+        visual: `${charTag} smiling confidently in studio lighting, pointing toward the ${currentStory.channelName || 'IT Cafeteria'} subscribe button and notification bell.`,
+        dialogue: buildUniquePatternCTADialogue({
+          pattern,
+          topic: cleanTitle,
+          channelName: currentStory.channelName || 'IT Cafeteria',
+          variantIndex: rotationState.totalGenerated + 1
+        })
       }
     ]
   };
 
-  const rewrittenScenes: StoryScene[] = currentStory.scenes.map((oldScene) => {
-    const pool = alternativeBeatVariations[oldScene.num] || alternativeBeatVariations[(oldScene.num % 6) + 1] || [];
+  let rewrittenScenes: StoryScene[] = currentStory.scenes.map((oldScene, idx) => {
+    const isFirst = idx === 0;
+    const isLast = idx === currentStory.scenes.length - 1;
+    const pool = isFirst
+      ? alternativeBeatVariations[1]
+      : isLast
+      ? alternativeBeatVariations[6]
+      : alternativeBeatVariations[oldScene.num] || alternativeBeatVariations[(oldScene.num % 4) + 2] || [];
     const pick = pool.length > 0
       ? pool[Math.floor(Math.random() * pool.length)]
       : { visual: oldScene.visual, dialogue: oldScene.dialogue };
 
-    const rawFreshDialogue = pick.dialogue;
-    const freshDialogue = applyPhoneticFixes(rawFreshDialogue);
+    const freshDialogue = applyPhoneticFixes(pick.dialogue);
     const freshVisual = pick.visual;
-    const freshScript = `[PRESENTER & ACTION]: ${charTag} ${freshVisual.replace(charTag, '').trim()}.\n[CAMERA & LIGHTING]: Studio 4K, 60fps cinematic key light, cyan accents. Duration: 0-10s.\n[VOICEOVER / DIALOGUE]: "${freshDialogue}"`;
+    const continuityLock = `CONTINUITY LOCK: Use the character selected in Flow for tag ${charTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
+    const freshScript = `[DIRECTOR CAMERA & LIGHTING]: Studio 4K, 9:16 vertical cinematic key light, crisp focus. Duration: 0-10s.\n[SCENE VISUAL & PROPS]: ${freshVisual}\n[PRESENTER & ACTION]: ${charTag} (${presenter}) in studio, natural confident posture and gestures. ${continuityLock}\nDIALOGUE: "${freshDialogue}"`;
     const wordCount = freshDialogue.split(/\s+/).filter(Boolean).length;
 
     return {
       ...oldScene,
+      purpose: isFirst && isDemoScriptPattern(pattern) ? `Topic-Identifying Hook (${pattern.name})` : oldScene.purpose,
       words: wordCount,
       visual: freshVisual,
       dialogue: freshDialogue,
@@ -986,14 +1186,54 @@ export function rewriteCompleteStoryPackage(currentStory: GeneratedStory, prefer
     };
   });
 
+  const enforced = enforcePatternAndUniquenessOnStory({
+    scenes: rewrittenScenes,
+    hook: freshOpening,
+    topic: cleanTitle,
+    toolName: currentStory.practicalBlueprint?.namedToolOrApp,
+    categoryName: currentStory.categoryName,
+    channelName: currentStory.channelName,
+    pattern,
+    recentStories,
+    variantIndex: rotationState.totalGenerated + 1
+  });
+  rewrittenScenes = enforced.scenes.map((s) => ({
+    ...s,
+    dialogue: applyPhoneticFixes(s.dialogue),
+    script: applyPhoneticFixes(s.script)
+  }));
+  const finalHook = applyPhoneticFixes(enforced.hook);
+
+  const nextState = recordPatternUsageInState(rotationState, pattern, {
+    title: cleanTitle,
+    topic: cleanTitle,
+    hook: finalHook,
+    scene1Dialogue: rewrittenScenes[0]?.dialogue || finalHook,
+    scene2Dialogue: rewrittenScenes[1]?.dialogue || '',
+    ctaDialogue: rewrittenScenes[rewrittenScenes.length - 1]?.dialogue || ''
+  });
+  saveLocalScriptRotationState(nextState);
+  if (typeof window !== 'undefined' && !isHydratingRemoteState()) {
+    pushStudioStatePatch({ scriptRotationState: nextState }, 'script_pattern_rewritten');
+  }
+
   return {
     ...currentStory,
-    hook: applyPhoneticFixes(freshHook),
+    hook: finalHook,
     dateLabel: todayLabel,
     thumbnailHeadline: currentStory.thumbnailHeadline || 'SMART TECH TRICK',
-    thumbnailSubBadge: chosenAngle.name.toUpperCase(),
+    thumbnailSubBadge: `${pattern.name.toUpperCase()}`,
     scenes: rewrittenScenes,
-    discussionNotes: `Story completely rewritten with angle: "${chosenAngle.name}" on ${todayLabel}. Fresh dialogues, new visual actions, and 100% unique phrasing verified against living phonetic rules dictionary.`
+    scriptPattern: {
+      id: pattern.id,
+      order: pattern.order,
+      name: pattern.name,
+      isDemo: pattern.isDemo,
+      tone: pattern.tone,
+      angle: pattern.angle
+    },
+    scriptPatternName: pattern.name,
+    discussionNotes: `Story rewritten with Pattern ${pattern.order}/8 (${pattern.name}) & angle "${chosenAngle.name}" on ${todayLabel}. Unique dialogues, Demo hook compliance, and phonetic accuracy verified.`
   };
 }
 

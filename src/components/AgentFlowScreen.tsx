@@ -36,6 +36,7 @@ import { applyCinematicDirecting } from '../lib/cinematicDirector';
 import type { SimulatorConfig } from './SimulatorConfigModal';
 import { checkDeletedStoryBlacklist, loadDeletedStoryBlacklist } from '../lib/deletedStoryRegistry';
 import { applyPhoneticFixes, verifyAndCorrectStoryPhonetics, getPhoneticDictionary } from '../lib/phoneticDictionaryStore';
+import { saveLocalScriptRotationState } from '../lib/scriptPatternRotation';
 import {
   checkHierarchicalDuplicate,
   getAlreadyCoveredPointsList,
@@ -453,7 +454,7 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
           .slice(-10)
           .map((message) => ({ role: message.role, text: message.text.trim().slice(0, 600) })),
         excludeTitles: buildExcludedTitles([idea.title]),
-        dialectTone: simulatorConfig?.dialectTone || 'conversational',
+        dialectTone: simulatorConfig?.dialectTone || 'lahori_conversational',
         flowPromptFormat: simulatorConfig?.flowPromptFormat || 'split_screen',
         customInstructions: simulatorConfig?.customInstructions || ''
       }, abortRef.current?.signal);
@@ -554,8 +555,14 @@ Status: bani`;
         consistencyReport: data.consistencyReport,
         practicalSteps: data.practicalBlueprint?.steps?.map((s: any) => `${s.stepNumber}. ${s.actionTitle}: ${s.exactPathOrCommand}`),
         outsourcedLinks: data.practicalBlueprint?.sourceLinks || data.outsourcedLinks,
-        demoPrompt: data.demoPrompt
+        demoPrompt: data.demoPrompt,
+        scriptPattern: data.scriptPattern,
+        scriptPatternName: data.scriptPatternName || data.scriptPattern?.name
       };
+
+      if (data.scriptRotationState && typeof data.scriptRotationState === 'object') {
+        saveLocalScriptRotationState(data.scriptRotationState);
+      }
 
       // Mandatory Verification & Correction Pass:
       // Audit all dialogues, compare against phonetic rules dictionary, replace mispronunciations, and sync scripts

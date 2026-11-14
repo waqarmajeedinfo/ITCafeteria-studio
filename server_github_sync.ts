@@ -20,6 +20,7 @@ export interface StudioSharedState {
   profileLibraries?: Record<string, any[]>;
   channels?: Record<string, any>;
   latestStory?: any;
+  scriptRotationState?: any;
   agentGeneratedData?: {
     stories?: any[];
     competitorScan?: any;

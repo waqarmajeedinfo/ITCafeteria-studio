@@ -22,6 +22,16 @@ import {
   scheduleGitHubSync,
   mergeStudioStatePatch,
 } from './server_github_sync';
+import {
+  SCRIPT_PATTERNS_12,
+  createDefaultRotationState,
+  selectNextPatternFromState,
+  recordPatternUsageInState,
+  enforcePatternAndUniquenessOnStory,
+  buildPromptSectionForScriptPattern,
+  isDemoScriptPattern,
+  type ScriptRotationState,
+} from './src/lib/scriptPatternRotation';
 
 dotenv.config({ override: true });
 
@@ -2057,6 +2067,49 @@ Return STRICT raw JSON only, no markdown fences:
   }
 });
 
+const SCRIPT_ROTATION_FILE = path.join(__dirname, 'data', 'studio', 'script-rotation-state.json');
+
+function readScriptRotationState(): ScriptRotationState {
+  try {
+    if (fs.existsSync(SCRIPT_ROTATION_FILE)) {
+      const raw = fs.readFileSync(SCRIPT_ROTATION_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          nextPatternIndex: Number(parsed.nextPatternIndex) || 0,
+          totalGenerated: Number(parsed.totalGenerated) || 0,
+          lastPatternId: parsed.lastPatternId,
+          lastPatternName: parsed.lastPatternName,
+          recentStories: Array.isArray(parsed.recentStories) ? parsed.recentStories.slice(0, 16) : [],
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Could not read script rotation state:', err);
+  }
+  return createDefaultRotationState();
+}
+
+function writeScriptRotationState(state: ScriptRotationState): void {
+  try {
+    fs.mkdirSync(path.dirname(SCRIPT_ROTATION_FILE), { recursive: true });
+    fs.writeFileSync(SCRIPT_ROTATION_FILE, JSON.stringify(state, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Could not write script rotation state:', err);
+  }
+}
+
+app.get('/api/ai/script-rotation', (_req, res) => {
+  const state = readScriptRotationState();
+  const { pattern } = selectNextPatternFromState(state);
+  res.json({
+    ok: true,
+    nextPattern: pattern,
+    patterns: SCRIPT_PATTERNS_12,
+    state,
+  });
+});
+
 // 9. Agent Trigger — full scene-by-scene story package
 app.post('/api/ai/generate-story', async (req, res) => {
   try {
@@ -2073,8 +2126,9 @@ app.post('/api/ai/generate-story', async (req, res) => {
       discussionTranscript = [],
       excludeTitles = [],
       customInstructions = '',
-      dialectTone = 'conversational',
-      flowPromptFormat = 'cinematic_3d'
+      dialectTone = 'lahori_conversational',
+      flowPromptFormat = 'cinematic_3d',
+      scriptPatternId = ''
     } = req.body || {};
 
     const ideaTitle = String(idea.title || '').trim();
@@ -2114,16 +2168,16 @@ app.post('/api/ai/generate-story', async (req, res) => {
       : 'Hook; Deep Problem Overview; Context & Architecture; In-depth Comprehensive Step-by-Step Hands-On Workshop (Scenes 4-22); Comprehensive Validation & Speed Test; Pitfalls & Edge Cases; Advanced Tips; Full Summary Recap; Series Teaser; Final Save & Follow CTA';
 
     const dialectDescriptions: Record<string, string> = {
-      conversational: 'Natural Lahori conversational Pakistani Urdu, friendly tech YouTuber cadence, approachable brotherly tone.',
-      lahori_conversational: 'Natural Lahori conversational Pakistani Urdu, friendly tech YouTuber cadence, approachable brotherly tone.',
-      formal: 'Neutral semi-formal tech Urdu, clear articulate phrasing.',
-      fast_paced: 'Fast-paced, high-energy viral TikTok style, punchy sentences, zero pause.',
-      documentary: 'Deep-dive documentary explainer cadence, authoritative, serious investigative tone.',
-      brotherly: 'Casual senior brotherly / Bhai advice cadence, trustworthy mentor tone.',
-      urgent_tech: 'High-stakes urgent breaking tech alert tone, high energy, crisp hook.',
-      workshop: 'Step-by-step hands-on workshop pace, calm structured instructor tone.'
+      conversational: 'Authentic Lahori / Pakistani Punjab conversational Roman Urdu — warm, punchy, relatable Pakistani tech YouTuber cadence with interesting factor and zero robotic phrasing.',
+      lahori_conversational: 'Authentic Lahori / Pakistani Punjab conversational Roman Urdu — warm, punchy, relatable Pakistani tech YouTuber cadence with interesting factor and zero robotic phrasing.',
+      formal: 'Clean Pakistani Urdu technical voice with natural Lahori warmth and clarity.',
+      fast_paced: 'High-tempo Lahori Shorts viral cadence — punchy sentences, high energy, zero pause.',
+      documentary: 'Investigative Lahori explainer cadence — authoritative yet warm Pakistani storytelling.',
+      brotherly: 'Warm Lahori senior-brother (Bara Bhai) mentor cadence with relatable desi examples.',
+      urgent_tech: 'Urgent Lahori breaking-tech alert cadence — sharp hook and immediate practical warning.',
+      workshop: 'Patient Lahori hands-on ustad/instructor cadence combined with warm Pakistani Punjab relatability.'
     };
-    const dialectGuide = dialectDescriptions[dialectTone] || dialectDescriptions.conversational;
+    const dialectGuide = dialectDescriptions[dialectTone] || dialectDescriptions.lahori_conversational;
 
     const flowDescriptions: Record<string, string> = {
       cinematic_3d: 'Cinematic 3D Hologram + Anchor split-screen studio visuals.',
@@ -2154,6 +2208,16 @@ app.post('/api/ai/generate-story', async (req, res) => {
       ? storedRules.slice(0, 35).map((r) => `"${r.word}" ➔ "${r.fix}"`).join(', ')
       : '"waqt" ➔ "waq-t", "aksar" ➔ "ak-sr", "turant" ➔ "usi waqt", "baray" ➔ "barray", "hal" ➔ "tareeqa", "Gemini" ➔ "Jemini"';
 
+    const rotationState = readScriptRotationState();
+    const { pattern: activePattern } = selectNextPatternFromState(
+      rotationState,
+      typeof scriptPatternId === 'string' && scriptPatternId.trim() ? scriptPatternId.trim() : undefined
+    );
+    const patternPromptSection = buildPromptSectionForScriptPattern(
+      activePattern,
+      rotationState.recentStories || []
+    );
+
     const prompt = `You are the lead story architect for "${channelName}" (${niche}), presenter "${presenter}".
 Create a complete ${totalScenes}-scene vertical video story package in Roman Urdu (Pakistani Urdu in Latin script), with English tech/beauty keywords where natural. Total duration: ${totalScenes * 10} seconds (${Math.floor((totalScenes * 10) / 60)}m ${(totalScenes * 10) % 60}s).
 
@@ -2162,7 +2226,7 @@ CREATOR BRIEF
 - Character tag for Flow prompts: "${tag}"
 - Working idea title: "${ideaTitle}"
 - Idea hook direction: "${String(idea.hook || '').trim()}"
-- Unique angle: "${String(idea.angle || '').trim()}"
+- Unique angle: "${String(idea.angle || activePattern.angle).trim()}"
 - Points to cover: "${String(idea.points || '').trim()}"
 - Discussion notes from creator: "${String(discussionNotes || '').trim() || '(none)'}"
 - Discussion transcript:
@@ -2173,11 +2237,11 @@ ${transcript || '(none)'}
 - Visual Direction for Flow Prompts: ${flowGuide}
 - LIVING PHONETIC RULES DICTIONARY (MANDATORY): You MUST pick and use the exact phonetic pronunciations from our living library when writing dialogues (e.g. ${phoneticDirectives}). Never use forbidden words or mispronounced slurs.
 ${customInstructions ? `- Custom Creator Directives & Pattern Rules:\n${customInstructions}` : ''}
-
+${patternPromptSection}
 YOUTUBE CHANNEL ANALYTICS & 4-PILLAR GROWTH OPTIMIZATION (STRICT MANDATORY RULES):
 Live channel metrics for IT Cafeteria show: Retention 38.8% (Target: 50%+), Shorts Feed 6.7% (Major Bottleneck - Search is 68.8%), Subscriber conversion 3.99/1k (Target: 5+), Engagement 2.62% (Target: 4%+).
 To mathematically boost channel velocity and fix these leaks, every generated story MUST embed these 4 tactical pillars:
-1. PILLAR 1 (First 2 Seconds Instant Payoff - Boost Retention to 50%+): Scene 1 must show the finished visual result or an intense curiosity gap within the first 2 seconds. Zero welcome greeting, zero channel name intro, zero slow animations. First frame prompt MUST describe a visual pattern interrupt with a bold 3-5 word on-screen text overlay.
+1. PILLAR 1 (First 2 Seconds Instant Payoff - Boost Retention to 50%+): Scene 1 must show the finished visual result or an intense curiosity gap within the first 2 seconds. Zero welcome greeting, zero channel name intro, zero slow animations. First frame prompt MUST describe a visual pattern interrupt with a bold 3-5 word on-screen text overlay.${isDemoScriptPattern(activePattern) ? ' Because this is a DEMO pattern, Scene 1 dialogue MUST ask an identifying question or deliver a topic-revealing hook FIRST before jumping into Scene 2 hands-on demo steps.' : ''}
 2. PILLAR 2 (Shorts Feed Discovery & Infinite Loop - Break 6.7% Bottleneck): The final scene's concluding dialogue and visual must connect smoothly and loop back to the opening phrase of Scene 1, making the short seamlessly replayable without a jarring stop.
 3. PILLAR 3 (Mid-Story Subscriber Trigger at 60-75% Mark - Lift Subs from 3.99 to 5+/1k): In Scene 4 or 5 (approx. 35-45s in), deliver an explicit high-value reason to subscribe (e.g. "Is trick ka automated script agle episode mein share karunga — channel subscribe karke bell daba lein!").
 4. PILLAR 4 (High-Engagement A/B Dilemma - Push Engagement from 2.62% to 4%+): In the final CTA scene, ask the audience a direct 2-option question or dilemma (e.g. "Aap konsa tool prefer karte hain, A ya B? Comment mein batayein!"), and prompt a reply-worthy question in the description.
@@ -2212,7 +2276,7 @@ STORY RULES (strict)
 3. Scene 1 Hook: no greeting, immediate pattern interrupt in the first line. Final scene must be a Save/Follow CTA with high-engagement question.
 4. Dialogue must be Roman Urdu in Latin script. No Devanagari. English only for tool names/tech terms. Acronyms MUST be hyphenated for TTS pronunciation (e.g. A-I, G-P-T, C-M-D, P-C, U-R-L).
 5. Each "script" is a paste-ready Google Flow prompt for that scene following "${flowGuide}":
-   - Character scenes start with "${tag}" and include: sitting/standing anchor pose (0.5s), studio setting, gesture/visual overlay, voice instruction line ("He speaks in his natural, warm, conversational Pakistani Urdu voice at a calm pace. No word or syllable is repeated."), then the exact dialogue in double quotes, then the closing anchor pose.
+   - Character scenes start with "${tag}" and include: sitting/standing anchor pose (0.5s), studio setting, gesture/visual overlay, voice instruction line ("He speaks in his natural, warm, authentic Lahori Pakistani Punjab Urdu voice at an engaging, crisp pace. No word or syllable is repeated."), then the exact dialogue in double quotes, then the closing anchor pose.
    - Screen-demo scenes start with "The camera cuts to a full-screen..." and include ${tag}'s voiceover plus the exact dialogue in quotes.
    - The dialogue inside script must be word-for-word identical to the "dialogue" field.
    - Every scene script must include strictly "Duration: 0-10s."
@@ -2273,7 +2337,7 @@ Return STRICT valid JSON only, no markdown fences:
             contents: prompt,
             config: {
               responseMimeType: 'application/json',
-              temperature: 0.8,
+              temperature: 0.88,
               maxOutputTokens: 32768,
               ...(attempt.thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
             },
@@ -2328,7 +2392,7 @@ Return STRICT valid JSON only, no markdown fences:
 
           script = `[DIRECTOR CAMERA & LIGHTING]: ${cameraDir} Duration: 10s.
 [SCENE VISUAL & PROPS]: ${visual}
-[PRESENTER & ACTION]: ${tag} (${presenter}) in studio, natural confident posture and hand gestures. Natural warm Pakistani tech YouTuber cadence. ${continuityLock}
+[PRESENTER & ACTION]: ${tag} (${presenter}) in studio, natural confident posture and hand gestures. Natural warm Lahori Pakistani Punjab YouTuber cadence. ${continuityLock}
 DIALOGUE: "${dialogue}"`;
         } else {
           script = applyPhoneticFixes(script);
@@ -2423,9 +2487,42 @@ DIALOGUE: "${dialogue}"`;
       });
     }
 
+    const rawHook = safeString(data.hook) || safeString(idea.hook) || 'Reveal';
+    const patternEnforced = enforcePatternAndUniquenessOnStory({
+      scenes,
+      hook: rawHook,
+      topic: ideaTitle,
+      toolName: practicalBlueprint.namedToolOrApp,
+      categoryName: category,
+      channelName,
+      pattern: activePattern,
+      recentStories: rotationState.recentStories || [],
+      variantIndex: rotationState.totalGenerated
+    });
+    const finalScenes = patternEnforced.scenes.map((sc: any) => {
+      const fixedDialogue = applyPhoneticFixes(sc.dialogue);
+      return {
+        ...sc,
+        dialogue: fixedDialogue,
+        words: fixedDialogue.split(/\s+/).filter(Boolean).length,
+        script: applyPhoneticFixes(sc.script)
+      };
+    });
+    const finalHook = applyPhoneticFixes(patternEnforced.hook);
+
+    const updatedRotationState = recordPatternUsageInState(rotationState, activePattern, {
+      title,
+      topic: ideaTitle,
+      hook: finalHook,
+      scene1Dialogue: finalScenes[0]?.dialogue || finalHook,
+      scene2Dialogue: finalScenes[1]?.dialogue || '',
+      ctaDialogue: finalScenes[finalScenes.length - 1]?.dialogue || '',
+    });
+    writeScriptRotationState(updatedRotationState);
+
     const generatedStoryPayload = {
       title,
-      hook: safeString(data.hook) || safeString(idea.hook) || 'Reveal',
+      hook: finalHook,
       thumbnailLine1,
       thumbnailLine2,
       thumbnailHeadline,
@@ -2441,15 +2538,26 @@ DIALOGUE: "${dialogue}"`;
       outsourcedLinks: practicalBlueprint.sourceLinks.length > 0
         ? practicalBlueprint.sourceLinks
         : (Array.isArray(data.outsourcedLinks) ? data.outsourcedLinks.map((item: any) => safeString(item)).filter(Boolean) : []),
-      scenes,
+      scenes: finalScenes,
       modelUsed,
       practicalBlueprint,
-      consistencyReport
+      consistencyReport,
+      scriptPattern: {
+        id: activePattern.id,
+        order: activePattern.order,
+        name: activePattern.name,
+        isDemo: activePattern.isDemo,
+        tone: activePattern.tone,
+        angle: activePattern.angle,
+      },
+      scriptPatternName: activePattern.name,
+      scriptRotationState: updatedRotationState,
     };
 
     mergeStudioStatePatch(
       {
         latestStory: generatedStoryPayload,
+        scriptRotationState: updatedRotationState,
         agentGeneratedData: {
           lastGeneratedAt: new Date().toISOString(),
         },
@@ -2457,7 +2565,7 @@ DIALOGUE: "${dialogue}"`;
       'agent_story_generated'
     );
     scheduleGitHubSync(
-      ['data/studio/studio-state.json'],
+      ['data/studio/studio-state.json', 'data/studio/script-rotation-state.json'],
       `feat(agent): sync generated story "${title.slice(0, 60)}"`
     );
 

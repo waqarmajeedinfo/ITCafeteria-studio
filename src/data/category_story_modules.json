@@ -57,6 +57,25 @@
     "rule": "Store the visual signature of the last 5 stories. A new story must differ from each of the last 3 in at least 3 of the 6 fields. If not, regenerate the Flow blocks (not the dialogue).",
     "forbidden": "Do not start every Flow script with the same sentence. Do not reuse the same camera/lighting/presenter block word-for-word across videos."
   },
+  "script_pattern_rotation": {
+    "sequence_order": [
+      "1. Direct ProblemSolving",
+      "2. BeforeAfter",
+      "3. Seedha Demo (DEMO PATTERN)",
+      "4. Chhupe hue Secrets",
+      "5. TikTok trickdemo (DEMO PATTERN)",
+      "6. Lecturrar Pattern",
+      "7. Myth vs Reality",
+      "8. Speedrun Challenge Demo (DEMO PATTERN)",
+      "9. Ghalti Alert (Costly Mistake Rescue)",
+      "10. Live Showdown (Method A vs Method B)",
+      "11. Real-Life Desi Case Study",
+      "12. Zero-to-Hero Rapid Roadmap"
+    ],
+    "lahori_punjab_voice_dna": "Authentic, engaging Lahori / Pakistani Punjab conversational tone across all patterns — relatable, punchy, warm elder-brother/friend cadence with mid-story Scene 5 Interesting Factor spike and binge-watch series bridge.",
+    "demo_opening_rule": "Any pattern classified as a Demo (Seedha Demo, TikTok trickdemo, Speedrun Challenge Demo) MUST strictly begin Scene 1 with a topic-identifying question or hook dialogue clearly indicating the topic to spark curiosity BEFORE transitioning directly into hands-on demonstration steps in Scene 2+.",
+    "uniqueness_rule": "Every generated story must carry a unique tone, angle, and dialogue compared to recent stories while staying aligned with the topic requirements and category."
+  },
   "module_types": {
     "standard_tutorial": "One topic, one video, 10 scenes, self-contained.",
     "ongoing_series": "Never-ending part-by-part series (Part 1, 2, 3...). Each part links to the previous one. Runs under its own extended-length test format already defined in the agent file.",
