@@ -187,7 +187,7 @@
         "camera": "Static or slow lateral movement over prompt and output panels; cut quickly between before and after.",
         "lighting_and_set": "Bright, minimal creator desk; prompt text legible on screen.",
         "presenter_action": "Typing, comparing two outputs, thumbs-up gesture.",
-        "hologram": "Not used."
+        "hologram": "Allowed for concept visualisation."
       },
       "dialogue_tone": "Playful, smart, 'trick' feeling, short punchy sentences.",
       "hook_style": "Weak vs strong prompt contrast.",
@@ -228,7 +228,7 @@
         "camera": "Screen recording with zoom on menus, terminal text and click targets; slow zoom-out when showing results.",
         "lighting_and_set": "Practical PC desk or laptop setup for presenter scenes.",
         "presenter_action": "Pointing at screen, cautious 'be careful' gesture for safety note.",
-        "hologram": "Not used."
+        "hologram": "Allowed for concept visualisation."
       },
       "dialogue_tone": "Helpful repair-guy tone, calm, safety-aware.",
       "hook_style": "Hook: direct PC problem with zero invented numbers.",
@@ -344,7 +344,7 @@
         "camera": "Phone-screen framing, finger tap highlights, quick zoom into the exact menu; occasional over-shoulder shot.",
         "lighting_and_set": "Casual bright desk, phone prominent; mood 'insider secret'.",
         "presenter_action": "Whisper-like lean-in gesture for secrets, holding phone.",
-        "hologram": "Not used."
+        "hologram": "Allowed for concept visualisation."
       },
       "dialogue_tone": "Insider, 'kisi ko nahi pata' energy, quick and friendly.",
       "hook_style": "Teaser revealing a hidden trick.",
@@ -381,7 +381,7 @@
         "camera": "Warm medium shots, idea cards appearing beside the presenter.",
         "lighting_and_set": "Friendly studio, warm tones.",
         "presenter_action": "Encouraging, conversational gestures.",
-        "hologram": "Not used."
+        "hologram": "Allowed for concept visualisation."
       },
       "dialogue_tone": "Motivating but realistic; never claim guaranteed earnings.",
       "hook_style": "Idea-first curiosity.",
@@ -424,7 +424,7 @@
         "camera": "Stable 16:9 instructor framing, slide inserts, screen-recording for demos.",
         "lighting_and_set": "Classroom or studio with slide/whiteboard area.",
         "presenter_action": "Teaching gestures, pointing at slides.",
-        "hologram": "Not used."
+        "hologram": "Allowed for concept visualisation."
       },
       "dialogue_tone": "Calm, structured instructor tone.",
       "hook_style": "Chapter promise.",
