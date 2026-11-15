@@ -37,10 +37,10 @@ const PRESET_AVATARS: Array<{ value: string; label: string; path: string; aspect
   { value: '@WM25-3', label: 'Tech Setup', path: '/character-refs/WM25-3.jpg', aspectRatios: ['9:16', '16:9'] },
   { value: '@WM25-4', label: 'Lecture Series', path: '/character-refs/WM25-4.jpg', aspectRatios: ['16:9'] },
   { value: '@WM25-5', label: 'Smart Casual', path: '/character-refs/WM25-5.jpg', aspectRatios: ['9:16', '16:9'] },
-  { value: '@WM25-6', label: 'Signature Studio / Black Jacket', path: '/character-refs/WM25-6.png', aspectRatios: ['9:16'] },
-  { value: '@WM25-7', label: 'Plaid Flannel / Vertical Studio', path: '/character-refs/WM25-7.jpeg', aspectRatios: ['9:16'] },
-  { value: '@WM25-8', label: 'Green Bomber / Tech Desk', path: '/character-refs/WM25-8.png', aspectRatios: ['9:16'] },
-  { value: '@WM25-9', label: 'Black Blazer / Studio Suit', path: '/character-refs/WM25-9.png', aspectRatios: ['9:16'] }
+  { value: '@WM25-6', label: 'Signature Studio / Black Jacket', path: '/character-refs/WM25-6.png', aspectRatios: ['9:16', '16:9'] },
+  { value: '@WM25-7', label: 'Plaid Flannel / Vertical Studio', path: '/character-refs/WM25-7.jpeg', aspectRatios: ['9:16', '16:9'] },
+  { value: '@WM25-8', label: 'Green Bomber / Tech Desk', path: '/character-refs/WM25-8.png', aspectRatios: ['9:16', '16:9'] },
+  { value: '@WM25-9', label: 'Black Blazer / Studio Suit', path: '/character-refs/WM25-9.png', aspectRatios: ['9:16', '16:9'] }
 ];
 
 export const TagManagerModal: React.FC<TagManagerModalProps> = ({
