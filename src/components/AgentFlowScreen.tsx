@@ -439,6 +439,9 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
     });
 
     try {
+      const coveredPointsExclusion = getAlreadyCoveredPointsList(profile.id, category.id);
+      const antiTemplateDirective = `[STRICT ANTI-TEMPLATE & VARIETY RULE]: Never reuse repetitive script templates, identical opening hooks, or previously covered technical commands/points (${coveredPointsExclusion.slice(0, 10).join(', ')}). Enforce a fresh narrative structure, unique visual pacing, and original spoken Roman Urdu phrasing.`;
+
       const data = await postJson('/api/ai/generate-story', {
         channelName: profile.name,
         presenter: profile.presenter,
@@ -454,9 +457,10 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
           .slice(-10)
           .map((message) => ({ role: message.role, text: message.text.trim().slice(0, 600) })),
         excludeTitles: buildExcludedTitles([idea.title]),
+        excludePoints: coveredPointsExclusion,
         dialectTone: simulatorConfig?.dialectTone || 'lahori_conversational',
         flowPromptFormat: simulatorConfig?.flowPromptFormat || 'split_screen',
-        customInstructions: simulatorConfig?.customInstructions || ''
+        customInstructions: `${antiTemplateDirective}\n${simulatorConfig?.customInstructions || ''}`.trim()
       }, abortRef.current?.signal);
 
       const rawScenes = Array.isArray(data.scenes) ? data.scenes : [];
