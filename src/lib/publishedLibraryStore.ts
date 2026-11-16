@@ -9,12 +9,14 @@
 import { PUBLISHED_VIDEOS, type PublishedVideo } from '../data/channelData';
 import { loadPendingQueue, savePendingQueue, type PendingStoryRecord } from './pendingQueueStore';
 import type { GeneratedStory } from '../components/StoryPackageView';
+
 import {
   loadProfileLibrary,
   saveProfileLibrary,
   IT_CAFETERIA_CATALOG_COVERED_POINTS,
   extractCoveredPointsFromStoryPackage,
   checkSmarterDuplicate,
+  inferProblemSignature,
   type DuplicateCheckResult
 } from './profileStore';
 import { pushStudioStatePatch, isHydratingRemoteState } from './studioSyncStore';
@@ -239,6 +241,11 @@ export function publishStoryDirectly(
     storyPackage: story,
     isPlatformGenerated: true,
     covered_points: coveredPoints,
+    problem_signature: inferProblemSignature({
+      title: story.title,
+      points: story.idea?.points || story.hook,
+      covered_points: coveredPoints
+    }),
     channelId
   };
 
