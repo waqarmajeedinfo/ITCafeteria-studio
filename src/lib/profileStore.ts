@@ -1061,7 +1061,7 @@ export function checkHierarchicalDuplicate(
     tool: candidate.tool
   });
 
-  // 1. REJECTED / BLOCKED TOPICS CHECK (Part B3)
+  // 1. REJECTED / BLOCKED TOPICS CHECK
   const blockedCheck = isTopicBlocked(channelId, candidateTitle, candSig);
   if (blockedCheck.blocked) {
     const report: DuplicateReport = {
@@ -1072,7 +1072,7 @@ export function checkHierarchicalDuplicate(
       comparedStories: [{ id: 'rejected', title: blockedCheck.blockedTopicTitle || candidateTitle, matchNote: 'In Rejected Topics list' }],
       matchedStoryTitle: blockedCheck.blockedTopicTitle,
       verdict: 'SAME-PROBLEM',
-      reason: `REJECTED TOPIC BLOCKED: "${candidateTitle}" matches a topic previously discarded or deleted from this channel: ${blockedCheck.matchedReason}`,
+      reason: `REJECTED TOPIC BLOCKED: "${candidateTitle}" matches a topic previously discarded.`,
       confidence: 100,
       checkedAt: new Date().toISOString()
     };
@@ -1089,178 +1089,69 @@ export function checkHierarchicalDuplicate(
     };
   }
 
-  // 2. POOL: Published Library + Generated Memory Stories (Part B4)
+  // 2. POOL: Published Library + Generated Memory Stories
   const library = options?.customLibrary || loadProfileLibrary(channelId);
   const generatedMemory = loadDuplicateMemoryStories(channelId);
-  // Deduplicate pool by id / title
   const poolMap = new Map<string, DynamicPublishedStory>();
   library.forEach(s => poolMap.set(String(s.id) + s.title.toLowerCase(), s));
   generatedMemory.forEach(s => poolMap.set('gen-' + s.title.toLowerCase(), s));
   const fullPool = Array.from(poolMap.values());
 
-  const fullCandidateText = `${candidateTitle} ${(candidate.points || []).join(' ')} ${candidate.rawPointsText || ''} ${candidate.tool || ''}`.toLowerCase();
+  const candidatePoints = extractCandidateSpecificPoints(candidate);
+  const fullCandidateText = `${candidateTitle} ${candidatePoints.join(' ')} ${candidate.tool || ''}`.toLowerCase();
   const entity = extractPrimaryTopicEntity(fullCandidateText);
 
-  let matchedStories: DynamicPublishedStory[] = [];
-  if (entity) {
-    matchedStories = fullPool.filter(story => {
-      const storyText = `${story.title} ${story.tool} ${story.series || ''}`.toLowerCase();
-      return storyText.includes(entity);
-    });
-  } else {
-    const candidateTool = candidate.tool?.toLowerCase().trim();
-    if (candidateTool && candidateTool.length >= 3 && !isPlaceholderOrToolName(candidateTool)) {
-      matchedStories = fullPool.filter(story => {
-        return (story.tool && story.tool.toLowerCase().includes(candidateTool)) ||
-          story.title.toLowerCase().includes(candidateTool);
-      });
-    }
-  }
-
-  const isSeriesCategory = candidate.categoryId === 4 || candidate.categoryId === 7;
-  const candidatePoints = extractCandidateSpecificPoints(candidate);
-
-  // 3. PROBLEM-LEVEL CHECK: Check SAME-PROBLEM across the entire pool (Part B1)
+  // 3. TIER 3: DEEP POINT-LEVEL PAYLOAD SCAN (Checking covered_points for exact technical collision like cleanmgr)
   for (const story of fullPool) {
-    const storySig = story.problem_signature || inferProblemSignature(story);
-    const probSim = calculatePointSimilarity(candSig.viewerProblem, storySig.viewerProblem);
-    const outSim = calculatePointSimilarity(candSig.promisedOutcome, storySig.promisedOutcome);
-
-    // If both viewer problem and promised outcome match
-    if (probSim >= 0.68 && outSim >= 0.68) {
-      const toolSim = calculatePointSimilarity(candSig.methodOrTool, storySig.methodOrTool);
-      const isPartNOrAlternative = /\b(part\s*\d+|alternative|tarika\s*2|method\s*2|vol\s*\d+|part\s*[a-z]|nayi\s*trick)\b/i.test(candidateTitle);
-
-      // If tool is also identical -> EXACT duplicate
-      if (toolSim >= 0.70) {
-        const report: DuplicateReport = {
-          comparedStoriesCount: fullPool.length,
-          candidateTitle,
-          candidatePoints,
-          candidateSignature: candSig,
-          comparedStories: fullPool.slice(0, 10).map(s => ({ id: s.id, title: s.title, tool: s.tool })),
-          matchedStoryTitle: story.title,
-          matchedPoint: storySig.viewerProblem,
-          verdict: 'exact',
-          reason: `EXACT DUPLICATE: Story #${story.id} ("${story.title}") pehle se isi viewer problem ("${storySig.viewerProblem}") ko isi tool (${storySig.methodOrTool}) se solve karti hai.`,
-          confidence: Math.round(((probSim + outSim + toolSim) / 3) * 100),
-          checkedAt: new Date().toISOString()
-        };
-        return {
-          verdict: 'exact',
-          level1AppDetected: entity,
-          level1Count: matchedStories.length,
-          matchedStoryId: story.id,
-          matchedStoryTitle: story.title,
-          matchedPoint: storySig.viewerProblem,
-          candidatePoint: candSig.viewerProblem,
-          candidateSignature: candSig,
-          report,
-          reason: report.reason,
-          confidence: report.confidence
-        };
-      }
-
-      // If tool differs but solves SAME-PROBLEM without explicit Part N / alternative value -> SAME-PROBLEM
-      if (!isPartNOrAlternative) {
-        const report: DuplicateReport = {
-          comparedStoriesCount: fullPool.length,
-          candidateTitle,
-          candidatePoints,
-          candidateSignature: candSig,
-          comparedStories: fullPool.slice(0, 10).map(s => ({ id: s.id, title: s.title, tool: s.tool })),
-          matchedStoryTitle: story.title,
-          matchedPoint: storySig.viewerProblem,
-          verdict: 'SAME-PROBLEM',
-          reason: `SAME-PROBLEM DUPLICATE: Published/generated video #${story.id} ("${story.title}") already solves this exact viewer problem ("${storySig.viewerProblem}") with outcome ("${storySig.promisedOutcome}"). Different tool alone is not allowed unless marked as Part N / alternative method with new value. Skipped to next topic.`,
-          confidence: Math.round(((probSim + outSim) / 2) * 100),
-          checkedAt: new Date().toISOString()
-        };
-        return {
-          verdict: 'SAME-PROBLEM',
-          level1AppDetected: entity,
-          level1Count: matchedStories.length,
-          matchedStoryId: story.id,
-          matchedStoryTitle: story.title,
-          matchedPoint: storySig.viewerProblem,
-          candidatePoint: candSig.viewerProblem,
-          candidateSignature: candSig,
-          report,
-          reason: report.reason,
-          confidence: report.confidence
-        };
-      }
-    }
-  }
-
-  // 4. POINT-LEVEL CHECK against matched stories
-  let exactMatch: {
-    storyId: number | string;
-    storyTitle: string;
-    coveredPoint: string;
-    candidatePoint: string;
-    similarity: number;
-  } | null = null;
-
-  for (const story of matchedStories) {
     const coveredPoints = ensureStoryCoveredPoints(story);
+    
     for (const cp of coveredPoints) {
       for (const candPoint of candidatePoints) {
         const sim = calculatePointSimilarity(candPoint, cp, entity);
-        if (sim >= 0.68) {
-          if (!exactMatch || sim > exactMatch.similarity) {
-            exactMatch = {
-              storyId: story.id,
-              storyTitle: story.title,
-              coveredPoint: cp,
-              candidatePoint: candPoint,
-              similarity: sim
-            };
-          }
+        
+        // If technical point / method similarity is high (e.g. cleanmgr / sage set / specific command match)
+        if (sim >= 0.65) {
+          const report: DuplicateReport = {
+            comparedStoriesCount: fullPool.length,
+            candidateTitle,
+            candidatePoints,
+            candidateSignature: candSig,
+            comparedStories: [{ id: story.id, title: story.title, tool: story.tool }],
+            matchedStoryTitle: story.title,
+            matchedPoint: cp,
+            verdict: 'exact',
+            reason: `EXACT POINT DUPLICATE (Tier-3 Payload Match): Published Story #${story.id} ("${story.title}") has already covered this exact technical point/command: "${cp}". Candidate point "${candPoint}" is rejected to ensure 100% content freshness.`,
+            confidence: Math.round(sim * 100),
+            checkedAt: new Date().toISOString()
+          };
+          return {
+            verdict: 'exact',
+            level1AppDetected: entity,
+            level1Count: 1,
+            matchedStoryId: story.id,
+            matchedStoryTitle: story.title,
+            matchedPoint: cp,
+            candidatePoint: candPoint,
+            candidateSignature: candSig,
+            report,
+            reason: report.reason,
+            confidence: report.confidence
+          };
         }
       }
     }
   }
 
-  if (exactMatch) {
+  // If no point collision found -> NEW or PARTIAL
+  if (fullPool.length === 0 || !entity) {
     const report: DuplicateReport = {
       comparedStoriesCount: fullPool.length,
       candidateTitle,
       candidatePoints,
       candidateSignature: candSig,
-      comparedStories: matchedStories.map(s => ({ id: s.id, title: s.title, tool: s.tool })),
-      matchedStoryTitle: exactMatch.storyTitle,
-      matchedPoint: exactMatch.coveredPoint,
-      verdict: 'exact',
-      reason: `EXACT DUPLICATE: Yeh specific feature/trick pehle Story #${exactMatch.storyId} ("${exactMatch.storyTitle}") mein cover ho chuka hai: "${exactMatch.coveredPoint}".`,
-      confidence: Math.round(exactMatch.similarity * 100),
-      checkedAt: new Date().toISOString()
-    };
-    return {
-      verdict: 'exact',
-      level1AppDetected: entity,
-      level1Count: matchedStories.length,
-      matchedStoryId: exactMatch.storyId,
-      matchedStoryTitle: exactMatch.storyTitle,
-      matchedPoint: exactMatch.coveredPoint,
-      candidatePoint: exactMatch.candidatePoint,
-      candidateSignature: candSig,
-      report,
-      reason: report.reason,
-      confidence: report.confidence
-    };
-  }
-
-  // If no match in pool at all -> NEW
-  if (matchedStories.length === 0) {
-    const report: DuplicateReport = {
-      comparedStoriesCount: fullPool.length,
-      candidateTitle,
-      candidatePoints,
-      candidateSignature: candSig,
-      comparedStories: fullPool.slice(0, 5).map(s => ({ id: s.id, title: s.title, tool: s.tool })),
+      comparedStories: [],
       verdict: 'new',
-      reason: `NEW TOPIC: Active profile library aur generated memory (total ${fullPool.length} stories compared) mein "${entity || candidate.title}" ka koi pehla record nahi hai. 100% unique!`,
+      reason: `NEW TOPIC: 100% unique point-level verification passed.`,
       confidence: 100,
       checkedAt: new Date().toISOString()
     };
@@ -1275,32 +1166,27 @@ export function checkHierarchicalDuplicate(
     };
   }
 
-  // PARTIAL (Fresh angle on known app)
-  const seriesNote = isSeriesCategory
-    ? `Series Category (${candidate.categoryId === 7 ? 'Secrets' : 'PC & Windows'}) mein same app repeat hona normal hai.`
-    : `Same app/tool area, lekin bilkul naya secret/trick hai.`;
-
+  // Default allowed as fresh angle
   const report: DuplicateReport = {
     comparedStoriesCount: fullPool.length,
     candidateTitle,
     candidatePoints,
     candidateSignature: candSig,
-    comparedStories: matchedStories.map(s => ({ id: s.id, title: s.title, tool: s.tool })),
+    comparedStories: [],
     verdict: 'partial',
-    reason: `PARTIAL ALLOW (Fresh Angle): ${seriesNote} Total ${matchedStories.length} matched stories ke covered points se koi collision nahi mila. Approved as fresh angle/Part N!`,
-    confidence: 88,
+    reason: `PARTIAL (Fresh Angle): App is known, but specific point payload is unique. Approved!`,
+    confidence: 85,
     checkedAt: new Date().toISOString()
   };
 
   return {
     verdict: 'partial',
     level1AppDetected: entity,
-    level1Count: matchedStories.length,
-    level1Note: `${entity?.toUpperCase() || 'App'} library mein ${matchedStories.length} dafa pehle published hai.`,
+    level1Count: 1,
     candidateSignature: candSig,
     report,
     reason: report.reason,
-    confidence: 88
+    confidence: 85
   };
 }
 
