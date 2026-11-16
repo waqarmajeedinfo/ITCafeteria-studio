@@ -370,12 +370,17 @@ export const AgentSimulator: React.FC = () => {
     };
   }, [draftChannel, draftTag, draftSceneCount]);
 
-  const handleCategoryChange = (newCatId: number) => {
+ const handleCategoryChange = (newCatId: number) => {
     setDraftCategory(newCatId);
+    
+    // Determine target aspect ratio based on category rules, Category 9 strictly 16:9, Category 10 flexible / default 9:16
     const targetRatio = (draftProfile.categoryRules?.[newCatId]?.defaultRatio || (newCatId === 9 ? '16:9' : '9:16')) as '9:16' | '16:9';
     setDraftAspectRatio(targetRatio);
 
+    // Fetch valid tags matching the target ratio (For Category 9 -> 16:9 tags like @WM25-6, 8, 9; For others -> 9:16 tags)
     const validTags = getValidTagsForRatio(draftProfile, targetRatio);
+    
+    // Automatically select the first valid matching tag if current tag is not valid for this ratio
     if (!validTags.some(t => t.value.toLowerCase() === draftTag.toLowerCase()) && validTags.length > 0) {
       setDraftTag(validTags[0].value);
     }
