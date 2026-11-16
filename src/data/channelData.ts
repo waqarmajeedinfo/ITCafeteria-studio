@@ -711,12 +711,12 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
       { value: "@WM25-1", label: "@WM25-1 (Casual Studio)", aspectRatios: ['9:16', '16:9'], path: '/character-refs/WM25-1.jpg' },
       { value: "@WM25-2", label: "@WM25-2 (Blue Accent)", aspectRatios: ['9:16', '16:9'], path: '/character-refs/WM25-2.jpg' },
       { value: "@WM25-3", label: "@WM25-3 (Tech Setup)", aspectRatios: ['9:16', '16:9'], path: '/character-refs/WM25-3.jpg' },
-      { value: "@WM25-4", label: "@WM25-4 (Lecture Series)", aspectRatios: ['16:9'], path: '/character-refs/WM25-4.jpg' },
+      { value: "@WM25-4", label: "@WM25-4 (Lecture Series)", aspectRatios: ['9:16', '16:9'], path: '/character-refs/WM25-4.jpg' },
       { value: "@WM25-5", label: "@WM25-5 (Smart Casual)", aspectRatios: ['9:16', '16:9'], path: '/character-refs/WM25-5.jpg' },
       { value: "@WM25-6", label: "@WM25-6 (Signature Studio / Black Jacket)", aspectRatios: ['9:16'], path: '/character-refs/WM25-6.png' },
       { value: "@WM25-7", label: "@WM25-7 (Plaid Flannel / Vertical Studio)", aspectRatios: ['9:16'], path: '/character-refs/WM25-7.jpeg' },
       { value: "@WM25-8", label: "@WM25-8 (Green Bomber / Tech Desk)", aspectRatios: ['9:16'], path: '/character-refs/WM25-8.png' },
-      { value: "@WM25-9", label: "@WM25-9 (Black Blazer / Studio Suit)", aspectRatios: ['9:16'], path: '/character-refs/WM25-9.png' }
+      { value: "@WM25-9", label: "@WM25-9 (Black Blazer / Studio Suit)", aspectRatios: ['9:16', '16:9'], path: '/character-refs/WM25-9.png' }
     ],
     categories: CATEGORIES_IT_CAFETERIA.map(({ id, name, playlist }) => ({ id, name, playlist })),
     rotationCategoryIds: CATEGORIES_IT_CAFETERIA.filter((c) => c.id <= 8).map((c) => c.id),
@@ -792,7 +792,7 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
       10: {
         title: "Custom Search Rule",
         instructions: "IT Cafeteria Script Rule (Cat 10 — Custom Search): Dynamic topic supplied directly by user or real-time 48h search grounding, outside regular rotation. Structure: 1) Urgent breaking topic hook (0-10s), 2) Source-grounded fact check, 3) Core controversy or technical question answered, 4) Step-by-step verified instructions, 5) Official source citation (Google, Microsoft, OpenAI), 6) Live test proof, 7) Important caveats or regional restrictions, 8) Practical user takeaway, 9) Rapid summary, 10) Discussion question CTA. Grounded search snippets, verified source highlights, flexible dynamic camera setup.",
-        defaultRatio: "9:16"
+        defaultRatio: "'9:16', '16:9'"
       }
     }
   },
