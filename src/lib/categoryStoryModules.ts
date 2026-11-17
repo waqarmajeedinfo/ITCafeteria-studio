@@ -55,7 +55,7 @@ export interface GlobalStoryRules {
 export function getContinuityLockText(characterTag?: string): string {
   const rawTag = (characterTag || '@WM25-1').trim();
   const effectiveTag = rawTag.startsWith('@') ? rawTag : `@${rawTag}`;
-  return `CONTINUITY LOCK: Use the character selected in Flow for tag ${effectiveTag} exactly as set (same face, hairstyle, beard length and shape, moustache, chin/goatee style, body build and wardrobe). Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow (same room, same wall colors, same desk, same lighting style). Do not move the scene to a different room.`;
+  return `CONTINUITY LOCK: Use the character selected in Flow for tag ${effectiveTag} exactly as set. Do not restyle or alter the character in any way. Use the same character voice as set in Flow, identical in every scene. Keep the same studio look as set in Flow. Do not move the scene to a different room.`;
 }
 
 export function appendContinuityLockToPresenterAction(presenterAction: string, characterTag?: string): string {
