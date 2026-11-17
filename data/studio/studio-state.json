@@ -1,8 +1,940 @@
 {
-  "version": 3,
-  "updatedAt": "2026-11-13T20:59:59.853Z",
+  "version": 4,
+  "updatedAt": "2026-11-17T04:21:34.109Z",
   "lastSyncedAt": null,
   "lastCommitSha": null,
-  "lastSyncReason": "restore_clean_state",
-  "menuConfig": null
+  "lastSyncReason": "profile_library_itcafeteria_updated",
+  "menuConfig": null,
+  "profileLibraries": {
+    "itcafeteria": [
+      {
+        "id": 1,
+        "title": "Gemini 4 Argon Launch: This AI Model Will Do Your Work in Seconds!",
+        "length": "1:13",
+        "tool": "Gemini 4 Argon",
+        "points": "global launch, multimodal capabilities, complex coding support in GitHub Copilot, enterprise task automation",
+        "series": "—",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Gemini 4 Argon multimodal reasoning on enterprise logs",
+          "GitHub Copilot deep coding assistance",
+          "Automated cloud infrastructure scripts"
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Windows 11 Hidden Trick! Paste Old Text Using Win + V",
+        "length": "1:33",
+        "tool": "Windows 11 clipboard history (Win+V)",
+        "points": "Clipboard History: paste text copied earlier, pin frequent items",
+        "series": "PC & Windows Hacks",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Win+V Clipboard History activation shortcut",
+          "Pasting text clips copied hours earlier",
+          "Pinning permanent text clips to clipboard menu"
+        ]
+      },
+      {
+        "id": 3,
+        "title": "How to Make Remote Income with Shopify Store Management?",
+        "length": "1:13",
+        "tool": "Shopify store management (income ideas)",
+        "points": "Store handling, product listing, client communication, passive income model",
+        "series": "Income & Skills",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Setting up store catalog without holding physical inventory",
+          "Automating supplier product sync and remote client chats",
+          "No-inventory dropshipping cashflow pipeline"
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Meta Muse Wonder AI: Kya AI Ab Memory Aur Focus Mein Behtar Ho Rahi Hai?",
+        "length": "1:15",
+        "tool": "Meta Muse Wonder / Muse Wonder Full",
+        "points": "New AI models; Active Memory and Active Focus concepts",
+        "series": "AI & Smart Tech",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Active Memory and Active Focus context buffer",
+          "Preserving conversational state across long tasks",
+          "Benchmark speed for long-context recall"
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Bina Coding Ke Kaam Asan Karein! Power Automate Workflow Tutorial",
+        "length": "1:10",
+        "tool": "Power Automate (no-code workflows)",
+        "points": "Repetitive office tasks, no-code workflow automation tools",
+        "series": "Power Automate",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "No-code desktop flow for daily Excel data entry",
+          "Auto-triggering desktop tasks on file drop",
+          "Automating repetitive spreadsheet formatting"
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Google Flow AI Video Trick: Start & End Frames Explained",
+        "length": "1:16",
+        "tool": "Google Flow",
+        "points": "Start Frame and End Frame workflow for smooth transitions and consistent scenes",
+        "series": "AI Workflows",
+        "published": "Oct 18, 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Start Frame and End Frame interpolation in Google Flow",
+          "Eliminating character face morphing across video cuts",
+          "Locking visual continuity between keyframes"
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Google Astra AI: Live Camera Vision Magic Tool!",
+        "length": "1:01",
+        "tool": "Google Astra",
+        "points": "Phone camera turned into a live intelligent assistant",
+        "series": "AI & Smart Tech",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Real-time phone camera visual scanning of objects and error codes",
+          "Hands-free audio inquiry during live camera inspection",
+          "Instant visual troubleshooting of physical hardware and cables"
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Google Gemini Ka Naya Real-Time Screen-Share Feature — Ab Har Problem Secondon Mein",
+        "length": "1:04",
+        "tool": "Gemini screen share",
+        "points": "Explain screen errors or complex coding bugs without long typing",
+        "series": "AI Chatbots & Tools",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Live screen-share error diagnosis in Gemini",
+          "Instant debugging of running console errors without pasting",
+          "Voice walkthrough while viewing developer screen"
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Gemini Notebook AI Research Trick: Ghanton Ka Kaam Seconds Mein!",
+        "length": "1:09",
+        "tool": "Gemini Notebook (NotebookLM)",
+        "points": "Summaries and source-grounded answers from a PDF, research paper or notes",
+        "series": "AI Tools",
+        "published": "Oct 16, 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Source-grounded Q&A against uploaded PDF research",
+          "Generating two-host audio podcast from document notes",
+          "Clickable citation links pointing to exact document page"
+        ]
+      },
+      {
+        "id": 10,
+        "title": "ChatGPT vs Gemini vs Claude (2026) — Konsa AI Tool Best Hai?",
+        "length": "1:08",
+        "tool": "ChatGPT / Gemini / Claude comparison",
+        "points": "Detailed comparison of the three major AI chatbots, speed vs reasoning",
+        "series": "AI Chatbots",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Speed vs deep reasoning benchmark comparison across frontier models",
+          "Which model handles Roman Urdu technical nuances accurately",
+          "Cost and latency evaluation for student workflows"
+        ]
+      },
+      {
+        "id": 11,
+        "title": "AI Agents Auto Setup: Build Multi-Agent Workflows Fast!",
+        "length": "1:10",
+        "tool": "AI agents, multi-agent workflows",
+        "points": "OpenAI Swarm setup, Gemini Flash, autonomous agents for daily repetitive tasks",
+        "series": "AI Workflows",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Autonomous agent handoff loop in OpenAI Swarm",
+          "Multi-agent task distribution and result synthesis",
+          "Daily scheduled autonomous web research pipeline"
+        ]
+      },
+      {
+        "id": 12,
+        "title": "WhatsApp Business Advanced Analytics & Stats Setup",
+        "length": "1:10",
+        "tool": "WhatsApp Business",
+        "points": "Message delivery and read rates, customer statistics; final series episode",
+        "series": "WhatsApp Business",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Broadcast delivery and read analytics dashboard",
+          "Measuring customer conversion rates from broadcast lists",
+          "Tracking message open rates and reply latency"
+        ]
+      },
+      {
+        "id": 13,
+        "title": "WhatsApp Hidden Secrets & Power Shortcuts Part 4",
+        "length": "1:05",
+        "tool": "WhatsApp hidden features",
+        "points": "Pinning important messages, HD media as default, biometric chat lock",
+        "series": "Secrets Part 4",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Pinning 3 most important priority chats to the top",
+          "Setting distinct custom ringtones per client contact",
+          "Setting disappearing messages timer for privacy (24h/7d/90d)"
+        ]
+      },
+      {
+        "id": 14,
+        "title": "WhatsApp Hidden Secrets & Power Shortcuts Part 3",
+        "length": "1:15",
+        "tool": "WhatsApp hidden features",
+        "points": "Date-wise chat search, reading messages from notification panel without blue ticks",
+        "series": "Secrets Part 3",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Editing sent messages within the 15-minute window",
+          "Fingerprint and FaceID biometric chat lock",
+          "Sending uncompressed full-resolution HD media"
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Advanced WhatsApp Hidden Secrets & Tricks (Part 2)",
+        "length": "1:21",
+        "tool": "WhatsApp hidden features",
+        "points": "Chat without saving numbers, storage management, multi-device login, starred messages",
+        "series": "Secrets Part 2",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "1.5x and 2x voice note playback acceleration",
+          "Linking up to 4 companion phones to single account",
+          "Hiding online presence status while actively typing"
+        ]
+      },
+      {
+        "id": 16,
+        "title": "Top WhatsApp Hidden Secrets & Chat Tricks (Part 1)",
+        "length": "1:15",
+        "tool": "WhatsApp hidden features",
+        "points": "Chat lock, message yourself, text formatting, pinning chats",
+        "series": "Secrets Part 1",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Disabling read receipts to hide blue double-ticks",
+          "Markdown formatting with asterisks, underscores, and tildes",
+          "Starring critical messages for quick bookmark search"
+        ]
+      },
+      {
+        "id": 17,
+        "title": "ChatGPT Slash Command Hacks & /ugcad Secret (Part 1)",
+        "length": "1:34",
+        "tool": "ChatGPT slash commands",
+        "points": "/ugcad, /summarize, /table, workflow shortcuts",
+        "series": "AI Prompt Hacks Part 1",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Activating God Mode master panel with GUID folder code {ED7BA470-8E54-465E-825C-99712043E01C}",
+          "Accessing 200+ hidden system settings in one window",
+          "Quick administrative control shortcuts without settings app"
+        ]
+      },
+      {
+        "id": 18,
+        "title": "Top Windows Hidden Secrets & Shortcuts You Didn't Know (Part 1)",
+        "length": "1:34",
+        "tool": "Windows hidden features and shortcuts",
+        "points": "Clipboard history, snipping tools, virtual desktops, keyboard shortcuts",
+        "series": "PC & Windows Hacks Part 1",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Magic Switch layout and auto-resize across platforms",
+          "Generative text-to-graphic asset synthesis in Canva",
+          "Multi-page design consistency with Brand Kit"
+        ]
+      },
+      {
+        "id": 19,
+        "title": "Google Maps Hidden Offline & Timeline Tricks!",
+        "length": "1:20",
+        "tool": "Google Maps",
+        "points": "Offline maps download, navigation without internet, Timeline history",
+        "series": "Secrets",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "CapCut text-to-speech voice styling and tone adjustments",
+          "Auto-caption generator with dynamic kinetic presets",
+          "Video background removal without green screen"
+        ]
+      },
+      {
+        "id": 20,
+        "title": "Browser Ka Kaam Auto Mode Par! AI Web Agents Automation",
+        "length": "1:20",
+        "tool": "AI web agents in the browser",
+        "points": "AI web extensions that control the browser and auto-fill forms",
+        "series": "AI Workflows",
+        "published": "Sep 30, 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Midjourney v7 photorealistic prompt syntax rules",
+          "Character reference parameter (--cref) for identical face",
+          "Style reference parameter (--sref) for cinematic color grading"
+        ]
+      },
+      {
+        "id": 21,
+        "title": "AI Images Ko Realistic Banayein! Pro Prompting Secret Formula",
+        "length": "1:22",
+        "tool": "AI image prompting (Midjourney, ChatGPT)",
+        "points": "Prompt formula for studio-quality realistic images, lighting tokens",
+        "series": "AI Prompt Hacks",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Runway Gen-3 Alpha multi-axis camera motion controls",
+          "Motion brush for selective regional animation",
+          "Text-to-high-fidelity cinematic 4K video rendering"
+        ]
+      },
+      {
+        "id": 22,
+        "title": "Bina Coding Web App Banayein! Claude 3.7 Sonnet & Artifacts 2.0",
+        "length": "1:22",
+        "tool": "Claude Sonnet / Artifacts",
+        "points": "Live web apps, custom calculators and dashboards without coding knowledge",
+        "series": "AI Tools",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "ElevenLabs voice cloning from 1-minute audio sample",
+          "Emotion stability and similarity sliders configuration",
+          "Multilingual Urdu accent dubbing without robotic artifacts"
+        ]
+      },
+      {
+        "id": 23,
+        "title": "ChatGPT Sketch to Image! Naye Canvas Editor Se Images Edit Karein",
+        "length": "1:24",
+        "tool": "ChatGPT Images (Sketch to Image)",
+        "points": "Turn rough sketch into high-quality AI image, canvas editor tweaks",
+        "series": "AI Prompt Hacks",
+        "published": "Oct 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Cleanmgr & %temp% junk file purge shortcut",
+          "Freeing up C-Drive red bar space safely",
+          "Disabling high-impact startup apps in Task Manager"
+        ]
+      },
+      {
+        "id": 24,
+        "title": "OpenAI Launched GPT-6 Astra! Big AI Revolution",
+        "length": "1:08",
+        "tool": "GPT-6 Astra",
+        "points": "OpenAI launch of flagship model, direct autonomous tasks without API code",
+        "series": "AI Breakthroughs",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Suno AI v4 full musical arrangement generation",
+          "Custom lyrical metronome and style genre tags",
+          "Commercial stems separation and instrumental mix"
+        ]
+      },
+      {
+        "id": 25,
+        "title": "Google Gemini Item Tracker Tutorial!",
+        "length": "0:58",
+        "tool": "Gemini on Android",
+        "points": "Ask Gemini to remember where you placed items like passports, keys",
+        "series": "AI Smart Tech",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Center Across Selection (Ctrl+1 -> Alignment)",
+          "Safe alternative to Merge Cells in Excel",
+          "Preventing sorting and VLOOKUP formula breaks in tables"
+        ]
+      },
+      {
+        "id": 26,
+        "title": "Double Your PC Speed! Secret Windows Performance Trick",
+        "length": "1:07",
+        "tool": "Windows power plan",
+        "points": "Command Prompt to unlock Ultimate Performance power plan, boost heavy apps",
+        "series": "PC & Windows Hacks",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Perplexity AI Pro search citations and follow-up threads",
+          "Focus mode filters: Academic, YouTube, and Reddit",
+          "Collections feature for structured team research dossiers"
+        ]
+      },
+      {
+        "id": 27,
+        "title": "Secret AI Image To Prompt Hack! Copy Any Image Style",
+        "length": "1:04",
+        "tool": "Reverse prompt engineering",
+        "points": "Extract exact AI prompt and style modifiers from any visual image",
+        "series": "AI Prompt Hacks",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Claude 3.7 Sonnet extended thinking mode toggle",
+          "Architecting multi-file codebases without hallucinations",
+          "Complex full-stack system debugging and refactoring"
+        ]
+      },
+      {
+        "id": 28,
+        "title": "ChatGPT Voice Mode Big Update! Background Multitasking Feature",
+        "length": "1:04",
+        "tool": "ChatGPT Voice Mode",
+        "points": "Use Voice Mode with screen locked and while using other apps simultaneously",
+        "series": "AI Chatbots",
+        "published": "Sep 26, 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Screen sharing with device system audio in video calls",
+          "Secret code password for hidden locked WhatsApp chats",
+          "Instant 60-second circular video message shortcut"
+        ]
+      },
+      {
+        "id": 29,
+        "title": "WhatsApp 3 New Mind-Blowing Features 2026! Complete Guide",
+        "length": "2:02",
+        "tool": "WhatsApp new features (2026)",
+        "points": "Dual accounts natively on one phone, custom chat themes, privacy controls",
+        "series": "Secrets",
+        "published": "Sep 25, 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Activating Ultimate Performance power plan via powercfg command",
+          "Maximum CPU frequency locking with zero throttling",
+          "Eliminating FPS drops and render stutter in Windows"
+        ]
+      },
+      {
+        "id": 30,
+        "title": "PC Freeze Fix Secret Key! Laptop Unfreeze Karein",
+        "length": "1:03",
+        "tool": "Windows emergency shortcut (Win+Ctrl+Shift+B)",
+        "points": "Secret emergency shortcut key to reset graphics drivers when screen freezes",
+        "series": "PC & Windows Hacks Part 1",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Google Sheets Smart Fill AI pattern auto-detection",
+          "Splitting combined phone numbers and emails without formulas",
+          "Instant multi-column text normalization"
+        ]
+      },
+      {
+        "id": 31,
+        "title": "AI Smart Home 2026! Ghar Ke Devices Ab Auto Manage Honge",
+        "length": "1:05",
+        "tool": "AI agents for smart homes",
+        "points": "Agents connect with household appliances for automated energy saving and security",
+        "series": "AI & Smart Tech",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Gamma App prompt-to-presentation slide generation",
+          "Exporting interactive decks to PowerPoint and web",
+          "Embedding live analytics widgets directly into slides"
+        ]
+      },
+      {
+        "id": 32,
+        "title": "OpenAI ka New Breakthrough Aisi AI Technology Jo sub kuch badal de gi",
+        "length": "0:52",
+        "tool": "OpenAI breakthrough",
+        "points": "Next-generation model updates and reasoning milestones",
+        "series": "Future Tech",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "DeepSeek R1 open-weight local model execution via Ollama",
+          "Zero-cost local coding benchmarks matching proprietary models",
+          "Offline reasoning pipelines without cloud API fees"
+        ]
+      },
+      {
+        "id": 33,
+        "title": "Windows ki Aik Aisi Hidden Trick Jo Aapka PC Super Fast Kar Degi!",
+        "length": "0:53",
+        "tool": "Windows speed trick",
+        "points": "Slow PC fix, boot time cleanup via Task Manager startup services",
+        "series": "PC & Windows Hacks",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Kling AI 1.5 camera path positioning and motion control",
+          "Realistic human body physics and facial expression rendering",
+          "Prompt structuring for 1080p cinematic video clips"
+        ]
+      },
+      {
+        "id": 34,
+        "title": "Sell AI Prompts & Make Passive Dollars!",
+        "length": "0:56",
+        "tool": "Selling AI prompts & automation workflows",
+        "points": "Marketplaces for prompt packs and automation sequences for creators",
+        "series": "Income & Skills",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Bolt.new prompt-to-fullstack application generator",
+          "Live WebContainer execution inside browser tabs",
+          "One-click deployment to Netlify and custom domains"
+        ]
+      },
+      {
+        "id": 35,
+        "title": "YouTube Algorithm Changed: Fix Your Views Now!",
+        "length": "0:54",
+        "tool": "YouTube Shorts algorithm 2026",
+        "points": "Retention updates, micro-retention signals, stayed vs swiped away dynamics",
+        "series": "Digital Growth",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Lovable dev full-stack web builder with Supabase backend",
+          "Automated database schema creation and auth configuration",
+          "Exporting clean React code directly to GitHub repository"
+        ]
+      },
+      {
+        "id": 36,
+        "title": "Claude AI Live Workspace Artifacts! No Coding Required",
+        "length": "0:51",
+        "tool": "Claude Workspace Artifacts",
+        "points": "Interactive artifacts inside chat window without external code editor",
+        "series": "AI Tools",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Automating instant WhatsApp order alerts via HTTP webhooks",
+          "Triggering customer notifications on new online store orders",
+          "Sending approved templated WhatsApp messages automatically"
+        ]
+      },
+      {
+        "id": 37,
+        "title": "GPT-6 Astra Is Here! No-Code AI Agents",
+        "length": "0:48",
+        "tool": "GPT-6 Astra",
+        "points": "Autonomous agentic workflows without complex API setup",
+        "series": "AI Breakthroughs",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Cursor AI Composer multi-file project refactoring",
+          "Full codebase indexing for context-aware code generation",
+          "Configuring custom .cursorrules for project standards"
+        ]
+      },
+      {
+        "id": 38,
+        "title": "How IT Cafeteria Creates AI Videos Step-by-Step",
+        "length": "1:05",
+        "tool": "IT Cafeteria workflow",
+        "points": "Step-by-step AI video creation workflow, tools used, scene assembly",
+        "series": "Behind the Scenes",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "v0 by Vercel React UI generator from screenshots",
+          "Tailwind CSS component generation and live preview",
+          "Direct copy-paste integration into Next.js and Vite apps"
+        ]
+      },
+      {
+        "id": 39,
+        "title": "Automate Daily Reports in Power Automate!",
+        "length": "0:56",
+        "tool": "Power Automate",
+        "points": "Scheduled Cloud Flow (Recurrence trigger), daily automated Excel reports",
+        "series": "Power Automate",
+        "published": "Sep 20, 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Flux 1.1 Pro Ultra accurate typography rendering in images",
+          "Clean legible English text inside generative visuals",
+          "High-frequency 2K photorealism and skin textures"
+        ]
+      },
+      {
+        "id": 40,
+        "title": "Power Automate Ep 7: Send Automated WhatsApp Alerts via HTTP API",
+        "length": "0:35",
+        "tool": "Power Automate + WhatsApp API",
+        "points": "HTTP calls to send instant automated alerts from cloud triggers",
+        "series": "Power Automate Ep 7",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Win+R secret diagnostic commands: msconfig, mrt, perfmon",
+          "Running malicious software removal tool deep background scans",
+          "Diagnosing hardware resource bottlenecks via Performance Monitor"
+        ]
+      },
+      {
+        "id": 41,
+        "title": "AI Document & Invoice Processing in Power Automate (Episode 6)",
+        "length": "1:00",
+        "tool": "Power Automate AI Builder",
+        "points": "OCR for invoices, receipts and PDFs; automated Excel extraction",
+        "series": "Power Automate Ep 6",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Pika 2.0 Pikaffects physics simulation: melt, explode, inflate",
+          "Keyframe timing and motion physics parameters",
+          "Transforming static image objects into kinetic effects"
+        ]
+      },
+      {
+        "id": 42,
+        "title": "Connect APIs & ChatGPT in Power Automate (Episode 5)",
+        "length": "1:08",
+        "tool": "Power Automate + APIs + ChatGPT",
+        "points": "Custom APIs, HTTP actions, JSON parsing, OpenAI connection",
+        "series": "Power Automate Ep 5",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "HeyGen custom interactive video avatar from webcam footage",
+          "Lip-sync synthesis across 40+ languages",
+          "Automating multilingual product tutorial video pipelines"
+        ]
+      },
+      {
+        "id": 43,
+        "title": "Master Approval Workflows & Adaptive Cards in Power Automate (Episode 4)",
+        "length": "1:11",
+        "tool": "Power Automate approvals",
+        "points": "Approval workflows and interactive Adaptive Cards in Microsoft Teams",
+        "series": "Power Automate Ep 4",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Napkin AI text-to-infographic visual documentation",
+          "Converting dense articles into structured visual flowcharts",
+          "Exporting scalable vector SVG graphics for presentations"
+        ]
+      },
+      {
+        "id": 44,
+        "title": "Web Scraping without Code in Power Automate Desktop (Episode 4)",
+        "length": "1:03",
+        "tool": "Power Automate Desktop web scraping",
+        "points": "Automated tabular data extraction from web pages without code",
+        "series": "Power Automate Ep 4 (dup label)",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Make.com vs Zapier visual automation pipeline comparison",
+          "Router branches, filters, and error-handling configurations",
+          "Cost-effective webhook pipelines for high-volume tasks"
+        ]
+      },
+      {
+        "id": 45,
+        "title": "Windows Secret God Mode — Unlock 200+ Hidden Settings",
+        "length": "0:59",
+        "tool": "Windows God Mode",
+        "points": "Folder GUID code to access all 200+ hidden Control Panel settings",
+        "series": "PC & Windows Hacks",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Ollama local LLM runner setup on desktop PC",
+          "Running Llama 3.3 and DeepSeek completely offline",
+          "Privacy-first local AI operations without internet connection"
+        ]
+      },
+      {
+        "id": 46,
+        "title": "Build Flows with AI Copilot in Power Automate (Part 2)",
+        "length": "0:51",
+        "tool": "Power Automate Copilot",
+        "points": "Build cloud flows directly from natural-language prompts in Copilot",
+        "series": "Power Automate Ep 2",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Whisper AI local voice transcription with zero cloud latency",
+          "SRT subtitle file generation with word-level timestamps",
+          "Accurate Roman Urdu and English mixed dialect transcription"
+        ]
+      },
+      {
+        "id": 47,
+        "title": "Master Conditions, Loops & Control in Power Automate Episode 3",
+        "length": "0:50",
+        "tool": "Power Automate control logic",
+        "points": "If/Else conditions, Apply to Each loops, Switch cases, variables",
+        "series": "Power Automate Ep 3",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "WhatsApp Business multi-device sync without keeping phone online",
+          "Meta AI assistant integration inside business chats",
+          "Catalog inventory management synced across desktop and mobile"
+        ]
+      },
+      {
+        "id": 48,
+        "title": "Build Your First Cloud Flow in Power Automate Episode 1 - Part 1",
+        "length": "1:01",
+        "tool": "Power Automate basics",
+        "points": "Triggers and actions; Outlook email arrives -> Excel sheet updates",
+        "series": "Power Automate Ep 1",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "WhatsApp Business color-coded customer lifecycle labels",
+          "Targeted broadcast lists without creating noisy group chats",
+          "Filtering customer chats by paid, pending, and shipped status"
+        ]
+      },
+      {
+        "id": 49,
+        "title": "Stop YouTube Re-Uploads Automatically! (Part 3)",
+        "length": "0:45",
+        "tool": "YouTube copyright tools",
+        "points": "Archive, Contact Uploader, Scheduled vs Standard Takedown, Auto-Block",
+        "series": "YouTube Protection Part 3",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "WhatsApp Business product catalog setup with item prices",
+          "Generating direct WhatsApp purchase links for social media",
+          "Sharing seasonal collections directly in customer chats"
+        ]
+      },
+      {
+        "id": 50,
+        "title": "Review Copied YouTube Videos & Fair Use Rules! (Part 2)",
+        "length": "0:49",
+        "tool": "YouTube Copyright Match",
+        "points": "Copyright Matches tab analytics, takedown workflow, Fair Use nuances",
+        "series": "YouTube Protection Part 2",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "WhatsApp Business automated away messages and greeting replies",
+          "Quick reply keyboard shortcuts for FAQs (/price, /bank, /hours)",
+          "Handling after-hours customer inquiries automatically"
+        ]
+      },
+      {
+        "id": 51,
+        "title": "How to Protect YouTube Videos! Copyright Match Tool (Part 1)",
+        "length": "0:40",
+        "tool": "YouTube Copyright Match Tool",
+        "points": "How copyright matching works and how it differs from Content ID",
+        "series": "YouTube Protection Part 1",
+        "published": "Sep 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "WhatsApp Business verified official profile setup",
+          "Configuring verified business hours, support email, and location",
+          "Building buyer trust with complete business credentials"
+        ]
+      },
+      {
+        "id": 52,
+        "title": "Episode 6: WhatsApp Multi-Device & Meta AI Updates (Final)",
+        "length": "0:39",
+        "tool": "WhatsApp Business",
+        "points": "Linked Devices multi-device, Facebook/Instagram ads, Meta AI integration",
+        "series": "WhatsApp Business Ep 6",
+        "published": "Aug 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Migrating regular WhatsApp to WhatsApp Business without data loss",
+          "Full chat and media backup to Google Drive before switch",
+          "Clean profile transition retaining complete customer history"
+        ]
+      },
+      {
+        "id": 53,
+        "title": "Episode 5: Organize Customers on WhatsApp (Labels & Broadcasts)",
+        "length": "0:33",
+        "tool": "WhatsApp Business",
+        "points": "Labels, custom QR code, short link, Broadcast lists for customer retention",
+        "series": "WhatsApp Business Ep 5",
+        "published": "Aug 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Google Chrome secret flags for 2X parallel download speed",
+          "Enabling Memory Saver and proactive Tab Discarding",
+          "Optimizing hardware-accelerated video decoding in browser"
+        ]
+      },
+      {
+        "id": 54,
+        "title": "Episode 4: WhatsApp Product Catalog Setup, No Website Needed",
+        "length": "0:30",
+        "tool": "WhatsApp Business",
+        "points": "Catalog setup, product collections, direct order checkout flow",
+        "series": "WhatsApp Business Ep 4",
+        "published": "Aug 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Google Drive advanced search operators: type:pdf, owner:me, before:date",
+          "Restoring permanently overwritten document versions",
+          "Organizing shared folders with color codes and shortcuts"
+        ]
+      },
+      {
+        "id": 55,
+        "title": "Episode 3: WhatsApp Auto Reply & Quick Replies Trick",
+        "length": "0:34",
+        "tool": "WhatsApp Business",
+        "points": "Greeting message, away message, slash command quick replies",
+        "series": "WhatsApp Business Ep 3",
+        "published": "Aug 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Gmail search filters for gigabyte storage recovery: size:10M, older_than:1y",
+          "Auto-cleaning bloated promotional inbox clutter in 1 click",
+          "Creating automatic rule filters for incoming client attachments"
+        ]
+      },
+      {
+        "id": 56,
+        "title": "How to Build Trust with Your WhatsApp Profile",
+        "length": "0:31",
+        "tool": "WhatsApp Business",
+        "points": "Business name, HD logo, category, location map, business hours verification",
+        "series": "WhatsApp Business Ep 2",
+        "published": "Aug 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "YouTube secret URL parameters: exact timestamp sharing and loop toggle",
+          "Clean distraction-free full-screen embeds",
+          "Keyboard timeline navigation shortcuts: J, K, L, M, and F"
+        ]
+      },
+      {
+        "id": 57,
+        "title": "Episode 1: WhatsApp Business Kya Hai? Install & Migrate Kaise Karein?",
+        "length": "0:36",
+        "tool": "WhatsApp Business",
+        "points": "Difference from normal WhatsApp, clean installation, migrating old chats",
+        "series": "WhatsApp Business Ep 1",
+        "published": "Aug 2026",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Telegram scheduled messages and silent sending without notification sound",
+          "Sending uncompressed original files up to 2GB in size",
+          "Setting up anonymous custom public usernames"
+        ]
+      },
+      {
+        "id": 58,
+        "title": "Chrome vs Chromium Secrets (Browser Architecture)",
+        "length": "1:15",
+        "tool": "Google Chrome vs Chromium",
+        "points": "Open source vs proprietary difference, Google's purpose for Chromium, Edge/Brave/Opera sharing engine",
+        "series": "Secrets (Custom)",
+        "published": "Oct 24, 2026 (Memory N1)",
+        "channelId": "itcafeteria",
+        "isPlatformGenerated": false,
+        "covered_points": [
+          "Google Maps offline city map downloads for internet-free navigation",
+          "Measuring straight-line distance between geographic pins",
+          "Saving exact vehicle parking locations and timeline history"
+        ]
+      }
+    ]
+  }
 }
