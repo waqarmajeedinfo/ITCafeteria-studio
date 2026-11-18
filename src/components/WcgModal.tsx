@@ -27,6 +27,8 @@ import {
   findWcgMusicPreset,
   getDefaultMusicForCategory,
   type WcgCardData,
+  type WcgCustomSongItem,
+  type WcgCustomTemplateItem,
   type WcgEventCategory,
   type WcgRenderQuality,
   type WcgRenderResult,
@@ -34,6 +36,7 @@ import {
   type WcgTemplateSpec,
   type WcgTrendSuggestion,
 } from '../lib/wcgTemplates';
+import { WCGUploadManager } from './WCGUploadManager';
 
 interface WcgModalProps {
   onClose: () => void;
@@ -214,6 +217,11 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   const [previewingMusicId, setPreviewingMusicId] = useState<string | null>(null);
   const [quality, setQuality] = useState<WcgRenderQuality>('1080p');
 
+  // Permanent Server Library state (custom templates + custom 30s songs)
+  const [customTemplates, setCustomTemplates] = useState<WcgCustomTemplateItem[]>([]);
+  const [customSongs, setCustomSongs] = useState<WcgCustomSongItem[]>([]);
+  const [activeCustomTemplate, setActiveCustomTemplate] = useState<WcgCustomTemplateItem | null>(null);
+
   // Render & Playback state
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -226,13 +234,25 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const imgS1Ref = useRef<HTMLImageElement | null>(null);
   const imgS2Ref = useRef<HTMLImageElement | null>(null);
+  const customImg1Ref = useRef<HTMLImageElement | null>(null);
+  const customImg2Ref = useRef<HTMLImageElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [imagesReady, setImagesReady] = useState<boolean>(false);
+  const [customImagesRev, setCustomImagesRev] = useState<number>(0);
   const mountedRef = useRef<boolean>(true);
   const renderRunIdRef = useRef<number>(0);
 
   useEffect(() => {
     mountedRef.current = true;
+    fetch('/api/wcg/library')
+      .then((r) => r.json())
+      .then((json) => {
+        if (!mountedRef.current || !json?.ok) return;
+        if (Array.isArray(json.templates)) setCustomTemplates(json.templates);
+        if (Array.isArray(json.songs)) setCustomSongs(json.songs);
+      })
+      .catch(() => {});
+
     return () => {
       mountedRef.current = false;
       renderRunIdRef.current += 1;
@@ -249,6 +269,30 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       audioRef.current.volume = musicVolume;
     }
   }, [musicVolume]);
+
+  // Preload active custom uploaded card images for live canvas preview
+  useEffect(() => {
+    if (!activeCustomTemplate) {
+      customImg1Ref.current = null;
+      customImg2Ref.current = null;
+      return;
+    }
+    let alive = true;
+    const i1 = new Image();
+    const i2 = new Image();
+    const bump = () => {
+      if (alive) setCustomImagesRev((v) => v + 1);
+    };
+    i1.onload = bump;
+    i2.onload = bump;
+    i1.src = activeCustomTemplate.part1Url;
+    i2.src = activeCustomTemplate.part2Url || activeCustomTemplate.part1Url;
+    customImg1Ref.current = i1;
+    customImg2Ref.current = i2;
+    return () => {
+      alive = false;
+    };
+  }, [activeCustomTemplate]);
 
   // Preload s1 & s2 high-res uploaded assets for instant smooth 60fps canvas rendering
   useEffect(() => {
@@ -312,10 +356,13 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       ctx.globalAlpha = alpha;
       ctx.translate(0, slideYOffset);
 
-      const useUploaded = selectedTemplate.id === 'pakistani-emerald-mehndi-multipart';
-      const img = part === 1 ? imgS1Ref.current : imgS2Ref.current;
+      const isCustom = Boolean(activeCustomTemplate);
+      const isBuiltinMultipart = !isCustom && selectedTemplate.id === 'pakistani-emerald-mehndi-multipart';
+      const img = isCustom
+        ? (part === 1 ? customImg1Ref.current : customImg2Ref.current)
+        : (isBuiltinMultipart ? (part === 1 ? imgS1Ref.current : imgS2Ref.current) : null);
 
-      if (useUploaded && img && img.complete && img.naturalWidth > 0) {
+      if ((isCustom || isBuiltinMultipart) && img && img.complete && img.naturalWidth > 0) {
         // Blurred ambient fill background
         ctx.save();
         ctx.filter = 'blur(18px) brightness(0.62)';
@@ -330,7 +377,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
         const cardY = (h - cardH) / 2;
         ctx.drawImage(img, cardX, cardY, cardW, cardH);
 
-        if (styling.cleanSampleText) {
+        if (isBuiltinMultipart && styling.cleanSampleText) {
           ctx.save();
           ctx.fillStyle = part === 1 ? 'rgba(27, 122, 114, 0.96)' : 'rgba(25, 97, 52, 0.96)';
           ctx.shadowColor = part === 1 ? '#1B7A72' : '#196134';
@@ -406,7 +453,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       renderScenePart(2, currentTime - halfDur, 1, 0);
     }
     ctx.restore();
-  }, [currentTime, card, styling, selectedTemplate, durationSeconds, imagesReady]);
+  }, [currentTime, card, styling, selectedTemplate, activeCustomTemplate, durationSeconds, imagesReady, customImagesRev]);
 
   const filteredTemplates = useMemo(
     () =>
@@ -417,6 +464,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   );
 
   const handleSelectTemplate = (tpl: WcgTemplateSpec) => {
+    setActiveCustomTemplate(null);
     setSelectedTemplate(tpl);
     setStyling({ ...tpl.styling });
     setCard((prev) => ({
@@ -431,6 +479,15 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
     setIsPlaying(true);
   };
 
+  const handleSelectCustomTemplate = (customTpl: WcgCustomTemplateItem) => {
+    setActiveCustomTemplate(customTpl);
+    const matchingBuiltin =
+      WCG_TEMPLATES.find((t) => t.category === customTpl.category) || WCG_TEMPLATES[0];
+    setSelectedTemplate(matchingBuiltin);
+    setCurrentTime(0);
+    setIsPlaying(true);
+  };
+
   const stopAudioPreview = () => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -439,13 +496,15 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
     setPreviewingMusicId(null);
   };
 
-  const handleToggleMusicPreview = (presetId: string) => {
+  const handleToggleMusicPreview = (presetId: string, customAudioUrl?: string) => {
     if (previewingMusicId === presetId) {
       stopAudioPreview();
       return;
     }
     const preset = findWcgMusicPreset(presetId);
-    if (!preset) {
+    const customSong = customSongs.find((s) => s.id === presetId);
+    const resolvedUrl = customAudioUrl || customSong?.audioUrl || preset?.audioUrl;
+    if (!resolvedUrl) {
       stopAudioPreview();
       return;
     }
@@ -454,12 +513,12 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       audioRef.current.onended = () => setPreviewingMusicId(null);
     }
     audioRef.current.pause();
-    audioRef.current.src = preset.audioUrl;
+    audioRef.current.src = resolvedUrl;
     audioRef.current.volume = musicVolume;
     audioRef.current.loop = true;
     audioRef.current.play().catch(() => {});
-    setPreviewingMusicId(preset.id);
-    setMusicId(preset.id);
+    setPreviewingMusicId(presetId);
+    setMusicId(presetId);
   };
 
   const handleVerifyTrends = async () => {
@@ -513,7 +572,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          templateId: selectedTemplate.id,
+          templateId: activeCustomTemplate ? activeCustomTemplate.id : selectedTemplate.id,
           durationSeconds,
           quality,
           musicId,
@@ -832,7 +891,7 @@ imageio-ffmpeg>=0.5.1`}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1 custom-modal-scroll">
                     {filteredTemplates.map((tpl) => {
-                      const active = selectedTemplate.id === tpl.id;
+                      const active = !activeCustomTemplate && selectedTemplate.id === tpl.id;
                       return (
                         <button
                           key={tpl.id}
@@ -880,6 +939,40 @@ imageio-ffmpeg>=0.5.1`}
                     })}
                   </div>
                 </section>
+
+                {/* 2B. Permanent Custom Template & 30-Sec Song Library Manager */}
+                <WCGUploadManager
+                  customTemplates={customTemplates}
+                  customSongs={customSongs}
+                  activeCustomTemplateId={activeCustomTemplate?.id || null}
+                  selectedMusicId={musicId}
+                  previewingMusicId={previewingMusicId}
+                  onSelectCustomTemplate={handleSelectCustomTemplate}
+                  onSelectBuiltinMultipart={() => handleSelectTemplate(WCG_TEMPLATES[0])}
+                  onUploadedTemplate={(tpl) => {
+                    setCustomTemplates((prev) => [tpl, ...prev]);
+                    handleSelectCustomTemplate(tpl);
+                  }}
+                  onDeletedTemplate={(id) => {
+                    setCustomTemplates((prev) => prev.filter((t) => t.id !== id));
+                    if (activeCustomTemplate?.id === id) {
+                      handleSelectTemplate(WCG_TEMPLATES[0]);
+                    }
+                  }}
+                  onSelectSong={(id) => setMusicId(id)}
+                  onUploadedSong={(song) => {
+                    setCustomSongs((prev) => [song, ...prev]);
+                    setMusicId(song.id);
+                  }}
+                  onDeletedSong={(id) => {
+                    setCustomSongs((prev) => prev.filter((s) => s.id !== id));
+                    if (musicId === id) {
+                      stopAudioPreview();
+                      setMusicId('mehndi-laga-ke-rakhna');
+                    }
+                  }}
+                  onTogglePreviewMusic={handleToggleMusicPreview}
+                />
 
                 {/* 3. Dynamic Event & Family Details */}
                 <section className="bg-slate-900/65 border border-slate-800 rounded-xl p-4 space-y-3">

@@ -89,6 +89,27 @@ export interface WcgRenderResult {
   musicId?: string;
 }
 
+export interface WcgCustomTemplateItem {
+  id: string;
+  name: string;
+  category: Exclude<WcgEventCategory, 'All'>;
+  part1Url: string;
+  part2Url?: string;
+  part1Filename: string;
+  part2Filename?: string;
+  createdAt: string;
+}
+
+export interface WcgCustomSongItem {
+  id: string;
+  title: string;
+  category: string;
+  filename: string;
+  audioUrl: string;
+  durationSec: number;
+  createdAt: string;
+}
+
 export const DEFAULT_WCG_CARD_DATA: WcgCardData = {
   invocation: 'IN THE NAME OF ALLAH · THE MOST GRACIOUS & MERCIFUL',
   hostLine1: 'Mr. & Mrs. Jalal Din (Late)',

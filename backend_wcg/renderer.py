@@ -1,3 +1,4 @@
+import json
 import math
 import os
 import textwrap
@@ -11,7 +12,11 @@ from moviepy.editor import AudioFileClip, VideoClip, concatenate_videoclips
 CANVAS_W = 1080
 CANVAS_H = 1920
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+CUSTOM_TEMPLATES_DIR = ASSETS_DIR / "custom_templates"
+CUSTOM_MUSIC_DIR = ASSETS_DIR / "custom_music"
 OUTPUT_DIR = Path(__file__).resolve().parent / "renders"
+CUSTOM_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+CUSTOM_MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -234,8 +239,41 @@ def render_wedding_card_video(payload: Dict) -> Path:
 
     s1_path = ASSETS_DIR / "s1.jpeg"
     s2_path = ASSETS_DIR / "s2.jpeg"
+    manifest_path = ASSETS_DIR / "library.json"
+    custom_p1: Optional[Path] = None
+    custom_p2: Optional[Path] = None
 
-    if template_id == "pakistani-emerald-mehndi-multipart" and s1_path.exists() and s2_path.exists():
+    if template_id.startswith("custom_tpl_") and manifest_path.exists():
+        try:
+            lib = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for item in lib.get("templates") or []:
+                if item.get("id") == template_id:
+                    f1 = os.path.basename(str(item.get("part1Filename") or ""))
+                    f2 = os.path.basename(str(item.get("part2Filename") or ""))
+                    if f1 and (CUSTOM_TEMPLATES_DIR / f1).exists():
+                        custom_p1 = CUSTOM_TEMPLATES_DIR / f1
+                    if f2 and (CUSTOM_TEMPLATES_DIR / f2).exists():
+                        custom_p2 = CUSTOM_TEMPLATES_DIR / f2
+                    elif custom_p1 is not None:
+                        custom_p2 = custom_p1
+                    break
+        except Exception:
+            pass
+
+    if custom_p1 is not None and custom_p2 is not None:
+        p1_bg = _fit_and_clean_multipart_image(
+            custom_p1,
+            patch_box=(0.24, 0.21, 0.77, 0.69),
+            sample_point=(0.50, 0.45),
+            clean_sample_text=False,
+        )
+        p2_bg = _fit_and_clean_multipart_image(
+            custom_p2,
+            patch_box=(0.27, 0.12, 0.75, 0.72),
+            sample_point=(0.55, 0.35),
+            clean_sample_text=False,
+        )
+    elif template_id == "pakistani-emerald-mehndi-multipart" and s1_path.exists() and s2_path.exists():
         p1_bg = _fit_and_clean_multipart_image(
             s1_path,
             patch_box=(0.24, 0.21, 0.77, 0.69),
@@ -290,13 +328,24 @@ def render_wedding_card_video(payload: Dict) -> Path:
 
     music_id = str(payload.get("musicId") or "mehndi-laga-ke-rakhna").strip()
     music_volume = max(0.0, min(1.0, float(payload.get("musicVolume", 0.78))))
-    music_path = ASSETS_DIR / "music" / f"{os.path.basename(music_id)}.m4a"
+    music_path: Optional[Path] = None
+    if music_id != "none" and music_volume > 0.01:
+        for ext in (".mp3", ".wav", ".m4a", ".ogg"):
+            cand = CUSTOM_MUSIC_DIR / f"{os.path.basename(music_id)}{ext}"
+            if cand.exists():
+                music_path = cand
+                break
+        if music_path is None:
+            builtin = ASSETS_DIR / "music" / f"{os.path.basename(music_id)}.m4a"
+            if builtin.exists():
+                music_path = builtin
+
     audio_clip = None
-    if music_id != "none" and music_volume > 0.01 and music_path.exists():
+    if music_path is not None:
         try:
             audio_clip = (
                 AudioFileClip(str(music_path))
-                .subclip(0, min(duration, 21.5))
+                .subclip(0, min(duration, 29.5))
                 .volumex(music_volume)
                 .audio_fadein(0.6)
                 .audio_fadeout(1.4)

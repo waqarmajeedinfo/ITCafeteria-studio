@@ -13,6 +13,8 @@ import {
   findWcgMusicPreset,
   findWcgTemplate,
   type WcgCardData,
+  type WcgCustomSongItem,
+  type WcgCustomTemplateItem,
   type WcgRenderQuality,
   type WcgStylingConfig,
   type WcgTrendSuggestion,
@@ -23,6 +25,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const WCG_OUTPUT_DIR = path.resolve(__dirname, 'data', 'wcg-renders');
+const WCG_LIB_DIR = path.resolve(__dirname, 'data', 'wcg-library');
+const WCG_LIB_TEMPLATES_DIR = path.join(WCG_LIB_DIR, 'templates');
+const WCG_LIB_MUSIC_DIR = path.join(WCG_LIB_DIR, 'music');
+const WCG_LIB_MANIFEST_PATH = path.join(WCG_LIB_DIR, 'library.json');
+const BACKEND_CUSTOM_TEMPLATES_DIR = path.resolve(__dirname, 'backend_wcg', 'assets', 'custom_templates');
+const BACKEND_CUSTOM_MUSIC_DIR = path.resolve(__dirname, 'backend_wcg', 'assets', 'custom_music');
 const PUBLIC_S1_PATH = path.resolve(__dirname, 'public', 'assets', 'aistudio', 's1_0b0de8d4.jpeg');
 const PUBLIC_S2_PATH = path.resolve(__dirname, 'public', 'assets', 'aistudio', 's2_610b836e.jpeg');
 const DIST_S1_PATH = path.resolve(__dirname, 'dist', 'assets', 'aistudio', 's1_0b0de8d4.jpeg');
@@ -35,10 +43,61 @@ const PUBLIC_MUSIC_DIR = path.resolve(__dirname, 'public', 'assets', 'wcg-music'
 const DIST_MUSIC_DIR = path.resolve(__dirname, 'dist', 'assets', 'wcg-music');
 const BACKEND_MUSIC_DIR = path.resolve(__dirname, 'backend_wcg', 'assets', 'music');
 
+interface WcgLibraryManifest {
+  templates: WcgCustomTemplateItem[];
+  songs: WcgCustomSongItem[];
+}
+
 function ensureOutputDir() {
-  if (!fs.existsSync(WCG_OUTPUT_DIR)) {
-    fs.mkdirSync(WCG_OUTPUT_DIR, { recursive: true });
+  for (const dir of [
+    WCG_OUTPUT_DIR,
+    WCG_LIB_DIR,
+    WCG_LIB_TEMPLATES_DIR,
+    WCG_LIB_MUSIC_DIR,
+    BACKEND_CUSTOM_TEMPLATES_DIR,
+    BACKEND_CUSTOM_MUSIC_DIR,
+  ]) {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
   }
+}
+
+function readLibraryManifest(): WcgLibraryManifest {
+  ensureOutputDir();
+  if (!fs.existsSync(WCG_LIB_MANIFEST_PATH)) {
+    return { templates: [], songs: [] };
+  }
+  try {
+    const raw = JSON.parse(fs.readFileSync(WCG_LIB_MANIFEST_PATH, 'utf8'));
+    const templates = (Array.isArray(raw?.templates) ? raw.templates : []).filter((t: WcgCustomTemplateItem) => {
+      const p1 = path.join(WCG_LIB_TEMPLATES_DIR, path.basename(t.part1Filename || ''));
+      const b1 = path.join(BACKEND_CUSTOM_TEMPLATES_DIR, path.basename(t.part1Filename || ''));
+      return fs.existsSync(p1) || fs.existsSync(b1);
+    });
+    const songs = (Array.isArray(raw?.songs) ? raw.songs : []).filter((s: WcgCustomSongItem) => {
+      const p = path.join(WCG_LIB_MUSIC_DIR, path.basename(s.filename || ''));
+      const b = path.join(BACKEND_CUSTOM_MUSIC_DIR, path.basename(s.filename || ''));
+      return fs.existsSync(p) || fs.existsSync(b);
+    });
+    return { templates, songs };
+  } catch {
+    return { templates: [], songs: [] };
+  }
+}
+
+function writeLibraryManifest(manifest: WcgLibraryManifest) {
+  ensureOutputDir();
+  fs.writeFileSync(WCG_LIB_MANIFEST_PATH, JSON.stringify(manifest, null, 2), 'utf8');
+}
+
+function decodeBase64DataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null {
+  const match = String(dataUrl || '').match(/^data:([^;]+);base64,(.+)$/s);
+  if (!match) return null;
+  return {
+    mime: match[1].toLowerCase().trim(),
+    buffer: Buffer.from(match[2], 'base64'),
+  };
 }
 
 function resolveMultiPartAssetPaths(): { s1: string | null; s2: string | null } {
@@ -49,7 +108,31 @@ function resolveMultiPartAssetPaths(): { s1: string | null; s2: string | null } 
   return { s1, s2 };
 }
 
+function resolveCustomTemplateFile(filename?: string): string | null {
+  if (!filename) return null;
+  const safe = path.basename(filename);
+  const candidates = [
+    path.join(WCG_LIB_TEMPLATES_DIR, safe),
+    path.join(BACKEND_CUSTOM_TEMPLATES_DIR, safe),
+  ];
+  return candidates.find((p) => fs.existsSync(p)) || null;
+}
+
 function resolveMusicAssetPath(musicId?: string): string | null {
+  if (!musicId || musicId === 'none') return null;
+
+  const manifest = readLibraryManifest();
+  const customSong = manifest.songs.find((s) => s.id === musicId);
+  if (customSong) {
+    const safe = path.basename(customSong.filename);
+    const customCandidates = [
+      path.join(WCG_LIB_MUSIC_DIR, safe),
+      path.join(BACKEND_CUSTOM_MUSIC_DIR, safe),
+    ];
+    const found = customCandidates.find((p) => fs.existsSync(p));
+    if (found) return found;
+  }
+
   const preset = findWcgMusicPreset(musicId);
   if (!preset) return null;
   const filename = `${preset.id}.m4a`;
@@ -377,7 +460,195 @@ export function registerWcgRoutes(app: Express) {
       ...p,
       available: Boolean(resolveMusicAssetPath(p.id)),
     }));
-    res.json({ ok: true, presets });
+    const manifest = readLibraryManifest();
+    res.json({ ok: true, presets, customSongs: manifest.songs });
+  });
+
+  // Persistent Asset Library CRUD (Custom Templates & Custom 30s Wedding Songs)
+  app.get('/api/wcg/library', (_req, res) => {
+    const manifest = readLibraryManifest();
+    res.json({
+      ok: true,
+      templates: manifest.templates,
+      songs: manifest.songs,
+    });
+  });
+
+  app.post('/api/wcg/library/templates', (req, res) => {
+    try {
+      ensureOutputDir();
+      const body = req.body || {};
+      const name = String(body.name || `Custom Wedding Card ${Date.now().toString().slice(-4)}`).trim().slice(0, 80);
+      const rawCat = String(body.category || 'Mehndi');
+      const category = (['Mehndi', 'Barat', 'Walima', 'Nikah'].includes(rawCat) ? rawCat : 'Mehndi') as WcgCustomTemplateItem['category'];
+      const part1Raw = String(body.part1DataUrl || body.dataUrl || '');
+      const part2Raw = String(body.part2DataUrl || '');
+
+      const dec1 = decodeBase64DataUrl(part1Raw);
+      if (!dec1 || !/^image\/(jpeg|jpg|png|webp)$/.test(dec1.mime)) {
+        return res.status(400).json({ ok: false, error: 'Part 1 image JPG, PNG ya WebP format mein upload karein.' });
+      }
+      if (dec1.buffer.length > 12 * 1024 * 1024) {
+        return res.status(400).json({ ok: false, error: 'Image size 12MB se kam hona chahiye.' });
+      }
+
+      const ext1 = dec1.mime === 'image/png' ? 'png' : dec1.mime === 'image/webp' ? 'webp' : 'jpg';
+      const id = `custom_tpl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const file1 = `${id}_p1.${ext1}`;
+      fs.writeFileSync(path.join(WCG_LIB_TEMPLATES_DIR, file1), dec1.buffer);
+      fs.writeFileSync(path.join(BACKEND_CUSTOM_TEMPLATES_DIR, file1), dec1.buffer);
+
+      let file2: string | undefined;
+      if (part2Raw) {
+        const dec2 = decodeBase64DataUrl(part2Raw);
+        if (dec2 && /^image\/(jpeg|jpg|png|webp)$/.test(dec2.mime) && dec2.buffer.length <= 12 * 1024 * 1024) {
+          const ext2 = dec2.mime === 'image/png' ? 'png' : dec2.mime === 'image/webp' ? 'webp' : 'jpg';
+          file2 = `${id}_p2.${ext2}`;
+          fs.writeFileSync(path.join(WCG_LIB_TEMPLATES_DIR, file2), dec2.buffer);
+          fs.writeFileSync(path.join(BACKEND_CUSTOM_TEMPLATES_DIR, file2), dec2.buffer);
+        }
+      }
+
+      const item: WcgCustomTemplateItem = {
+        id,
+        name,
+        category,
+        part1Filename: file1,
+        part2Filename: file2,
+        part1Url: `/api/wcg/library/assets/templates/${file1}`,
+        part2Url: file2 ? `/api/wcg/library/assets/templates/${file2}` : undefined,
+        createdAt: new Date().toISOString(),
+      };
+
+      const manifest = readLibraryManifest();
+      manifest.templates.unshift(item);
+      writeLibraryManifest(manifest);
+
+      res.json({ ok: true, template: item });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err?.message || 'Template save failed' });
+    }
+  });
+
+  app.delete('/api/wcg/library/templates/:id', (req, res) => {
+    const manifest = readLibraryManifest();
+    const target = manifest.templates.find((t) => t.id === req.params.id);
+    if (!target) {
+      return res.status(404).json({ ok: false, error: 'Custom template not found' });
+    }
+    for (const fname of [target.part1Filename, target.part2Filename]) {
+      if (!fname) continue;
+      for (const dir of [WCG_LIB_TEMPLATES_DIR, BACKEND_CUSTOM_TEMPLATES_DIR]) {
+        const p = path.join(dir, path.basename(fname));
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      }
+    }
+    manifest.templates = manifest.templates.filter((t) => t.id !== req.params.id);
+    writeLibraryManifest(manifest);
+    res.json({ ok: true });
+  });
+
+  app.post('/api/wcg/library/songs', async (req, res) => {
+    try {
+      ensureOutputDir();
+      const body = req.body || {};
+      const title = String(body.title || `Custom Song ${Date.now().toString().slice(-4)}`).trim().slice(0, 80);
+      const category = String(body.category || 'Custom').trim().slice(0, 32);
+      const dec = decodeBase64DataUrl(String(body.dataUrl || ''));
+      if (!dec || !/^audio\/(mpeg|mp3|wav|x-wav|mp4|x-m4a|aac|ogg|webm)$/.test(dec.mime)) {
+        return res.status(400).json({ ok: false, error: 'Audio track MP3, WAV ya M4A format mein upload karein.' });
+      }
+      if (dec.buffer.length > 20 * 1024 * 1024) {
+        return res.status(400).json({ ok: false, error: 'Audio file size 20MB se kam hona chahiye.' });
+      }
+
+      const ext = dec.mime.includes('wav')
+        ? 'wav'
+        : dec.mime.includes('mp4') || dec.mime.includes('m4a') || dec.mime.includes('aac')
+          ? 'm4a'
+          : dec.mime.includes('ogg')
+            ? 'ogg'
+            : 'mp3';
+      const id = `custom_song_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const filename = `${id}.${ext}`;
+      const libPath = path.join(WCG_LIB_MUSIC_DIR, filename);
+      fs.writeFileSync(libPath, dec.buffer);
+      fs.writeFileSync(path.join(BACKEND_CUSTOM_MUSIC_DIR, filename), dec.buffer);
+
+      let durationSec = 30;
+      const ff = resolveFfmpegBinary();
+      if (ff) {
+        try {
+          await execFileAsync(ff.bin, ['-i', libPath]);
+        } catch (probeErr: any) {
+          const stderr = String(probeErr?.stderr || '');
+          const m = stderr.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+          if (m) {
+            durationSec = Math.round(Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]));
+          }
+        }
+      }
+
+      const item: WcgCustomSongItem = {
+        id,
+        title,
+        category,
+        filename,
+        audioUrl: `/api/wcg/library/assets/music/${filename}`,
+        durationSec: Math.max(1, durationSec),
+        createdAt: new Date().toISOString(),
+      };
+      const manifest = readLibraryManifest();
+      manifest.songs.unshift(item);
+      writeLibraryManifest(manifest);
+      res.json({ ok: true, song: item });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err?.message || 'Song upload failed' });
+    }
+  });
+
+  app.delete('/api/wcg/library/songs/:id', (req, res) => {
+    const manifest = readLibraryManifest();
+    const target = manifest.songs.find((s) => s.id === req.params.id);
+    if (!target) {
+      return res.status(404).json({ ok: false, error: 'Custom song not found' });
+    }
+    for (const dir of [WCG_LIB_MUSIC_DIR, BACKEND_CUSTOM_MUSIC_DIR]) {
+      const p = path.join(dir, path.basename(target.filename));
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
+    manifest.songs = manifest.songs.filter((s) => s.id !== req.params.id);
+    writeLibraryManifest(manifest);
+    res.json({ ok: true });
+  });
+
+  app.get('/api/wcg/library/assets/:kind/:filename', (req, res) => {
+    const kind = req.params.kind;
+    const safeName = path.basename(req.params.filename || '');
+    if (!safeName || (kind !== 'templates' && kind !== 'music')) {
+      return res.status(400).json({ error: 'Invalid asset path' });
+    }
+    const primaryDir = kind === 'templates' ? WCG_LIB_TEMPLATES_DIR : WCG_LIB_MUSIC_DIR;
+    const backupDir = kind === 'templates' ? BACKEND_CUSTOM_TEMPLATES_DIR : BACKEND_CUSTOM_MUSIC_DIR;
+    const filePath = [path.join(primaryDir, safeName), path.join(backupDir, safeName)].find((p) => fs.existsSync(p));
+    if (!filePath) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+    const ext = path.extname(safeName).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.m4a': 'audio/mp4',
+      '.ogg': 'audio/ogg',
+    };
+    res.setHeader('Content-Type', mimeMap[ext] || 'application/octet-stream');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    fs.createReadStream(filePath).pipe(res);
   });
 
   app.get('/api/wcg/diagnostics', (_req, res) => {
@@ -385,12 +656,15 @@ export function registerWcgRoutes(app: Express) {
     const ffmpegResolved = resolveFfmpegBinary();
     const fontsDir = resolveFontsDir();
     const musicReadyCount = WCG_MUSIC_PRESETS.filter((p) => Boolean(resolveMusicAssetPath(p.id))).length;
+    const manifest = readLibraryManifest();
     res.json({
       ok: Boolean(ffmpegResolved),
       ffmpeg: ffmpegResolved,
       fontsDir,
       assets: { s1, s2 },
       musicReadyCount,
+      customTemplatesCount: manifest.templates.length,
+      customSongsCount: manifest.songs.length,
       outputDir: WCG_OUTPUT_DIR,
     });
   });
@@ -651,8 +925,18 @@ Keep spacingScale between 0.90 and 1.12.`;
 
         const outFilename = `${jobId}.mp4`;
         const outPath = path.join(WCG_OUTPUT_DIR, outFilename);
+        const rawTplId = String(body.templateId || '');
+        const manifest = readLibraryManifest();
+        const customTpl = manifest.templates.find((t) => t.id === rawTplId);
+        const customP1 = customTpl ? resolveCustomTemplateFile(customTpl.part1Filename) : null;
+        const customP2 = customTpl
+          ? resolveCustomTemplateFile(customTpl.part2Filename) || customP1
+          : null;
+
         const { s1, s2 } = resolveMultiPartAssetPaths();
-        const useUploadedImages = template.id === 'pakistani-emerald-mehndi-multipart' && Boolean(s1 && s2);
+        const isBuiltinMultipart = rawTplId === 'pakistani-emerald-mehndi-multipart' && Boolean(s1 && s2);
+        const part1ImagePath = customP1 || (isBuiltinMultipart ? s1 : null);
+        const part2ImagePath = customP2 || (isBuiltinMultipart ? s2 : null);
         const musicPath = resolveMusicAssetPath(musicId);
 
         const ass1Esc = escapeFfmpegFilterPath(ass1Path);
@@ -670,25 +954,27 @@ Keep spacingScale between 0.90 and 1.12.`;
         const p2BakedPath = path.join(tmpDir, 'p2_bg.png');
         const scaleTail = isFullHd ? '' : `,scale=${targetW}:${targetH}`;
 
-        if (useUploadedImages && s1 && s2) {
-          const p1Mask = styling.cleanSampleText
-            ? `,drawbox=x=275:y=495:w=530:h=735:color=0x1B7A72@0.98:t=fill`
-            : '';
-          const p2Mask = styling.cleanSampleText
-            ? `,drawbox=x=285:y=420:w=510:h=840:color=0x196134@0.98:t=fill`
-            : '';
+        if (part1ImagePath && part2ImagePath) {
+          const p1Mask =
+            isBuiltinMultipart && styling.cleanSampleText
+              ? `,drawbox=x=275:y=495:w=530:h=735:color=0x1B7A72@0.98:t=fill`
+              : '';
+          const p2Mask =
+            isBuiltinMultipart && styling.cleanSampleText
+              ? `,drawbox=x=285:y=420:w=510:h=840:color=0x196134@0.98:t=fill`
+              : '';
 
-          // Bake crisp target-resolution stills once per part
+          // Bake crisp target-resolution stills once per part (supports both s1/s2 and custom user uploads)
           await Promise.all([
             execFileAsync(ffmpegBin, [
-              '-y', '-i', s1,
+              '-y', '-i', part1ImagePath,
               '-filter_complex',
               `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p1Mask},vignette=PI/6${scaleTail}`,
               '-frames:v', '1',
               p1BakedPath,
             ]),
             execFileAsync(ffmpegBin, [
-              '-y', '-i', s2,
+              '-y', '-i', part2ImagePath,
               '-filter_complex',
               `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p2Mask},vignette=PI/6${scaleTail}`,
               '-frames:v', '1',
