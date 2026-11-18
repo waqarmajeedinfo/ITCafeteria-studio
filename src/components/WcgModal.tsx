@@ -1039,17 +1039,52 @@ imageio-ffmpeg>=0.5.1`}
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-400 mb-1">Display Font</label>
-                      <select
-                        value={styling.displayFont}
-                        onChange={(e) => setStyling({ ...styling, displayFont: e.target.value as any })}
-                        className="w-full h-9 bg-slate-950 border border-slate-800 rounded-lg px-2 text-slate-100"
-                      >
-                        <option value="Cormorant Garamond">Cormorant Garamond</option>
-                        <option value="Cinzel">Cinzel</option>
-                        <option value="Amiri">Amiri</option>
-                      </select>
-                    </div>
+                     <label className="block text-slate-400 mb-1">Display Font Style (Live Preview)</label>
+  
+                      {/* Live Visualizer / Preview Box */}
+                      <div 
+                         className="mb-2 p-3 bg-slate-900 border border-slate-700 rounded-lg text-center overflow-hidden"
+                         style={{ fontFamily: styling.displayFont || 'Cormorant Garamond' }}
+                       >
+                       <span className="text-xs text-slate-400 block mb-1">Preview:</span>
+                       <span className="text-xl text-amber-300 tracking-wide">
+                        Save the Wedding Date
+                       </span>
+                       </div>
+
+                       {/* Font Select Dropdown with Rich Options */}
+                       <select
+                         value={styling.displayFont}
+                         onChange={(e) => setStyling({ ...styling, displayFont: e.target.value as any })}
+                         className="w-full h-10 bg-slate-950 border border-slate-800 rounded-lg px-3 text-slate-100 focus:border-amber-500 focus:outline-none transition-all"
+                        >
+                        {/* Elegant & Luxury Serif */}
+                        <optgroup label="✨ Elegant & Luxury Serif">
+                          <option value="Cormorant Garamond" style={{ fontFamily: 'Cormorant Garamond' }}>Cormorant Garamond</option>
+                          <option value="Cinzel" style={{ fontFamily: 'Cinzel' }}>Cinzel (Classic Royal)</option>
+                          <option value="Playfair Display" style={{ fontFamily: 'Playfair Display' }}>Playfair Display</option>
+                          <option value="Great Vibes" style={{ fontFamily: 'Great Vibes' }}>Great Vibes (Script)</option>
+                          <option value="Alex Brush" style={{ fontFamily: 'Alex Brush' }}>Alex Brush (Smooth Script)</option>
+                          <option value="Pinyon Script" style={{ fontFamily: 'Pinyon Script' }}>Pinyon Script (Cursive)</option>
+                         </optgroup>
+
+                        {/* Traditional & Arabic / Urdu Calligraphy */}
+                          <optgroup label="🌙 Traditional & Calligraphy">
+      <option value="Amiri" style={{ fontFamily: 'Amiri' }}>Amiri (Arabic Classic)</option>
+      <option value="Scheherazade New" style={{ fontFamily: 'Scheherazade New' }}>Scheherazade (Traditional)</option>
+      <option value="Reem Kufi" style={{ fontFamily: 'Reem Kufi' }}>Reem Kufi (Modern Arabic)</option>
+      <option value="Noto Nastaliq Urdu" style={{ fontFamily: 'Noto Nastaliq Urdu' }}>Noto Nastaliq Urdu</option>
+    </optgroup>
+
+    {/* Modern & Clean */}
+    <optgroup label="💼 Modern & Minimal">
+      <option value="Montserrat" style={{ fontFamily: 'Montserrat' }}>Montserrat</option>
+      <option value="Poppins" style={{ fontFamily: 'Poppins' }}>Poppins</option>
+      <option value="Lato" style={{ fontFamily: 'Lato' }}>Lato</option>
+      <option value="Lora" style={{ fontFamily: 'Lora' }}>Lora Serif</option>
+    </optgroup>
+  </select>
+</div>
                    <div>
   <label className="block text-slate-400 mb-1">Transition</label>
   <select
