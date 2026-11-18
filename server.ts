@@ -22,6 +22,7 @@ import {
   scheduleGitHubSync,
   mergeStudioStatePatch,
 } from './server_github_sync';
+import { registerWcgRoutes } from './server_wcg';
 import {
   SCRIPT_PATTERNS_12,
   createDefaultRotationState,
@@ -2905,6 +2906,7 @@ registerMultiUserRoutes(app);
 registerTopicResearchRoutes(app);
 registerAgentManagementRoutes(app, () => port);
 registerGitHubSyncRoutes(app);
+registerWcgRoutes(app);
 
 // Setup Vite middleware in dev or static files in prod
 async function startServer() {

@@ -792,7 +792,7 @@ export const CHANNEL_PROFILES: Record<"itcafeteria" | "beautyhub", ChannelProfil
       10: {
         title: "Custom Search Rule",
         instructions: "IT Cafeteria Script Rule (Cat 10 — Custom Search): Dynamic topic supplied directly by user or real-time 48h search grounding, outside regular rotation. Structure: 1) Urgent breaking topic hook (0-10s), 2) Source-grounded fact check, 3) Core controversy or technical question answered, 4) Step-by-step verified instructions, 5) Official source citation (Google, Microsoft, OpenAI), 6) Live test proof, 7) Important caveats or regional restrictions, 8) Practical user takeaway, 9) Rapid summary, 10) Discussion question CTA. Grounded search snippets, verified source highlights, flexible dynamic camera setup.",
-        defaultRatio: "'9:16', '16:9'"
+        defaultRatio: "9:16"
       }
     }
   },

@@ -64,6 +64,7 @@ export interface ButtonLabelsConfig {
   holoBg: string;
   settings: string;
   mobileMenu: string;
+  wcg: string;
 }
 
 export const DEFAULT_BUTTON_LABELS: ButtonLabelsConfig = {
@@ -79,6 +80,7 @@ export const DEFAULT_BUTTON_LABELS: ButtonLabelsConfig = {
   holoBg: 'Holo BG',
   settings: 'Settings',
   mobileMenu: 'Navigation Menu',
+  wcg: 'WCG',
 };
 
 export const BUTTON_LABEL_META: Array<{
@@ -97,6 +99,7 @@ export const BUTTON_LABEL_META: Array<{
   { key: 'theme', location: 'Top Bar Right', defaultLabel: 'Theme' },
   { key: 'holoBg', location: 'Top Bar Right', defaultLabel: 'Holo BG' },
   { key: 'settings', location: 'Bottom Menu Bar Right', defaultLabel: 'Settings' },
+  { key: 'wcg', location: 'Menu Bar (Beside AI Studios)', defaultLabel: 'WCG' },
   { key: 'mobileMenu', location: 'Mobile Menu Toggle', defaultLabel: 'Navigation Menu' },
 ];
 

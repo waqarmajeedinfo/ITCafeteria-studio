@@ -92,6 +92,7 @@ import {
 import { GroundLevelSearchDashboard } from './components/GroundLevelSearchDashboard';
 import { CompanionMemoryModal } from './components/CompanionMemoryModal';
 import { GoLiveCoPilotModal } from './components/GoLiveCoPilotModal';
+import { WcgModal } from './components/WcgModal';
 import {
   MenuBarCustomizerModal,
   loadMenuConfig,
@@ -179,6 +180,7 @@ export default function App() {
   const [showChannelManager, setShowChannelManager] = useState(false);
   const [showTagManager, setShowTagManager] = useState(false);
   const [showMultiUserModal, setShowMultiUserModal] = useState(false);
+  const [showWcgModal, setShowWcgModal] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserSessionProfile | null>(() => userAuthManager.getUser());
   const [channels, setChannels] = useState<Record<string, ExtendedChannelProfile>>(loadAllChannels);
   const [activeChannelId, setActiveChannelId] = useState<string>('itcafeteria');
@@ -391,7 +393,7 @@ export default function App() {
 
   // Prevent full-page scroll when Banner, Dictionary or Unsaved modal is open
   useEffect(() => {
-    if (showDictionary || showBannerModal || showUnsavedModal) {
+    if (showDictionary || showBannerModal || showUnsavedModal || showWcgModal) {
       document.documentElement.classList.add('modal-open');
       document.body.classList.add('modal-open');
       return () => {
@@ -399,7 +401,7 @@ export default function App() {
         document.body.classList.remove('modal-open');
       };
     }
-  }, [showDictionary, showBannerModal, showUnsavedModal]);
+  }, [showDictionary, showBannerModal, showUnsavedModal, showWcgModal]);
 
 
   // Holographic background theme & animation states
@@ -1182,6 +1184,23 @@ export default function App() {
                   </div>
                 );
               })}
+
+              {/* WCG (Wedding Card Generator) Button Right Beside AI Studios */}
+              <button
+                onClick={() => {
+                  setOpenMenu(null);
+                  setShowWcgModal(true);
+                }}
+                className={`h-10 px-3.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer border whitespace-nowrap select-none shrink-0 ${
+                  showWcgModal
+                    ? 'text-amber-200 bg-amber-950/50 border-amber-500/60 shadow-md shadow-amber-950/50 ring-1 ring-amber-500/30'
+                    : 'text-amber-300 hover:text-amber-100 bg-slate-900/75 hover:bg-amber-950/30 border-amber-500/35 hover:border-amber-400/60 shadow-sm'
+                }`}
+                title="WCG — Adaptive AI Multi-Part Wedding Card Video Generator (9:16)"
+              >
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="whitespace-nowrap">{getButtonLabel('wcg')}</span>
+              </button>
             </div>
 
             {/* Right: Settings Button Only */}
@@ -1251,6 +1270,20 @@ export default function App() {
                   </div>
                 </div>
               ))}
+              <div className="pt-1 border-t border-slate-800/60">
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowWcgModal(true);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl flex items-center justify-between text-left text-xs bg-amber-950/30 border border-amber-500/40 text-amber-200 cursor-pointer"
+                >
+                  <span className="flex items-center gap-2 font-semibold">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{getButtonLabel('wcg')} — Wedding Card Generator</span>
+                  </span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -2068,6 +2101,10 @@ export default function App() {
         onClose={() => setShowAgentManagement(false)}
         currentUserRole={currentUserProfile?.role}
       />
+
+      {showWcgModal && (
+        <WcgModal onClose={() => setShowWcgModal(false)} />
+      )}
 
       <DiagnosticMessageBox />
 
