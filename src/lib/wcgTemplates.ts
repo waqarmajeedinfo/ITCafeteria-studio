@@ -1,5 +1,42 @@
 export type WcgEventCategory = 'All' | 'Mehndi' | 'Barat' | 'Walima' | 'Nikah';
-export type WcgTransitionStyle = 'crossfade' | 'slideup' | 'wipeup';
+export type WcgPartCount = 1 | 2 | 3;
+export type WcgPartFilter = 'all' | '1' | '2' | '3';
+
+export type WcgTransitionStyle =
+  | 'crossfade'
+  | 'dissolve'
+  | 'fade_black'
+  | 'slideup'
+  | 'slidedown'
+  | 'slideleft'
+  | 'slideright'
+  | 'zoomin'
+  | 'zoomout'
+  | 'spin'
+  | 'wipeup'
+  | 'wipedown'
+  | 'wipeleft'
+  | 'wiperight'
+  | 'glitch'
+  | 'blur'
+  | 'lightleak';
+
+export type WcgDisplayFont =
+  | 'Cormorant Garamond'
+  | 'Cinzel'
+  | 'Playfair Display'
+  | 'Great Vibes'
+  | 'Alex Brush'
+  | 'Pinyon Script'
+  | 'Amiri'
+  | 'Scheherazade New'
+  | 'Reem Kufi'
+  | 'Noto Nastaliq Urdu'
+  | 'Montserrat'
+  | 'Poppins'
+  | 'Lato'
+  | 'Lora';
+
 export type WcgArchStyle = 'floral-arch' | 'mughal-dome' | 'minimal-frame' | 'botanical-vellum';
 
 export interface WcgCardData {
@@ -21,6 +58,22 @@ export interface WcgCardData {
   timing2: string;
   venueName: string;
   venueAddress: string;
+  // 3-Function Suite Fields (e.g. Mehndi -> Barat -> Walima)
+  func1Title: string;
+  func1Subtitle: string;
+  func1Date: string;
+  func1Timing: string;
+  func1Venue: string;
+  func2Title: string;
+  func2Subtitle: string;
+  func2Date: string;
+  func2Timing: string;
+  func2Venue: string;
+  func3Title: string;
+  func3Subtitle: string;
+  func3Date: string;
+  func3Timing: string;
+  func3Venue: string;
 }
 
 export interface WcgStylingConfig {
@@ -28,8 +81,8 @@ export interface WcgStylingConfig {
   secondaryColor: string;
   accentColor: string;
   textColor: string;
-  displayFont: 'Cormorant Garamond' | 'Cinzel' | 'Amiri';
-  scriptFont: 'Great Vibes' | 'Cormorant Garamond';
+  displayFont: WcgDisplayFont | string;
+  scriptFont: 'Great Vibes' | 'Cormorant Garamond' | string;
   spacingScale: number;
   transitionStyle: WcgTransitionStyle;
   cleanSampleText: boolean;
@@ -39,10 +92,12 @@ export interface WcgTemplateSpec {
   id: string;
   name: string;
   category: Exclude<WcgEventCategory, 'All'>;
+  partCount: WcgPartCount;
   aesthetic: string;
   isMultiPart: boolean;
   part1Image?: string;
   part2Image?: string;
+  part3Image?: string;
   archStyle: WcgArchStyle;
   styling: WcgStylingConfig;
   defaultEventTitle: string;
@@ -86,6 +141,7 @@ export interface WcgRenderResult {
   resolution: string;
   engine: string;
   multiPart: boolean;
+  partCount?: WcgPartCount;
   musicId?: string;
 }
 
@@ -93,10 +149,13 @@ export interface WcgCustomTemplateItem {
   id: string;
   name: string;
   category: Exclude<WcgEventCategory, 'All'>;
+  partCount?: WcgPartCount;
   part1Url: string;
   part2Url?: string;
+  part3Url?: string;
   part1Filename: string;
   part2Filename?: string;
+  part3Filename?: string;
   createdAt: string;
 }
 
@@ -129,6 +188,21 @@ export const DEFAULT_WCG_CARD_DATA: WcgCardData = {
   timing2: 'Dinner .................... 7:00 PM',
   venueName: 'RAUF MARQUI',
   venueAddress: 'Mughalpura Road, Baja Line, Near Railway Power House, Lahore',
+  func1Title: 'Mehndi',
+  func1Subtitle: '"Rasm-e-Hina" & Dholki Night',
+  func1Date: 'Friday 27 November 2026',
+  func1Timing: 'Mehndi 6:30 PM  ·  Dinner 8:00 PM',
+  func1Venue: 'RAUF MARQUI · Mughalpura Road, Lahore',
+  func2Title: 'Barat',
+  func2Subtitle: 'Istiqbal-e-Barat & Rukhsati',
+  func2Date: 'Saturday 28 November 2026',
+  func2Timing: 'Barat 7:30 PM  ·  Dinner 9:00 PM',
+  func2Venue: 'ROYAL PALM MARQUEE · Canal Road, Lahore',
+  func3Title: 'Walima',
+  func3Subtitle: 'Sunnat-e-Walima Reception',
+  func3Date: 'Sunday 29 November 2026',
+  func3Timing: 'Arrival 1:30 PM  ·  Lunch 2:30 PM',
+  func3Venue: 'PEARL CONTINENTAL · Mall Road, Lahore',
 };
 
 export const WCG_TEMPLATES: WcgTemplateSpec[] = [
@@ -136,6 +210,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     id: 'pakistani-emerald-mehndi-multipart',
     name: 'Emerald Mehndi & Dholki Royal Suite (s1 + s2)',
     category: 'Mehndi',
+    partCount: 2,
     aesthetic: '2-Part Wisteria Floral Arch, Dholki & Bride Mehndi Pavilion',
     isMultiPart: true,
     part1Image: '/assets/aistudio/s1_0b0de8d4.jpeg',
@@ -158,9 +233,106 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     defaultTiming2: 'Dinner .................... 7:00 PM',
   },
   {
+    id: 'shahi-3part-mehndi-barat-walima',
+    name: '3-Function Royal Suite (Mehndi · Barat · Walima)',
+    category: 'Barat',
+    partCount: 3,
+    aesthetic: '3-Part Grand Wedding Journey: Mehndi -> Barat -> Walima',
+    isMultiPart: true,
+    archStyle: 'mughal-dome',
+    styling: {
+      primaryColor: '#4E0D19',
+      secondaryColor: '#194D33',
+      accentColor: '#E8C56E',
+      textColor: '#FFF9EC',
+      displayFont: 'Cinzel',
+      scriptFont: 'Great Vibes',
+      spacingScale: 1.0,
+      transitionStyle: 'crossfade',
+      cleanSampleText: false,
+    },
+    defaultEventTitle: 'Mehndi · Barat · Walima',
+    defaultEventSubtitle: '3-Day Grand Family Celebration',
+    defaultTiming1: 'Evening Ceremonies ........ 7:00 PM',
+    defaultTiming2: 'Dinner Served ............. 8:30 PM',
+  },
+  {
+    id: 'all-in-one-emerald-single',
+    name: 'All-in-One Complete Royal Card (Single Page)',
+    category: 'Barat',
+    partCount: 1,
+    aesthetic: '1-Part Complete Invitation: Hosts, Couple, Timing & Venue',
+    isMultiPart: false,
+    archStyle: 'floral-arch',
+    styling: {
+      primaryColor: '#124632',
+      secondaryColor: '#0A281D',
+      accentColor: '#EAD07A',
+      textColor: '#FFFFFF',
+      displayFont: 'Playfair Display',
+      scriptFont: 'Great Vibes',
+      spacingScale: 0.96,
+      transitionStyle: 'fade_black',
+      cleanSampleText: false,
+    },
+    defaultEventTitle: 'Wedding Ceremony',
+    defaultEventSubtitle: 'Barat & Grand Dinner',
+    defaultTiming1: 'Reception of Barat ........ 7:00 PM',
+    defaultTiming2: 'Dinner .................... 8:30 PM',
+  },
+  {
+    id: 'mughal-3part-heritage-trio',
+    name: 'Mughal Heritage 3-Part Trio (Dholki · Barat · Walima)',
+    category: 'Mehndi',
+    partCount: 3,
+    aesthetic: '3 Sequential Mughal Jharokha Slides · Gold Filigree Borders',
+    isMultiPart: true,
+    archStyle: 'mughal-dome',
+    styling: {
+      primaryColor: '#5B1626',
+      secondaryColor: '#36111B',
+      accentColor: '#E4BA66',
+      textColor: '#FFF8ED',
+      displayFont: 'Cinzel',
+      scriptFont: 'Great Vibes',
+      spacingScale: 1.0,
+      transitionStyle: 'zoomin',
+      cleanSampleText: false,
+    },
+    defaultEventTitle: 'Dholki · Barat · Walima',
+    defaultEventSubtitle: 'Three Days of Joy & Blessing',
+    defaultTiming1: 'Functions Start ........... 7:00 PM',
+    defaultTiming2: 'Grand Dinner .............. 9:00 PM',
+  },
+  {
+    id: 'nikah-barat-walima-3part',
+    name: 'Nikah · Barat · Walima Quiet-Luxury 3-Part',
+    category: 'Walima',
+    partCount: 3,
+    aesthetic: '3-Part Modern Emerald & Champagne Foil Sequential Invite',
+    isMultiPart: true,
+    archStyle: 'minimal-frame',
+    styling: {
+      primaryColor: '#1C362D',
+      secondaryColor: '#10211B',
+      accentColor: '#E5CE9A',
+      textColor: '#FBF8F1',
+      displayFont: 'Cormorant Garamond',
+      scriptFont: 'Great Vibes',
+      spacingScale: 1.02,
+      transitionStyle: 'slideup',
+      cleanSampleText: false,
+    },
+    defaultEventTitle: 'Nikah · Barat · Walima',
+    defaultEventSubtitle: 'Complete 3-Ceremony Wedding Invite',
+    defaultTiming1: 'Reception ................. 7:00 PM',
+    defaultTiming2: 'Feast ..................... 8:30 PM',
+  },
+  {
     id: 'shahi-maroon-gold-barat',
     name: 'Shahi Maroon & Gold Foil Barat',
     category: 'Barat',
+    partCount: 2,
     aesthetic: 'Deep Mughal Crimson Velvet · Embossed Zari Filigree',
     isMultiPart: true,
     archStyle: 'mughal-dome',
@@ -184,6 +356,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     id: 'champagne-ivory-walima',
     name: 'Champagne Ivory & Sage Walima',
     category: 'Walima',
+    partCount: 2,
     aesthetic: '2026 Quiet-Luxury Editorial · Soft Champagne & Sage Leaf',
     isMultiPart: true,
     archStyle: 'minimal-frame',
@@ -207,6 +380,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     id: 'noor-nikah-kufic-gold',
     name: 'Noor-e-Nikah Midnight & Kufic Gold',
     category: 'Nikah',
+    partCount: 2,
     aesthetic: 'Sacred Emerald Night · Classical Calligraphy Arch',
     isMultiPart: true,
     archStyle: 'mughal-dome',
@@ -230,6 +404,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     id: 'lahori-genda-mayun',
     name: 'Lahori Genda & Truck-Art Dholki',
     category: 'Mehndi',
+    partCount: 2,
     aesthetic: 'Festive Mustard, Peacock Teal & Marigold Motifs',
     isMultiPart: true,
     archStyle: 'floral-arch',
@@ -253,6 +428,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     id: 'mughal-jharokha-ruby',
     name: 'Mughal Jharokha Ruby & Brass',
     category: 'Barat',
+    partCount: 2,
     aesthetic: 'Lahore Fort Inspired Archway · Warm Antique Brass',
     isMultiPart: true,
     archStyle: 'mughal-dome',
@@ -276,6 +452,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     id: 'dusty-rose-pearl-walima',
     name: 'Dusty Rose & Pearl Modern Walima',
     category: 'Walima',
+    partCount: 2,
     aesthetic: 'Mauve Plum Velvet · Pearl Rose Gold Borders',
     isMultiPart: true,
     archStyle: 'botanical-vellum',
@@ -299,6 +476,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     id: 'midnight-sapphire-sangeet',
     name: 'Midnight Sapphire & Silver Mehndi',
     category: 'Mehndi',
+    partCount: 2,
     aesthetic: 'Royal Starry Indigo · Brushed Champagne Silver',
     isMultiPart: true,
     archStyle: 'minimal-frame',
@@ -320,10 +498,11 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
   },
   {
     id: 'botanical-sage-vellum-nikah',
-    name: 'Botanical Sage & Vellum Nikah',
+    name: 'Botanical Sage Single-Card Nikah (All-in-One)',
     category: 'Nikah',
-    aesthetic: 'Frosted Olive Minimalist · Fine Botanical Foil',
-    isMultiPart: true,
+    partCount: 1,
+    aesthetic: '1-Part Frosted Olive Minimalist · Complete Nikah Invite',
+    isMultiPart: false,
     archStyle: 'botanical-vellum',
     styling: {
       primaryColor: '#2E4335',
@@ -332,7 +511,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
       textColor: '#F9F8F2',
       displayFont: 'Amiri',
       scriptFont: 'Cormorant Garamond',
-      spacingScale: 1.05,
+      spacingScale: 1.02,
       transitionStyle: 'crossfade',
       cleanSampleText: false,
     },
@@ -345,6 +524,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     id: 'regal-crimson-palki-barat',
     name: 'Regal Crimson Palki Barat',
     category: 'Barat',
+    partCount: 2,
     aesthetic: 'Bridal Scarlet & Heritage Mustard Gold Filigree',
     isMultiPart: true,
     archStyle: 'floral-arch',
@@ -366,10 +546,11 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
   },
   {
     id: 'lavender-wisteria-engagement',
-    name: 'Lavender Wisteria & Gold Engagement',
+    name: 'Lavender Wisteria Single Card (All-in-One)',
     category: 'Walima',
-    aesthetic: 'Soft Dusk Plum & Romantic Wisteria Gold',
-    isMultiPart: true,
+    partCount: 1,
+    aesthetic: '1-Part Soft Dusk Plum & Romantic Wisteria Gold',
+    isMultiPart: false,
     archStyle: 'floral-arch',
     styling: {
       primaryColor: '#362749',
@@ -378,7 +559,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
       textColor: '#FAF7FF',
       displayFont: 'Cormorant Garamond',
       scriptFont: 'Great Vibes',
-      spacingScale: 1.02,
+      spacingScale: 1.0,
       transitionStyle: 'crossfade',
       cleanSampleText: false,
     },
@@ -391,6 +572,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     id: 'sunlit-marigold-rasm-e-hina',
     name: 'Sunlit Jade & Marigold Rasm-e-Hina',
     category: 'Mehndi',
+    partCount: 2,
     aesthetic: 'Deep Forest Jade · Bright Saffron Gold Ribbons',
     isMultiPart: true,
     archStyle: 'botanical-vellum',

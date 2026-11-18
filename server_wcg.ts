@@ -15,6 +15,7 @@ import {
   type WcgCardData,
   type WcgCustomSongItem,
   type WcgCustomTemplateItem,
+  type WcgPartCount,
   type WcgRenderQuality,
   type WcgStylingConfig,
   type WcgTrendSuggestion,
@@ -483,6 +484,7 @@ export function registerWcgRoutes(app: Express) {
       const category = (['Mehndi', 'Barat', 'Walima', 'Nikah'].includes(rawCat) ? rawCat : 'Mehndi') as WcgCustomTemplateItem['category'];
       const part1Raw = String(body.part1DataUrl || body.dataUrl || '');
       const part2Raw = String(body.part2DataUrl || '');
+      const part3Raw = String(body.part3DataUrl || '');
 
       const dec1 = decodeBase64DataUrl(part1Raw);
       if (!dec1 || !/^image\/(jpeg|jpg|png|webp)$/.test(dec1.mime)) {
@@ -509,14 +511,38 @@ export function registerWcgRoutes(app: Express) {
         }
       }
 
+      let file3: string | undefined;
+      if (part3Raw) {
+        const dec3 = decodeBase64DataUrl(part3Raw);
+        if (dec3 && /^image\/(jpeg|jpg|png|webp)$/.test(dec3.mime) && dec3.buffer.length <= 12 * 1024 * 1024) {
+          const ext3 = dec3.mime === 'image/png' ? 'png' : dec3.mime === 'image/webp' ? 'webp' : 'jpg';
+          file3 = `${id}_p3.${ext3}`;
+          fs.writeFileSync(path.join(WCG_LIB_TEMPLATES_DIR, file3), dec3.buffer);
+          fs.writeFileSync(path.join(BACKEND_CUSTOM_TEMPLATES_DIR, file3), dec3.buffer);
+        }
+      }
+
+      const reqPartCount = Number(body.partCount);
+      const detectedParts: WcgPartCount =
+        reqPartCount === 1 || reqPartCount === 2 || reqPartCount === 3
+          ? reqPartCount
+          : file3
+            ? 3
+            : file2
+              ? 2
+              : 1;
+
       const item: WcgCustomTemplateItem = {
         id,
         name,
         category,
+        partCount: detectedParts,
         part1Filename: file1,
         part2Filename: file2,
+        part3Filename: file3,
         part1Url: `/api/wcg/library/assets/templates/${file1}`,
         part2Url: file2 ? `/api/wcg/library/assets/templates/${file2}` : undefined,
+        part3Url: file3 ? `/api/wcg/library/assets/templates/${file3}` : undefined,
         createdAt: new Date().toISOString(),
       };
 
@@ -536,7 +562,7 @@ export function registerWcgRoutes(app: Express) {
     if (!target) {
       return res.status(404).json({ ok: false, error: 'Custom template not found' });
     }
-    for (const fname of [target.part1Filename, target.part2Filename]) {
+    for (const fname of [target.part1Filename, target.part2Filename, target.part3Filename]) {
       if (!fname) continue;
       for (const dir of [WCG_LIB_TEMPLATES_DIR, BACKEND_CUSTOM_TEMPLATES_DIR]) {
         const p = path.join(dir, path.basename(fname));
@@ -807,6 +833,15 @@ Keep spacingScale between 0.90 and 1.12.`;
     const musicId = typeof body.musicId === 'string' ? body.musicId.trim() : 'mehndi-laga-ke-rakhna';
     const musicVolume = Math.max(0, Math.min(1, Number(body.musicVolume ?? 0.78)));
 
+    const rawTplId = String(body.templateId || 'pakistani-emerald-mehndi-multipart');
+    const manifestSnap = readLibraryManifest();
+    const customTplSnap = manifestSnap.templates.find((t) => t.id === rawTplId);
+    const reqPartCount = Number(body.partCount);
+    const partCount: WcgPartCount =
+      reqPartCount === 1 || reqPartCount === 2 || reqPartCount === 3
+        ? reqPartCount
+        : customTplSnap?.partCount || template.partCount || 2;
+
     const card: WcgCardData = {
       ...DEFAULT_WCG_CARD_DATA,
       ...(body.card || {}),
@@ -823,7 +858,8 @@ Keep spacingScale between 0.90 and 1.12.`;
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            templateId: template.id,
+            templateId: rawTplId || template.id,
+            partCount,
             durationSeconds,
             quality,
             musicId,
@@ -844,7 +880,8 @@ Keep spacingScale between 0.90 and 1.12.`;
             durationSeconds,
             resolution: quality === '720p' ? '720x1280' : '1080x1920',
             engine: 'onrender-python-moviepy',
-            multiPart: true,
+            multiPart: partCount > 1,
+            partCount,
             musicId,
           });
         }
@@ -877,8 +914,14 @@ Keep spacingScale between 0.90 and 1.12.`;
         const ffmpegBin = ffmpegResolved.bin;
         const fontsDir = resolveFontsDir();
         const xfadeDur = 0.8;
-        const partDur = Number(((durationSeconds + xfadeDur) / 2).toFixed(2));
-        const fontName = fontsDir ? 'DejaVu Serif' : 'Sans';
+        const partDur =
+          partCount === 1
+            ? durationSeconds
+            : partCount === 2
+              ? Number(((durationSeconds + xfadeDur) / 2).toFixed(2))
+              : Number(((durationSeconds + xfadeDur * 2) / 3).toFixed(2));
+        const isModernSans = ['Montserrat', 'Poppins', 'Lato'].includes(String(styling.displayFont || ''));
+        const fontName = fontsDir ? (isModernSans ? 'DejaVu Sans' : 'DejaVu Serif') : 'Sans';
         const isFullHd = quality === '1080p';
         const targetW = isFullHd ? 1080 : 720;
         const targetH = isFullHd ? 1920 : 1280;
@@ -886,143 +929,250 @@ Keep spacingScale between 0.90 and 1.12.`;
         const crf = isFullHd ? '20' : '22';
         const timeScale = partDur / 9.9;
 
-        const ass1Content = buildTypewriterAssFile(
-          [
-            { text: card.invocation, x: 540, y: 565, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.3 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 34 },
-            { text: card.hostLine1, x: 540, y: 655, fontSize: 38, bold: true, revealOffsetSec: 1.05 * timeScale, typeDurationSec: 1.05 * timeScale, maxCharsPerLine: 28 },
-            { text: card.relationLine1, x: 540, y: 745, fontSize: 25, italic: true, revealOffsetSec: 2.0 * timeScale, typeDurationSec: 1.2 * timeScale, maxCharsPerLine: 34 },
-            { text: card.hostLine2, x: 540, y: 855, fontSize: 38, isAccent: true, bold: true, revealOffsetSec: 3.15 * timeScale, typeDurationSec: 1.05 * timeScale, maxCharsPerLine: 28 },
-            { text: card.relationLine2, x: 540, y: 940, fontSize: 25, italic: true, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 1.15 * timeScale, maxCharsPerLine: 34 },
-            { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 1035, fontSize: 48, isAccent: true, bold: true, italic: true, revealOffsetSec: 5.15 * timeScale, typeDurationSec: 1.0 * timeScale, maxCharsPerLine: 24 },
-            { text: `${card.specialTitle}  ·  ${card.specialNames}`, x: 540, y: 1140, fontSize: 25, revealOffsetSec: 6.05 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 34 },
-          ],
-          partDur,
-          styling,
-          fontName
-        );
-
-        const ass2Content = buildTypewriterAssFile(
-          [
-            { text: card.part2Blessing, x: 540, y: 495, fontSize: 35, isAccent: true, bold: true, revealOffsetSec: 0.3 * timeScale, typeDurationSec: 0.8 * timeScale, maxCharsPerLine: 28 },
-            { text: card.part2Intro, x: 540, y: 565, fontSize: 22, revealOffsetSec: 0.95 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 38 },
-            { text: card.eventTitle, x: 540, y: 660, fontSize: 72, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.7 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 20 },
-            { text: card.eventSubtitle, x: 540, y: 745, fontSize: 30, italic: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
-            { text: `Programme  ·  ${card.weddingDate}`, x: 540, y: 850, fontSize: 33, isAccent: true, bold: true, revealOffsetSec: 3.35 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 34 },
-            { text: card.timing1, x: 540, y: 932, fontSize: 28, revealOffsetSec: 4.35 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 36 },
-            { text: card.timing2, x: 540, y: 992, fontSize: 28, revealOffsetSec: 5.1 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 36 },
-            { text: card.venueName, x: 540, y: 1105, fontSize: 37, isAccent: true, bold: true, revealOffsetSec: 5.9 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 30 },
-            { text: card.venueAddress, x: 540, y: 1185, fontSize: 24, revealOffsetSec: 6.65 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 36 },
-          ],
-          partDur,
-          styling,
-          fontName
-        );
-
-        const ass1Path = path.join(tmpDir, 'part1.ass');
-        const ass2Path = path.join(tmpDir, 'part2.ass');
-        fs.writeFileSync(ass1Path, ass1Content, 'utf8');
-        fs.writeFileSync(ass2Path, ass2Content, 'utf8');
-
-        const outFilename = `${jobId}.mp4`;
-        const outPath = path.join(WCG_OUTPUT_DIR, outFilename);
-        const rawTplId = String(body.templateId || '');
         const manifest = readLibraryManifest();
         const customTpl = manifest.templates.find((t) => t.id === rawTplId);
         const customP1 = customTpl ? resolveCustomTemplateFile(customTpl.part1Filename) : null;
         const customP2 = customTpl
           ? resolveCustomTemplateFile(customTpl.part2Filename) || customP1
           : null;
+        const customP3 = customTpl
+          ? resolveCustomTemplateFile(customTpl.part3Filename) || customP2 || customP1
+          : null;
 
         const { s1, s2 } = resolveMultiPartAssetPaths();
         const isBuiltinMultipart = rawTplId === 'pakistani-emerald-mehndi-multipart' && Boolean(s1 && s2);
         const part1ImagePath = customP1 || (isBuiltinMultipart ? s1 : null);
         const part2ImagePath = customP2 || (isBuiltinMultipart ? s2 : null);
+        const part3ImagePath = customP3 || (isBuiltinMultipart ? s1 : null);
         const musicPath = resolveMusicAssetPath(musicId);
 
-        const ass1Esc = escapeFfmpegFilterPath(ass1Path);
-        const ass2Esc = escapeFfmpegFilterPath(ass2Path);
+        const xfadeMap: Record<string, string> = {
+          crossfade: 'fade',
+          dissolve: 'dissolve',
+          fade_black: 'fadeblack',
+          slideup: 'slideup',
+          slidedown: 'slidedown',
+          slideleft: 'slideleft',
+          slideright: 'slideright',
+          zoomin: 'circleopen',
+          zoomout: 'circleclose',
+          spin: 'radial',
+          wipeup: 'wipeup',
+          wipedown: 'wipedown',
+          wipeleft: 'wipeleft',
+          wiperight: 'wiperight',
+          glitch: 'pixelize',
+          blur: 'hblur',
+          lightleak: 'fadewhite',
+        };
+        const xfadeMode = xfadeMap[String(styling.transitionStyle || 'crossfade')] || 'fade';
+
+        const bakeBgStill = async (
+          srcImg: string | null,
+          fallbackHex: string,
+          outPng: string,
+          maskType: 'p1' | 'p2' | 'none'
+        ) => {
+          const scaleTail = isFullHd ? '' : `,scale=${targetW}:${targetH}`;
+          if (srcImg) {
+            const maskFilter =
+              maskType === 'p1' && isBuiltinMultipart && styling.cleanSampleText
+                ? `,drawbox=x=275:y=495:w=530:h=735:color=0x1B7A72@0.98:t=fill`
+                : maskType === 'p2' && isBuiltinMultipart && styling.cleanSampleText
+                  ? `,drawbox=x=285:y=420:w=510:h=840:color=0x196134@0.98:t=fill`
+                  : '';
+            await execFileAsync(ffmpegBin, [
+              '-y', '-i', srcImg,
+              '-filter_complex',
+              `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${maskFilter},vignette=PI/6${scaleTail}`,
+              '-frames:v', '1',
+              outPng,
+            ]);
+          } else {
+            const fillColor = hexToFfmpegColor(fallbackHex, '0x4E0D19');
+            const sColor = hexToFfmpegColor(styling.secondaryColor, '0x2D070F');
+            const aColor = hexToFfmpegColor(styling.accentColor, '0xE6C275');
+            const frameDeco = [
+              `drawbox=x=44:y=44:w=992:h=1832:color=${aColor}@0.82:t=4`,
+              `drawbox=x=64:y=64:w=952:h=1792:color=${aColor}@0.45:t=2`,
+              `drawbox=x=115:y=290:w=850:h=1340:color=${aColor}@0.28:t=2`,
+              `drawbox=x=150:y=1100:w=780:h=155:color=${sColor}@0.45:t=fill`,
+              `drawbox=x=150:y=1100:w=780:h=155:color=${aColor}@0.65:t=2`,
+            ].join(',');
+            await execFileAsync(ffmpegBin, [
+              '-y', '-f', 'lavfi', '-i', `color=c=${fillColor}:s=1080x1920:d=1:r=1`,
+              '-vf', `${frameDeco},vignette=PI/6${scaleTail}`, '-frames:v', '1', outPng,
+            ]);
+          }
+        };
+
         const fontsOpt = fontsDir ? `:fontsdir='${escapeFfmpegFilterPath(fontsDir)}'` : '';
-        const xfadeOffset = Math.max(2, partDur - xfadeDur).toFixed(2);
-        const xfadeMode =
-          styling.transitionStyle === 'slideup'
-            ? 'slideup'
-            : styling.transitionStyle === 'wipeup'
-              ? 'wipeup'
-              : 'fade';
+        const outFilename = `${jobId}.mp4`;
+        const outPath = path.join(WCG_OUTPUT_DIR, outFilename);
+        const videoFilter: string[] = [];
+        const ffmpegArgs: string[] = ['-y', '-threads', '2'];
 
-        const p1BakedPath = path.join(tmpDir, 'p1_bg.png');
-        const p2BakedPath = path.join(tmpDir, 'p2_bg.png');
-        const scaleTail = isFullHd ? '' : `,scale=${targetW}:${targetH}`;
+        if (partCount === 1) {
+          const s1Scale = durationSeconds / 18;
+          const ass1 = buildTypewriterAssFile(
+            [
+              { text: card.invocation, x: 540, y: 410, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.25 * s1Scale, typeDurationSec: 0.85 * s1Scale, maxCharsPerLine: 36 },
+              { text: `${card.hostLine1}  &  ${card.hostLine2}`, x: 540, y: 525, fontSize: 32, bold: true, revealOffsetSec: 0.9 * s1Scale, typeDurationSec: 1.1 * s1Scale, maxCharsPerLine: 32 },
+              { text: 'Cordially Invite You to the Wedding Celebration of', x: 540, y: 620, fontSize: 24, italic: true, revealOffsetSec: 1.9 * s1Scale, typeDurationSec: 0.95 * s1Scale, maxCharsPerLine: 38 },
+              { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 725, fontSize: 52, isAccent: true, bold: true, italic: true, revealOffsetSec: 2.7 * s1Scale, typeDurationSec: 1.0 * s1Scale, maxCharsPerLine: 24 },
+              { text: card.eventTitle, x: 540, y: 860, fontSize: 56, isAccent: true, bold: true, revealOffsetSec: 3.6 * s1Scale, typeDurationSec: 0.95 * s1Scale, maxCharsPerLine: 22 },
+              { text: card.eventSubtitle, x: 540, y: 948, fontSize: 28, italic: true, revealOffsetSec: 4.4 * s1Scale, typeDurationSec: 0.85 * s1Scale, maxCharsPerLine: 32 },
+              { text: `Programme  ·  ${card.weddingDate}`, x: 540, y: 1055, fontSize: 31, isAccent: true, bold: true, revealOffsetSec: 5.1 * s1Scale, typeDurationSec: 1.0 * s1Scale, maxCharsPerLine: 34 },
+              { text: card.timing1, x: 540, y: 1135, fontSize: 27, revealOffsetSec: 5.9 * s1Scale, typeDurationSec: 0.85 * s1Scale, maxCharsPerLine: 36 },
+              { text: card.timing2, x: 540, y: 1195, fontSize: 27, revealOffsetSec: 6.6 * s1Scale, typeDurationSec: 0.85 * s1Scale, maxCharsPerLine: 36 },
+              { text: card.venueName, x: 540, y: 1300, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 7.3 * s1Scale, typeDurationSec: 0.9 * s1Scale, maxCharsPerLine: 30 },
+              { text: card.venueAddress, x: 540, y: 1385, fontSize: 23, revealOffsetSec: 8.0 * s1Scale, typeDurationSec: 1.1 * s1Scale, maxCharsPerLine: 38 },
+            ],
+            durationSeconds,
+            styling,
+            fontName
+          );
+          const ass1Path = path.join(tmpDir, 'part1.ass');
+          const p1BakedPath = path.join(tmpDir, 'p1_bg.png');
+          fs.writeFileSync(ass1Path, ass1, 'utf8');
+          await bakeBgStill(part1ImagePath, styling.primaryColor, p1BakedPath, 'p1');
 
-        if (part1ImagePath && part2ImagePath) {
-          const p1Mask =
-            isBuiltinMultipart && styling.cleanSampleText
-              ? `,drawbox=x=275:y=495:w=530:h=735:color=0x1B7A72@0.98:t=fill`
-              : '';
-          const p2Mask =
-            isBuiltinMultipart && styling.cleanSampleText
-              ? `,drawbox=x=285:y=420:w=510:h=840:color=0x196134@0.98:t=fill`
-              : '';
-
-          // Bake crisp target-resolution stills once per part (supports both s1/s2 and custom user uploads)
+          ffmpegArgs.push('-loop', '1', '-t', String(durationSeconds), '-framerate', String(fps), '-i', p1BakedPath);
+          videoFilter.push(`[0:v]ass='${escapeFfmpegFilterPath(ass1Path)}'${fontsOpt},format=yuv420p[vout]`);
+        } else if (partCount === 2) {
+          const ass1 = buildTypewriterAssFile(
+            [
+              { text: card.invocation, x: 540, y: 565, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.3 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 34 },
+              { text: card.hostLine1, x: 540, y: 655, fontSize: 38, bold: true, revealOffsetSec: 1.05 * timeScale, typeDurationSec: 1.05 * timeScale, maxCharsPerLine: 28 },
+              { text: card.relationLine1, x: 540, y: 745, fontSize: 25, italic: true, revealOffsetSec: 2.0 * timeScale, typeDurationSec: 1.2 * timeScale, maxCharsPerLine: 34 },
+              { text: card.hostLine2, x: 540, y: 855, fontSize: 38, isAccent: true, bold: true, revealOffsetSec: 3.15 * timeScale, typeDurationSec: 1.05 * timeScale, maxCharsPerLine: 28 },
+              { text: card.relationLine2, x: 540, y: 940, fontSize: 25, italic: true, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 1.15 * timeScale, maxCharsPerLine: 34 },
+              { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 1035, fontSize: 48, isAccent: true, bold: true, italic: true, revealOffsetSec: 5.15 * timeScale, typeDurationSec: 1.0 * timeScale, maxCharsPerLine: 24 },
+              { text: `${card.specialTitle}  ·  ${card.specialNames}`, x: 540, y: 1140, fontSize: 25, revealOffsetSec: 6.05 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 34 },
+            ],
+            partDur,
+            styling,
+            fontName
+          );
+          const ass2 = buildTypewriterAssFile(
+            [
+              { text: card.part2Blessing, x: 540, y: 495, fontSize: 35, isAccent: true, bold: true, revealOffsetSec: 0.3 * timeScale, typeDurationSec: 0.8 * timeScale, maxCharsPerLine: 28 },
+              { text: card.part2Intro, x: 540, y: 565, fontSize: 22, revealOffsetSec: 0.95 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 38 },
+              { text: card.eventTitle, x: 540, y: 660, fontSize: 72, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.7 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 20 },
+              { text: card.eventSubtitle, x: 540, y: 745, fontSize: 30, italic: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
+              { text: `Programme  ·  ${card.weddingDate}`, x: 540, y: 850, fontSize: 33, isAccent: true, bold: true, revealOffsetSec: 3.35 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 34 },
+              { text: card.timing1, x: 540, y: 932, fontSize: 28, revealOffsetSec: 4.35 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 36 },
+              { text: card.timing2, x: 540, y: 992, fontSize: 28, revealOffsetSec: 5.1 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 36 },
+              { text: card.venueName, x: 540, y: 1105, fontSize: 37, isAccent: true, bold: true, revealOffsetSec: 5.9 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 30 },
+              { text: card.venueAddress, x: 540, y: 1185, fontSize: 24, revealOffsetSec: 6.65 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 36 },
+            ],
+            partDur,
+            styling,
+            fontName
+          );
+          const ass1Path = path.join(tmpDir, 'part1.ass');
+          const ass2Path = path.join(tmpDir, 'part2.ass');
+          const p1BakedPath = path.join(tmpDir, 'p1_bg.png');
+          const p2BakedPath = path.join(tmpDir, 'p2_bg.png');
+          fs.writeFileSync(ass1Path, ass1, 'utf8');
+          fs.writeFileSync(ass2Path, ass2, 'utf8');
           await Promise.all([
-            execFileAsync(ffmpegBin, [
-              '-y', '-i', part1ImagePath,
-              '-filter_complex',
-              `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p1Mask},vignette=PI/6${scaleTail}`,
-              '-frames:v', '1',
-              p1BakedPath,
-            ]),
-            execFileAsync(ffmpegBin, [
-              '-y', '-i', part2ImagePath,
-              '-filter_complex',
-              `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p2Mask},vignette=PI/6${scaleTail}`,
-              '-frames:v', '1',
-              p2BakedPath,
-            ]),
+            bakeBgStill(part1ImagePath, styling.primaryColor, p1BakedPath, 'p1'),
+            bakeBgStill(part2ImagePath, styling.secondaryColor, p2BakedPath, 'p2'),
           ]);
+
+          const xfadeOffset = Math.max(2, partDur - xfadeDur).toFixed(2);
+          ffmpegArgs.push(
+            '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p1BakedPath,
+            '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p2BakedPath
+          );
+          videoFilter.push(
+            `[0:v]ass='${escapeFfmpegFilterPath(ass1Path)}'${fontsOpt},format=yuv420p[v1]`,
+            `[1:v]ass='${escapeFfmpegFilterPath(ass2Path)}'${fontsOpt},format=yuv420p[v2]`,
+            `[v1][v2]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${xfadeOffset},format=yuv420p[vout]`
+          );
         } else {
-          const pColor = hexToFfmpegColor(styling.primaryColor, '0x4E0D19');
-          const sColor = hexToFfmpegColor(styling.secondaryColor, '0x2D070F');
-          const aColor = hexToFfmpegColor(styling.accentColor, '0xE6C275');
+          // 3-Part Triple Function Suite (Function 1 Mehndi -> Function 2 Barat -> Function 3 Walima)
+          const ass1 = buildTypewriterAssFile(
+            [
+              { text: card.invocation, x: 540, y: 470, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.2 * timeScale, typeDurationSec: 0.8 * timeScale, maxCharsPerLine: 36 },
+              { text: `${card.hostLine1}  &  ${card.hostLine2}`, x: 540, y: 585, fontSize: 31, bold: true, revealOffsetSec: 0.85 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 32 },
+              { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 705, fontSize: 50, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.7 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 24 },
+              { text: `FUNCTION 1  ·  ${card.func1Title}`, x: 540, y: 845, fontSize: 56, isAccent: true, bold: true, revealOffsetSec: 2.5 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 24 },
+              { text: card.func1Subtitle, x: 540, y: 950, fontSize: 29, italic: true, revealOffsetSec: 3.3 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 32 },
+              { text: card.func1Date, x: 540, y: 1055, fontSize: 32, isAccent: true, bold: true, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 32 },
+              { text: card.func1Timing, x: 540, y: 1135, fontSize: 27, revealOffsetSec: 4.8 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 34 },
+              { text: card.func1Venue, x: 540, y: 1235, fontSize: 27, isAccent: true, bold: true, revealOffsetSec: 5.5 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 34 },
+            ],
+            partDur,
+            styling,
+            fontName
+          );
+          const ass2 = buildTypewriterAssFile(
+            [
+              { text: 'FUNCTION 2  ·  ROYAL CEREMONY', x: 540, y: 500, fontSize: 24, isAccent: true, bold: true, revealOffsetSec: 0.2 * timeScale, typeDurationSec: 0.75 * timeScale, maxCharsPerLine: 34 },
+              { text: card.func2Title, x: 540, y: 650, fontSize: 72, isAccent: true, bold: true, italic: true, revealOffsetSec: 0.9 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 20 },
+              { text: card.func2Subtitle, x: 540, y: 780, fontSize: 32, italic: true, revealOffsetSec: 1.75 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
+              { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 895, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 28 },
+              { text: card.func2Date, x: 540, y: 1015, fontSize: 34, isAccent: true, bold: true, revealOffsetSec: 3.3 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
+              { text: card.func2Timing, x: 540, y: 1105, fontSize: 29, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 34 },
+              { text: card.func2Venue, x: 540, y: 1225, fontSize: 29, isAccent: true, bold: true, revealOffsetSec: 4.85 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 34 },
+            ],
+            partDur,
+            styling,
+            fontName
+          );
+          const ass3 = buildTypewriterAssFile(
+            [
+              { text: 'FUNCTION 3  ·  GRAND RECEPTION', x: 540, y: 500, fontSize: 24, isAccent: true, bold: true, revealOffsetSec: 0.2 * timeScale, typeDurationSec: 0.75 * timeScale, maxCharsPerLine: 34 },
+              { text: card.func3Title, x: 540, y: 650, fontSize: 72, isAccent: true, bold: true, italic: true, revealOffsetSec: 0.9 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 20 },
+              { text: card.func3Subtitle, x: 540, y: 780, fontSize: 32, italic: true, revealOffsetSec: 1.75 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
+              { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 895, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 28 },
+              { text: card.func3Date, x: 540, y: 1015, fontSize: 34, isAccent: true, bold: true, revealOffsetSec: 3.3 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
+              { text: card.func3Timing, x: 540, y: 1105, fontSize: 29, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 34 },
+              { text: card.func3Venue, x: 540, y: 1225, fontSize: 29, isAccent: true, bold: true, revealOffsetSec: 4.85 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 34 },
+            ],
+            partDur,
+            styling,
+            fontName
+          );
 
-          const frameDeco = [
-            `drawbox=x=44:y=44:w=992:h=1832:color=${aColor}@0.82:t=4`,
-            `drawbox=x=64:y=64:w=952:h=1792:color=${aColor}@0.45:t=2`,
-            `drawbox=x=115:y=290:w=850:h=1340:color=${aColor}@0.28:t=2`,
-            `drawbox=x=150:y=1100:w=780:h=155:color=${sColor}@0.45:t=fill`,
-            `drawbox=x=150:y=1100:w=780:h=155:color=${aColor}@0.65:t=2`,
-          ].join(',');
-
+          const ass1Path = path.join(tmpDir, 'part1.ass');
+          const ass2Path = path.join(tmpDir, 'part2.ass');
+          const ass3Path = path.join(tmpDir, 'part3.ass');
+          const p1BakedPath = path.join(tmpDir, 'p1_bg.png');
+          const p2BakedPath = path.join(tmpDir, 'p2_bg.png');
+          const p3BakedPath = path.join(tmpDir, 'p3_bg.png');
+          fs.writeFileSync(ass1Path, ass1, 'utf8');
+          fs.writeFileSync(ass2Path, ass2, 'utf8');
+          fs.writeFileSync(ass3Path, ass3, 'utf8');
           await Promise.all([
-            execFileAsync(ffmpegBin, [
-              '-y', '-f', 'lavfi', '-i', `color=c=${pColor}:s=1080x1920:d=1:r=1`,
-              '-vf', `${frameDeco},vignette=PI/6${scaleTail}`, '-frames:v', '1', p1BakedPath,
-            ]),
-            execFileAsync(ffmpegBin, [
-              '-y', '-f', 'lavfi', '-i', `color=c=${sColor}:s=1080x1920:d=1:r=1`,
-              '-vf', `${frameDeco},vignette=PI/6${scaleTail}`, '-frames:v', '1', p2BakedPath,
-            ]),
+            bakeBgStill(part1ImagePath, styling.primaryColor, p1BakedPath, 'p1'),
+            bakeBgStill(part2ImagePath, styling.secondaryColor, p2BakedPath, 'p2'),
+            bakeBgStill(part3ImagePath, styling.primaryColor, p3BakedPath, 'p1'),
           ]);
+
+          const off1 = Math.max(1.5, partDur - xfadeDur);
+          const off2 = Math.max(3.0, off1 + partDur - xfadeDur);
+          ffmpegArgs.push(
+            '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p1BakedPath,
+            '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p2BakedPath,
+            '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p3BakedPath
+          );
+          videoFilter.push(
+            `[0:v]ass='${escapeFfmpegFilterPath(ass1Path)}'${fontsOpt},format=yuv420p[v1]`,
+            `[1:v]ass='${escapeFfmpegFilterPath(ass2Path)}'${fontsOpt},format=yuv420p[v2]`,
+            `[2:v]ass='${escapeFfmpegFilterPath(ass3Path)}'${fontsOpt},format=yuv420p[v3]`,
+            `[v1][v2]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${off1.toFixed(2)}[v12]`,
+            `[v12][v3]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${off2.toFixed(2)},format=yuv420p[vout]`
+          );
         }
 
-        const videoFilter = [
-          `[0:v]ass='${ass1Esc}'${fontsOpt},format=yuv420p[v1]`,
-          `[1:v]ass='${ass2Esc}'${fontsOpt},format=yuv420p[v2]`,
-          `[v1][v2]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${xfadeOffset},format=yuv420p[vout]`,
-        ];
-
-        const ffmpegArgs: string[] = [
-          '-y',
-          '-threads', '2',
-          '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p1BakedPath,
-          '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p2BakedPath,
-        ];
-
+        const audioInputIndex = partCount;
         if (musicPath && musicVolume > 0.01) {
           const fadeOutStart = Math.max(1, durationSeconds - 1.4).toFixed(2);
           videoFilter.push(
-            `[2:a]atrim=0:${durationSeconds},asetpts=PTS-STARTPTS,volume=${musicVolume.toFixed(2)},afade=t=in:st=0:d=0.6,afade=t=out:st=${fadeOutStart}:d=1.4[aout]`
+            `[${audioInputIndex}:a]atrim=0:${durationSeconds},asetpts=PTS-STARTPTS,volume=${musicVolume.toFixed(2)},afade=t=in:st=0:d=0.6,afade=t=out:st=${fadeOutStart}:d=1.4[aout]`
           );
           ffmpegArgs.push('-stream_loop', '-1', '-i', musicPath);
         }
@@ -1062,8 +1212,9 @@ Keep spacingScale between 0.90 and 1.12.`;
           downloadUrl: `${videoUrl}?download=1`,
           durationSeconds,
           resolution: `${targetW}x${targetH}`,
-          engine: `ffmpeg-${quality}${musicPath ? '+aac' : ''} (${ffmpegResolved.source})`,
-          multiPart: true,
+          engine: `ffmpeg-${quality}-${partCount}p${musicPath ? '+aac' : ''} (${ffmpegResolved.source})`,
+          multiPart: partCount > 1,
+          partCount,
           musicId: musicPath ? musicId : 'none',
         };
       } catch (err: any) {

@@ -219,16 +219,18 @@ def _draw_typewriter_lines(
 
 
 def render_wedding_card_video(payload: Dict) -> Path:
-    """Renders a 18-20s vertical (1080x1920) multi-part wedding card MP4 using Pillow + MoviePy."""
+    """Renders a 18-20s vertical (1080x1920) 1-part, 2-part, or 3-part wedding card MP4 using Pillow + MoviePy."""
     template_id = str(payload.get("templateId") or "pakistani-emerald-mehndi-multipart")
+    part_count = int(payload.get("partCount") or 2)
+    if part_count not in (1, 2, 3):
+        part_count = 2
     duration = float(payload.get("durationSeconds") or 19.0)
     duration = max(16.0, min(22.0, duration))
-    crossfade_dur = 0.9
-    part1_dur = (duration + crossfade_dur) / 2.0
-    part2_dur = (duration + crossfade_dur) / 2.0
+    crossfade_dur = 0.85
 
     styling = payload.get("styling") or {}
     primary_color = styling.get("primaryColor") or "#145339"
+    secondary_color = styling.get("secondaryColor") or primary_color
     accent_color = styling.get("accentColor") or "#E7C26B"
     text_color = styling.get("textColor") or "#FFFFFF"
     spacing_scale = float(styling.get("spacingScale") or 1.0)
@@ -242,6 +244,7 @@ def render_wedding_card_video(payload: Dict) -> Path:
     manifest_path = ASSETS_DIR / "library.json"
     custom_p1: Optional[Path] = None
     custom_p2: Optional[Path] = None
+    custom_p3: Optional[Path] = None
 
     if template_id.startswith("custom_tpl_") and manifest_path.exists():
         try:
@@ -250,12 +253,17 @@ def render_wedding_card_video(payload: Dict) -> Path:
                 if item.get("id") == template_id:
                     f1 = os.path.basename(str(item.get("part1Filename") or ""))
                     f2 = os.path.basename(str(item.get("part2Filename") or ""))
+                    f3 = os.path.basename(str(item.get("part3Filename") or ""))
                     if f1 and (CUSTOM_TEMPLATES_DIR / f1).exists():
                         custom_p1 = CUSTOM_TEMPLATES_DIR / f1
                     if f2 and (CUSTOM_TEMPLATES_DIR / f2).exists():
                         custom_p2 = CUSTOM_TEMPLATES_DIR / f2
                     elif custom_p1 is not None:
                         custom_p2 = custom_p1
+                    if f3 and (CUSTOM_TEMPLATES_DIR / f3).exists():
+                        custom_p3 = CUSTOM_TEMPLATES_DIR / f3
+                    elif custom_p2 is not None:
+                        custom_p3 = custom_p2
                     break
         except Exception:
             pass
@@ -273,6 +281,16 @@ def render_wedding_card_video(payload: Dict) -> Path:
             sample_point=(0.55, 0.35),
             clean_sample_text=False,
         )
+        p3_bg = (
+            _fit_and_clean_multipart_image(
+                custom_p3,
+                patch_box=(0.24, 0.21, 0.77, 0.69),
+                sample_point=(0.50, 0.45),
+                clean_sample_text=False,
+            )
+            if custom_p3 is not None
+            else p1_bg
+        )
     elif template_id == "pakistani-emerald-mehndi-multipart" and s1_path.exists() and s2_path.exists():
         p1_bg = _fit_and_clean_multipart_image(
             s1_path,
@@ -286,44 +304,104 @@ def render_wedding_card_video(payload: Dict) -> Path:
             sample_point=(0.55, 0.35),
             clean_sample_text=clean_sample_text,
         )
+        p3_bg = p1_bg
     else:
         p1_bg = _create_luxury_card_backdrop(primary_color, accent_color)
-        p2_bg = _create_luxury_card_backdrop(primary_color, accent_color)
+        p2_bg = _create_luxury_card_backdrop(secondary_color, accent_color)
+        p3_bg = _create_luxury_card_backdrop(primary_color, accent_color)
 
     card = payload.get("card") or {}
-    part1_items = [
-        {"text": card.get("invocation", "IN THE NAME OF ALLAH · THE MOST MERCIFUL"), "y_rel": -0.23, "size": 26, "accent": True, "start": 0.4, "type_dur": 1.1, "wrap": 40},
-        {"text": card.get("hostLine1", "Mr. & Mrs. Jalal Din (Late)"), "y_rel": -0.15, "size": 44, "bold": True, "start": 1.3, "type_dur": 1.4},
-        {"text": card.get("relationLine1", "Request the pleasure of your company at the Wedding of their Beloved Nephew"), "y_rel": -0.08, "size": 30, "start": 2.6, "type_dur": 1.6, "wrap": 34},
-        {"text": card.get("hostLine2", "Mr. & Mrs. M Amjad Rana"), "y_rel": 0.01, "size": 44, "bold": True, "accent": True, "start": 4.0, "type_dur": 1.3},
-        {"text": card.get("relationLine2", "Cordially invite you to the Wedding Ceremony of their Beloved Daughter"), "y_rel": 0.08, "size": 30, "start": 5.1, "type_dur": 1.5, "wrap": 34},
-        {"text": f"{card.get('groomName', 'Hamza')}  &  {card.get('brideName', 'Ayesha')}", "y_rel": 0.145, "size": 48, "style": "script", "accent": True, "start": 6.2, "type_dur": 1.3},
-        {"text": f"{card.get('specialTitle', 'Special Invitees')}: {card.get('specialNames', 'Ammal Fatima, Mehroosh')}", "y_rel": 0.215, "size": 28, "start": 7.2, "type_dur": 1.4, "wrap": 36, "box_border": True},
-    ]
 
-    part2_items = [
-        {"text": card.get("part2Blessing", "In Sha Allah"), "y_rel": -0.26, "size": 36, "accent": True, "style": "serif", "bold": True, "start": 0.5, "type_dur": 0.9},
-        {"text": card.get("part2Intro", "JOIN US FOR A JOYFUL EVENING OF"), "y_rel": -0.20, "size": 24, "start": 1.2, "type_dur": 1.1, "wrap": 40},
-        {"text": card.get("eventTitle", "Mehndi"), "y_rel": -0.14, "size": 76, "style": "script", "accent": True, "start": 2.0, "type_dur": 1.1},
-        {"text": card.get("eventSubtitle", '"Rasm-e-Hina" Celebration'), "y_rel": -0.075, "size": 32, "start": 3.0, "type_dur": 1.1},
-        {"text": f"Programme  ·  {card.get('weddingDate', 'Thursday 26 November 2026')}", "y_rel": -0.005, "size": 34, "bold": True, "accent": True, "start": 3.9, "type_dur": 1.4, "wrap": 36},
-        {"text": card.get("timing1", "Mehndi ..................... 6:00 PM"), "y_rel": 0.055, "size": 31, "start": 5.1, "type_dur": 1.0},
-        {"text": card.get("timing2", "Dinner ..................... 7:00 PM"), "y_rel": 0.10, "size": 31, "start": 5.9, "type_dur": 1.0},
-        {"text": card.get("venueName", "RAUF MARQUI"), "y_rel": 0.175, "size": 40, "bold": True, "accent": True, "start": 6.7, "type_dur": 1.0},
-        {"text": card.get("venueAddress", "Mughalpura Road, Baja Line, Near Railway Power House, Lahore"), "y_rel": 0.235, "size": 27, "start": 7.5, "type_dur": 1.4, "wrap": 36},
-    ]
+    if part_count == 1:
+        single_items = [
+            {"text": card.get("invocation", "IN THE NAME OF ALLAH · THE MOST MERCIFUL"), "y_rel": -0.28, "size": 24, "accent": True, "start": 0.3, "type_dur": 0.9, "wrap": 40},
+            {"text": f"{card.get('hostLine1', '')}  &  {card.get('hostLine2', '')}", "y_rel": -0.22, "size": 34, "bold": True, "start": 1.0, "type_dur": 1.2, "wrap": 34},
+            {"text": "Cordially Invite You to the Wedding Celebration of", "y_rel": -0.165, "size": 25, "start": 2.1, "type_dur": 1.0, "wrap": 38},
+            {"text": f"{card.get('groomName', 'Hamza')}  &  {card.get('brideName', 'Ayesha')}", "y_rel": -0.105, "size": 52, "style": "script", "accent": True, "start": 3.0, "type_dur": 1.1},
+            {"text": card.get("eventTitle", "Wedding Ceremony"), "y_rel": -0.025, "size": 56, "bold": True, "accent": True, "start": 3.9, "type_dur": 1.0},
+            {"text": card.get("eventSubtitle", ""), "y_rel": 0.03, "size": 29, "start": 4.8, "type_dur": 0.9},
+            {"text": f"Programme  ·  {card.get('weddingDate', '')}", "y_rel": 0.095, "size": 32, "bold": True, "accent": True, "start": 5.6, "type_dur": 1.1, "wrap": 36},
+            {"text": card.get("timing1", ""), "y_rel": 0.145, "size": 28, "start": 6.6, "type_dur": 0.9},
+            {"text": card.get("timing2", ""), "y_rel": 0.185, "size": 28, "start": 7.4, "type_dur": 0.9},
+            {"text": card.get("venueName", ""), "y_rel": 0.24, "size": 36, "bold": True, "accent": True, "start": 8.2, "type_dur": 0.9},
+            {"text": card.get("venueAddress", ""), "y_rel": 0.29, "size": 24, "start": 9.0, "type_dur": 1.2, "wrap": 38},
+        ]
+        final_clip = VideoClip(
+            lambda t: _draw_typewriter_lines(p1_bg, single_items, t, text_rgb, accent_rgb, spacing_scale),
+            duration=duration,
+        )
+    elif part_count == 3:
+        seg_dur = (duration + crossfade_dur * 2.0) / 3.0
+        tscale = seg_dur / 9.9
+        f1_items = [
+            {"text": card.get("invocation", "IN THE NAME OF ALLAH · THE MOST MERCIFUL"), "y_rel": -0.25, "size": 23, "accent": True, "start": 0.2 * tscale, "type_dur": 0.8 * tscale, "wrap": 40},
+            {"text": f"{card.get('hostLine1', '')} & {card.get('hostLine2', '')}", "y_rel": -0.185, "size": 32, "bold": True, "start": 0.9 * tscale, "type_dur": 1.0 * tscale, "wrap": 34},
+            {"text": f"{card.get('groomName', 'Hamza')}  &  {card.get('brideName', 'Ayesha')}", "y_rel": -0.115, "size": 50, "style": "script", "accent": True, "start": 1.8 * tscale, "type_dur": 1.0 * tscale},
+            {"text": f"FUNCTION 1  ·  {card.get('func1Title', 'Mehndi')}", "y_rel": -0.025, "size": 56, "bold": True, "accent": True, "start": 2.6 * tscale, "type_dur": 0.9 * tscale},
+            {"text": card.get("func1Subtitle", '"Rasm-e-Hina" & Dholki Night'), "y_rel": 0.04, "size": 30, "start": 3.4 * tscale, "type_dur": 0.9 * tscale},
+            {"text": card.get("func1Date", "Friday 27 November 2026"), "y_rel": 0.105, "size": 33, "bold": True, "accent": True, "start": 4.2 * tscale, "type_dur": 0.9 * tscale},
+            {"text": card.get("func1Timing", "Mehndi 6:30 PM · Dinner 8:00 PM"), "y_rel": 0.16, "size": 28, "start": 5.0 * tscale, "type_dur": 0.9 * tscale},
+            {"text": card.get("func1Venue", "RAUF MARQUI · Lahore"), "y_rel": 0.225, "size": 28, "bold": True, "accent": True, "start": 5.8 * tscale, "type_dur": 0.9 * tscale, "wrap": 36, "box_border": True},
+        ]
+        f2_items = [
+            {"text": "FUNCTION 2  ·  ROYAL CEREMONY", "y_rel": -0.24, "size": 26, "bold": True, "accent": True, "start": 0.2 * tscale, "type_dur": 0.8 * tscale},
+            {"text": card.get("func2Title", "Barat"), "y_rel": -0.145, "size": 76, "style": "script", "accent": True, "start": 0.9 * tscale, "type_dur": 1.0 * tscale},
+            {"text": card.get("func2Subtitle", "Istiqbal-e-Barat & Rukhsati"), "y_rel": -0.065, "size": 32, "start": 1.8 * tscale, "type_dur": 0.9 * tscale},
+            {"text": f"{card.get('groomName', 'Hamza')}  &  {card.get('brideName', 'Ayesha')}", "y_rel": 0.005, "size": 36, "bold": True, "accent": True, "start": 2.6 * tscale, "type_dur": 0.9 * tscale},
+            {"text": card.get("func2Date", "Saturday 28 November 2026"), "y_rel": 0.08, "size": 34, "bold": True, "accent": True, "start": 3.4 * tscale, "type_dur": 0.9 * tscale},
+            {"text": card.get("func2Timing", "Barat 7:30 PM · Dinner 9:00 PM"), "y_rel": 0.14, "size": 29, "start": 4.2 * tscale, "type_dur": 0.9 * tscale},
+            {"text": card.get("func2Venue", "ROYAL PALM MARQUEE · Lahore"), "y_rel": 0.215, "size": 29, "bold": True, "accent": True, "start": 5.0 * tscale, "type_dur": 1.0 * tscale, "wrap": 36, "box_border": True},
+        ]
+        f3_items = [
+            {"text": "FUNCTION 3  ·  GRAND RECEPTION", "y_rel": -0.24, "size": 26, "bold": True, "accent": True, "start": 0.2 * tscale, "type_dur": 0.8 * tscale},
+            {"text": card.get("func3Title", "Walima"), "y_rel": -0.145, "size": 76, "style": "script", "accent": True, "start": 0.9 * tscale, "type_dur": 1.0 * tscale},
+            {"text": card.get("func3Subtitle", "Sunnat-e-Walima Reception"), "y_rel": -0.065, "size": 32, "start": 1.8 * tscale, "type_dur": 0.9 * tscale},
+            {"text": f"{card.get('groomName', 'Hamza')}  &  {card.get('brideName', 'Ayesha')}", "y_rel": 0.005, "size": 36, "bold": True, "accent": True, "start": 2.6 * tscale, "type_dur": 0.9 * tscale},
+            {"text": card.get("func3Date", "Sunday 29 November 2026"), "y_rel": 0.08, "size": 34, "bold": True, "accent": True, "start": 3.4 * tscale, "type_dur": 0.9 * tscale},
+            {"text": card.get("func3Timing", "Arrival 1:30 PM · Lunch 2:30 PM"), "y_rel": 0.14, "size": 29, "start": 4.2 * tscale, "type_dur": 0.9 * tscale},
+            {"text": card.get("func3Venue", "PEARL CONTINENTAL · Lahore"), "y_rel": 0.215, "size": 29, "bold": True, "accent": True, "start": 5.0 * tscale, "type_dur": 1.0 * tscale, "wrap": 36, "box_border": True},
+        ]
+        c1 = VideoClip(lambda t: _draw_typewriter_lines(p1_bg, f1_items, t, text_rgb, accent_rgb, spacing_scale), duration=seg_dur)
+        c2 = VideoClip(lambda t: _draw_typewriter_lines(p2_bg, f2_items, t, text_rgb, accent_rgb, spacing_scale), duration=seg_dur).crossfadein(crossfade_dur)
+        c3 = VideoClip(lambda t: _draw_typewriter_lines(p3_bg, f3_items, t, text_rgb, accent_rgb, spacing_scale), duration=seg_dur).crossfadein(crossfade_dur)
+        final_clip = concatenate_videoclips([c1, c2, c3], padding=-crossfade_dur, method="compose")
+    else:
+        part1_dur = (duration + crossfade_dur) / 2.0
+        part2_dur = (duration + crossfade_dur) / 2.0
+        part1_items = [
+            {"text": card.get("invocation", "IN THE NAME OF ALLAH · THE MOST MERCIFUL"), "y_rel": -0.23, "size": 26, "accent": True, "start": 0.4, "type_dur": 1.1, "wrap": 40},
+            {"text": card.get("hostLine1", "Mr. & Mrs. Jalal Din (Late)"), "y_rel": -0.15, "size": 44, "bold": True, "start": 1.3, "type_dur": 1.4},
+            {"text": card.get("relationLine1", "Request the pleasure of your company at the Wedding of their Beloved Nephew"), "y_rel": -0.08, "size": 30, "start": 2.6, "type_dur": 1.6, "wrap": 34},
+            {"text": card.get("hostLine2", "Mr. & Mrs. M Amjad Rana"), "y_rel": 0.01, "size": 44, "bold": True, "accent": True, "start": 4.0, "type_dur": 1.3},
+            {"text": card.get("relationLine2", "Cordially invite you to the Wedding Ceremony of their Beloved Daughter"), "y_rel": 0.08, "size": 30, "start": 5.1, "type_dur": 1.5, "wrap": 34},
+            {"text": f"{card.get('groomName', 'Hamza')}  &  {card.get('brideName', 'Ayesha')}", "y_rel": 0.145, "size": 48, "style": "script", "accent": True, "start": 6.2, "type_dur": 1.3},
+            {"text": f"{card.get('specialTitle', 'Special Invitees')}: {card.get('specialNames', 'Ammal Fatima, Mehroosh')}", "y_rel": 0.215, "size": 28, "start": 7.2, "type_dur": 1.4, "wrap": 36, "box_border": True},
+        ]
 
-    clip1 = VideoClip(
-        lambda t: _draw_typewriter_lines(p1_bg, part1_items, t, text_rgb, accent_rgb, spacing_scale),
-        duration=part1_dur,
-    )
-    clip2 = VideoClip(
-        lambda t: _draw_typewriter_lines(p2_bg, part2_items, t, text_rgb, accent_rgb, spacing_scale),
-        duration=part2_dur,
-    ).crossfadein(crossfade_dur)
+        part2_items = [
+            {"text": card.get("part2Blessing", "In Sha Allah"), "y_rel": -0.26, "size": 36, "accent": True, "style": "serif", "bold": True, "start": 0.5, "type_dur": 0.9},
+            {"text": card.get("part2Intro", "JOIN US FOR A JOYFUL EVENING OF"), "y_rel": -0.20, "size": 24, "start": 1.2, "type_dur": 1.1, "wrap": 40},
+            {"text": card.get("eventTitle", "Mehndi"), "y_rel": -0.14, "size": 76, "style": "script", "accent": True, "start": 2.0, "type_dur": 1.1},
+            {"text": card.get("eventSubtitle", '"Rasm-e-Hina" Celebration'), "y_rel": -0.075, "size": 32, "start": 3.0, "type_dur": 1.1},
+            {"text": f"Programme  ·  {card.get('weddingDate', 'Thursday 26 November 2026')}", "y_rel": -0.005, "size": 34, "bold": True, "accent": True, "start": 3.9, "type_dur": 1.4, "wrap": 36},
+            {"text": card.get("timing1", "Mehndi ..................... 6:00 PM"), "y_rel": 0.055, "size": 31, "start": 5.1, "type_dur": 1.0},
+            {"text": card.get("timing2", "Dinner ..................... 7:00 PM"), "y_rel": 0.10, "size": 31, "start": 5.9, "type_dur": 1.0},
+            {"text": card.get("venueName", "RAUF MARQUI"), "y_rel": 0.175, "size": 40, "bold": True, "accent": True, "start": 6.7, "type_dur": 1.0},
+            {"text": card.get("venueAddress", "Mughalpura Road, Baja Line, Near Railway Power House, Lahore"), "y_rel": 0.235, "size": 27, "start": 7.5, "type_dur": 1.4, "wrap": 36},
+        ]
 
-    final_clip = concatenate_videoclips([clip1, clip2], padding=-crossfade_dur, method="compose")
-    out_name = f"wcg_{template_id}_{int(os.times().elapsed * 100)}.mp4"
+        clip1 = VideoClip(
+            lambda t: _draw_typewriter_lines(p1_bg, part1_items, t, text_rgb, accent_rgb, spacing_scale),
+            duration=part1_dur,
+        )
+        clip2 = VideoClip(
+            lambda t: _draw_typewriter_lines(p2_bg, part2_items, t, text_rgb, accent_rgb, spacing_scale),
+            duration=part2_dur,
+        ).crossfadein(crossfade_dur)
+
+        final_clip = concatenate_videoclips([clip1, clip2], padding=-crossfade_dur, method="compose")
+
+    out_name = f"wcg_{template_id}_{part_count}p_{int(os.times().elapsed * 100)}.mp4"
     out_path = OUTPUT_DIR / out_name
 
     music_id = str(payload.get("musicId") or "mehndi-laga-ke-rakhna").strip()

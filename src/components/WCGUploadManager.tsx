@@ -50,6 +50,7 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
   const [tplCategory, setTplCategory] = useState<Exclude<WcgEventCategory, 'All'>>('Mehndi');
   const [part1File, setPart1File] = useState<File | null>(null);
   const [part2File, setPart2File] = useState<File | null>(null);
+  const [part3File, setPart3File] = useState<File | null>(null);
   const [isUploadingTpl, setIsUploadingTpl] = useState<boolean>(false);
 
   const [songTitle, setSongTitle] = useState<string>('');
@@ -68,7 +69,9 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
     try {
       const part1DataUrl = await readFileAsDataUrl(part1File);
       const part2DataUrl = part2File ? await readFileAsDataUrl(part2File) : undefined;
+      const part3DataUrl = part3File ? await readFileAsDataUrl(part3File) : undefined;
       const derivedName = tplName.trim() || part1File.name.replace(/\.[^.]+$/, '');
+      const detectedParts = part3File ? 3 : part2File ? 2 : 1;
 
       const res = await fetch('/api/wcg/library/templates', {
         method: 'POST',
@@ -76,8 +79,10 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
         body: JSON.stringify({
           name: derivedName,
           category: tplCategory,
+          partCount: detectedParts,
           part1DataUrl,
           part2DataUrl,
+          part3DataUrl,
         }),
       });
       const json = await res.json();
@@ -90,7 +95,8 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
       setTplName('');
       setPart1File(null);
       setPart2File(null);
-      setUploadMsg(`"${json.template.name}" permanent server library mein save aur select ho gaya hai.`);
+      setPart3File(null);
+      setUploadMsg(`"${json.template.name}" (${detectedParts}-Part) permanent server library mein save ho gaya hai.`);
     } catch (err: any) {
       setUploadErr(err?.message || 'Template upload error');
     } finally {
@@ -198,6 +204,7 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
 
           {customTemplates.map((tpl, index) => {
             const active = activeCustomTemplateId === tpl.id;
+            const tplParts = tpl.partCount || (tpl.part3Url ? 3 : tpl.part2Url ? 2 : 1);
             return (
               <div
                 key={tpl.id}
@@ -207,6 +214,9 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
                 }`}
               >
                 <img src={tpl.part1Url} alt={tpl.name} className="w-full h-full object-cover" />
+                <span className="absolute top-1 left-1 bg-slate-950/85 text-[9px] px-1.5 py-0.5 rounded text-cyan-300 font-semibold">
+                  {tplParts}-Part
+                </span>
                 <span className="absolute bottom-1 left-1 right-7 truncate bg-slate-950/85 text-[10px] px-1.5 py-0.5 rounded text-slate-200">
                   #{index + 1} {tpl.name}
                 </span>
@@ -229,7 +239,7 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
               type="text"
               value={tplName}
               onChange={(e) => setTplName(e.target.value)}
-              placeholder="Template name (e.g. Royal Gold Walima)"
+              placeholder="Template name (e.g. Royal 3-Function Suite)"
               className="sm:col-span-2 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
             />
             <select
@@ -244,23 +254,32 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
             </select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <label className="block">
-              <span className="text-[11px] text-slate-400 block mb-1">Part 1 Image (Required JPG/PNG)</span>
+              <span className="text-[11px] text-slate-400 block mb-1">Part 1 (Required · Page 1)</span>
               <input
                 type="file"
                 accept="image/jpeg, image/png, image/jpg, image/webp"
                 onChange={(e) => setPart1File(e.target.files?.[0] || null)}
-                className="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 cursor-pointer"
+                className="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 cursor-pointer"
               />
             </label>
             <label className="block">
-              <span className="text-[11px] text-slate-400 block mb-1">Part 2 Image (Optional 2nd Page)</span>
+              <span className="text-[11px] text-slate-400 block mb-1">Part 2 (Optional · Page 2)</span>
               <input
                 type="file"
                 accept="image/jpeg, image/png, image/jpg, image/webp"
                 onChange={(e) => setPart2File(e.target.files?.[0] || null)}
-                className="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer"
+                className="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer"
+              />
+            </label>
+            <label className="block">
+              <span className="text-[11px] text-slate-400 block mb-1">Part 3 (Optional · Page 3)</span>
+              <input
+                type="file"
+                accept="image/jpeg, image/png, image/jpg, image/webp"
+                onChange={(e) => setPart3File(e.target.files?.[0] || null)}
+                className="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 cursor-pointer"
               />
             </label>
           </div>

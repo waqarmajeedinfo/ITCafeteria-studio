@@ -70,6 +70,21 @@ class CardDetails(BaseModel):
     timing2: str = "Dinner .................... 7:00 PM"
     venueName: str = "RAUF MARQUI"
     venueAddress: str = "Mughalpura Road, Baja Line, Near Railway Power House, Lahore"
+    func1Title: str = "Mehndi"
+    func1Subtitle: str = '"Rasm-e-Hina" & Dholki Night'
+    func1Date: str = "Friday 27 November 2026"
+    func1Timing: str = "Mehndi 6:30 PM  ·  Dinner 8:00 PM"
+    func1Venue: str = "RAUF MARQUI · Mughalpura Road, Lahore"
+    func2Title: str = "Barat"
+    func2Subtitle: str = "Istiqbal-e-Barat & Rukhsati"
+    func2Date: str = "Saturday 28 November 2026"
+    func2Timing: str = "Barat 7:30 PM  ·  Dinner 9:00 PM"
+    func2Venue: str = "ROYAL PALM MARQUEE · Canal Road, Lahore"
+    func3Title: str = "Walima"
+    func3Subtitle: str = "Sunnat-e-Walima Reception"
+    func3Date: str = "Sunday 29 November 2026"
+    func3Timing: str = "Arrival 1:30 PM  ·  Lunch 2:30 PM"
+    func3Venue: str = "PEARL CONTINENTAL · Mall Road, Lahore"
 
 
 class StylingConfig(BaseModel):
@@ -85,6 +100,7 @@ class StylingConfig(BaseModel):
 
 class RenderRequest(BaseModel):
     templateId: str = "pakistani-emerald-mehndi-multipart"
+    partCount: int = Field(default=2, ge=1, le=3)
     durationSeconds: float = Field(default=19.0, ge=16.0, le=22.0)
     quality: str = "1080p"
     musicId: str = "mehndi-laga-ke-rakhna"
@@ -117,6 +133,7 @@ async def upload_template(
     category: str = Form("Mehndi"),
     part1: UploadFile = File(...),
     part2: Optional[UploadFile] = File(None),
+    part3: Optional[UploadFile] = File(None),
 ) -> Dict[str, Any]:
     CUSTOM_TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     ext1 = Path(part1.filename or "card.jpg").suffix.lower() or ".jpg"
@@ -135,14 +152,25 @@ async def upload_template(
             f2_name = f"{tpl_id}_p2{ext2}"
             (CUSTOM_TEMPLATES_DIR / f2_name).write_bytes(await part2.read())
 
+    f3_name: Optional[str] = None
+    if part3 is not None and part3.filename:
+        ext3 = Path(part3.filename).suffix.lower() or ".jpg"
+        if ext3 in {".jpg", ".jpeg", ".png", ".webp"}:
+            f3_name = f"{tpl_id}_p3{ext3}"
+            (CUSTOM_TEMPLATES_DIR / f3_name).write_bytes(await part3.read())
+
+    part_count = 3 if f3_name else (2 if f2_name else 1)
     item = {
         "id": tpl_id,
         "name": name.strip() or tpl_id,
         "category": category if category in {"Mehndi", "Barat", "Walima", "Nikah"} else "Mehndi",
+        "partCount": part_count,
         "part1Filename": f1_name,
         "part2Filename": f2_name,
+        "part3Filename": f3_name,
         "part1Url": f"/assets/custom_templates/{f1_name}",
         "part2Url": f"/assets/custom_templates/{f2_name}" if f2_name else None,
+        "part3Url": f"/assets/custom_templates/{f3_name}" if f3_name else None,
     }
     manifest = _load_manifest()
     manifest["templates"].insert(0, item)

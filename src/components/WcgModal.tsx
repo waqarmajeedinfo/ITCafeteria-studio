@@ -30,10 +30,13 @@ import {
   type WcgCustomSongItem,
   type WcgCustomTemplateItem,
   type WcgEventCategory,
+  type WcgPartCount,
+  type WcgPartFilter,
   type WcgRenderQuality,
   type WcgRenderResult,
   type WcgStylingConfig,
   type WcgTemplateSpec,
+  type WcgTransitionStyle,
   type WcgTrendSuggestion,
 } from '../lib/wcgTemplates';
 import { WCGUploadManager } from './WCGUploadManager';
@@ -43,6 +46,12 @@ interface WcgModalProps {
 }
 
 const EVENT_FILTERS: WcgEventCategory[] = ['All', 'Mehndi', 'Barat', 'Walima', 'Nikah'];
+const PART_FILTERS: Array<{ value: WcgPartFilter; label: string; hint: string }> = [
+  { value: 'all', label: 'All Parts', hint: 'Sab Types' },
+  { value: '1', label: '1-Part (All-in-One)', hint: 'Ek Hi Card' },
+  { value: '2', label: '2-Part Suite', hint: '2 Pages' },
+  { value: '3', label: '3-Part Trio', hint: 'Mehndi · Barat · Walima' },
+];
 
 function wrapCanvasText(
   ctx: CanvasRenderingContext2D,
@@ -200,7 +209,9 @@ function drawTypedBlocks(
 export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   const [activeView, setActiveView] = useState<'studio' | 'deploy'>('studio');
   const [categoryFilter, setCategoryFilter] = useState<WcgEventCategory>('All');
+  const [partFilter, setPartFilter] = useState<WcgPartFilter>('all');
   const [selectedTemplate, setSelectedTemplate] = useState<WcgTemplateSpec>(WCG_TEMPLATES[0]);
+  const [partCount, setPartCount] = useState<WcgPartCount>(WCG_TEMPLATES[0].partCount || 2);
   const [card, setCard] = useState<WcgCardData>({ ...DEFAULT_WCG_CARD_DATA });
   const [styling, setStyling] = useState<WcgStylingConfig>({ ...WCG_TEMPLATES[0].styling });
   const [durationSeconds, setDurationSeconds] = useState<number>(19);
@@ -236,6 +247,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   const imgS2Ref = useRef<HTMLImageElement | null>(null);
   const customImg1Ref = useRef<HTMLImageElement | null>(null);
   const customImg2Ref = useRef<HTMLImageElement | null>(null);
+  const customImg3Ref = useRef<HTMLImageElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [imagesReady, setImagesReady] = useState<boolean>(false);
   const [customImagesRev, setCustomImagesRev] = useState<number>(0);
@@ -270,25 +282,30 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
     }
   }, [musicVolume]);
 
-  // Preload active custom uploaded card images for live canvas preview
+  // Preload active custom uploaded card images (up to 3 parts) for live canvas preview
   useEffect(() => {
     if (!activeCustomTemplate) {
       customImg1Ref.current = null;
       customImg2Ref.current = null;
+      customImg3Ref.current = null;
       return;
     }
     let alive = true;
     const i1 = new Image();
     const i2 = new Image();
+    const i3 = new Image();
     const bump = () => {
       if (alive) setCustomImagesRev((v) => v + 1);
     };
     i1.onload = bump;
     i2.onload = bump;
+    i3.onload = bump;
     i1.src = activeCustomTemplate.part1Url;
     i2.src = activeCustomTemplate.part2Url || activeCustomTemplate.part1Url;
+    i3.src = activeCustomTemplate.part3Url || activeCustomTemplate.part2Url || activeCustomTemplate.part1Url;
     customImg1Ref.current = i1;
     customImg2Ref.current = i2;
+    customImg3Ref.current = i3;
     return () => {
       alive = false;
     };
@@ -335,7 +352,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
     return () => cancelAnimationFrame(rafId);
   }, [isPlaying, durationSeconds]);
 
-  // Draw live crisp 720x1280 9:16 preview onto canvas (using 360x640 logical coords scaled 2x)
+  // Draw live crisp 720x1280 9:16 preview onto canvas (supports 1-part, 2-part, 3-part modes & all 17 transitions)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -347,29 +364,117 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
     const sx = canvas.width / w;
     const sy = canvas.height / h;
     const xfadeDur = 0.85;
-    const halfDur = durationSeconds / 2;
-    const scaleT = halfDur / 9.5;
-    const inTransition = currentTime >= halfDur - xfadeDur / 2 && currentTime <= halfDur + xfadeDur / 2;
+    const segDur = durationSeconds / partCount;
 
-    const renderScenePart = (part: 1 | 2, localT: number, alpha: number, slideYOffset = 0) => {
+    const getBlocksForPart = (part: 1 | 2 | 3): DrawTextBlock[] => {
+      const st = segDur / 9.5;
+      if (partCount === 1) {
+        const s1 = durationSeconds / 18;
+        return [
+          { text: card.invocation, yRatio: 0.215, size: 8.8, isAccent: true, bold: true, startSec: 0.25 * s1, typeSec: 0.8 * s1, maxWidthRatio: 0.52 },
+          { text: `${card.hostLine1}  &  ${card.hostLine2}`, yRatio: 0.275, size: 12.2, bold: true, startSec: 0.9 * s1, typeSec: 1.1 * s1, maxWidthRatio: 0.66 },
+          { text: 'Invite you to Celebrate the Wedding of', yRatio: 0.325, size: 10.2, startSec: 1.9 * s1, typeSec: 0.9 * s1, maxWidthRatio: 0.62 },
+          { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.382, size: 22.5, isScript: true, isAccent: true, startSec: 2.7 * s1, typeSec: 1.0 * s1, maxWidthRatio: 0.72 },
+          { text: card.eventTitle, yRatio: 0.452, size: 23, isAccent: true, bold: true, startSec: 3.6 * s1, typeSec: 0.9 * s1, maxWidthRatio: 0.7 },
+          { text: card.eventSubtitle, yRatio: 0.498, size: 11.5, startSec: 4.4 * s1, typeSec: 0.8 * s1, maxWidthRatio: 0.62 },
+          { text: `Programme  ·  ${card.weddingDate}`, yRatio: 0.552, size: 12.5, isAccent: true, bold: true, startSec: 5.1 * s1, typeSec: 0.95 * s1, maxWidthRatio: 0.66 },
+          { text: card.timing1, yRatio: 0.595, size: 11.2, startSec: 5.9 * s1, typeSec: 0.8 * s1, maxWidthRatio: 0.66 },
+          { text: card.timing2, yRatio: 0.628, size: 11.2, startSec: 6.6 * s1, typeSec: 0.8 * s1, maxWidthRatio: 0.66 },
+          { text: card.venueName, yRatio: 0.682, size: 15, isAccent: true, bold: true, startSec: 7.3 * s1, typeSec: 0.85 * s1, maxWidthRatio: 0.66 },
+          { text: card.venueAddress, yRatio: 0.732, size: 9.8, startSec: 8.0 * s1, typeSec: 1.0 * s1, maxWidthRatio: 0.58 },
+        ];
+      }
+
+      if (partCount === 3) {
+        if (part === 1) {
+          return [
+            { text: card.invocation, yRatio: 0.25, size: 8.8, isAccent: true, bold: true, startSec: 0.2 * st, typeSec: 0.75 * st, maxWidthRatio: 0.52 },
+            { text: `${card.hostLine1} & ${card.hostLine2}`, yRatio: 0.31, size: 11.8, bold: true, startSec: 0.85 * st, typeSec: 0.95 * st, maxWidthRatio: 0.64 },
+            { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.372, size: 21, isScript: true, isAccent: true, startSec: 1.7 * st, typeSec: 0.9 * st, maxWidthRatio: 0.72 },
+            { text: `FUNCTION 1  ·  ${card.func1Title}`, yRatio: 0.445, size: 24, isAccent: true, bold: true, startSec: 2.5 * st, typeSec: 0.9 * st, maxWidthRatio: 0.72 },
+            { text: card.func1Subtitle, yRatio: 0.502, size: 12.2, startSec: 3.3 * st, typeSec: 0.85 * st, maxWidthRatio: 0.64 },
+            { text: card.func1Date, yRatio: 0.558, size: 13.2, isAccent: true, bold: true, startSec: 4.1 * st, typeSec: 0.85 * st, maxWidthRatio: 0.66 },
+            { text: card.func1Timing, yRatio: 0.605, size: 11.5, startSec: 4.9 * st, typeSec: 0.85 * st, maxWidthRatio: 0.66 },
+            { text: card.func1Venue, yRatio: 0.665, size: 11.5, isAccent: true, bold: true, startSec: 5.7 * st, typeSec: 0.9 * st, maxWidthRatio: 0.6, boxBorder: true },
+          ];
+        }
+        if (part === 2) {
+          return [
+            { text: 'FUNCTION 2  ·  ROYAL CEREMONY', yRatio: 0.265, size: 10.2, isAccent: true, bold: true, startSec: 0.2 * st, typeSec: 0.75 * st, maxWidthRatio: 0.6 },
+            { text: card.func2Title, yRatio: 0.345, size: 32, isScript: true, isAccent: true, startSec: 0.9 * st, typeSec: 0.95 * st, maxWidthRatio: 0.74 },
+            { text: card.func2Subtitle, yRatio: 0.415, size: 13.5, startSec: 1.8 * st, typeSec: 0.9 * st, maxWidthRatio: 0.64 },
+            { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.472, size: 15, isAccent: true, bold: true, startSec: 2.6 * st, typeSec: 0.85 * st, maxWidthRatio: 0.66 },
+            { text: card.func2Date, yRatio: 0.538, size: 14, isAccent: true, bold: true, startSec: 3.4 * st, typeSec: 0.9 * st, maxWidthRatio: 0.66 },
+            { text: card.func2Timing, yRatio: 0.588, size: 12, startSec: 4.2 * st, typeSec: 0.9 * st, maxWidthRatio: 0.66 },
+            { text: card.func2Venue, yRatio: 0.655, size: 12, isAccent: true, bold: true, startSec: 5.0 * st, typeSec: 0.95 * st, maxWidthRatio: 0.62, boxBorder: true },
+          ];
+        }
+        return [
+          { text: 'FUNCTION 3  ·  GRAND RECEPTION', yRatio: 0.265, size: 10.2, isAccent: true, bold: true, startSec: 0.2 * st, typeSec: 0.75 * st, maxWidthRatio: 0.6 },
+          { text: card.func3Title, yRatio: 0.345, size: 32, isScript: true, isAccent: true, startSec: 0.9 * st, typeSec: 0.95 * st, maxWidthRatio: 0.74 },
+          { text: card.func3Subtitle, yRatio: 0.415, size: 13.5, startSec: 1.8 * st, typeSec: 0.9 * st, maxWidthRatio: 0.64 },
+          { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.472, size: 15, isAccent: true, bold: true, startSec: 2.6 * st, typeSec: 0.85 * st, maxWidthRatio: 0.66 },
+          { text: card.func3Date, yRatio: 0.538, size: 14, isAccent: true, bold: true, startSec: 3.4 * st, typeSec: 0.9 * st, maxWidthRatio: 0.66 },
+          { text: card.func3Timing, yRatio: 0.588, size: 12, startSec: 4.2 * st, typeSec: 0.9 * st, maxWidthRatio: 0.66 },
+          { text: card.func3Venue, yRatio: 0.655, size: 12, isAccent: true, bold: true, startSec: 5.0 * st, typeSec: 0.95 * st, maxWidthRatio: 0.62, boxBorder: true },
+        ];
+      }
+
+      // Default 2-Part Suite
+      if (part === 1) {
+        return [
+          { text: card.invocation, yRatio: 0.305, size: 9.2, isAccent: true, bold: true, startSec: 0.25 * st, typeSec: 0.85 * st, maxWidthRatio: 0.45 },
+          { text: card.hostLine1, yRatio: 0.358, size: 16.5, bold: true, startSec: 0.95 * st, typeSec: 1.0 * st, maxWidthRatio: 0.58 },
+          { text: card.relationLine1, yRatio: 0.41, size: 11.2, startSec: 1.85 * st, typeSec: 1.15 * st, maxWidthRatio: 0.48 },
+          { text: card.hostLine2, yRatio: 0.47, size: 16.5, isAccent: true, bold: true, startSec: 2.9 * st, typeSec: 1.0 * st, maxWidthRatio: 0.58 },
+          { text: card.relationLine2, yRatio: 0.52, size: 11.2, startSec: 3.8 * st, typeSec: 1.1 * st, maxWidthRatio: 0.48 },
+          { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.575, size: 22.5, isScript: true, isAccent: true, startSec: 4.8 * st, typeSec: 0.95 * st, maxWidthRatio: 0.68 },
+          { text: `${card.specialTitle}: ${card.specialNames}`, yRatio: 0.635, size: 11, startSec: 5.7 * st, typeSec: 1.05 * st, maxWidthRatio: 0.52, boxBorder: true },
+        ];
+      }
+      return [
+        { text: card.part2Blessing, yRatio: 0.255, size: 16, isAccent: true, bold: true, startSec: 0.25 * st, typeSec: 0.75 * st, maxWidthRatio: 0.56 },
+        { text: card.part2Intro, yRatio: 0.298, size: 10, startSec: 0.9 * st, typeSec: 0.85 * st, maxWidthRatio: 0.55 },
+        { text: card.eventTitle, yRatio: 0.352, size: 33, isScript: true, isAccent: true, startSec: 1.65 * st, typeSec: 0.9 * st, maxWidthRatio: 0.72 },
+        { text: card.eventSubtitle, yRatio: 0.405, size: 14, startSec: 2.45 * st, typeSec: 0.85 * st, maxWidthRatio: 0.62 },
+        { text: `Programme  ·  ${card.weddingDate}`, yRatio: 0.462, size: 13.8, isAccent: true, bold: true, startSec: 3.2 * st, typeSec: 1.05 * st, maxWidthRatio: 0.64 },
+        { text: card.timing1, yRatio: 0.508, size: 12.8, startSec: 4.15 * st, typeSec: 0.85 * st, maxWidthRatio: 0.62 },
+        { text: card.timing2, yRatio: 0.542, size: 12.8, startSec: 4.9 * st, typeSec: 0.85 * st, maxWidthRatio: 0.62 },
+        { text: card.venueName, yRatio: 0.602, size: 17, isAccent: true, bold: true, startSec: 5.65 * st, typeSec: 0.85 * st, maxWidthRatio: 0.62 },
+        { text: card.venueAddress, yRatio: 0.655, size: 10.8, startSec: 6.4 * st, typeSec: 1.1 * st, maxWidthRatio: 0.52 },
+      ];
+    };
+
+    const renderScenePart = (
+      part: 1 | 2 | 3,
+      localT: number,
+      alpha: number,
+      offsetX = 0,
+      offsetY = 0,
+      extraScale = 1,
+      extraRot = 0
+    ) => {
       ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.translate(0, slideYOffset);
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+      ctx.translate(w / 2 + offsetX, h / 2 + offsetY);
+      if (extraRot !== 0) ctx.rotate(extraRot);
+      if (extraScale !== 1) ctx.scale(extraScale, extraScale);
+      ctx.translate(-w / 2, -h / 2);
 
       const isCustom = Boolean(activeCustomTemplate);
       const isBuiltinMultipart = !isCustom && selectedTemplate.id === 'pakistani-emerald-mehndi-multipart';
       const img = isCustom
-        ? (part === 1 ? customImg1Ref.current : customImg2Ref.current)
-        : (isBuiltinMultipart ? (part === 1 ? imgS1Ref.current : imgS2Ref.current) : null);
+        ? (part === 1 ? customImg1Ref.current : part === 2 ? customImg2Ref.current : customImg3Ref.current)
+        : isBuiltinMultipart
+          ? (part === 2 ? imgS2Ref.current : imgS1Ref.current)
+          : null;
 
       if ((isCustom || isBuiltinMultipart) && img && img.complete && img.naturalWidth > 0) {
-        // Blurred ambient fill background
         ctx.save();
         ctx.filter = 'blur(18px) brightness(0.62)';
         ctx.drawImage(img, -20, -20, w + 40, h + 40);
         ctx.restore();
 
-        // Subtle zoom animation
         const zoom = 1 + Math.min(0.03, localT * 0.003);
         const cardW = w * zoom;
         const cardH = Math.min(h * 0.78, (img.naturalHeight / img.naturalWidth) * cardW);
@@ -379,10 +484,10 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
 
         if (isBuiltinMultipart && styling.cleanSampleText) {
           ctx.save();
-          ctx.fillStyle = part === 1 ? 'rgba(27, 122, 114, 0.96)' : 'rgba(25, 97, 52, 0.96)';
-          ctx.shadowColor = part === 1 ? '#1B7A72' : '#196134';
+          ctx.fillStyle = part === 1 || part === 3 ? 'rgba(27, 122, 114, 0.96)' : 'rgba(25, 97, 52, 0.96)';
+          ctx.shadowColor = part === 1 || part === 3 ? '#1B7A72' : '#196134';
           ctx.shadowBlur = 18;
-          if (part === 1) {
+          if (part === 1 || part === 3) {
             ctx.beginPath();
             ctx.roundRect(cardX + cardW * 0.255, cardY + cardH * 0.255, cardW * 0.49, cardH * 0.41, 16);
             ctx.fill();
@@ -397,75 +502,113 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
         drawArchitecturalBackdrop(ctx, w, h, styling, selectedTemplate.archStyle);
       }
 
-      // Soft ambient floating gold sparkles
       ctx.save();
       ctx.fillStyle = styling.accentColor;
       for (let i = 0; i < 12; i += 1) {
         const px = ((Math.sin(i * 73.1 + localT * 0.35) + 1) * 0.5) * w;
         const py = ((Math.cos(i * 41.7 + localT * 0.22) + 1) * 0.5) * h;
         const r = 1.2 + (i % 3) * 0.55;
-        ctx.globalAlpha = alpha * (0.2 + 0.35 * Math.abs(Math.sin(localT * 1.4 + i)));
+        ctx.globalAlpha = Math.max(0, alpha) * (0.2 + 0.35 * Math.abs(Math.sin(localT * 1.4 + i)));
         ctx.beginPath();
         ctx.arc(px, py, r, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
 
-      const part1Blocks: DrawTextBlock[] = [
-        { text: card.invocation, yRatio: 0.305, size: 9.2, isAccent: true, bold: true, startSec: 0.25 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.45 },
-        { text: card.hostLine1, yRatio: 0.358, size: 16.5, bold: true, startSec: 0.95 * scaleT, typeSec: 1.0 * scaleT, maxWidthRatio: 0.58 },
-        { text: card.relationLine1, yRatio: 0.41, size: 11.2, startSec: 1.85 * scaleT, typeSec: 1.15 * scaleT, maxWidthRatio: 0.48 },
-        { text: card.hostLine2, yRatio: 0.47, size: 16.5, isAccent: true, bold: true, startSec: 2.9 * scaleT, typeSec: 1.0 * scaleT, maxWidthRatio: 0.58 },
-        { text: card.relationLine2, yRatio: 0.52, size: 11.2, startSec: 3.8 * scaleT, typeSec: 1.1 * scaleT, maxWidthRatio: 0.48 },
-        { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.575, size: 22.5, isScript: true, isAccent: true, startSec: 4.8 * scaleT, typeSec: 0.95 * scaleT, maxWidthRatio: 0.68 },
-        { text: `${card.specialTitle}: ${card.specialNames}`, yRatio: 0.635, size: 11, startSec: 5.7 * scaleT, typeSec: 1.05 * scaleT, maxWidthRatio: 0.52, boxBorder: true },
-      ];
-
-      const part2Blocks: DrawTextBlock[] = [
-        { text: card.part2Blessing, yRatio: 0.255, size: 16, isAccent: true, bold: true, startSec: 0.25 * scaleT, typeSec: 0.75 * scaleT, maxWidthRatio: 0.56 },
-        { text: card.part2Intro, yRatio: 0.298, size: 10, startSec: 0.9 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.55 },
-        { text: card.eventTitle, yRatio: 0.352, size: 33, isScript: true, isAccent: true, startSec: 1.65 * scaleT, typeSec: 0.9 * scaleT, maxWidthRatio: 0.72 },
-        { text: card.eventSubtitle, yRatio: 0.405, size: 14, startSec: 2.45 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.62 },
-        { text: `Programme  ·  ${card.weddingDate}`, yRatio: 0.462, size: 13.8, isAccent: true, bold: true, startSec: 3.2 * scaleT, typeSec: 1.05 * scaleT, maxWidthRatio: 0.64 },
-        { text: card.timing1, yRatio: 0.508, size: 12.8, startSec: 4.15 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.62 },
-        { text: card.timing2, yRatio: 0.542, size: 12.8, startSec: 4.9 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.62 },
-        { text: card.venueName, yRatio: 0.602, size: 17, isAccent: true, bold: true, startSec: 5.65 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.62 },
-        { text: card.venueAddress, yRatio: 0.655, size: 10.8, startSec: 6.4 * scaleT, typeSec: 1.1 * scaleT, maxWidthRatio: 0.52 },
-      ];
-
-      drawTypedBlocks(ctx, w, h, localT, part === 1 ? part1Blocks : part2Blocks, styling);
+      drawTypedBlocks(ctx, w, h, localT, getBlocksForPart(part), styling);
       ctx.restore();
+    };
+
+    const drawTransition = (fromPart: 1 | 2, toPart: 2 | 3, p: number, toLocalT: number) => {
+      const tr: WcgTransitionStyle = styling.transitionStyle;
+      if (tr === 'fade_black') {
+        if (p < 0.5) renderScenePart(fromPart, currentTime, 1 - p * 2);
+        else renderScenePart(toPart, toLocalT, (p - 0.5) * 2);
+      } else if (tr === 'lightleak') {
+        renderScenePart(fromPart, currentTime, 1 - p);
+        renderScenePart(toPart, toLocalT, p);
+        ctx.save();
+        ctx.globalAlpha = Math.sin(p * Math.PI) * 0.55;
+        ctx.fillStyle = '#FFF3D1';
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+      } else if (tr === 'slideup' || tr === 'wipeup') {
+        renderScenePart(fromPart, currentTime, 1 - p, 0, -p * h * 0.32);
+        renderScenePart(toPart, toLocalT, p, 0, (1 - p) * h * 0.32);
+      } else if (tr === 'slidedown' || tr === 'wipedown') {
+        renderScenePart(fromPart, currentTime, 1 - p, 0, p * h * 0.32);
+        renderScenePart(toPart, toLocalT, p, 0, -(1 - p) * h * 0.32);
+      } else if (tr === 'slideleft' || tr === 'wipeleft') {
+        renderScenePart(fromPart, currentTime, 1 - p, -p * w * 0.45, 0);
+        renderScenePart(toPart, toLocalT, p, (1 - p) * w * 0.45, 0);
+      } else if (tr === 'slideright' || tr === 'wiperight') {
+        renderScenePart(fromPart, currentTime, 1 - p, p * w * 0.45, 0);
+        renderScenePart(toPart, toLocalT, p, -(1 - p) * w * 0.45, 0);
+      } else if (tr === 'zoomin') {
+        renderScenePart(fromPart, currentTime, 1 - p, 0, 0, 1 + p * 0.14);
+        renderScenePart(toPart, toLocalT, p, 0, 0, 0.88 + p * 0.12);
+      } else if (tr === 'zoomout') {
+        renderScenePart(fromPart, currentTime, 1 - p, 0, 0, 1 - p * 0.12);
+        renderScenePart(toPart, toLocalT, p, 0, 0, 1.14 - p * 0.14);
+      } else if (tr === 'spin') {
+        renderScenePart(fromPart, currentTime, 1 - p, 0, 0, 1 - p * 0.15, p * 0.18);
+        renderScenePart(toPart, toLocalT, p, 0, 0, 0.85 + p * 0.15, -(1 - p) * 0.18);
+      } else {
+        renderScenePart(fromPart, currentTime, 1 - p);
+        renderScenePart(toPart, toLocalT, p);
+      }
     };
 
     ctx.save();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.scale(sx, sy);
 
-    if (inTransition) {
-      const p = (currentTime - (halfDur - xfadeDur / 2)) / xfadeDur;
-      const offsetOut = styling.transitionStyle === 'slideup' ? -p * h * 0.25 : 0;
-      const offsetIn = styling.transitionStyle === 'slideup' ? (1 - p) * h * 0.25 : 0;
-      renderScenePart(1, currentTime, 1 - p, offsetOut);
-      renderScenePart(2, Math.max(0, currentTime - (halfDur - xfadeDur / 2)), p, offsetIn);
-    } else if (currentTime < halfDur) {
-      renderScenePart(1, currentTime, 1, 0);
+    if (partCount === 1) {
+      renderScenePart(1, currentTime, 1);
+    } else if (partCount === 2) {
+      const boundary = segDur;
+      if (currentTime >= boundary - xfadeDur / 2 && currentTime <= boundary + xfadeDur / 2) {
+        const p = (currentTime - (boundary - xfadeDur / 2)) / xfadeDur;
+        drawTransition(1, 2, p, Math.max(0, currentTime - (boundary - xfadeDur / 2)));
+      } else if (currentTime < boundary) {
+        renderScenePart(1, currentTime, 1);
+      } else {
+        renderScenePart(2, currentTime - boundary, 1);
+      }
     } else {
-      renderScenePart(2, currentTime - halfDur, 1, 0);
+      const b1 = segDur;
+      const b2 = segDur * 2;
+      if (currentTime >= b1 - xfadeDur / 2 && currentTime <= b1 + xfadeDur / 2) {
+        const p = (currentTime - (b1 - xfadeDur / 2)) / xfadeDur;
+        drawTransition(1, 2, p, Math.max(0, currentTime - (b1 - xfadeDur / 2)));
+      } else if (currentTime >= b2 - xfadeDur / 2 && currentTime <= b2 + xfadeDur / 2) {
+        const p = (currentTime - (b2 - xfadeDur / 2)) / xfadeDur;
+        drawTransition(2, 3, p, Math.max(0, currentTime - (b2 - xfadeDur / 2)));
+      } else if (currentTime < b1) {
+        renderScenePart(1, currentTime, 1);
+      } else if (currentTime < b2) {
+        renderScenePart(2, currentTime - b1, 1);
+      } else {
+        renderScenePart(3, currentTime - b2, 1);
+      }
     }
     ctx.restore();
-  }, [currentTime, card, styling, selectedTemplate, activeCustomTemplate, durationSeconds, imagesReady, customImagesRev]);
+  }, [currentTime, card, styling, selectedTemplate, activeCustomTemplate, partCount, durationSeconds, imagesReady, customImagesRev]);
 
   const filteredTemplates = useMemo(
     () =>
-      categoryFilter === 'All'
-        ? WCG_TEMPLATES
-        : WCG_TEMPLATES.filter((t) => t.category === categoryFilter),
-    [categoryFilter]
+      WCG_TEMPLATES.filter((t) => {
+        const catOk = categoryFilter === 'All' || t.category === categoryFilter;
+        const partOk = partFilter === 'all' || String(t.partCount) === partFilter;
+        return catOk && partOk;
+      }),
+    [categoryFilter, partFilter]
   );
 
   const handleSelectTemplate = (tpl: WcgTemplateSpec) => {
     setActiveCustomTemplate(null);
     setSelectedTemplate(tpl);
+    setPartCount(tpl.partCount || 2);
     setStyling({ ...tpl.styling });
     setCard((prev) => ({
       ...prev,
@@ -484,6 +627,9 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
     const matchingBuiltin =
       WCG_TEMPLATES.find((t) => t.category === customTpl.category) || WCG_TEMPLATES[0];
     setSelectedTemplate(matchingBuiltin);
+    const customParts =
+      customTpl.partCount || (customTpl.part3Url ? 3 : customTpl.part2Url ? 2 : 1);
+    setPartCount(customParts);
     setCurrentTime(0);
     setIsPlaying(true);
   };
@@ -573,6 +719,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateId: activeCustomTemplate ? activeCustomTemplate.id : selectedTemplate.id,
+          partCount,
           durationSeconds,
           quality,
           musicId,
@@ -662,7 +809,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
               <span>WCG — Wedding Card Generator</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5 tabular-nums">
-              9:16 Vertical MP4 · Multi-Part s1 → s2 Typewriter Engine · Adaptive Trend Verifier
+              9:16 Vertical MP4 · 1 / 2 / 3-Part Multi-Function Typewriter Engine · Adaptive Trend Verifier
             </p>
           </div>
 
@@ -866,11 +1013,11 @@ imageio-ffmpeg>=0.5.1`}
                   )}
                 </section>
 
-                {/* 2. Multi-Part & 12 Template Gallery */}
+                {/* 2. Multi-Part (1-Part, 2-Part, 3-Part) Template Gallery */}
                 <section className="bg-slate-900/65 border border-slate-800 rounded-xl p-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold text-white">
-                      12 Pakistani & Modern Card Templates
+                      Wedding Card Templates ({WCG_TEMPLATES.length} Suites · 1 / 2 / 3 Parts)
                     </h3>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {EVENT_FILTERS.map((cat) => (
@@ -889,9 +1036,34 @@ imageio-ffmpeg>=0.5.1`}
                     </div>
                   </div>
 
+                  {/* 3-Category Part Structure Filter */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {PART_FILTERS.map((pf) => (
+                      <button
+                        key={pf.value}
+                        type="button"
+                        onClick={() => setPartFilter(pf.value)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                          partFilter === pf.value
+                            ? 'bg-cyan-500/15 border-cyan-500/60 text-cyan-200'
+                            : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <div className="text-xs font-semibold truncate">{pf.label}</div>
+                        <div className="text-[10px] opacity-80 truncate">{pf.hint}</div>
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1 custom-modal-scroll">
                     {filteredTemplates.map((tpl) => {
                       const active = !activeCustomTemplate && selectedTemplate.id === tpl.id;
+                      const partLabel =
+                        tpl.partCount === 1
+                          ? '1-Part · All-in-One'
+                          : tpl.partCount === 3
+                            ? '3-Part · Mehndi/Barat/Walima'
+                            : '2-Part Suite';
                       return (
                         <button
                           key={tpl.id}
@@ -917,20 +1089,21 @@ imageio-ffmpeg>=0.5.1`}
                             </div>
                           ) : (
                             <div
-                              className="w-14 h-12 rounded border shrink-0 flex items-center justify-center text-xs font-serif"
+                              className="w-14 h-12 rounded border shrink-0 flex flex-col items-center justify-center text-[10px] font-serif leading-tight"
                               style={{
                                 background: `linear-gradient(135deg, ${tpl.styling.primaryColor}, ${tpl.styling.secondaryColor})`,
                                 borderColor: tpl.styling.accentColor,
                                 color: tpl.styling.accentColor,
                               }}
                             >
-                              {tpl.category.slice(0, 1)}
+                              <span className="text-xs font-bold">{tpl.partCount}P</span>
+                              <span>{tpl.category.slice(0, 4)}</span>
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="text-xs font-semibold text-white truncate">{tpl.name}</div>
-                            <div className="text-xs text-slate-400 truncate">
-                              {tpl.category} · 2-Part Suite
+                            <div className="text-[11px] text-slate-400 truncate">
+                              {tpl.category} · {partLabel}
                             </div>
                           </div>
                           {active && <Check className="w-4 h-4 text-cyan-400 shrink-0" />}
@@ -974,14 +1147,41 @@ imageio-ffmpeg>=0.5.1`}
                   onTogglePreviewMusic={handleToggleMusicPreview}
                 />
 
-                {/* 3. Dynamic Event & Family Details */}
+                {/* 3. Dynamic Event & Family Details (Adapts to 1-Part, 2-Part, or 3-Part Mode) */}
                 <section className="bg-slate-900/65 border border-slate-800 rounded-xl p-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-white">
-                    Dynamic Invitation Inputs (Part 1 Hosts · Part 2 Event & Venue)
-                  </h3>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-white">
+                      {partCount === 1
+                        ? 'All-in-One Single Card Inputs (Complete Details)'
+                        : partCount === 3
+                          ? '3-Function Invitation Inputs (Mehndi · Barat · Walima)'
+                          : '2-Part Invitation Inputs (Part 1 Hosts · Part 2 Event & Venue)'}
+                    </h3>
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+                      {([1, 2, 3] as WcgPartCount[]).map((cnt) => (
+                        <button
+                          key={cnt}
+                          type="button"
+                          onClick={() => {
+                            setPartCount(cnt);
+                            setCurrentTime(0);
+                            setIsPlaying(true);
+                          }}
+                          className={`px-2 py-1 rounded font-medium cursor-pointer ${
+                            partCount === cnt
+                              ? 'bg-amber-500 text-slate-950 font-semibold'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {cnt}-Part
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div>
-                      <label className="block text-slate-400 mb-1">Host Family 1 (Part 1)</label>
+                      <label className="block text-slate-400 mb-1">Host Family 1</label>
                       <input
                         value={card.hostLine1}
                         onChange={(e) => setCard({ ...card, hostLine1: e.target.value })}
@@ -989,26 +1189,10 @@ imageio-ffmpeg>=0.5.1`}
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-400 mb-1">Host Family 2 (Part 1)</label>
+                      <label className="block text-slate-400 mb-1">Host Family 2</label>
                       <input
                         value={card.hostLine2}
                         onChange={(e) => setCard({ ...card, hostLine2: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Relation Line 1</label>
-                      <input
-                        value={card.relationLine1}
-                        onChange={(e) => setCard({ ...card, relationLine1: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Relation Line 2</label>
-                      <input
-                        value={card.relationLine2}
-                        onChange={(e) => setCard({ ...card, relationLine2: e.target.value })}
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
                       />
                     </div>
@@ -1028,82 +1212,220 @@ imageio-ffmpeg>=0.5.1`}
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
                       />
                     </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Special Box Title</label>
-                      <input
-                        value={card.specialTitle}
-                        onChange={(e) => setCard({ ...card, specialTitle: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Special Guests Names</label>
-                      <input
-                        value={card.specialNames}
-                        onChange={(e) => setCard({ ...card, specialNames: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-400 mb-1">Event Title (Part 2)</label>
-                      <input
-                        value={card.eventTitle}
-                        onChange={(e) => setCard({ ...card, eventTitle: e.target.value })}
-                        placeholder="Mehndi, Barat, Walima"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Event Subtitle</label>
-                      <input
-                        value={card.eventSubtitle}
-                        onChange={(e) => setCard({ ...card, eventSubtitle: e.target.value })}
-                        placeholder='"Rasm-e-Hina"'
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Wedding Date</label>
-                      <input
-                        value={card.weddingDate}
-                        onChange={(e) => setCard({ ...card, weddingDate: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Venue Title</label>
-                      <input
-                        value={card.venueName}
-                        onChange={(e) => setCard({ ...card, venueName: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Programme Timing 1</label>
-                      <input
-                        value={card.timing1}
-                        onChange={(e) => setCard({ ...card, timing1: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Programme Timing 2</label>
-                      <input
-                        value={card.timing2}
-                        onChange={(e) => setCard({ ...card, timing2: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-slate-400 mb-1">Venue Full Address</label>
-                      <input
-                        value={card.venueAddress}
-                        onChange={(e) => setCard({ ...card, venueAddress: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
-                      />
-                    </div>
                   </div>
+
+                  {partCount === 3 ? (
+                    <div className="space-y-3 pt-1 text-xs">
+                      {/* Function 1: Mehndi */}
+                      <div className="p-3 rounded-xl bg-slate-950/70 border border-emerald-500/30 space-y-2">
+                        <div className="font-semibold text-emerald-300">Part 1 · Function 1 (e.g. Mehndi)</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input
+                            value={card.func1Title}
+                            onChange={(e) => setCard({ ...card, func1Title: e.target.value })}
+                            placeholder="Mehndi"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func1Subtitle}
+                            onChange={(e) => setCard({ ...card, func1Subtitle: e.target.value })}
+                            placeholder='"Rasm-e-Hina" & Dholki'
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func1Date}
+                            onChange={(e) => setCard({ ...card, func1Date: e.target.value })}
+                            placeholder="Date"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func1Timing}
+                            onChange={(e) => setCard({ ...card, func1Timing: e.target.value })}
+                            placeholder="Timing"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func1Venue}
+                            onChange={(e) => setCard({ ...card, func1Venue: e.target.value })}
+                            placeholder="Venue"
+                            className="sm:col-span-2 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Function 2: Barat */}
+                      <div className="p-3 rounded-xl bg-slate-950/70 border border-amber-500/30 space-y-2">
+                        <div className="font-semibold text-amber-300">Part 2 · Function 2 (e.g. Barat)</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input
+                            value={card.func2Title}
+                            onChange={(e) => setCard({ ...card, func2Title: e.target.value })}
+                            placeholder="Barat"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func2Subtitle}
+                            onChange={(e) => setCard({ ...card, func2Subtitle: e.target.value })}
+                            placeholder="Istiqbal-e-Barat & Rukhsati"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func2Date}
+                            onChange={(e) => setCard({ ...card, func2Date: e.target.value })}
+                            placeholder="Date"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func2Timing}
+                            onChange={(e) => setCard({ ...card, func2Timing: e.target.value })}
+                            placeholder="Timing"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func2Venue}
+                            onChange={(e) => setCard({ ...card, func2Venue: e.target.value })}
+                            placeholder="Venue"
+                            className="sm:col-span-2 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Function 3: Walima */}
+                      <div className="p-3 rounded-xl bg-slate-950/70 border border-cyan-500/30 space-y-2">
+                        <div className="font-semibold text-cyan-300">Part 3 · Function 3 (e.g. Walima)</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input
+                            value={card.func3Title}
+                            onChange={(e) => setCard({ ...card, func3Title: e.target.value })}
+                            placeholder="Walima"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func3Subtitle}
+                            onChange={(e) => setCard({ ...card, func3Subtitle: e.target.value })}
+                            placeholder="Sunnat-e-Walima Reception"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func3Date}
+                            onChange={(e) => setCard({ ...card, func3Date: e.target.value })}
+                            placeholder="Date"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func3Timing}
+                            onChange={(e) => setCard({ ...card, func3Timing: e.target.value })}
+                            placeholder="Timing"
+                            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                          <input
+                            value={card.func3Venue}
+                            onChange={(e) => setCard({ ...card, func3Venue: e.target.value })}
+                            placeholder="Venue"
+                            className="sm:col-span-2 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-100"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      {partCount === 2 && (
+                        <>
+                          <div>
+                            <label className="block text-slate-400 mb-1">Relation Line 1</label>
+                            <input
+                              value={card.relationLine1}
+                              onChange={(e) => setCard({ ...card, relationLine1: e.target.value })}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-400 mb-1">Relation Line 2</label>
+                            <input
+                              value={card.relationLine2}
+                              onChange={(e) => setCard({ ...card, relationLine2: e.target.value })}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-400 mb-1">Special Box Title</label>
+                            <input
+                              value={card.specialTitle}
+                              onChange={(e) => setCard({ ...card, specialTitle: e.target.value })}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-slate-400 mb-1">Special Guests Names</label>
+                            <input
+                              value={card.specialNames}
+                              onChange={(e) => setCard({ ...card, specialNames: e.target.value })}
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <div>
+                        <label className="block text-slate-400 mb-1">Event Title</label>
+                        <input
+                          value={card.eventTitle}
+                          onChange={(e) => setCard({ ...card, eventTitle: e.target.value })}
+                          placeholder="Mehndi, Barat, Walima"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 mb-1">Event Subtitle</label>
+                        <input
+                          value={card.eventSubtitle}
+                          onChange={(e) => setCard({ ...card, eventSubtitle: e.target.value })}
+                          placeholder='"Rasm-e-Hina"'
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 mb-1">Wedding Date</label>
+                        <input
+                          value={card.weddingDate}
+                          onChange={(e) => setCard({ ...card, weddingDate: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 mb-1">Venue Title</label>
+                        <input
+                          value={card.venueName}
+                          onChange={(e) => setCard({ ...card, venueName: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 mb-1">Programme Timing 1</label>
+                        <input
+                          value={card.timing1}
+                          onChange={(e) => setCard({ ...card, timing1: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 mb-1">Programme Timing 2</label>
+                        <input
+                          value={card.timing2}
+                          onChange={(e) => setCard({ ...card, timing2: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-slate-400 mb-1">Venue Full Address</label>
+                        <input
+                          value={card.venueAddress}
+                          onChange={(e) => setCard({ ...card, venueAddress: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </section>
 
                 {/* 4. Styling & Video Motion */}
@@ -1131,94 +1453,79 @@ imageio-ffmpeg>=0.5.1`}
                         className="w-full h-9 rounded-lg bg-slate-950 border border-slate-800 p-1 cursor-pointer"
                       />
                     </div>
-                    <div>
-                     <label className="block text-slate-400 mb-1">Display Font Style (Live Preview)</label>
-  
-                      {/* Live Visualizer / Preview Box */}
-                      <div 
-                         className="mb-2 p-3 bg-slate-900 border border-slate-700 rounded-lg text-center overflow-hidden"
-                         style={{ fontFamily: styling.displayFont || 'Cormorant Garamond' }}
-                       >
-                       <span className="text-xs text-slate-400 block mb-1">Preview:</span>
-                       <span className="text-xl text-amber-300 tracking-wide">
-                        Save the Wedding Date
-                       </span>
-                       </div>
-
-                       {/* Font Select Dropdown with Rich Options */}
-                       <select
-                         value={styling.displayFont}
-                         onChange={(e) => setStyling({ ...styling, displayFont: e.target.value as any })}
-                         className="w-full h-10 bg-slate-950 border border-slate-800 rounded-lg px-3 text-slate-100 focus:border-amber-500 focus:outline-none transition-all"
-                        >
-                        {/* Elegant & Luxury Serif */}
-                        <optgroup label="✨ Elegant & Luxury Serif">
+                    <div className="col-span-2">
+                      <label className="block text-slate-400 mb-1">Transition</label>
+                      <select
+                        value={styling.transitionStyle}
+                        onChange={(e) => setStyling({ ...styling, transitionStyle: e.target.value as any })}
+                        className="w-full h-9 bg-slate-950 border border-slate-800 rounded-lg px-2 text-slate-100"
+                      >
+                        <optgroup label="Basic & Smooth">
+                          <option value="crossfade">Crossfade (Smooth Fade)</option>
+                          <option value="dissolve">Dissolve</option>
+                          <option value="fade_black">Fade to Black</option>
+                        </optgroup>
+                        <optgroup label="Camera & Motion">
+                          <option value="slideup">Slide Up</option>
+                          <option value="slidedown">Slide Down</option>
+                          <option value="slideleft">Slide Left</option>
+                          <option value="slideright">Slide Right</option>
+                          <option value="zoomin">Zoom In (CapCut Style)</option>
+                          <option value="zoomout">Zoom Out</option>
+                          <option value="spin">Spin / Rotate</option>
+                        </optgroup>
+                        <optgroup label="Wipes & Directional">
+                          <option value="wipeup">Wipe Up</option>
+                          <option value="wipedown">Wipe Down</option>
+                          <option value="wipeleft">Wipe Left</option>
+                          <option value="wiperight">Wipe Right</option>
+                        </optgroup>
+                        <optgroup label="Effects & Glitch">
+                          <option value="glitch">Glitch Effect</option>
+                          <option value="blur">Motion Blur</option>
+                          <option value="lightleak">Light Leak</option>
+                        </optgroup>
+                      </select>
+                    </div>
+                    <div className="col-span-2 sm:col-span-4">
+                      <label className="block text-slate-400 mb-1">Display Font Style (Live Preview)</label>
+                      <div
+                        className="mb-2 p-3 bg-slate-900 border border-slate-700 rounded-lg text-center overflow-hidden"
+                        style={{ fontFamily: styling.displayFont || 'Cormorant Garamond' }}
+                      >
+                        <span className="text-xs text-slate-400 block mb-1">Preview:</span>
+                        <span className="text-xl text-amber-300 tracking-wide">
+                          Save the Wedding Date
+                        </span>
+                      </div>
+                      <select
+                        value={styling.displayFont}
+                        onChange={(e) => setStyling({ ...styling, displayFont: e.target.value as any })}
+                        className="w-full h-10 bg-slate-950 border border-slate-800 rounded-lg px-3 text-slate-100 focus:border-amber-500 focus:outline-none transition-all"
+                      >
+                        <optgroup label="Elegant & Luxury Serif">
                           <option value="Cormorant Garamond" style={{ fontFamily: 'Cormorant Garamond' }}>Cormorant Garamond</option>
                           <option value="Cinzel" style={{ fontFamily: 'Cinzel' }}>Cinzel (Classic Royal)</option>
                           <option value="Playfair Display" style={{ fontFamily: 'Playfair Display' }}>Playfair Display</option>
                           <option value="Great Vibes" style={{ fontFamily: 'Great Vibes' }}>Great Vibes (Script)</option>
                           <option value="Alex Brush" style={{ fontFamily: 'Alex Brush' }}>Alex Brush (Smooth Script)</option>
                           <option value="Pinyon Script" style={{ fontFamily: 'Pinyon Script' }}>Pinyon Script (Cursive)</option>
-                         </optgroup>
-
-                        {/* Traditional & Arabic / Urdu Calligraphy */}
-                          <optgroup label="🌙 Traditional & Calligraphy">
-      <option value="Amiri" style={{ fontFamily: 'Amiri' }}>Amiri (Arabic Classic)</option>
-      <option value="Scheherazade New" style={{ fontFamily: 'Scheherazade New' }}>Scheherazade (Traditional)</option>
-      <option value="Reem Kufi" style={{ fontFamily: 'Reem Kufi' }}>Reem Kufi (Modern Arabic)</option>
-      <option value="Noto Nastaliq Urdu" style={{ fontFamily: 'Noto Nastaliq Urdu' }}>Noto Nastaliq Urdu</option>
-    </optgroup>
-
-    {/* Modern & Clean */}
-    <optgroup label="💼 Modern & Minimal">
-      <option value="Montserrat" style={{ fontFamily: 'Montserrat' }}>Montserrat</option>
-      <option value="Poppins" style={{ fontFamily: 'Poppins' }}>Poppins</option>
-      <option value="Lato" style={{ fontFamily: 'Lato' }}>Lato</option>
-      <option value="Lora" style={{ fontFamily: 'Lora' }}>Lora Serif</option>
-    </optgroup>
-  </select>
-</div>
-                   <div>
-  <label className="block text-slate-400 mb-1">Transition</label>
-  <select
-    value={styling.transitionStyle}
-    onChange={(e) => setStyling({ ...styling, transitionStyle: e.target.value as any })}
-    className="w-full h-9 bg-slate-950 border border-slate-800 rounded-lg px-2 text-slate-100"
-  >
-    {/* Basic Category */}
-    <optgroup label="Basic & Smooth">
-      <option value="crossfade">Crossfade (Smooth Fade)</option>
-      <option value="dissolve">Dissolve</option>
-      <option value="fade_black">Fade to Black</option>
-    </optgroup>
-
-    {/* Camera Movements */}
-    <optgroup label="Camera & Motion">
-      <option value="slideup">Slide Up</option>
-      <option value="slidedown">Slide Down</option>
-      <option value="slideleft">Slide Left</option>
-      <option value="slideright">Slide Right</option>
-      <option value="zoomin">Zoom In (CapCut Style)</option>
-      <option value="zoomout">Zoom Out</option>
-      <option value="spin">Spin / Rotate</option>
-    </optgroup>
-
-    {/* Wipes & Shapes */}
-    <optgroup label="Wipes & Directional">
-      <option value="wipeup">Wipe Up</option>
-      <option value="wipedown">Wipe Down</option>
-      <option value="wipeleft">Wipe Left</option>
-      <option value="wiperight">Wipe Right</option>
-    </optgroup>
-
-    {/* Effects & Modern */}
-    <optgroup label="Effects & Glitch">
-      <option value="glitch">Glitch Effect</option>
-      <option value="blur">Motion Blur</option>
-      <option value="lightleak">Light Leak</option>
-    </optgroup>
-  </select>
-</div>
+                        </optgroup>
+                        <optgroup label="Traditional & Calligraphy">
+                          <option value="Amiri" style={{ fontFamily: 'Amiri' }}>Amiri (Arabic Classic)</option>
+                          <option value="Scheherazade New" style={{ fontFamily: 'Scheherazade New' }}>Scheherazade (Traditional)</option>
+                          <option value="Reem Kufi" style={{ fontFamily: 'Reem Kufi' }}>Reem Kufi (Modern Arabic)</option>
+                          <option value="Noto Nastaliq Urdu" style={{ fontFamily: 'Noto Nastaliq Urdu' }}>Noto Nastaliq Urdu</option>
+                        </optgroup>
+                        <optgroup label="Modern & Minimal">
+                          <option value="Montserrat" style={{ fontFamily: 'Montserrat' }}>Montserrat</option>
+                          <option value="Poppins" style={{ fontFamily: 'Poppins' }}>Poppins</option>
+                          <option value="Lato" style={{ fontFamily: 'Lato' }}>Lato</option>
+                          <option value="Lora" style={{ fontFamily: 'Lora' }}>Lora Serif</option>
+                        </optgroup>
+                      </select>
+                    </div>
+                  </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
                     <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
@@ -1339,7 +1646,18 @@ imageio-ffmpeg>=0.5.1`}
                 <div className="bg-slate-900/75 border border-slate-800 rounded-xl p-4 flex flex-col items-center">
                   <div className="w-full flex items-center justify-between mb-3 text-xs">
                     <span className="font-semibold text-white">
-                      Live 9:16 Preview · {currentTime < durationSeconds / 2 ? 'Part 1 (s1 Hosts)' : 'Part 2 (s2 Event)'}
+                      Live 9:16 ·{' '}
+                      {partCount === 1
+                        ? '1-Part All-in-One Card'
+                        : partCount === 3
+                          ? currentTime < durationSeconds / 3
+                            ? `Part 1 (${card.func1Title || 'Mehndi'})`
+                            : currentTime < (durationSeconds * 2) / 3
+                              ? `Part 2 (${card.func2Title || 'Barat'})`
+                              : `Part 3 (${card.func3Title || 'Walima'})`
+                          : currentTime < durationSeconds / 2
+                            ? 'Part 1 (Hosts)'
+                            : 'Part 2 (Event)'}
                     </span>
                     <span className="font-mono text-amber-300 tabular-nums">
                       {currentTime.toFixed(1)}s / {durationSeconds.toFixed(1)}s
@@ -1369,7 +1687,7 @@ imageio-ffmpeg>=0.5.1`}
                       }}
                       className="w-full accent-amber-400 cursor-pointer"
                     />
-                    <div className="flex items-center justify-between gap-2 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => setIsPlaying(!isPlaying)}
@@ -1391,24 +1709,68 @@ imageio-ffmpeg>=0.5.1`}
                       </div>
 
                       <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => {
-                            setCurrentTime(0.5);
-                            setIsPlaying(true);
-                          }}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
-                        >
-                          Part 1
-                        </button>
-                        <button
-                          onClick={() => {
-                            setCurrentTime(durationSeconds / 2 + 0.5);
-                            setIsPlaying(true);
-                          }}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
-                        >
-                          Part 2
-                        </button>
+                        {partCount === 1 ? (
+                          <button
+                            onClick={() => {
+                              setCurrentTime(0.3);
+                              setIsPlaying(true);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                          >
+                            Full Card
+                          </button>
+                        ) : partCount === 2 ? (
+                          <>
+                            <button
+                              onClick={() => {
+                                setCurrentTime(0.4);
+                                setIsPlaying(true);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                            >
+                              Part 1
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCurrentTime(durationSeconds / 2 + 0.5);
+                                setIsPlaying(true);
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                            >
+                              Part 2
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => {
+                                setCurrentTime(0.3);
+                                setIsPlaying(true);
+                              }}
+                              className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                            >
+                              1. {card.func1Title || 'Mehndi'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCurrentTime(durationSeconds / 3 + 0.5);
+                                setIsPlaying(true);
+                              }}
+                              className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                            >
+                              2. {card.func2Title || 'Barat'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCurrentTime((durationSeconds * 2) / 3 + 0.5);
+                                setIsPlaying(true);
+                              }}
+                              className="px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                            >
+                              3. {card.func3Title || 'Walima'}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
