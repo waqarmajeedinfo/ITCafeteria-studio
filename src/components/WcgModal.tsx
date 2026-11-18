@@ -1050,19 +1050,47 @@ imageio-ffmpeg>=0.5.1`}
                         <option value="Amiri">Amiri</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-slate-400 mb-1">Transition</label>
-                      <select
-                        value={styling.transitionStyle}
-                        onChange={(e) => setStyling({ ...styling, transitionStyle: e.target.value as any })}
-                        className="w-full h-9 bg-slate-950 border border-slate-800 rounded-lg px-2 text-slate-100"
-                      >
-                        <option value="crossfade">Crossfade</option>
-                        <option value="slideup">Slide Up</option>
-                        <option value="wipeup">Wipe Up</option>
-                      </select>
-                    </div>
-                  </div>
+                   <div>
+  <label className="block text-slate-400 mb-1">Transition</label>
+  <select
+    value={styling.transitionStyle}
+    onChange={(e) => setStyling({ ...styling, transitionStyle: e.target.value as any })}
+    className="w-full h-9 bg-slate-950 border border-slate-800 rounded-lg px-2 text-slate-100"
+  >
+    {/* Basic Category */}
+    <optgroup label="Basic & Smooth">
+      <option value="crossfade">Crossfade (Smooth Fade)</option>
+      <option value="dissolve">Dissolve</option>
+      <option value="fade_black">Fade to Black</option>
+    </optgroup>
+
+    {/* Camera Movements */}
+    <optgroup label="Camera & Motion">
+      <option value="slideup">Slide Up</option>
+      <option value="slidedown">Slide Down</option>
+      <option value="slideleft">Slide Left</option>
+      <option value="slideright">Slide Right</option>
+      <option value="zoomin">Zoom In (CapCut Style)</option>
+      <option value="zoomout">Zoom Out</option>
+      <option value="spin">Spin / Rotate</option>
+    </optgroup>
+
+    {/* Wipes & Shapes */}
+    <optgroup label="Wipes & Directional">
+      <option value="wipeup">Wipe Up</option>
+      <option value="wipedown">Wipe Down</option>
+      <option value="wipeleft">Wipe Left</option>
+      <option value="wiperight">Wipe Right</option>
+    </optgroup>
+
+    {/* Effects & Modern */}
+    <optgroup label="Effects & Glitch">
+      <option value="glitch">Glitch Effect</option>
+      <option value="blur">Motion Blur</option>
+      <option value="lightleak">Light Leak</option>
+    </optgroup>
+  </select>
+</div>
 
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
                     <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
