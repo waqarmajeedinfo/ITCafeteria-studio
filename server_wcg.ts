@@ -4,6 +4,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
+import ffmpegStatic from 'ffmpeg-static';
 import { GoogleGenAI } from '@google/genai';
 import {
   DEFAULT_WCG_CARD_DATA,
@@ -21,8 +22,12 @@ const __dirname = path.dirname(__filename);
 const WCG_OUTPUT_DIR = path.resolve(__dirname, 'data', 'wcg-renders');
 const PUBLIC_S1_PATH = path.resolve(__dirname, 'public', 'assets', 'aistudio', 's1_0b0de8d4.jpeg');
 const PUBLIC_S2_PATH = path.resolve(__dirname, 'public', 'assets', 'aistudio', 's2_610b836e.jpeg');
+const DIST_S1_PATH = path.resolve(__dirname, 'dist', 'assets', 'aistudio', 's1_0b0de8d4.jpeg');
+const DIST_S2_PATH = path.resolve(__dirname, 'dist', 'assets', 'aistudio', 's2_610b836e.jpeg');
 const BACKEND_S1_PATH = path.resolve(__dirname, 'backend_wcg', 'assets', 's1.jpeg');
 const BACKEND_S2_PATH = path.resolve(__dirname, 'backend_wcg', 'assets', 's2.jpeg');
+const BUNDLED_FONTS_DIR = path.resolve(__dirname, 'backend_wcg', 'assets', 'fonts');
+const SYSTEM_FONTS_DIR = '/usr/share/fonts/truetype/dejavu';
 
 function ensureOutputDir() {
   if (!fs.existsSync(WCG_OUTPUT_DIR)) {
@@ -31,17 +36,69 @@ function ensureOutputDir() {
 }
 
 function resolveMultiPartAssetPaths(): { s1: string | null; s2: string | null } {
-  const s1 = fs.existsSync(PUBLIC_S1_PATH)
-    ? PUBLIC_S1_PATH
-    : fs.existsSync(BACKEND_S1_PATH)
-      ? BACKEND_S1_PATH
-      : null;
-  const s2 = fs.existsSync(PUBLIC_S2_PATH)
-    ? PUBLIC_S2_PATH
-    : fs.existsSync(BACKEND_S2_PATH)
-      ? BACKEND_S2_PATH
-      : null;
+  const s1Candidates = [PUBLIC_S1_PATH, DIST_S1_PATH, BACKEND_S1_PATH];
+  const s2Candidates = [PUBLIC_S2_PATH, DIST_S2_PATH, BACKEND_S2_PATH];
+  const s1 = s1Candidates.find((p) => fs.existsSync(p)) || null;
+  const s2 = s2Candidates.find((p) => fs.existsSync(p)) || null;
   return { s1, s2 };
+}
+
+function resolveFontsDir(): string | null {
+  if (fs.existsSync(path.join(BUNDLED_FONTS_DIR, 'DejaVuSerif.ttf'))) {
+    return BUNDLED_FONTS_DIR;
+  }
+  if (fs.existsSync(path.join(SYSTEM_FONTS_DIR, 'DejaVuSerif.ttf'))) {
+    return SYSTEM_FONTS_DIR;
+  }
+  return null;
+}
+
+function resolveFfmpegBinary(): { bin: string; source: string } | null {
+  const envBin = (process.env.FFMPEG_PATH || '').trim();
+  if (envBin && fs.existsSync(envBin)) {
+    return { bin: envBin, source: 'env:FFMPEG_PATH' };
+  }
+
+  const staticRaw =
+    typeof ffmpegStatic === 'string'
+      ? ffmpegStatic
+      : (ffmpegStatic as unknown as { default?: string })?.default || '';
+
+  if (staticRaw && fs.existsSync(staticRaw)) {
+    try {
+      if (process.platform !== 'win32') {
+        fs.chmodSync(staticRaw, 0o755);
+      }
+    } catch {}
+    return { bin: staticRaw, source: 'npm:ffmpeg-static' };
+  }
+
+  const systemCandidates = [
+    '/usr/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+    '/opt/homebrew/bin/ffmpeg',
+    '/app/node_modules/ffmpeg-static/ffmpeg',
+  ];
+  for (const candidate of systemCandidates) {
+    if (fs.existsSync(candidate)) {
+      return { bin: candidate, source: `system:${candidate}` };
+    }
+  }
+
+  const pathDirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  const exeName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  for (const dir of pathDirs) {
+    const full = path.join(dir, exeName);
+    if (fs.existsSync(full)) {
+      return { bin: full, source: `path:${full}` };
+    }
+  }
+
+  return null;
+}
+
+function escapeFfmpegFilterPath(p: string): string {
+  return p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'");
 }
 
 function getAiClient(): GoogleGenAI | null {
@@ -259,15 +316,33 @@ export function registerWcgRoutes(app: Express) {
   // List available templates and asset readiness
   app.get('/api/wcg/templates', (_req, res) => {
     const { s1, s2 } = resolveMultiPartAssetPaths();
+    const ffmpegResolved = resolveFfmpegBinary();
+    const fontsDir = resolveFontsDir();
     res.json({
       ok: true,
       templates: WCG_TEMPLATES,
       assetsReady: {
         part1S1: Boolean(s1),
         part2S2: Boolean(s2),
+        ffmpegAvailable: Boolean(ffmpegResolved),
+        ffmpegSource: ffmpegResolved?.source || null,
+        fontsReady: Boolean(fontsDir),
         pythonBackendDir: fs.existsSync(path.resolve(__dirname, 'backend_wcg', 'main.py')),
         externalPythonUrlConfigured: Boolean((process.env.WCG_PYTHON_URL || '').trim()),
       },
+    });
+  });
+
+  app.get('/api/wcg/diagnostics', (_req, res) => {
+    const { s1, s2 } = resolveMultiPartAssetPaths();
+    const ffmpegResolved = resolveFfmpegBinary();
+    const fontsDir = resolveFontsDir();
+    res.json({
+      ok: Boolean(ffmpegResolved),
+      ffmpeg: ffmpegResolved,
+      fontsDir,
+      assets: { s1, s2 },
+      outputDir: WCG_OUTPUT_DIR,
     });
   });
 
@@ -436,11 +511,21 @@ Keep spacingScale between 0.90 and 1.12.`;
     fs.mkdirSync(tmpDir, { recursive: true });
 
     try {
+      const ffmpegResolved = resolveFfmpegBinary();
+      if (!ffmpegResolved) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        return res.status(500).json({
+          ok: false,
+          error:
+            'FFmpeg binary container mein nahi mila. Package.json mein ffmpeg-static install karein ya FFMPEG_PATH / Dockerfile ffmpeg configure karein.',
+        });
+      }
+      const ffmpegBin = ffmpegResolved.bin;
+      const fontsDir = resolveFontsDir();
+
       const xfadeDur = 0.9;
       const partDur = Number(((durationSeconds + xfadeDur) / 2).toFixed(2));
-      const fontName = fs.existsSync('/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf')
-        ? 'DejaVu Serif'
-        : 'DejaVu Sans';
+      const fontName = fontsDir ? 'DejaVu Serif' : 'Sans';
 
       const ass1Content = buildTypewriterAssFile(
         [
@@ -484,8 +569,9 @@ Keep spacingScale between 0.90 and 1.12.`;
       const { s1, s2 } = resolveMultiPartAssetPaths();
       const useUploadedImages = template.id === 'pakistani-emerald-mehndi-multipart' && Boolean(s1 && s2);
 
-      const ass1Esc = ass1Path.replace(/:/g, '\\:').replace(/'/g, "\\'");
-      const ass2Esc = ass2Path.replace(/:/g, '\\:').replace(/'/g, "\\'");
+      const ass1Esc = escapeFfmpegFilterPath(ass1Path);
+      const ass2Esc = escapeFfmpegFilterPath(ass2Path);
+      const fontsOpt = fontsDir ? `:fontsdir='${escapeFfmpegFilterPath(fontsDir)}'` : '';
       const xfadeOffset = Math.max(2, partDur - xfadeDur).toFixed(2);
       const xfadeMode =
         styling.transitionStyle === 'slideup'
@@ -505,34 +591,34 @@ Keep spacingScale between 0.90 and 1.12.`;
           ? `,drawbox=x=295:y=415:w=510:h=860:color=0x196134@0.98:t=fill`
           : '';
 
-        // Bake the blurred ambient canvas + card artwork + clean patch ONCE per part (1 frame each = ~0.2s)
         await Promise.all([
-          execFileAsync('ffmpeg', [
+          execFileAsync(ffmpegBin, [
             '-y', '-i', s1,
             '-filter_complex',
-            `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p1Mask}`,
+            `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p1Mask},vignette=PI/6`,
             '-frames:v', '1',
             p1BakedPath,
           ]),
-          execFileAsync('ffmpeg', [
+          execFileAsync(ffmpegBin, [
             '-y', '-i', s2,
             '-filter_complex',
-            `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p2Mask}`,
+            `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p2Mask},vignette=PI/6`,
             '-frames:v', '1',
             p2BakedPath,
           ]),
         ]);
 
         const filterComplex = [
-          `[0:v]ass='${ass1Esc}',format=yuv420p[v1]`,
-          `[1:v]ass='${ass2Esc}',format=yuv420p[v2]`,
-          `[v1][v2]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${xfadeOffset},vignette=PI/6,format=yuv420p[vout]`,
+          `[0:v]ass='${ass1Esc}'${fontsOpt},format=yuv420p[v1]`,
+          `[1:v]ass='${ass2Esc}'${fontsOpt},format=yuv420p[v2]`,
+          `[v1][v2]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${xfadeOffset},format=yuv420p[vout]`,
         ].join(';');
 
         await execFileAsync(
-          'ffmpeg',
+          ffmpegBin,
           [
             '-y',
+            '-threads', '2',
             '-loop', '1', '-t', String(partDur), '-framerate', '24', '-i', p1BakedPath,
             '-loop', '1', '-t', String(partDur), '-framerate', '24', '-i', p2BakedPath,
             '-filter_complex', filterComplex,
@@ -541,14 +627,14 @@ Keep spacingScale between 0.90 and 1.12.`;
             '-c:v', 'libx264',
             '-preset', 'ultrafast',
             '-crf', '22',
+            '-threads', '2',
             '-pix_fmt', 'yuv420p',
             '-movflags', '+faststart',
             outPath,
           ],
-          { timeout: 60000 }
+          { timeout: 120000 }
         );
       } else {
-        // Programmatic luxury Pakistani architectural double-bordered card render for all 11 other themes
         const pColor = hexToFfmpegColor(styling.primaryColor, '0x4E0D19');
         const sColor = hexToFfmpegColor(styling.secondaryColor, '0x2D070F');
         const aColor = hexToFfmpegColor(styling.accentColor, '0xE6C275');
@@ -564,26 +650,27 @@ Keep spacingScale between 0.90 and 1.12.`;
         ].join(',');
 
         await Promise.all([
-          execFileAsync('ffmpeg', [
+          execFileAsync(ffmpegBin, [
             '-y', '-f', 'lavfi', '-i', `color=c=${pColor}:s=1080x1920:d=1:r=1`,
             '-vf', `${frameDeco},vignette=PI/6`, '-frames:v', '1', p1BakedPath,
           ]),
-          execFileAsync('ffmpeg', [
+          execFileAsync(ffmpegBin, [
             '-y', '-f', 'lavfi', '-i', `color=c=${sColor}:s=1080x1920:d=1:r=1`,
             '-vf', `${frameDeco},vignette=PI/6`, '-frames:v', '1', p2BakedPath,
           ]),
         ]);
 
         const filterComplex = [
-          `[0:v]ass='${ass1Esc}',format=yuv420p[v1]`,
-          `[1:v]ass='${ass2Esc}',format=yuv420p[v2]`,
+          `[0:v]ass='${ass1Esc}'${fontsOpt},format=yuv420p[v1]`,
+          `[1:v]ass='${ass2Esc}'${fontsOpt},format=yuv420p[v2]`,
           `[v1][v2]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${xfadeOffset},format=yuv420p[vout]`,
         ].join(';');
 
         await execFileAsync(
-          'ffmpeg',
+          ffmpegBin,
           [
             '-y',
+            '-threads', '2',
             '-loop', '1', '-t', String(partDur), '-framerate', '24', '-i', p1BakedPath,
             '-loop', '1', '-t', String(partDur), '-framerate', '24', '-i', p2BakedPath,
             '-filter_complex', filterComplex,
@@ -592,11 +679,12 @@ Keep spacingScale between 0.90 and 1.12.`;
             '-c:v', 'libx264',
             '-preset', 'ultrafast',
             '-crf', '22',
+            '-threads', '2',
             '-pix_fmt', 'yuv420p',
             '-movflags', '+faststart',
             outPath,
           ],
-          { timeout: 60000 }
+          { timeout: 120000 }
         );
       }
 

@@ -32,17 +32,22 @@ def _load_font(size: int, style: str = "serif", bold: bool = False) -> ImageFont
     if style == "script":
         candidates.extend([
             str(ASSETS_DIR / "fonts" / "GreatVibes-Regular.ttf"),
+            str(ASSETS_DIR / "fonts" / "DejaVuSerif-Bold.ttf"),
             "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
         ])
     elif bold:
         candidates.extend([
             str(ASSETS_DIR / "fonts" / "Cinzel-Bold.ttf"),
+            str(ASSETS_DIR / "fonts" / "DejaVuSerif-Bold.ttf"),
+            str(ASSETS_DIR / "fonts" / "DejaVuSans-Bold.ttf"),
             "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
         ])
     else:
         candidates.extend([
             str(ASSETS_DIR / "fonts" / "CormorantGaramond-SemiBold.ttf"),
+            str(ASSETS_DIR / "fonts" / "DejaVuSerif.ttf"),
+            str(ASSETS_DIR / "fonts" / "DejaVuSans.ttf"),
             "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         ])
