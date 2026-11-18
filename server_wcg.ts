@@ -205,11 +205,13 @@ function buildTypewriterAssFile(
       const styleTags = `${spec.bold ? '\\b1' : '\\b0'}${spec.italic ? '\\i1' : '\\i0'}`;
 
       let animatedChars = '';
-      for (const ch of Array.from(lineStr)) {
+      const chars = Array.from(lineStr);
+      for (let cIdx = 0; cIdx < chars.length; cIdx += 3) {
+        const chunk = chars.slice(cIdx, cIdx + 3).join('');
         const t1 = charCursor * perCharMs;
-        const t2 = t1 + 75;
-        animatedChars += `{\\alpha&HFF&\\t(${t1},${t2},\\alpha&H00&)}${escapeAssText(ch)}`;
-        charCursor += 1;
+        const t2 = t1 + 90;
+        animatedChars += `{\\alpha&HFF&\\t(${t1},${t2},\\alpha&H00&)}${escapeAssText(chunk)}`;
+        charCursor += chunk.length;
       }
 
       const tStart = formatAssTime(spec.revealOffsetSec);
@@ -310,6 +312,25 @@ async function generateFallbackTrends(query: string, category: string): Promise<
   };
 }
 
+interface WcgJobRecord {
+  jobId: string;
+  status: 'rendering' | 'completed' | 'failed';
+  startedAt: number;
+  result?: Record<string, any>;
+  error?: string;
+}
+
+const WCG_JOBS = new Map<string, WcgJobRecord>();
+
+function pruneOldWcgJobs() {
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  for (const [id, job] of WCG_JOBS.entries()) {
+    if (job.startedAt < cutoff) {
+      WCG_JOBS.delete(id);
+    }
+  }
+}
+
 export function registerWcgRoutes(app: Express) {
   ensureOutputDir();
 
@@ -344,6 +365,21 @@ export function registerWcgRoutes(app: Express) {
       assets: { s1, s2 },
       outputDir: WCG_OUTPUT_DIR,
     });
+  });
+
+  app.get('/api/wcg/jobs/:jobId', (req, res) => {
+    const job = WCG_JOBS.get(req.params.jobId);
+    if (!job) {
+      return res.status(404).json({ ok: false, status: 'failed', error: 'Render job not found or expired' });
+    }
+    const elapsedSec = Math.max(0, Math.round((Date.now() - job.startedAt) / 1000));
+    if (job.status === 'completed' && job.result) {
+      return res.json({ ...job.result, status: 'completed', jobId: job.jobId, elapsedSec });
+    }
+    if (job.status === 'failed') {
+      return res.status(500).json({ ok: false, status: 'failed', jobId: job.jobId, elapsedSec, error: job.error || 'Render failed' });
+    }
+    return res.json({ ok: true, status: 'rendering', jobId: job.jobId, elapsedSec });
   });
 
   // Online Adaptive AI Trend Verifier using @google/genai + Google Search Grounding
@@ -458,9 +494,10 @@ Keep spacingScale between 0.90 and 1.12.`;
     }
   });
 
-  // Render 9:16 18-20s multi-part wedding card video (delegates to WCG_PYTHON_URL if set, else native FFmpeg + LibASS)
+  // Render 9:16 18-20s multi-part wedding card video (delegates to WCG_PYTHON_URL if set, else fast 720x1280 FFmpeg background job)
   app.post('/api/wcg/render', async (req, res) => {
     ensureOutputDir();
+    pruneOldWcgJobs();
     const body = req.body || {};
     const template = findWcgTemplate(String(body.templateId || 'pakistani-emerald-mehndi-multipart'));
     const durationSeconds = Math.max(18, Math.min(20, Number(body.durationSeconds || 19)));
@@ -492,6 +529,7 @@ Keep spacingScale between 0.90 and 1.12.`;
           const remoteUrl = `${pythonServiceUrl}${pyJson.downloadPath}`;
           return res.json({
             ok: true,
+            status: 'completed',
             filename: pyJson.filename,
             videoUrl: remoteUrl,
             downloadUrl: remoteUrl,
@@ -506,210 +544,209 @@ Keep spacingScale between 0.90 and 1.12.`;
       }
     }
 
-    const jobId = `wcg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const tmpDir = path.join(WCG_OUTPUT_DIR, `tmp_${jobId}`);
-    fs.mkdirSync(tmpDir, { recursive: true });
-
-    try {
-      const ffmpegResolved = resolveFfmpegBinary();
-      if (!ffmpegResolved) {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-        return res.status(500).json({
-          ok: false,
-          error:
-            'FFmpeg binary container mein nahi mila. Package.json mein ffmpeg-static install karein ya FFMPEG_PATH / Dockerfile ffmpeg configure karein.',
-        });
-      }
-      const ffmpegBin = ffmpegResolved.bin;
-      const fontsDir = resolveFontsDir();
-
-      const xfadeDur = 0.9;
-      const partDur = Number(((durationSeconds + xfadeDur) / 2).toFixed(2));
-      const fontName = fontsDir ? 'DejaVu Serif' : 'Sans';
-
-      const ass1Content = buildTypewriterAssFile(
-        [
-          { text: card.invocation, x: 540, y: 545, fontSize: 22, isAccent: true, bold: true, revealOffsetSec: 0.35, typeDurationSec: 1.0, maxCharsPerLine: 44 },
-          { text: card.hostLine1, x: 540, y: 650, fontSize: 40, bold: true, revealOffsetSec: 1.2, typeDurationSec: 1.2, maxCharsPerLine: 32 },
-          { text: card.relationLine1, x: 540, y: 745, fontSize: 27, italic: true, revealOffsetSec: 2.3, typeDurationSec: 1.5, maxCharsPerLine: 38 },
-          { text: card.hostLine2, x: 540, y: 865, fontSize: 40, isAccent: true, bold: true, revealOffsetSec: 3.7, typeDurationSec: 1.2, maxCharsPerLine: 32 },
-          { text: card.relationLine2, x: 540, y: 955, fontSize: 27, italic: true, revealOffsetSec: 4.8, typeDurationSec: 1.4, maxCharsPerLine: 38 },
-          { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 1055, fontSize: 50, isAccent: true, bold: true, italic: true, revealOffsetSec: 6.0, typeDurationSec: 1.1, maxCharsPerLine: 28 },
-          { text: `${card.specialTitle}  ·  ${card.specialNames}`, x: 540, y: 1170, fontSize: 26, revealOffsetSec: 7.0, typeDurationSec: 1.2, maxCharsPerLine: 38 },
-        ],
-        partDur,
-        styling,
-        fontName
-      );
-
-      const ass2Content = buildTypewriterAssFile(
-        [
-          { text: card.part2Blessing, x: 540, y: 485, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 0.4, typeDurationSec: 0.85, maxCharsPerLine: 30 },
-          { text: card.part2Intro, x: 540, y: 560, fontSize: 23, revealOffsetSec: 1.1, typeDurationSec: 1.0, maxCharsPerLine: 42 },
-          { text: card.eventTitle, x: 540, y: 655, fontSize: 74, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.9, typeDurationSec: 1.1, maxCharsPerLine: 22 },
-          { text: card.eventSubtitle, x: 540, y: 745, fontSize: 31, italic: true, revealOffsetSec: 2.85, typeDurationSec: 1.0, maxCharsPerLine: 34 },
-          { text: `Programme  ·  ${card.weddingDate}`, x: 540, y: 855, fontSize: 34, isAccent: true, bold: true, revealOffsetSec: 3.75, typeDurationSec: 1.3, maxCharsPerLine: 36 },
-          { text: card.timing1, x: 540, y: 940, fontSize: 29, revealOffsetSec: 4.9, typeDurationSec: 1.0, maxCharsPerLine: 38 },
-          { text: card.timing2, x: 540, y: 1000, fontSize: 29, revealOffsetSec: 5.7, typeDurationSec: 1.0, maxCharsPerLine: 38 },
-          { text: card.venueName, x: 540, y: 1120, fontSize: 38, isAccent: true, bold: true, revealOffsetSec: 6.5, typeDurationSec: 1.0, maxCharsPerLine: 32 },
-          { text: card.venueAddress, x: 540, y: 1205, fontSize: 25, revealOffsetSec: 7.3, typeDurationSec: 1.35, maxCharsPerLine: 38 },
-        ],
-        partDur,
-        styling,
-        fontName
-      );
-
-      const ass1Path = path.join(tmpDir, 'part1.ass');
-      const ass2Path = path.join(tmpDir, 'part2.ass');
-      fs.writeFileSync(ass1Path, ass1Content, 'utf8');
-      fs.writeFileSync(ass2Path, ass2Content, 'utf8');
-
-      const outFilename = `${jobId}.mp4`;
-      const outPath = path.join(WCG_OUTPUT_DIR, outFilename);
-      const { s1, s2 } = resolveMultiPartAssetPaths();
-      const useUploadedImages = template.id === 'pakistani-emerald-mehndi-multipart' && Boolean(s1 && s2);
-
-      const ass1Esc = escapeFfmpegFilterPath(ass1Path);
-      const ass2Esc = escapeFfmpegFilterPath(ass2Path);
-      const fontsOpt = fontsDir ? `:fontsdir='${escapeFfmpegFilterPath(fontsDir)}'` : '';
-      const xfadeOffset = Math.max(2, partDur - xfadeDur).toFixed(2);
-      const xfadeMode =
-        styling.transitionStyle === 'slideup'
-          ? 'slideup'
-          : styling.transitionStyle === 'wipeup'
-            ? 'wipeup'
-            : 'fade';
-
-      if (useUploadedImages && s1 && s2) {
-        const p1BakedPath = path.join(tmpDir, 'p1_bg.png');
-        const p2BakedPath = path.join(tmpDir, 'p2_bg.png');
-
-        const p1Mask = styling.cleanSampleText
-          ? `,drawbox=x=265:y=465:w=550:h=795:color=0x1B7A72@0.98:t=fill`
-          : '';
-        const p2Mask = styling.cleanSampleText
-          ? `,drawbox=x=295:y=415:w=510:h=860:color=0x196134@0.98:t=fill`
-          : '';
-
-        await Promise.all([
-          execFileAsync(ffmpegBin, [
-            '-y', '-i', s1,
-            '-filter_complex',
-            `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p1Mask},vignette=PI/6`,
-            '-frames:v', '1',
-            p1BakedPath,
-          ]),
-          execFileAsync(ffmpegBin, [
-            '-y', '-i', s2,
-            '-filter_complex',
-            `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p2Mask},vignette=PI/6`,
-            '-frames:v', '1',
-            p2BakedPath,
-          ]),
-        ]);
-
-        const filterComplex = [
-          `[0:v]ass='${ass1Esc}'${fontsOpt},format=yuv420p[v1]`,
-          `[1:v]ass='${ass2Esc}'${fontsOpt},format=yuv420p[v2]`,
-          `[v1][v2]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${xfadeOffset},format=yuv420p[vout]`,
-        ].join(';');
-
-        await execFileAsync(
-          ffmpegBin,
-          [
-            '-y',
-            '-threads', '2',
-            '-loop', '1', '-t', String(partDur), '-framerate', '24', '-i', p1BakedPath,
-            '-loop', '1', '-t', String(partDur), '-framerate', '24', '-i', p2BakedPath,
-            '-filter_complex', filterComplex,
-            '-map', '[vout]',
-            '-r', '24',
-            '-c:v', 'libx264',
-            '-preset', 'ultrafast',
-            '-crf', '22',
-            '-threads', '2',
-            '-pix_fmt', 'yuv420p',
-            '-movflags', '+faststart',
-            outPath,
-          ],
-          { timeout: 120000 }
-        );
-      } else {
-        const pColor = hexToFfmpegColor(styling.primaryColor, '0x4E0D19');
-        const sColor = hexToFfmpegColor(styling.secondaryColor, '0x2D070F');
-        const aColor = hexToFfmpegColor(styling.accentColor, '0xE6C275');
-
-        const p1BakedPath = path.join(tmpDir, 'p1_bg.png');
-        const p2BakedPath = path.join(tmpDir, 'p2_bg.png');
-        const frameDeco = [
-          `drawbox=x=44:y=44:w=992:h=1832:color=${aColor}@0.82:t=4`,
-          `drawbox=x=64:y=64:w=952:h=1792:color=${aColor}@0.45:t=2`,
-          `drawbox=x=115:y=290:w=850:h=1340:color=${aColor}@0.28:t=2`,
-          `drawbox=x=150:y=1100:w=780:h=155:color=${sColor}@0.45:t=fill`,
-          `drawbox=x=150:y=1100:w=780:h=155:color=${aColor}@0.65:t=2`,
-        ].join(',');
-
-        await Promise.all([
-          execFileAsync(ffmpegBin, [
-            '-y', '-f', 'lavfi', '-i', `color=c=${pColor}:s=1080x1920:d=1:r=1`,
-            '-vf', `${frameDeco},vignette=PI/6`, '-frames:v', '1', p1BakedPath,
-          ]),
-          execFileAsync(ffmpegBin, [
-            '-y', '-f', 'lavfi', '-i', `color=c=${sColor}:s=1080x1920:d=1:r=1`,
-            '-vf', `${frameDeco},vignette=PI/6`, '-frames:v', '1', p2BakedPath,
-          ]),
-        ]);
-
-        const filterComplex = [
-          `[0:v]ass='${ass1Esc}'${fontsOpt},format=yuv420p[v1]`,
-          `[1:v]ass='${ass2Esc}'${fontsOpt},format=yuv420p[v2]`,
-          `[v1][v2]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${xfadeOffset},format=yuv420p[vout]`,
-        ].join(';');
-
-        await execFileAsync(
-          ffmpegBin,
-          [
-            '-y',
-            '-threads', '2',
-            '-loop', '1', '-t', String(partDur), '-framerate', '24', '-i', p1BakedPath,
-            '-loop', '1', '-t', String(partDur), '-framerate', '24', '-i', p2BakedPath,
-            '-filter_complex', filterComplex,
-            '-map', '[vout]',
-            '-r', '24',
-            '-c:v', 'libx264',
-            '-preset', 'ultrafast',
-            '-crf', '22',
-            '-threads', '2',
-            '-pix_fmt', 'yuv420p',
-            '-movflags', '+faststart',
-            outPath,
-          ],
-          { timeout: 120000 }
-        );
-      }
-
-      // Clean up temporary ASS scripts
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-
-      const videoUrl = `/api/wcg/download/${outFilename}`;
-      res.json({
-        ok: true,
-        filename: outFilename,
-        videoUrl,
-        downloadUrl: `${videoUrl}?download=1`,
-        durationSeconds,
-        resolution: '1080x1920',
-        engine: 'ffmpeg-libass-typewriter',
-        multiPart: true,
-      });
-    } catch (err: any) {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-      console.error('[WCG Render Error]:', err);
-      res.status(500).json({
+    const ffmpegResolved = resolveFfmpegBinary();
+    if (!ffmpegResolved) {
+      return res.status(500).json({
         ok: false,
-        error: err?.message || 'Wedding card video render failed',
+        error:
+          'FFmpeg binary container mein nahi mila. Package.json mein ffmpeg-static install karein ya FFMPEG_PATH / Dockerfile ffmpeg configure karein.',
       });
     }
+
+    const jobId = `wcg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const jobRecord: WcgJobRecord = {
+      jobId,
+      status: 'rendering',
+      startedAt: Date.now(),
+    };
+    WCG_JOBS.set(jobId, jobRecord);
+
+    const runRenderTask = async () => {
+      const tmpDir = path.join(WCG_OUTPUT_DIR, `tmp_${jobId}`);
+      fs.mkdirSync(tmpDir, { recursive: true });
+      try {
+        const ffmpegBin = ffmpegResolved.bin;
+        const fontsDir = resolveFontsDir();
+        const xfadeDur = 0.8;
+        const partDur = Number(((durationSeconds + xfadeDur) / 2).toFixed(2));
+        const fontName = fontsDir ? 'DejaVu Serif' : 'Sans';
+        const fps = 15;
+
+        const ass1Content = buildTypewriterAssFile(
+          [
+            { text: card.invocation, x: 540, y: 545, fontSize: 22, isAccent: true, bold: true, revealOffsetSec: 0.35, typeDurationSec: 1.0, maxCharsPerLine: 44 },
+            { text: card.hostLine1, x: 540, y: 650, fontSize: 40, bold: true, revealOffsetSec: 1.2, typeDurationSec: 1.2, maxCharsPerLine: 32 },
+            { text: card.relationLine1, x: 540, y: 745, fontSize: 27, italic: true, revealOffsetSec: 2.3, typeDurationSec: 1.5, maxCharsPerLine: 38 },
+            { text: card.hostLine2, x: 540, y: 865, fontSize: 40, isAccent: true, bold: true, revealOffsetSec: 3.7, typeDurationSec: 1.2, maxCharsPerLine: 32 },
+            { text: card.relationLine2, x: 540, y: 955, fontSize: 27, italic: true, revealOffsetSec: 4.8, typeDurationSec: 1.4, maxCharsPerLine: 38 },
+            { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 1055, fontSize: 50, isAccent: true, bold: true, italic: true, revealOffsetSec: 6.0, typeDurationSec: 1.1, maxCharsPerLine: 28 },
+            { text: `${card.specialTitle}  ·  ${card.specialNames}`, x: 540, y: 1170, fontSize: 26, revealOffsetSec: 7.0, typeDurationSec: 1.2, maxCharsPerLine: 38 },
+          ],
+          partDur,
+          styling,
+          fontName
+        );
+
+        const ass2Content = buildTypewriterAssFile(
+          [
+            { text: card.part2Blessing, x: 540, y: 485, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 0.4, typeDurationSec: 0.85, maxCharsPerLine: 30 },
+            { text: card.part2Intro, x: 540, y: 560, fontSize: 23, revealOffsetSec: 1.1, typeDurationSec: 1.0, maxCharsPerLine: 42 },
+            { text: card.eventTitle, x: 540, y: 655, fontSize: 74, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.9, typeDurationSec: 1.1, maxCharsPerLine: 22 },
+            { text: card.eventSubtitle, x: 540, y: 745, fontSize: 31, italic: true, revealOffsetSec: 2.85, typeDurationSec: 1.0, maxCharsPerLine: 34 },
+            { text: `Programme  ·  ${card.weddingDate}`, x: 540, y: 855, fontSize: 34, isAccent: true, bold: true, revealOffsetSec: 3.75, typeDurationSec: 1.3, maxCharsPerLine: 36 },
+            { text: card.timing1, x: 540, y: 940, fontSize: 29, revealOffsetSec: 4.9, typeDurationSec: 1.0, maxCharsPerLine: 38 },
+            { text: card.timing2, x: 540, y: 1000, fontSize: 29, revealOffsetSec: 5.7, typeDurationSec: 1.0, maxCharsPerLine: 38 },
+            { text: card.venueName, x: 540, y: 1120, fontSize: 38, isAccent: true, bold: true, revealOffsetSec: 6.5, typeDurationSec: 1.0, maxCharsPerLine: 32 },
+            { text: card.venueAddress, x: 540, y: 1205, fontSize: 25, revealOffsetSec: 7.3, typeDurationSec: 1.35, maxCharsPerLine: 38 },
+          ],
+          partDur,
+          styling,
+          fontName
+        );
+
+        const ass1Path = path.join(tmpDir, 'part1.ass');
+        const ass2Path = path.join(tmpDir, 'part2.ass');
+        fs.writeFileSync(ass1Path, ass1Content, 'utf8');
+        fs.writeFileSync(ass2Path, ass2Content, 'utf8');
+
+        const outFilename = `${jobId}.mp4`;
+        const outPath = path.join(WCG_OUTPUT_DIR, outFilename);
+        const { s1, s2 } = resolveMultiPartAssetPaths();
+        const useUploadedImages = template.id === 'pakistani-emerald-mehndi-multipart' && Boolean(s1 && s2);
+
+        const ass1Esc = escapeFfmpegFilterPath(ass1Path);
+        const ass2Esc = escapeFfmpegFilterPath(ass2Path);
+        const fontsOpt = fontsDir ? `:fontsdir='${escapeFfmpegFilterPath(fontsDir)}'` : '';
+        const xfadeOffset = Math.max(2, partDur - xfadeDur).toFixed(2);
+        const xfadeMode =
+          styling.transitionStyle === 'slideup'
+            ? 'slideup'
+            : styling.transitionStyle === 'wipeup'
+              ? 'wipeup'
+              : 'fade';
+
+        const p1BakedPath = path.join(tmpDir, 'p1_bg.png');
+        const p2BakedPath = path.join(tmpDir, 'p2_bg.png');
+
+        if (useUploadedImages && s1 && s2) {
+          const p1Mask = styling.cleanSampleText
+            ? `,drawbox=x=265:y=465:w=550:h=795:color=0x1B7A72@0.98:t=fill`
+            : '';
+          const p2Mask = styling.cleanSampleText
+            ? `,drawbox=x=295:y=415:w=510:h=860:color=0x196134@0.98:t=fill`
+            : '';
+
+          // Bake crisp 720x1280 still frames ONCE per part (4.5x faster loop encode on Render Free Tier)
+          await Promise.all([
+            execFileAsync(ffmpegBin, [
+              '-y', '-i', s1,
+              '-filter_complex',
+              `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p1Mask},vignette=PI/6,scale=720:1280`,
+              '-frames:v', '1',
+              p1BakedPath,
+            ]),
+            execFileAsync(ffmpegBin, [
+              '-y', '-i', s2,
+              '-filter_complex',
+              `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p2Mask},vignette=PI/6,scale=720:1280`,
+              '-frames:v', '1',
+              p2BakedPath,
+            ]),
+          ]);
+        } else {
+          const pColor = hexToFfmpegColor(styling.primaryColor, '0x4E0D19');
+          const sColor = hexToFfmpegColor(styling.secondaryColor, '0x2D070F');
+          const aColor = hexToFfmpegColor(styling.accentColor, '0xE6C275');
+
+          const frameDeco = [
+            `drawbox=x=44:y=44:w=992:h=1832:color=${aColor}@0.82:t=4`,
+            `drawbox=x=64:y=64:w=952:h=1792:color=${aColor}@0.45:t=2`,
+            `drawbox=x=115:y=290:w=850:h=1340:color=${aColor}@0.28:t=2`,
+            `drawbox=x=150:y=1100:w=780:h=155:color=${sColor}@0.45:t=fill`,
+            `drawbox=x=150:y=1100:w=780:h=155:color=${aColor}@0.65:t=2`,
+          ].join(',');
+
+          await Promise.all([
+            execFileAsync(ffmpegBin, [
+              '-y', '-f', 'lavfi', '-i', `color=c=${pColor}:s=1080x1920:d=1:r=1`,
+              '-vf', `${frameDeco},vignette=PI/6,scale=720:1280`, '-frames:v', '1', p1BakedPath,
+            ]),
+            execFileAsync(ffmpegBin, [
+              '-y', '-f', 'lavfi', '-i', `color=c=${sColor}:s=1080x1920:d=1:r=1`,
+              '-vf', `${frameDeco},vignette=PI/6,scale=720:1280`, '-frames:v', '1', p2BakedPath,
+            ]),
+          ]);
+        }
+
+        const filterComplex = [
+          `[0:v]ass='${ass1Esc}'${fontsOpt},format=yuv420p[v1]`,
+          `[1:v]ass='${ass2Esc}'${fontsOpt},format=yuv420p[v2]`,
+          `[v1][v2]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${xfadeOffset},format=yuv420p[vout]`,
+        ].join(';');
+
+        await execFileAsync(
+          ffmpegBin,
+          [
+            '-y',
+            '-threads', '2',
+            '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p1BakedPath,
+            '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p2BakedPath,
+            '-filter_complex', filterComplex,
+            '-map', '[vout]',
+            '-r', String(fps),
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-tune', 'stillimage',
+            '-crf', '24',
+            '-threads', '2',
+            '-pix_fmt', 'yuv420p',
+            '-movflags', '+faststart',
+            outPath,
+          ],
+          { timeout: 300000 }
+        );
+
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        const videoUrl = `/api/wcg/download/${outFilename}`;
+        jobRecord.status = 'completed';
+        jobRecord.result = {
+          ok: true,
+          status: 'completed',
+          filename: outFilename,
+          videoUrl,
+          downloadUrl: `${videoUrl}?download=1`,
+          durationSeconds,
+          resolution: '720x1280',
+          engine: `ffmpeg-hd (${ffmpegResolved.source})`,
+          multiPart: true,
+        };
+      } catch (err: any) {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        console.error('[WCG Render Error]:', err);
+        jobRecord.status = 'failed';
+        jobRecord.error = err?.message || 'Wedding card video render failed';
+      }
+    };
+
+    const backgroundPromise = runRenderTask();
+    // Wait up to 8s so fast hosts finish in one request; slower hosts (Render Free Tier) return jobId for clean polling
+    await Promise.race([
+      backgroundPromise,
+      new Promise((resolve) => setTimeout(resolve, 8000)),
+    ]);
+
+    if (jobRecord.status === 'completed' && jobRecord.result) {
+      return res.json(jobRecord.result);
+    }
+    if (jobRecord.status === 'failed') {
+      return res.status(500).json({ ok: false, error: jobRecord.error || 'Render failed' });
+    }
+    return res.json({
+      ok: true,
+      status: 'rendering',
+      jobId,
+      elapsedSec: Math.round((Date.now() - jobRecord.startedAt) / 1000),
+    });
   });
 
   // Stream or download rendered MP4 safely with HTTP Range support

@@ -205,6 +205,8 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [isRendering, setIsRendering] = useState<boolean>(false);
+  const [isBrowserExporting, setIsBrowserExporting] = useState<boolean>(false);
+  const [renderElapsedSec, setRenderElapsedSec] = useState<number>(0);
   const [renderError, setRenderError] = useState<string>('');
   const [renderResult, setRenderResult] = useState<WcgRenderResult | null>(null);
   const [copiedKey, setCopiedKey] = useState<string>('');
@@ -213,6 +215,21 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   const imgS1Ref = useRef<HTMLImageElement | null>(null);
   const imgS2Ref = useRef<HTMLImageElement | null>(null);
   const [imagesReady, setImagesReady] = useState<boolean>(false);
+  const mountedRef = useRef<boolean>(true);
+  const renderRunIdRef = useRef<number>(0);
+  const blobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      renderRunIdRef.current += 1;
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, []);
 
   // Preload s1 & s2 high-res uploaded assets for instant smooth 60fps canvas rendering
   useEffect(() => {
@@ -421,9 +438,22 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   };
 
   const handleRenderVideo = async () => {
+    const runId = ++renderRunIdRef.current;
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
     setIsRendering(true);
+    setRenderElapsedSec(0);
     setRenderError('');
     setRenderResult(null);
+
+    const startedMs = Date.now();
+    const timerInterval = window.setInterval(() => {
+      if (!mountedRef.current || renderRunIdRef.current !== runId) return;
+      setRenderElapsedSec(Math.max(1, Math.round((Date.now() - startedMs) / 1000)));
+    }, 1000);
+
     try {
       const res = await fetch('/api/wcg/render', {
         method: 'POST',
@@ -436,15 +466,152 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
         }),
       });
       const json = await res.json();
+      if (!mountedRef.current || renderRunIdRef.current !== runId) return;
+
       if (!res.ok || !json?.ok) {
         setRenderError(json?.error || 'Video render complete nahi ho saka.');
-      } else {
-        setRenderResult(json);
+        return;
       }
+
+      if (json.status === 'completed' || json.videoUrl) {
+        setRenderResult(json);
+        return;
+      }
+
+      if (json.status === 'rendering' && json.jobId) {
+        const jobId = String(json.jobId);
+        const maxWaitMs = 310_000;
+        while (mountedRef.current && renderRunIdRef.current === runId) {
+          if (Date.now() - startedMs > maxWaitMs) {
+            setRenderError('Server render limit exceeded. Neeche "Instant Browser Export" button se 1-click local export try karein.');
+            return;
+          }
+          await new Promise((r) => setTimeout(r, 1500));
+          if (!mountedRef.current || renderRunIdRef.current !== runId) return;
+
+          const pollRes = await fetch(`/api/wcg/jobs/${encodeURIComponent(jobId)}`);
+          const pollJson = await pollRes.json();
+          if (!mountedRef.current || renderRunIdRef.current !== runId) return;
+
+          if (typeof pollJson?.elapsedSec === 'number') {
+            setRenderElapsedSec(pollJson.elapsedSec);
+          }
+
+          if (pollJson?.status === 'completed' && pollJson.videoUrl) {
+            setRenderResult(pollJson);
+            return;
+          }
+          if (!pollRes.ok || pollJson?.status === 'failed') {
+            setRenderError(pollJson?.error || 'Video render complete nahi ho saka.');
+            return;
+          }
+        }
+        return;
+      }
+
+      setRenderError('Unexpected render response received from server.');
     } catch (err: any) {
-      setRenderError(err?.message || 'Render API connection fail ho gaya.');
+      if (mountedRef.current && renderRunIdRef.current === runId) {
+        setRenderError(err?.message || 'Render API connection fail ho gaya.');
+      }
     } finally {
-      setIsRendering(false);
+      window.clearInterval(timerInterval);
+      if (mountedRef.current && renderRunIdRef.current === runId) {
+        setIsRendering(false);
+      }
+    }
+  };
+
+  const handleBrowserExport = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || typeof (canvas as any).captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
+      setRenderError('Aapka browser direct Canvas MediaRecorder support nahi karta. Server MP4 render use karein.');
+      return;
+    }
+
+    const runId = ++renderRunIdRef.current;
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    setIsBrowserExporting(true);
+    setRenderError('');
+    setRenderResult(null);
+    setIsPlaying(false);
+    setCurrentTime(0);
+
+    try {
+      const stream = canvas.captureStream(24);
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+      const recorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 2_500_000,
+      });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      const stoppedPromise = new Promise<Blob>((resolve) => {
+        recorder.onstop = () => {
+          resolve(new Blob(chunks, { type: 'video/webm' }));
+        };
+      });
+
+      recorder.start(250);
+      const startTs = performance.now();
+      await new Promise<void>((resolve) => {
+        const step = (now: number) => {
+          if (!mountedRef.current || renderRunIdRef.current !== runId) {
+            resolve();
+            return;
+          }
+          const elapsed = (now - startTs) / 1000;
+          setRenderElapsedSec(Math.round(elapsed));
+          if (elapsed >= durationSeconds) {
+            setCurrentTime(durationSeconds);
+            resolve();
+            return;
+          }
+          setCurrentTime(elapsed);
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      });
+
+      if (recorder.state !== 'inactive') {
+        recorder.stop();
+      }
+      stream.getTracks().forEach((t) => t.stop());
+
+      const blob = await stoppedPromise;
+      if (!mountedRef.current || renderRunIdRef.current !== runId) return;
+
+      const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
+      const safeSlug = selectedTemplate.category.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const filename = `wcg_${safeSlug}_${Date.now()}.webm`;
+      setRenderResult({
+        ok: true,
+        filename,
+        videoUrl: url,
+        downloadUrl: url,
+        durationSeconds,
+        resolution: `${canvas.width}x${canvas.height}`,
+        engine: 'browser-canvas-webm',
+        multiPart: true,
+      });
+    } catch (err: any) {
+      if (mountedRef.current && renderRunIdRef.current === runId) {
+        setRenderError(err?.message || 'Browser export fail ho gaya.');
+      }
+    } finally {
+      if (mountedRef.current && renderRunIdRef.current === runId) {
+        setIsBrowserExporting(false);
+        setIsPlaying(true);
+      }
     }
   };
 
@@ -1042,24 +1209,46 @@ imageio-ffmpeg>=0.5.1`}
                     </div>
                   </div>
 
-                  {/* Render Button */}
-                  <button
-                    onClick={handleRenderVideo}
-                    disabled={isRendering}
-                    className="w-full mt-4 py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                  >
-                    {isRendering ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Rendering {durationSeconds}s 9:16 Video...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Film className="w-4 h-4" />
-                        <span>Render 9:16 Video ({durationSeconds}s MP4)</span>
-                      </>
-                    )}
-                  </button>
+                  {/* Render Buttons */}
+                  <div className="w-full mt-4 space-y-2">
+                    <button
+                      onClick={handleRenderVideo}
+                      disabled={isRendering || isBrowserExporting}
+                      className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      {isRendering ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>
+                            Rendering {durationSeconds}s HD 9:16 MP4{renderElapsedSec > 0 ? ` (${renderElapsedSec}s)` : '...'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Film className="w-4 h-4" />
+                          <span>Render 9:16 Video ({durationSeconds}s MP4)</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleBrowserExport}
+                      disabled={isRendering || isBrowserExporting}
+                      className="w-full py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-slate-200 font-medium text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isBrowserExporting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+                          <span>Capturing Live Preview ({renderElapsedSec}s / {durationSeconds}s)...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Instant Browser Export (.webm · Zero Server Load)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                   {renderError && (
                     <div className="w-full mt-3 p-2.5 rounded-lg bg-rose-950/50 border border-rose-500/40 text-xs text-rose-200">
@@ -1084,7 +1273,7 @@ imageio-ffmpeg>=0.5.1`}
                         className="w-full py-2 px-3 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-200 text-xs font-semibold flex items-center justify-center gap-2"
                       >
                         <Download className="w-4 h-4" />
-                        <span>Download MP4 ({renderResult.filename})</span>
+                        <span>Download Video ({renderResult.filename})</span>
                       </a>
                     </div>
                   )}
