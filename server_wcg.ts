@@ -8,9 +8,12 @@ import ffmpegStatic from 'ffmpeg-static';
 import { GoogleGenAI } from '@google/genai';
 import {
   DEFAULT_WCG_CARD_DATA,
+  WCG_MUSIC_PRESETS,
   WCG_TEMPLATES,
+  findWcgMusicPreset,
   findWcgTemplate,
   type WcgCardData,
+  type WcgRenderQuality,
   type WcgStylingConfig,
   type WcgTrendSuggestion,
 } from './src/lib/wcgTemplates';
@@ -28,6 +31,9 @@ const BACKEND_S1_PATH = path.resolve(__dirname, 'backend_wcg', 'assets', 's1.jpe
 const BACKEND_S2_PATH = path.resolve(__dirname, 'backend_wcg', 'assets', 's2.jpeg');
 const BUNDLED_FONTS_DIR = path.resolve(__dirname, 'backend_wcg', 'assets', 'fonts');
 const SYSTEM_FONTS_DIR = '/usr/share/fonts/truetype/dejavu';
+const PUBLIC_MUSIC_DIR = path.resolve(__dirname, 'public', 'assets', 'wcg-music');
+const DIST_MUSIC_DIR = path.resolve(__dirname, 'dist', 'assets', 'wcg-music');
+const BACKEND_MUSIC_DIR = path.resolve(__dirname, 'backend_wcg', 'assets', 'music');
 
 function ensureOutputDir() {
   if (!fs.existsSync(WCG_OUTPUT_DIR)) {
@@ -41,6 +47,18 @@ function resolveMultiPartAssetPaths(): { s1: string | null; s2: string | null } 
   const s1 = s1Candidates.find((p) => fs.existsSync(p)) || null;
   const s2 = s2Candidates.find((p) => fs.existsSync(p)) || null;
   return { s1, s2 };
+}
+
+function resolveMusicAssetPath(musicId?: string): string | null {
+  const preset = findWcgMusicPreset(musicId);
+  if (!preset) return null;
+  const filename = `${preset.id}.m4a`;
+  const candidates = [
+    path.join(PUBLIC_MUSIC_DIR, filename),
+    path.join(DIST_MUSIC_DIR, filename),
+    path.join(BACKEND_MUSIC_DIR, filename),
+  ];
+  return candidates.find((p) => fs.existsSync(p)) || null;
 }
 
 function resolveFontsDir(): string | null {
@@ -354,15 +372,25 @@ export function registerWcgRoutes(app: Express) {
     });
   });
 
+  app.get('/api/wcg/music', (_req, res) => {
+    const presets = WCG_MUSIC_PRESETS.map((p) => ({
+      ...p,
+      available: Boolean(resolveMusicAssetPath(p.id)),
+    }));
+    res.json({ ok: true, presets });
+  });
+
   app.get('/api/wcg/diagnostics', (_req, res) => {
     const { s1, s2 } = resolveMultiPartAssetPaths();
     const ffmpegResolved = resolveFfmpegBinary();
     const fontsDir = resolveFontsDir();
+    const musicReadyCount = WCG_MUSIC_PRESETS.filter((p) => Boolean(resolveMusicAssetPath(p.id))).length;
     res.json({
       ok: Boolean(ffmpegResolved),
       ffmpeg: ffmpegResolved,
       fontsDir,
       assets: { s1, s2 },
+      musicReadyCount,
       outputDir: WCG_OUTPUT_DIR,
     });
   });
@@ -494,13 +522,16 @@ Keep spacingScale between 0.90 and 1.12.`;
     }
   });
 
-  // Render 9:16 18-20s multi-part wedding card video (delegates to WCG_PYTHON_URL if set, else fast 720x1280 FFmpeg background job)
+  // Render 9:16 18-20s multi-part wedding card MP4 with optional background music preset
   app.post('/api/wcg/render', async (req, res) => {
     ensureOutputDir();
     pruneOldWcgJobs();
     const body = req.body || {};
     const template = findWcgTemplate(String(body.templateId || 'pakistani-emerald-mehndi-multipart'));
     const durationSeconds = Math.max(18, Math.min(20, Number(body.durationSeconds || 19)));
+    const quality: WcgRenderQuality = body.quality === '720p' ? '720p' : '1080p';
+    const musicId = typeof body.musicId === 'string' ? body.musicId.trim() : 'mehndi-laga-ke-rakhna';
+    const musicVolume = Math.max(0, Math.min(1, Number(body.musicVolume ?? 0.78)));
 
     const card: WcgCardData = {
       ...DEFAULT_WCG_CARD_DATA,
@@ -520,6 +551,9 @@ Keep spacingScale between 0.90 and 1.12.`;
           body: JSON.stringify({
             templateId: template.id,
             durationSeconds,
+            quality,
+            musicId,
+            musicVolume,
             card,
             styling,
           }),
@@ -534,9 +568,10 @@ Keep spacingScale between 0.90 and 1.12.`;
             videoUrl: remoteUrl,
             downloadUrl: remoteUrl,
             durationSeconds,
-            resolution: '1080x1920',
+            resolution: quality === '720p' ? '720x1280' : '1080x1920',
             engine: 'onrender-python-moviepy',
             multiPart: true,
+            musicId,
           });
         }
       } catch (pyErr) {
@@ -570,17 +605,22 @@ Keep spacingScale between 0.90 and 1.12.`;
         const xfadeDur = 0.8;
         const partDur = Number(((durationSeconds + xfadeDur) / 2).toFixed(2));
         const fontName = fontsDir ? 'DejaVu Serif' : 'Sans';
-        const fps = 15;
+        const isFullHd = quality === '1080p';
+        const targetW = isFullHd ? 1080 : 720;
+        const targetH = isFullHd ? 1920 : 1280;
+        const fps = isFullHd ? 18 : 15;
+        const crf = isFullHd ? '20' : '22';
+        const timeScale = partDur / 9.9;
 
         const ass1Content = buildTypewriterAssFile(
           [
-            { text: card.invocation, x: 540, y: 545, fontSize: 22, isAccent: true, bold: true, revealOffsetSec: 0.35, typeDurationSec: 1.0, maxCharsPerLine: 44 },
-            { text: card.hostLine1, x: 540, y: 650, fontSize: 40, bold: true, revealOffsetSec: 1.2, typeDurationSec: 1.2, maxCharsPerLine: 32 },
-            { text: card.relationLine1, x: 540, y: 745, fontSize: 27, italic: true, revealOffsetSec: 2.3, typeDurationSec: 1.5, maxCharsPerLine: 38 },
-            { text: card.hostLine2, x: 540, y: 865, fontSize: 40, isAccent: true, bold: true, revealOffsetSec: 3.7, typeDurationSec: 1.2, maxCharsPerLine: 32 },
-            { text: card.relationLine2, x: 540, y: 955, fontSize: 27, italic: true, revealOffsetSec: 4.8, typeDurationSec: 1.4, maxCharsPerLine: 38 },
-            { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 1055, fontSize: 50, isAccent: true, bold: true, italic: true, revealOffsetSec: 6.0, typeDurationSec: 1.1, maxCharsPerLine: 28 },
-            { text: `${card.specialTitle}  ·  ${card.specialNames}`, x: 540, y: 1170, fontSize: 26, revealOffsetSec: 7.0, typeDurationSec: 1.2, maxCharsPerLine: 38 },
+            { text: card.invocation, x: 540, y: 565, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.3 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 34 },
+            { text: card.hostLine1, x: 540, y: 655, fontSize: 38, bold: true, revealOffsetSec: 1.05 * timeScale, typeDurationSec: 1.05 * timeScale, maxCharsPerLine: 28 },
+            { text: card.relationLine1, x: 540, y: 745, fontSize: 25, italic: true, revealOffsetSec: 2.0 * timeScale, typeDurationSec: 1.2 * timeScale, maxCharsPerLine: 34 },
+            { text: card.hostLine2, x: 540, y: 855, fontSize: 38, isAccent: true, bold: true, revealOffsetSec: 3.15 * timeScale, typeDurationSec: 1.05 * timeScale, maxCharsPerLine: 28 },
+            { text: card.relationLine2, x: 540, y: 940, fontSize: 25, italic: true, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 1.15 * timeScale, maxCharsPerLine: 34 },
+            { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 1035, fontSize: 48, isAccent: true, bold: true, italic: true, revealOffsetSec: 5.15 * timeScale, typeDurationSec: 1.0 * timeScale, maxCharsPerLine: 24 },
+            { text: `${card.specialTitle}  ·  ${card.specialNames}`, x: 540, y: 1140, fontSize: 25, revealOffsetSec: 6.05 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 34 },
           ],
           partDur,
           styling,
@@ -589,15 +629,15 @@ Keep spacingScale between 0.90 and 1.12.`;
 
         const ass2Content = buildTypewriterAssFile(
           [
-            { text: card.part2Blessing, x: 540, y: 485, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 0.4, typeDurationSec: 0.85, maxCharsPerLine: 30 },
-            { text: card.part2Intro, x: 540, y: 560, fontSize: 23, revealOffsetSec: 1.1, typeDurationSec: 1.0, maxCharsPerLine: 42 },
-            { text: card.eventTitle, x: 540, y: 655, fontSize: 74, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.9, typeDurationSec: 1.1, maxCharsPerLine: 22 },
-            { text: card.eventSubtitle, x: 540, y: 745, fontSize: 31, italic: true, revealOffsetSec: 2.85, typeDurationSec: 1.0, maxCharsPerLine: 34 },
-            { text: `Programme  ·  ${card.weddingDate}`, x: 540, y: 855, fontSize: 34, isAccent: true, bold: true, revealOffsetSec: 3.75, typeDurationSec: 1.3, maxCharsPerLine: 36 },
-            { text: card.timing1, x: 540, y: 940, fontSize: 29, revealOffsetSec: 4.9, typeDurationSec: 1.0, maxCharsPerLine: 38 },
-            { text: card.timing2, x: 540, y: 1000, fontSize: 29, revealOffsetSec: 5.7, typeDurationSec: 1.0, maxCharsPerLine: 38 },
-            { text: card.venueName, x: 540, y: 1120, fontSize: 38, isAccent: true, bold: true, revealOffsetSec: 6.5, typeDurationSec: 1.0, maxCharsPerLine: 32 },
-            { text: card.venueAddress, x: 540, y: 1205, fontSize: 25, revealOffsetSec: 7.3, typeDurationSec: 1.35, maxCharsPerLine: 38 },
+            { text: card.part2Blessing, x: 540, y: 495, fontSize: 35, isAccent: true, bold: true, revealOffsetSec: 0.3 * timeScale, typeDurationSec: 0.8 * timeScale, maxCharsPerLine: 28 },
+            { text: card.part2Intro, x: 540, y: 565, fontSize: 22, revealOffsetSec: 0.95 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 38 },
+            { text: card.eventTitle, x: 540, y: 660, fontSize: 72, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.7 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 20 },
+            { text: card.eventSubtitle, x: 540, y: 745, fontSize: 30, italic: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
+            { text: `Programme  ·  ${card.weddingDate}`, x: 540, y: 850, fontSize: 33, isAccent: true, bold: true, revealOffsetSec: 3.35 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 34 },
+            { text: card.timing1, x: 540, y: 932, fontSize: 28, revealOffsetSec: 4.35 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 36 },
+            { text: card.timing2, x: 540, y: 992, fontSize: 28, revealOffsetSec: 5.1 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 36 },
+            { text: card.venueName, x: 540, y: 1105, fontSize: 37, isAccent: true, bold: true, revealOffsetSec: 5.9 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 30 },
+            { text: card.venueAddress, x: 540, y: 1185, fontSize: 24, revealOffsetSec: 6.65 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 36 },
           ],
           partDur,
           styling,
@@ -613,6 +653,7 @@ Keep spacingScale between 0.90 and 1.12.`;
         const outPath = path.join(WCG_OUTPUT_DIR, outFilename);
         const { s1, s2 } = resolveMultiPartAssetPaths();
         const useUploadedImages = template.id === 'pakistani-emerald-mehndi-multipart' && Boolean(s1 && s2);
+        const musicPath = resolveMusicAssetPath(musicId);
 
         const ass1Esc = escapeFfmpegFilterPath(ass1Path);
         const ass2Esc = escapeFfmpegFilterPath(ass2Path);
@@ -627,28 +668,29 @@ Keep spacingScale between 0.90 and 1.12.`;
 
         const p1BakedPath = path.join(tmpDir, 'p1_bg.png');
         const p2BakedPath = path.join(tmpDir, 'p2_bg.png');
+        const scaleTail = isFullHd ? '' : `,scale=${targetW}:${targetH}`;
 
         if (useUploadedImages && s1 && s2) {
           const p1Mask = styling.cleanSampleText
-            ? `,drawbox=x=265:y=465:w=550:h=795:color=0x1B7A72@0.98:t=fill`
+            ? `,drawbox=x=275:y=495:w=530:h=735:color=0x1B7A72@0.98:t=fill`
             : '';
           const p2Mask = styling.cleanSampleText
-            ? `,drawbox=x=295:y=415:w=510:h=860:color=0x196134@0.98:t=fill`
+            ? `,drawbox=x=285:y=420:w=510:h=840:color=0x196134@0.98:t=fill`
             : '';
 
-          // Bake crisp 720x1280 still frames ONCE per part (4.5x faster loop encode on Render Free Tier)
+          // Bake crisp target-resolution stills once per part
           await Promise.all([
             execFileAsync(ffmpegBin, [
               '-y', '-i', s1,
               '-filter_complex',
-              `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p1Mask},vignette=PI/6,scale=720:1280`,
+              `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p1Mask},vignette=PI/6${scaleTail}`,
               '-frames:v', '1',
               p1BakedPath,
             ]),
             execFileAsync(ffmpegBin, [
               '-y', '-i', s2,
               '-filter_complex',
-              `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p2Mask},vignette=PI/6,scale=720:1280`,
+              `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${p2Mask},vignette=PI/6${scaleTail}`,
               '-frames:v', '1',
               p2BakedPath,
             ]),
@@ -669,42 +711,59 @@ Keep spacingScale between 0.90 and 1.12.`;
           await Promise.all([
             execFileAsync(ffmpegBin, [
               '-y', '-f', 'lavfi', '-i', `color=c=${pColor}:s=1080x1920:d=1:r=1`,
-              '-vf', `${frameDeco},vignette=PI/6,scale=720:1280`, '-frames:v', '1', p1BakedPath,
+              '-vf', `${frameDeco},vignette=PI/6${scaleTail}`, '-frames:v', '1', p1BakedPath,
             ]),
             execFileAsync(ffmpegBin, [
               '-y', '-f', 'lavfi', '-i', `color=c=${sColor}:s=1080x1920:d=1:r=1`,
-              '-vf', `${frameDeco},vignette=PI/6,scale=720:1280`, '-frames:v', '1', p2BakedPath,
+              '-vf', `${frameDeco},vignette=PI/6${scaleTail}`, '-frames:v', '1', p2BakedPath,
             ]),
           ]);
         }
 
-        const filterComplex = [
+        const videoFilter = [
           `[0:v]ass='${ass1Esc}'${fontsOpt},format=yuv420p[v1]`,
           `[1:v]ass='${ass2Esc}'${fontsOpt},format=yuv420p[v2]`,
           `[v1][v2]xfade=transition=${xfadeMode}:duration=${xfadeDur}:offset=${xfadeOffset},format=yuv420p[vout]`,
-        ].join(';');
+        ];
 
-        await execFileAsync(
-          ffmpegBin,
-          [
-            '-y',
-            '-threads', '2',
-            '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p1BakedPath,
-            '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p2BakedPath,
-            '-filter_complex', filterComplex,
-            '-map', '[vout]',
-            '-r', String(fps),
-            '-c:v', 'libx264',
-            '-preset', 'ultrafast',
-            '-tune', 'stillimage',
-            '-crf', '24',
-            '-threads', '2',
-            '-pix_fmt', 'yuv420p',
-            '-movflags', '+faststart',
-            outPath,
-          ],
-          { timeout: 300000 }
+        const ffmpegArgs: string[] = [
+          '-y',
+          '-threads', '2',
+          '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p1BakedPath,
+          '-loop', '1', '-t', String(partDur), '-framerate', String(fps), '-i', p2BakedPath,
+        ];
+
+        if (musicPath && musicVolume > 0.01) {
+          const fadeOutStart = Math.max(1, durationSeconds - 1.4).toFixed(2);
+          videoFilter.push(
+            `[2:a]atrim=0:${durationSeconds},asetpts=PTS-STARTPTS,volume=${musicVolume.toFixed(2)},afade=t=in:st=0:d=0.6,afade=t=out:st=${fadeOutStart}:d=1.4[aout]`
+          );
+          ffmpegArgs.push('-stream_loop', '-1', '-i', musicPath);
+        }
+
+        ffmpegArgs.push(
+          '-filter_complex', videoFilter.join(';'),
+          '-map', '[vout]'
         );
+
+        if (musicPath && musicVolume > 0.01) {
+          ffmpegArgs.push('-map', '[aout]', '-c:a', 'aac', '-b:a', '128k', '-ar', '44100');
+        }
+
+        ffmpegArgs.push(
+          '-t', String(durationSeconds),
+          '-r', String(fps),
+          '-c:v', 'libx264',
+          '-preset', 'ultrafast',
+          '-tune', 'stillimage',
+          '-crf', crf,
+          '-threads', '2',
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          outPath
+        );
+
+        await execFileAsync(ffmpegBin, ffmpegArgs, { timeout: 300000 });
 
         fs.rmSync(tmpDir, { recursive: true, force: true });
         const videoUrl = `/api/wcg/download/${outFilename}`;
@@ -716,9 +775,10 @@ Keep spacingScale between 0.90 and 1.12.`;
           videoUrl,
           downloadUrl: `${videoUrl}?download=1`,
           durationSeconds,
-          resolution: '720x1280',
-          engine: `ffmpeg-hd (${ffmpegResolved.source})`,
+          resolution: `${targetW}x${targetH}`,
+          engine: `ffmpeg-${quality}${musicPath ? '+aac' : ''} (${ffmpegResolved.source})`,
           multiPart: true,
+          musicId: musicPath ? musicId : 'none',
         };
       } catch (err: any) {
         fs.rmSync(tmpDir, { recursive: true, force: true });

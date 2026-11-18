@@ -65,6 +65,18 @@ export interface WcgTrendSuggestion {
   verifiedLive: boolean;
 }
 
+export type WcgRenderQuality = '1080p' | '720p';
+
+export interface WcgMusicPreset {
+  id: string;
+  title: string;
+  vibe: string;
+  category: 'Mehndi' | 'Barat' | 'Walima' | 'Nikah' | 'Sangeet';
+  bpm: number;
+  durationSec: number;
+  audioUrl: string;
+}
+
 export interface WcgRenderResult {
   ok: boolean;
   filename: string;
@@ -74,6 +86,7 @@ export interface WcgRenderResult {
   resolution: string;
   engine: string;
   multiPart: boolean;
+  musicId?: string;
 }
 
 export const DEFAULT_WCG_CARD_DATA: WcgCardData = {
@@ -378,6 +391,129 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
   },
 ];
 
+export const WCG_MUSIC_PRESETS: WcgMusicPreset[] = [
+  {
+    id: 'mehndi-laga-ke-rakhna',
+    title: 'Mehndi Laga Ke Rakhna · Classic Folk',
+    vibe: 'Santoor & Dholak Taal',
+    category: 'Mehndi',
+    bpm: 104,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/mehndi-laga-ke-rakhna.m4a',
+  },
+  {
+    id: 'din-shagna-royal',
+    title: 'Din Shagna Da · Bridal Entry',
+    vibe: 'Shehnai & Warm Strings',
+    category: 'Nikah',
+    bpm: 78,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/din-shagna-royal.m4a',
+  },
+  {
+    id: 'london-thumakda-dhol',
+    title: 'London Thumakda · Punjabi Dholki',
+    vibe: 'Tumbi Riff & Bhangra Dhol',
+    category: 'Mehndi',
+    bpm: 114,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/london-thumakda-dhol.m4a',
+  },
+  {
+    id: 'kesariya-love-acoustic',
+    title: 'Kesariya · Acoustic Romance',
+    vibe: 'Bansuri Flute & Pluck Guitar',
+    category: 'Nikah',
+    bpm: 88,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/kesariya-love-acoustic.m4a',
+  },
+  {
+    id: 'afreen-sufi-mehfil',
+    title: 'Afreen Afreen · Sufi Qawwali',
+    vibe: 'Harmonium, Santoor & Tabla',
+    category: 'Nikah',
+    bpm: 84,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/afreen-sufi-mehfil.m4a',
+  },
+  {
+    id: 'kudmayi-rukhsati-piano',
+    title: 'Kudmayi · Emotional Grand Piano',
+    vibe: 'Grand Piano & Velvet Strings',
+    category: 'Walima',
+    bpm: 72,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/kudmayi-rukhsati-piano.m4a',
+  },
+  {
+    id: 'gallan-goodiyaan-sangeet',
+    title: 'Gallan Goodiyaan · Sangeet Party',
+    vibe: 'Celebration Brass & Dhol',
+    category: 'Sangeet',
+    bpm: 118,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/gallan-goodiyaan-sangeet.m4a',
+  },
+  {
+    id: 'kabira-encore-shehnai',
+    title: 'Kabira Encore · Festive Shehnai',
+    vibe: 'Traditional Shehnai & Bells',
+    category: 'Barat',
+    bpm: 94,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/kabira-encore-shehnai.m4a',
+  },
+  {
+    id: 'kalank-shahi-barat',
+    title: 'Shahi Barat · Royal Mughal Sitar',
+    vibe: 'Mughal Sitar & Tanpura',
+    category: 'Barat',
+    bpm: 80,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/kalank-shahi-barat.m4a',
+  },
+  {
+    id: 'tere-bin-walima-lounge',
+    title: 'Tere Bin · Walima Romantic Keys',
+    vibe: 'Soft Keys & Acoustic Harp',
+    category: 'Walima',
+    bpm: 86,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/tere-bin-walima-lounge.m4a',
+  },
+  {
+    id: 'bole-chudiyan-family',
+    title: 'Bole Chudiyan · Family Sangeet',
+    vibe: 'Festive Santoor & Tabla',
+    category: 'Sangeet',
+    bpm: 108,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/bole-chudiyan-family.m4a',
+  },
+  {
+    id: 'mubarak-nikaah-nasheed',
+    title: 'Mubarak Hai · Oud & Chimes',
+    vibe: 'Warm Oud & Ambient Pad',
+    category: 'Nikah',
+    bpm: 76,
+    durationSec: 22,
+    audioUrl: '/assets/wcg-music/mubarak-nikaah-nasheed.m4a',
+  },
+];
+
 export function findWcgTemplate(templateId: string): WcgTemplateSpec {
   return WCG_TEMPLATES.find((t) => t.id === templateId) || WCG_TEMPLATES[0];
+}
+
+export function findWcgMusicPreset(musicId?: string): WcgMusicPreset | null {
+  if (!musicId || musicId === 'none') return null;
+  return WCG_MUSIC_PRESETS.find((m) => m.id === musicId) || null;
+}
+
+export function getDefaultMusicForCategory(cat: Exclude<WcgEventCategory, 'All'>): string {
+  if (cat === 'Mehndi') return 'mehndi-laga-ke-rakhna';
+  if (cat === 'Barat') return 'kabira-encore-shehnai';
+  if (cat === 'Walima') return 'tere-bin-walima-lounge';
+  return 'din-shagna-royal';
 }

@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
-from moviepy.editor import VideoClip, concatenate_videoclips
+from moviepy.editor import AudioFileClip, VideoClip, concatenate_videoclips
 
 CANVAS_W = 1080
 CANVAS_H = 1920
@@ -288,13 +288,33 @@ def render_wedding_card_video(payload: Dict) -> Path:
     out_name = f"wcg_{template_id}_{int(os.times().elapsed * 100)}.mp4"
     out_path = OUTPUT_DIR / out_name
 
+    music_id = str(payload.get("musicId") or "mehndi-laga-ke-rakhna").strip()
+    music_volume = max(0.0, min(1.0, float(payload.get("musicVolume", 0.78))))
+    music_path = ASSETS_DIR / "music" / f"{os.path.basename(music_id)}.m4a"
+    audio_clip = None
+    if music_id != "none" and music_volume > 0.01 and music_path.exists():
+        try:
+            audio_clip = (
+                AudioFileClip(str(music_path))
+                .subclip(0, min(duration, 21.5))
+                .volumex(music_volume)
+                .audio_fadein(0.6)
+                .audio_fadeout(1.4)
+            )
+            final_clip = final_clip.set_audio(audio_clip)
+        except Exception:
+            audio_clip = None
+
     final_clip.write_videofile(
         str(out_path),
         fps=24,
         codec="libx264",
-        audio=False,
+        audio=bool(audio_clip is not None),
+        audio_codec="aac" if audio_clip is not None else None,
         preset="medium",
         ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"],
         logger=None,
     )
+    if audio_clip is not None:
+        audio_clip.close()
     return out_path

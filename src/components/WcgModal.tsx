@@ -16,12 +16,19 @@ import {
   Server,
   Loader2,
   Copy,
+  Music,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import {
   DEFAULT_WCG_CARD_DATA,
+  WCG_MUSIC_PRESETS,
   WCG_TEMPLATES,
+  findWcgMusicPreset,
+  getDefaultMusicForCategory,
   type WcgCardData,
   type WcgEventCategory,
+  type WcgRenderQuality,
   type WcgRenderResult,
   type WcgStylingConfig,
   type WcgTemplateSpec,
@@ -201,11 +208,16 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   const [trendResult, setTrendResult] = useState<WcgTrendSuggestion | null>(null);
   const [trendsAppliedMsg, setTrendsAppliedMsg] = useState<string>('');
 
+  // Music & HD Quality state
+  const [musicId, setMusicId] = useState<string>('mehndi-laga-ke-rakhna');
+  const [musicVolume, setMusicVolume] = useState<number>(0.78);
+  const [previewingMusicId, setPreviewingMusicId] = useState<string | null>(null);
+  const [quality, setQuality] = useState<WcgRenderQuality>('1080p');
+
   // Render & Playback state
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [isRendering, setIsRendering] = useState<boolean>(false);
-  const [isBrowserExporting, setIsBrowserExporting] = useState<boolean>(false);
   const [renderElapsedSec, setRenderElapsedSec] = useState<number>(0);
   const [renderError, setRenderError] = useState<string>('');
   const [renderResult, setRenderResult] = useState<WcgRenderResult | null>(null);
@@ -214,22 +226,29 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const imgS1Ref = useRef<HTMLImageElement | null>(null);
   const imgS2Ref = useRef<HTMLImageElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [imagesReady, setImagesReady] = useState<boolean>(false);
   const mountedRef = useRef<boolean>(true);
   const renderRunIdRef = useRef<number>(0);
-  const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       renderRunIdRef.current += 1;
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        audioRef.current = null;
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = musicVolume;
+    }
+  }, [musicVolume]);
 
   // Preload s1 & s2 high-res uploaded assets for instant smooth 60fps canvas rendering
   useEffect(() => {
@@ -272,17 +291,20 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
     return () => cancelAnimationFrame(rafId);
   }, [isPlaying, durationSeconds]);
 
-  // Draw live 9:16 preview onto canvas
+  // Draw live crisp 720x1280 9:16 preview onto canvas (using 360x640 logical coords scaled 2x)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const w = canvas.width;
-    const h = canvas.height;
-    const xfadeDur = 0.9;
+    const w = 360;
+    const h = 640;
+    const sx = canvas.width / w;
+    const sy = canvas.height / h;
+    const xfadeDur = 0.85;
     const halfDur = durationSeconds / 2;
+    const scaleT = halfDur / 9.5;
     const inTransition = currentTime >= halfDur - xfadeDur / 2 && currentTime <= halfDur + xfadeDur / 2;
 
     const renderScenePart = (part: 1 | 2, localT: number, alpha: number, slideYOffset = 0) => {
@@ -296,14 +318,14 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       if (useUploaded && img && img.complete && img.naturalWidth > 0) {
         // Blurred ambient fill background
         ctx.save();
-        ctx.filter = 'blur(16px) brightness(0.65)';
+        ctx.filter = 'blur(18px) brightness(0.62)';
         ctx.drawImage(img, -20, -20, w + 40, h + 40);
         ctx.restore();
 
         // Subtle zoom animation
-        const zoom = 1 + Math.min(0.035, localT * 0.0035);
+        const zoom = 1 + Math.min(0.03, localT * 0.003);
         const cardW = w * zoom;
-        const cardH = Math.min(h * 0.8, (img.naturalHeight / img.naturalWidth) * cardW);
+        const cardH = Math.min(h * 0.78, (img.naturalHeight / img.naturalWidth) * cardW);
         const cardX = (w - cardW) / 2;
         const cardY = (h - cardH) / 2;
         ctx.drawImage(img, cardX, cardY, cardW, cardH);
@@ -315,11 +337,11 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
           ctx.shadowBlur = 18;
           if (part === 1) {
             ctx.beginPath();
-            ctx.roundRect(cardX + cardW * 0.22, cardY + cardH * 0.21, cardW * 0.56, cardH * 0.48, 18);
+            ctx.roundRect(cardX + cardW * 0.255, cardY + cardH * 0.255, cardW * 0.49, cardH * 0.41, 16);
             ctx.fill();
           } else {
             ctx.beginPath();
-            ctx.roundRect(cardX + cardW * 0.27, cardY + cardH * 0.13, cardW * 0.48, cardH * 0.59, 18);
+            ctx.roundRect(cardX + cardW * 0.265, cardY + cardH * 0.145, cardW * 0.48, cardH * 0.57, 16);
             ctx.fill();
           }
           ctx.restore();
@@ -334,7 +356,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       for (let i = 0; i < 12; i += 1) {
         const px = ((Math.sin(i * 73.1 + localT * 0.35) + 1) * 0.5) * w;
         const py = ((Math.cos(i * 41.7 + localT * 0.22) + 1) * 0.5) * h;
-        const r = 1.2 + (i % 3) * 0.6;
+        const r = 1.2 + (i % 3) * 0.55;
         ctx.globalAlpha = alpha * (0.2 + 0.35 * Math.abs(Math.sin(localT * 1.4 + i)));
         ctx.beginPath();
         ctx.arc(px, py, r, 0, Math.PI * 2);
@@ -343,32 +365,34 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       ctx.restore();
 
       const part1Blocks: DrawTextBlock[] = [
-        { text: card.invocation, yRatio: 0.285, size: 10.5, isAccent: true, bold: true, startSec: 0.35, typeSec: 1.0, maxWidthRatio: 0.55 },
-        { text: card.hostLine1, yRatio: 0.34, size: 18, bold: true, startSec: 1.15, typeSec: 1.2, maxWidthRatio: 0.65 },
-        { text: card.relationLine1, yRatio: 0.395, size: 12.5, startSec: 2.25, typeSec: 1.4, maxWidthRatio: 0.56 },
-        { text: card.hostLine2, yRatio: 0.46, size: 18, isAccent: true, bold: true, startSec: 3.55, typeSec: 1.2, maxWidthRatio: 0.65 },
-        { text: card.relationLine2, yRatio: 0.515, size: 12.5, startSec: 4.65, typeSec: 1.35, maxWidthRatio: 0.56 },
-        { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.57, size: 26, isScript: true, isAccent: true, startSec: 5.8, typeSec: 1.15, maxWidthRatio: 0.72 },
-        { text: `${card.specialTitle}: ${card.specialNames}`, yRatio: 0.635, size: 12, startSec: 6.8, typeSec: 1.15, maxWidthRatio: 0.55, boxBorder: true },
+        { text: card.invocation, yRatio: 0.305, size: 9.2, isAccent: true, bold: true, startSec: 0.25 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.45 },
+        { text: card.hostLine1, yRatio: 0.358, size: 16.5, bold: true, startSec: 0.95 * scaleT, typeSec: 1.0 * scaleT, maxWidthRatio: 0.58 },
+        { text: card.relationLine1, yRatio: 0.41, size: 11.2, startSec: 1.85 * scaleT, typeSec: 1.15 * scaleT, maxWidthRatio: 0.48 },
+        { text: card.hostLine2, yRatio: 0.47, size: 16.5, isAccent: true, bold: true, startSec: 2.9 * scaleT, typeSec: 1.0 * scaleT, maxWidthRatio: 0.58 },
+        { text: card.relationLine2, yRatio: 0.52, size: 11.2, startSec: 3.8 * scaleT, typeSec: 1.1 * scaleT, maxWidthRatio: 0.48 },
+        { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.575, size: 22.5, isScript: true, isAccent: true, startSec: 4.8 * scaleT, typeSec: 0.95 * scaleT, maxWidthRatio: 0.68 },
+        { text: `${card.specialTitle}: ${card.specialNames}`, yRatio: 0.635, size: 11, startSec: 5.7 * scaleT, typeSec: 1.05 * scaleT, maxWidthRatio: 0.52, boxBorder: true },
       ];
 
       const part2Blocks: DrawTextBlock[] = [
-        { text: card.part2Blessing, yRatio: 0.25, size: 17, isAccent: true, bold: true, startSec: 0.35, typeSec: 0.85, maxWidthRatio: 0.6 },
-        { text: card.part2Intro, yRatio: 0.295, size: 10.5, startSec: 1.05, typeSec: 1.0, maxWidthRatio: 0.6 },
-        { text: card.eventTitle, yRatio: 0.35, size: 35, isScript: true, isAccent: true, startSec: 1.85, typeSec: 1.05, maxWidthRatio: 0.75 },
-        { text: card.eventSubtitle, yRatio: 0.405, size: 15, startSec: 2.8, typeSec: 1.0, maxWidthRatio: 0.65 },
-        { text: `Programme  ·  ${card.weddingDate}`, yRatio: 0.465, size: 14.5, isAccent: true, bold: true, startSec: 3.65, typeSec: 1.25, maxWidthRatio: 0.68 },
-        { text: card.timing1, yRatio: 0.512, size: 13.5, startSec: 4.75, typeSec: 1.0, maxWidthRatio: 0.65 },
-        { text: card.timing2, yRatio: 0.548, size: 13.5, startSec: 5.55, typeSec: 1.0, maxWidthRatio: 0.65 },
-        { text: card.venueName, yRatio: 0.61, size: 18, isAccent: true, bold: true, startSec: 6.35, typeSec: 1.0, maxWidthRatio: 0.66 },
-        { text: card.venueAddress, yRatio: 0.665, size: 11.5, startSec: 7.15, typeSec: 1.35, maxWidthRatio: 0.56 },
+        { text: card.part2Blessing, yRatio: 0.255, size: 16, isAccent: true, bold: true, startSec: 0.25 * scaleT, typeSec: 0.75 * scaleT, maxWidthRatio: 0.56 },
+        { text: card.part2Intro, yRatio: 0.298, size: 10, startSec: 0.9 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.55 },
+        { text: card.eventTitle, yRatio: 0.352, size: 33, isScript: true, isAccent: true, startSec: 1.65 * scaleT, typeSec: 0.9 * scaleT, maxWidthRatio: 0.72 },
+        { text: card.eventSubtitle, yRatio: 0.405, size: 14, startSec: 2.45 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.62 },
+        { text: `Programme  ·  ${card.weddingDate}`, yRatio: 0.462, size: 13.8, isAccent: true, bold: true, startSec: 3.2 * scaleT, typeSec: 1.05 * scaleT, maxWidthRatio: 0.64 },
+        { text: card.timing1, yRatio: 0.508, size: 12.8, startSec: 4.15 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.62 },
+        { text: card.timing2, yRatio: 0.542, size: 12.8, startSec: 4.9 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.62 },
+        { text: card.venueName, yRatio: 0.602, size: 17, isAccent: true, bold: true, startSec: 5.65 * scaleT, typeSec: 0.85 * scaleT, maxWidthRatio: 0.62 },
+        { text: card.venueAddress, yRatio: 0.655, size: 10.8, startSec: 6.4 * scaleT, typeSec: 1.1 * scaleT, maxWidthRatio: 0.52 },
       ];
 
       drawTypedBlocks(ctx, w, h, localT, part === 1 ? part1Blocks : part2Blocks, styling);
       ctx.restore();
     };
 
-    ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(sx, sy);
 
     if (inTransition) {
       const p = (currentTime - (halfDur - xfadeDur / 2)) / xfadeDur;
@@ -381,6 +405,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
     } else {
       renderScenePart(2, currentTime - halfDur, 1, 0);
     }
+    ctx.restore();
   }, [currentTime, card, styling, selectedTemplate, durationSeconds, imagesReady]);
 
   const filteredTemplates = useMemo(
@@ -401,8 +426,40 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       timing1: tpl.defaultTiming1,
       timing2: tpl.defaultTiming2,
     }));
+    setMusicId(getDefaultMusicForCategory(tpl.category));
     setCurrentTime(0);
     setIsPlaying(true);
+  };
+
+  const stopAudioPreview = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setPreviewingMusicId(null);
+  };
+
+  const handleToggleMusicPreview = (presetId: string) => {
+    if (previewingMusicId === presetId) {
+      stopAudioPreview();
+      return;
+    }
+    const preset = findWcgMusicPreset(presetId);
+    if (!preset) {
+      stopAudioPreview();
+      return;
+    }
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      audioRef.current.onended = () => setPreviewingMusicId(null);
+    }
+    audioRef.current.pause();
+    audioRef.current.src = preset.audioUrl;
+    audioRef.current.volume = musicVolume;
+    audioRef.current.loop = true;
+    audioRef.current.play().catch(() => {});
+    setPreviewingMusicId(preset.id);
+    setMusicId(preset.id);
   };
 
   const handleVerifyTrends = async () => {
@@ -439,10 +496,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
 
   const handleRenderVideo = async () => {
     const runId = ++renderRunIdRef.current;
-    if (blobUrlRef.current) {
-      URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = null;
-    }
+    stopAudioPreview();
     setIsRendering(true);
     setRenderElapsedSec(0);
     setRenderError('');
@@ -461,6 +515,9 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
         body: JSON.stringify({
           templateId: selectedTemplate.id,
           durationSeconds,
+          quality,
+          musicId,
+          musicVolume,
           card,
           styling,
         }),
@@ -483,7 +540,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
         const maxWaitMs = 310_000;
         while (mountedRef.current && renderRunIdRef.current === runId) {
           if (Date.now() - startedMs > maxWaitMs) {
-            setRenderError('Server render limit exceeded. Neeche "Instant Browser Export" button se 1-click local export try karein.');
+            setRenderError('Server render limit exceeded. Quality selector ko 720x1280 Fast HD par switch karke dobara render karein.');
             return;
           }
           await new Promise((r) => setTimeout(r, 1500));
@@ -518,99 +575,6 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       window.clearInterval(timerInterval);
       if (mountedRef.current && renderRunIdRef.current === runId) {
         setIsRendering(false);
-      }
-    }
-  };
-
-  const handleBrowserExport = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas || typeof (canvas as any).captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
-      setRenderError('Aapka browser direct Canvas MediaRecorder support nahi karta. Server MP4 render use karein.');
-      return;
-    }
-
-    const runId = ++renderRunIdRef.current;
-    if (blobUrlRef.current) {
-      URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = null;
-    }
-    setIsBrowserExporting(true);
-    setRenderError('');
-    setRenderResult(null);
-    setIsPlaying(false);
-    setCurrentTime(0);
-
-    try {
-      const stream = canvas.captureStream(24);
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9'
-        : 'video/webm';
-      const recorder = new MediaRecorder(stream, {
-        mimeType,
-        videoBitsPerSecond: 2_500_000,
-      });
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunks.push(e.data);
-      };
-
-      const stoppedPromise = new Promise<Blob>((resolve) => {
-        recorder.onstop = () => {
-          resolve(new Blob(chunks, { type: 'video/webm' }));
-        };
-      });
-
-      recorder.start(250);
-      const startTs = performance.now();
-      await new Promise<void>((resolve) => {
-        const step = (now: number) => {
-          if (!mountedRef.current || renderRunIdRef.current !== runId) {
-            resolve();
-            return;
-          }
-          const elapsed = (now - startTs) / 1000;
-          setRenderElapsedSec(Math.round(elapsed));
-          if (elapsed >= durationSeconds) {
-            setCurrentTime(durationSeconds);
-            resolve();
-            return;
-          }
-          setCurrentTime(elapsed);
-          requestAnimationFrame(step);
-        };
-        requestAnimationFrame(step);
-      });
-
-      if (recorder.state !== 'inactive') {
-        recorder.stop();
-      }
-      stream.getTracks().forEach((t) => t.stop());
-
-      const blob = await stoppedPromise;
-      if (!mountedRef.current || renderRunIdRef.current !== runId) return;
-
-      const url = URL.createObjectURL(blob);
-      blobUrlRef.current = url;
-      const safeSlug = selectedTemplate.category.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const filename = `wcg_${safeSlug}_${Date.now()}.webm`;
-      setRenderResult({
-        ok: true,
-        filename,
-        videoUrl: url,
-        downloadUrl: url,
-        durationSeconds,
-        resolution: `${canvas.width}x${canvas.height}`,
-        engine: 'browser-canvas-webm',
-        multiPart: true,
-      });
-    } catch (err: any) {
-      if (mountedRef.current && renderRunIdRef.current === runId) {
-        setRenderError(err?.message || 'Browser export fail ho gaya.');
-      }
-    } finally {
-      if (mountedRef.current && renderRunIdRef.current === runId) {
-        setIsBrowserExporting(false);
-        setIsPlaying(true);
       }
     }
   };
@@ -1128,9 +1092,93 @@ imageio-ffmpeg>=0.5.1`}
                     </div>
                   </div>
                 </section>
+
+                {/* 5. Bollywood & Pakistani Shaadi Background Music Library (12 Presets) */}
+                <section className="bg-slate-900/65 border border-slate-800 rounded-xl p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <Music className="w-4 h-4 text-amber-400" />
+                      <span>Shaadi & Bollywood Music Presets (12 Tracks)</span>
+                    </h3>
+                    <div className="flex items-center gap-2 text-xs">
+                      <button
+                        onClick={() => {
+                          stopAudioPreview();
+                          setMusicId('none');
+                        }}
+                        className={`px-2.5 py-1 rounded-lg border flex items-center gap-1 cursor-pointer ${
+                          musicId === 'none'
+                            ? 'bg-rose-500/20 border-rose-500/50 text-rose-200'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <VolumeX className="w-3.5 h-3.5" />
+                        <span>No Music</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs bg-slate-950/60 border border-slate-800/80 rounded-lg px-3 py-2">
+                    <Volume2 className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span className="text-slate-300 shrink-0">Music Volume</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={musicVolume}
+                      onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
+                      className="flex-1 accent-cyan-400 cursor-pointer"
+                    />
+                    <span className="font-mono text-cyan-300 w-9 text-right tabular-nums">
+                      {Math.round(musicVolume * 100)}%
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1 custom-modal-scroll">
+                    {WCG_MUSIC_PRESETS.map((preset) => {
+                      const active = musicId === preset.id;
+                      const previewing = previewingMusicId === preset.id;
+                      return (
+                        <div
+                          key={preset.id}
+                          onClick={() => setMusicId(preset.id)}
+                          className={`p-2.5 rounded-xl border transition-colors cursor-pointer flex items-center justify-between gap-2 ${
+                            active
+                              ? 'bg-amber-500/15 border-amber-500/60'
+                              : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-semibold text-white truncate">{preset.title}</div>
+                            <div className="text-[11px] text-slate-400 truncate">
+                              {preset.category} · {preset.vibe} · {preset.bpm} BPM
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleMusicPreview(preset.id);
+                            }}
+                            className={`px-2 py-1.5 rounded-lg border text-xs flex items-center gap-1 shrink-0 cursor-pointer ${
+                              previewing
+                                ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200'
+                                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white'
+                            }`}
+                            title={previewing ? 'Stop Preview' : 'Preview Track'}
+                          >
+                            {previewing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                            <span>{previewing ? 'Stop' : 'Listen'}</span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
               </div>
 
-              {/* Right Column: Live 9:16 Multi-Part Video Canvas & MP4 Render Export */}
+              {/* Right Column: Live 9:16 Multi-Part Video Canvas & HD MP4 Render Export */}
               <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-0">
                 <div className="bg-slate-900/75 border border-slate-800 rounded-xl p-4 flex flex-col items-center">
                   <div className="w-full flex items-center justify-between mb-3 text-xs">
@@ -1145,8 +1193,8 @@ imageio-ffmpeg>=0.5.1`}
                   <div className="w-[260px] sm:w-[290px] aspect-[9/16] rounded-xl overflow-hidden border border-slate-700 bg-black shadow-xl">
                     <canvas
                       ref={canvasRef}
-                      width={360}
-                      height={640}
+                      width={720}
+                      height={1280}
                       className="w-full h-full block"
                     />
                   </div>
@@ -1209,42 +1257,51 @@ imageio-ffmpeg>=0.5.1`}
                     </div>
                   </div>
 
-                  {/* Render Buttons */}
-                  <div className="w-full mt-4 space-y-2">
+                  {/* Quality Selector & MP4 Render Button */}
+                  <div className="w-full mt-4 space-y-2.5">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setQuality('1080p')}
+                        disabled={isRendering}
+                        className={`py-1.5 px-2.5 rounded-lg border font-medium cursor-pointer ${
+                          quality === '1080p'
+                            ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-200'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        1080x1920 Full HD
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuality('720p')}
+                        disabled={isRendering}
+                        className={`py-1.5 px-2.5 rounded-lg border font-medium cursor-pointer ${
+                          quality === '720p'
+                            ? 'bg-cyan-500/20 border-cyan-500/60 text-cyan-200'
+                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        720x1280 Fast HD
+                      </button>
+                    </div>
+
                     <button
                       onClick={handleRenderVideo}
-                      disabled={isRendering || isBrowserExporting}
+                      disabled={isRendering}
                       className="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                     >
                       {isRendering ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
                           <span>
-                            Rendering {durationSeconds}s HD 9:16 MP4{renderElapsedSec > 0 ? ` (${renderElapsedSec}s)` : '...'}
+                            Rendering {quality === '1080p' ? '1080p Full HD' : '720p HD'} {durationSeconds}s MP4{renderElapsedSec > 0 ? ` (${renderElapsedSec}s)` : '...'}
                           </span>
                         </>
                       ) : (
                         <>
                           <Film className="w-4 h-4" />
-                          <span>Render 9:16 Video ({durationSeconds}s MP4)</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={handleBrowserExport}
-                      disabled={isRendering || isBrowserExporting}
-                      className="w-full py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-slate-200 font-medium text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isBrowserExporting ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
-                          <span>Capturing Live Preview ({renderElapsedSec}s / {durationSeconds}s)...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-3.5 h-3.5 text-cyan-400" />
-                          <span>Instant Browser Export (.webm · Zero Server Load)</span>
+                          <span>Render {quality === '1080p' ? 'Full HD' : 'HD'} 9:16 Video ({durationSeconds}s MP4)</span>
                         </>
                       )}
                     </button>
