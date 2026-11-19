@@ -38,6 +38,24 @@ export type WcgDisplayFont =
   | 'Lora';
 
 export type WcgArchStyle = 'floral-arch' | 'mughal-dome' | 'minimal-frame' | 'botanical-vellum';
+export type WcgPatchBlendMode = 'seamless' | 'plaque' | 'direct';
+
+export interface WcgNormalizedBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface WcgCardPartAnalysis {
+  safeBox: WcgNormalizedBox;
+  hideBoxes: WcgNormalizedBox[];
+  patchColor: string;
+  suggestedTextColor: string;
+  suggestedAccentColor: string;
+  summaryRomanUrdu?: string;
+  analyzedBy?: 'gemini-vision' | 'builtin-preset' | 'pixel-heuristic';
+}
 
 export interface WcgCardData {
   invocation: string;
@@ -86,6 +104,7 @@ export interface WcgStylingConfig {
   spacingScale: number;
   transitionStyle: WcgTransitionStyle;
   cleanSampleText: boolean;
+  patchMode?: WcgPatchBlendMode;
 }
 
 export interface WcgTemplateSpec {
@@ -98,6 +117,9 @@ export interface WcgTemplateSpec {
   part1Image?: string;
   part2Image?: string;
   part3Image?: string;
+  part1Analysis?: WcgCardPartAnalysis;
+  part2Analysis?: WcgCardPartAnalysis;
+  part3Analysis?: WcgCardPartAnalysis;
   archStyle: WcgArchStyle;
   styling: WcgStylingConfig;
   defaultEventTitle: string;
@@ -156,6 +178,9 @@ export interface WcgCustomTemplateItem {
   part1Filename: string;
   part2Filename?: string;
   part3Filename?: string;
+  part1Analysis?: WcgCardPartAnalysis;
+  part2Analysis?: WcgCardPartAnalysis;
+  part3Analysis?: WcgCardPartAnalysis;
   createdAt: string;
 }
 
@@ -215,6 +240,32 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
     isMultiPart: true,
     part1Image: '/assets/aistudio/s1_0b0de8d4.jpeg',
     part2Image: '/assets/aistudio/s2_610b836e.jpeg',
+    part1Analysis: {
+      safeBox: { x: 0.235, y: 0.245, w: 0.53, h: 0.42 },
+      hideBoxes: [
+        { x: 0.235, y: 0.238, w: 0.53, h: 0.325 },
+        { x: 0.22, y: 0.568, w: 0.56, h: 0.102 },
+      ],
+      patchColor: '#1B7A72',
+      suggestedTextColor: '#FFFFFF',
+      suggestedAccentColor: '#E7C26B',
+      summaryRomanUrdu:
+        'Part 1 (s1): Wisteria flowers aur dholki artwork ko mehfooz rakh kar beech ke teal arch area mein text fit kiya gaya hai.',
+      analyzedBy: 'builtin-preset',
+    },
+    part2Analysis: {
+      safeBox: { x: 0.275, y: 0.145, w: 0.455, h: 0.555 },
+      hideBoxes: [
+        { x: 0.365, y: 0.132, w: 0.27, h: 0.082 },
+        { x: 0.27, y: 0.214, w: 0.46, h: 0.495 },
+      ],
+      patchColor: '#196134',
+      suggestedTextColor: '#FFFFFF',
+      suggestedAccentColor: '#E7C26B',
+      summaryRomanUrdu:
+        'Part 2 (s2): Roses, lanterns aur bride dome ko chhor kar central emerald zone aur calligraphy ko cleanly patch kiya gaya hai.',
+      analyzedBy: 'builtin-preset',
+    },
     archStyle: 'floral-arch',
     styling: {
       primaryColor: '#196134',
@@ -226,6 +277,7 @@ export const WCG_TEMPLATES: WcgTemplateSpec[] = [
       spacingScale: 1.0,
       transitionStyle: 'crossfade',
       cleanSampleText: true,
+      patchMode: 'seamless',
     },
     defaultEventTitle: 'Mehndi',
     defaultEventSubtitle: '"Rasm-e-Hina"',

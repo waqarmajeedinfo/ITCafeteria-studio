@@ -1,11 +1,12 @@
 import type { Express } from 'express';
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import ffmpegStatic from 'ffmpeg-static';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import {
   DEFAULT_WCG_CARD_DATA,
   WCG_MUSIC_PRESETS,
@@ -13,9 +14,12 @@ import {
   findWcgMusicPreset,
   findWcgTemplate,
   type WcgCardData,
+  type WcgCardPartAnalysis,
   type WcgCustomSongItem,
   type WcgCustomTemplateItem,
+  type WcgNormalizedBox,
   type WcgPartCount,
+  type WcgPatchBlendMode,
   type WcgRenderQuality,
   type WcgStylingConfig,
   type WcgTrendSuggestion,
@@ -89,7 +93,12 @@ function readLibraryManifest(): WcgLibraryManifest {
 
 function writeLibraryManifest(manifest: WcgLibraryManifest) {
   ensureOutputDir();
-  fs.writeFileSync(WCG_LIB_MANIFEST_PATH, JSON.stringify(manifest, null, 2), 'utf8');
+  const payload = JSON.stringify(manifest, null, 2);
+  fs.writeFileSync(WCG_LIB_MANIFEST_PATH, payload, 'utf8');
+  try {
+    const backendManifest = path.resolve(__dirname, 'backend_wcg', 'assets', 'library.json');
+    fs.writeFileSync(backendManifest, payload, 'utf8');
+  } catch {}
 }
 
 function decodeBase64DataUrl(dataUrl: string): { mime: string; buffer: Buffer } | null {
@@ -267,21 +276,561 @@ function wrapLines(text: string, maxChars: number): string[] {
   return lines;
 }
 
-interface AssLineSpec {
+interface AssAdaptiveLineSpec {
   text: string;
-  x: number;
-  y: number;
+  slotY: number; // Normalized 0..1 within safeRect vertical stack
   fontSize: number;
   isAccent?: boolean;
   bold?: boolean;
   italic?: boolean;
   revealOffsetSec: number;
   typeDurationSec: number;
-  maxCharsPerLine?: number;
 }
 
-function buildTypewriterAssFile(
-  lines: AssLineSpec[],
+interface PixelRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+function clampBox(b: Partial<WcgNormalizedBox>, fallback: WcgNormalizedBox): WcgNormalizedBox {
+  const x = Math.max(0.03, Math.min(0.85, Number.isFinite(Number(b?.x)) ? Number(b.x) : fallback.x));
+  const y = Math.max(0.03, Math.min(0.85, Number.isFinite(Number(b?.y)) ? Number(b.y) : fallback.y));
+  const maxW = Math.max(0.1, 0.97 - x);
+  const maxH = Math.max(0.06, 0.97 - y);
+  const w = Math.max(0.1, Math.min(maxW, Number.isFinite(Number(b?.w)) ? Number(b.w) : fallback.w));
+  const h = Math.max(0.05, Math.min(maxH, Number.isFinite(Number(b?.h)) ? Number(b.h) : fallback.h));
+  return { x: Number(x.toFixed(3)), y: Number(y.toFixed(3)), w: Number(w.toFixed(3)), h: Number(h.toFixed(3)) };
+}
+
+function hexToRgbTuple(hex: string, fallback: [number, number, number] = [27, 122, 114]): [number, number, number] {
+  const clean = String(hex || '').trim().replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return fallback;
+  return [
+    parseInt(full.slice(0, 2), 16),
+    parseInt(full.slice(2, 4), 16),
+    parseInt(full.slice(4, 6), 16),
+  ];
+}
+
+function rgbTupleToHex(r: number, g: number, b: number): string {
+  const toHex = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0').toUpperCase();
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function getRelativeLuminance(rgb: [number, number, number]): number {
+  return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
+}
+
+function suggestHarmoniousInkPalette(patchHex: string): { textColor: string; accentColor: string } {
+  const rgb = hexToRgbTuple(patchHex, [27, 122, 114]);
+  const lum = getRelativeLuminance(rgb);
+  if (lum > 158) {
+    // Light cream / ivory / pastel floral interior -> rich espresso & royal antique gold-bronze
+    return {
+      textColor: '#231915',
+      accentColor: '#8B5A1E',
+    };
+  }
+  // Deep emerald / maroon / navy interior -> crisp ivory white & champagne gold
+  return {
+    textColor: '#FFFFFF',
+    accentColor: '#E7C26B',
+  };
+}
+
+async function probeImageDimensions(ffmpegBin: string, imgPath: string): Promise<{ width: number; height: number }> {
+  try {
+    await execFileAsync(ffmpegBin, ['-i', imgPath]);
+  } catch (err: any) {
+    const stderr = String(err?.stderr || '');
+    const m = stderr.match(/Video:[^\n]*?,\s*(\d{2,5})x(\d{2,5})\b/);
+    if (m) {
+      const w = Number(m[1]);
+      const h = Number(m[2]);
+      if (w > 0 && h > 0) return { width: w, height: h };
+    }
+  }
+  return { width: 1080, height: 1350 };
+}
+
+async function sampleRegionMedianHex(
+  ffmpegBin: string,
+  imgPath: string,
+  box: WcgNormalizedBox
+): Promise<string | null> {
+  try {
+    const x = Math.max(0, Math.min(0.9, box.x));
+    const y = Math.max(0, Math.min(0.9, box.y));
+    const w = Math.max(0.06, Math.min(1 - x, box.w));
+    const h = Math.max(0.06, Math.min(1 - y, box.h));
+    const { stdout } = await execFileAsync(
+      ffmpegBin,
+      [
+        '-y',
+        '-i',
+        imgPath,
+        '-vf',
+        `crop=max(4\\,iw*${w.toFixed(3)}):max(4\\,ih*${h.toFixed(3)}):iw*${x.toFixed(3)}:ih*${y.toFixed(3)},scale=16:16:flags=area`,
+        '-frames:v',
+        '1',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgb24',
+        'pipe:1',
+      ],
+      { encoding: 'buffer', maxBuffer: 1024 * 1024 }
+    );
+    const buf = stdout as unknown as Buffer;
+    if (!buf || buf.length < 3 * 16) return null;
+    const rs: number[] = [];
+    const gs: number[] = [];
+    const bs: number[] = [];
+    for (let i = 0; i + 2 < buf.length; i += 3) {
+      rs.push(buf[i]);
+      gs.push(buf[i + 1]);
+      bs.push(buf[i + 2]);
+    }
+    rs.sort((a, b) => a - b);
+    gs.sort((a, b) => a - b);
+    bs.sort((a, b) => a - b);
+    const mid = Math.floor(rs.length / 2);
+    return rgbTupleToHex(rs[mid], gs[mid], bs[mid]);
+  } catch {
+    return null;
+  }
+}
+
+async function analyzeCardByPixels(
+  ffmpegBin: string,
+  imgPath: string
+): Promise<WcgCardPartAnalysis> {
+  const fallbackBox: WcgNormalizedBox = { x: 0.22, y: 0.22, w: 0.56, h: 0.48 };
+  try {
+    const grid = 24;
+    const { stdout } = await execFileAsync(
+      ffmpegBin,
+      [
+        '-y',
+        '-i',
+        imgPath,
+        '-vf',
+        `scale=${grid}:${grid}:flags=area`,
+        '-frames:v',
+        '1',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgb24',
+        'pipe:1',
+      ],
+      { encoding: 'buffer', maxBuffer: 1024 * 1024 }
+    );
+    const buf = stdout as unknown as Buffer;
+    if (!buf || buf.length < grid * grid * 3) {
+      const patchColor = '#196134';
+      const ink = suggestHarmoniousInkPalette(patchColor);
+      return {
+        safeBox: fallbackBox,
+        hideBoxes: [fallbackBox],
+        patchColor,
+        suggestedTextColor: ink.textColor,
+        suggestedAccentColor: ink.accentColor,
+        summaryRomanUrdu:
+          'Uploaded card ka central safe zone detect karke sample text hide patch aur harmonious typography set kar di gayi hai.',
+        analyzedBy: 'pixel-heuristic',
+      };
+    }
+
+    // Estimate interior core background color from middle 8x8 block
+    const coreR: number[] = [];
+    const coreG: number[] = [];
+    const coreB: number[] = [];
+    for (let gy = 8; gy < 16; gy += 1) {
+      for (let gx = 8; gx < 16; gx += 1) {
+        const idx = (gy * grid + gx) * 3;
+        coreR.push(buf[idx]);
+        coreG.push(buf[idx + 1]);
+        coreB.push(buf[idx + 2]);
+      }
+    }
+    coreR.sort((a, b) => a - b);
+    coreG.sort((a, b) => a - b);
+    coreB.sort((a, b) => a - b);
+    const mid = Math.floor(coreR.length / 2);
+    const bgR = coreR[mid];
+    const bgG = coreG[mid];
+    const bgB = coreB[mid];
+
+    // Identify contiguous interior cells close to core background (avoiding floral borders)
+    const isClean = (gx: number, gy: number) => {
+      const idx = (gy * grid + gx) * 3;
+      const dist = Math.hypot(buf[idx] - bgR, buf[idx + 1] - bgG, buf[idx + 2] - bgB);
+      return dist <= 52;
+    };
+
+    let minX = 5;
+    let maxX = 18;
+    let minY = 5;
+    let maxY = 17;
+    // Shrink from edges if outer columns/rows are heavily floral/decorative
+    for (let gx = 3; gx <= 8; gx += 1) {
+      let cleanRows = 0;
+      for (let gy = 6; gy <= 17; gy += 1) if (isClean(gx, gy)) cleanRows += 1;
+      if (cleanRows >= 8) {
+        minX = gx;
+        break;
+      }
+    }
+    for (let gx = 20; gx >= 15; gx -= 1) {
+      let cleanRows = 0;
+      for (let gy = 6; gy <= 17; gy += 1) if (isClean(gx, gy)) cleanRows += 1;
+      if (cleanRows >= 8) {
+        maxX = gx;
+        break;
+      }
+    }
+    for (let gy = 3; gy <= 8; gy += 1) {
+      let cleanCols = 0;
+      for (let gx = minX; gx <= maxX; gx += 1) if (isClean(gx, gy)) cleanCols += 1;
+      if (cleanCols >= Math.max(4, Math.floor((maxX - minX) * 0.6))) {
+        minY = gy;
+        break;
+      }
+    }
+    for (let gy = 20; gy >= 14; gy -= 1) {
+      let cleanCols = 0;
+      for (let gx = minX; gx <= maxX; gx += 1) if (isClean(gx, gy)) cleanCols += 1;
+      if (cleanCols >= Math.max(4, Math.floor((maxX - minX) * 0.6))) {
+        maxY = gy;
+        break;
+      }
+    }
+
+    const safeBox = clampBox(
+      {
+        x: Math.max(0.14, minX / grid),
+        y: Math.max(0.14, minY / grid),
+        w: Math.max(0.42, (maxX - minX + 1) / grid),
+        h: Math.max(0.36, (maxY - minY + 1) / grid),
+      },
+      fallbackBox
+    );
+    const patchColor = (await sampleRegionMedianHex(ffmpegBin, imgPath, safeBox)) || rgbTupleToHex(bgR, bgG, bgB);
+    const ink = suggestHarmoniousInkPalette(patchColor);
+    return {
+      safeBox,
+      hideBoxes: [safeBox],
+      patchColor,
+      suggestedTextColor: ink.textColor,
+      suggestedAccentColor: ink.accentColor,
+      summaryRomanUrdu:
+        'Image pixel scan se floral borders ke andar ka clean text-safe area aur background patch color auto-match kar liya gaya hai.',
+      analyzedBy: 'pixel-heuristic',
+    };
+  } catch {
+    const patchColor = '#196134';
+    const ink = suggestHarmoniousInkPalette(patchColor);
+    return {
+      safeBox: fallbackBox,
+      hideBoxes: [fallbackBox],
+      patchColor,
+      suggestedTextColor: ink.textColor,
+      suggestedAccentColor: ink.accentColor,
+      summaryRomanUrdu: 'Default adaptive central patch applied.',
+      analyzedBy: 'pixel-heuristic',
+    };
+  }
+}
+
+async function analyzeCardImageDesign(params: {
+  ffmpegBin: string;
+  imagePath: string;
+  mimeType: string;
+  partLabel: string;
+  throwOnAiError?: boolean;
+}): Promise<WcgCardPartAnalysis> {
+  const { ffmpegBin, imagePath, mimeType, partLabel, throwOnAiError } = params;
+  const fallback = await analyzeCardByPixels(ffmpegBin, imagePath);
+  const ai = getAiClient();
+  if (!ai) {
+    if (throwOnAiError) {
+      throw new Error('Gemini API key server par configured nahi hai.');
+    }
+    return fallback;
+  }
+
+  try {
+    const imgBase64 = fs.readFileSync(imagePath).toString('base64');
+    const response = await ai.models.generateContent({
+      model: 'gemini-4-hydrogen',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: mimeType || 'image/jpeg',
+              data: imgBase64,
+            },
+          },
+          {
+            text: `Analyze this wedding invitation card design (${partLabel}) so our video engine can cleanly replace existing sample text with new guest/wedding details while preserving 100% of floral borders, domes, lanterns, dholki, or decorative illustrations.
+
+Return strictly valid JSON matching the schema:
+1. safeBox: The single largest clean interior rectangle (normalized 0.0-1.0 coordinates x, y, w, h) suitable for new invitation text overlay WITHOUT colliding with flowers, pillars, arches, couple illustrations, or decorative artwork. Ensure w >= 0.36 and h >= 0.28.
+2. hideBoxes: 1 to 4 tight normalized {x, y, w, h} rectangles covering ALL pre-existing printed text, Arabic calligraphy, names, timings, and venue text in the source card that should be hidden/masked with matching background paint. Avoid covering decorative flowers!
+3. suggestedTextColor: High-contrast hex ink color (e.g. "#FFFFFF" on dark backgrounds, "#231915" on light cream/pastel backgrounds).
+4. suggestedAccentColor: Harmonious hex accent color matching the card aesthetic (e.g. "#E7C26B" or "#8B5A1E").
+5. summaryRomanUrdu: 1 concise Roman Urdu sentence explaining which region was cleared and where new text fits cleanly.`,
+          },
+        ],
+      },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            safeBox: {
+              type: Type.OBJECT,
+              properties: {
+                x: { type: Type.NUMBER },
+                y: { type: Type.NUMBER },
+                w: { type: Type.NUMBER },
+                h: { type: Type.NUMBER },
+              },
+              required: ['x', 'y', 'w', 'h'],
+            },
+            hideBoxes: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  x: { type: Type.NUMBER },
+                  y: { type: Type.NUMBER },
+                  w: { type: Type.NUMBER },
+                  h: { type: Type.NUMBER },
+                },
+                required: ['x', 'y', 'w', 'h'],
+              },
+            },
+            suggestedTextColor: { type: Type.STRING },
+            suggestedAccentColor: { type: Type.STRING },
+            summaryRomanUrdu: { type: Type.STRING },
+          },
+          required: ['safeBox', 'hideBoxes', 'suggestedTextColor', 'suggestedAccentColor', 'summaryRomanUrdu'],
+        },
+      },
+    });
+
+    const parsed = JSON.parse((response.text || '{}').trim());
+    const safeBox = clampBox(parsed.safeBox || {}, fallback.safeBox);
+    if (safeBox.w < 0.36) safeBox.w = Math.min(0.92 - safeBox.x, 0.38);
+    if (safeBox.h < 0.28) safeBox.h = Math.min(0.92 - safeBox.y, 0.32);
+
+    const rawHides: WcgNormalizedBox[] = Array.isArray(parsed.hideBoxes) && parsed.hideBoxes.length > 0
+      ? parsed.hideBoxes.slice(0, 5).map((b: any) => clampBox(b, safeBox))
+      : [safeBox];
+
+    // Always sample the real interior background RGB from the actual uploaded file for seamless color matching
+    const sampledHex = (await sampleRegionMedianHex(ffmpegBin, imagePath, safeBox)) || fallback.patchColor;
+    const autoInk = suggestHarmoniousInkPalette(sampledHex);
+    const validHex = (v: any, fb: string) => (/^#[0-9a-fA-F]{6}$/.test(String(v || '').trim()) ? String(v).trim() : fb);
+
+    return {
+      safeBox,
+      hideBoxes: rawHides,
+      patchColor: sampledHex,
+      suggestedTextColor: validHex(parsed.suggestedTextColor, autoInk.textColor),
+      suggestedAccentColor: validHex(parsed.suggestedAccentColor, autoInk.accentColor),
+      summaryRomanUrdu: String(parsed.summaryRomanUrdu || fallback.summaryRomanUrdu),
+      analyzedBy: 'gemini-vision',
+    };
+  } catch (err: any) {
+    if (throwOnAiError) {
+      throw err;
+    }
+    console.warn('[WCG Card Analyze] Falling back to pixel heuristic:', err?.message || err);
+    return fallback;
+  }
+}
+
+const CRC32_TABLE = (() => {
+  const tbl = new Uint32Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    let c = i;
+    for (let k = 0; k < 8; k += 1) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    tbl[i] = c >>> 0;
+  }
+  return tbl;
+})();
+
+function crc32(buf: Buffer): number {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i += 1) {
+    c = CRC32_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const typeBuf = Buffer.from(type, 'ascii');
+  const lenBuf = Buffer.alloc(4);
+  lenBuf.writeUInt32BE(data.length, 0);
+  const crcInput = Buffer.concat([typeBuf, data]);
+  const crcBuf = Buffer.alloc(4);
+  crcBuf.writeUInt32BE(crc32(crcInput), 0);
+  return Buffer.concat([lenBuf, typeBuf, data, crcBuf]);
+}
+
+function encodeRgbaPng(width: number, height: number, rgba: Buffer): Buffer {
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // RGBA
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+
+  const stride = width * 4;
+  const raw = Buffer.alloc((stride + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    const rowOff = y * (stride + 1);
+    raw[rowOff] = 0; // filter None
+    rgba.copy(raw, rowOff + 1, y * stride, (y + 1) * stride);
+  }
+  const compressed = zlib.deflateSync(raw, { level: 3 });
+  return Buffer.concat([
+    sig,
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', compressed),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+function buildFeatheredPatchPngBuffer(params: {
+  width: number;
+  height: number;
+  safeBox: WcgNormalizedBox;
+  hideBoxes: WcgNormalizedBox[];
+  patchHex: string;
+  accentHex: string;
+  patchMode: WcgPatchBlendMode;
+  cleanSampleText: boolean;
+}): Buffer {
+  const { width, height, safeBox, hideBoxes, patchHex, accentHex, patchMode, cleanSampleText } = params;
+  const rgba = Buffer.alloc(width * height * 4, 0);
+  const [pr, pg, pb] = hexToRgbTuple(patchHex, [27, 122, 114]);
+  const [ar, ag, ab] = hexToRgbTuple(accentHex, [231, 194, 107]);
+
+  const paintSoftRoundedRect = (
+    bx: number,
+    by: number,
+    bw: number,
+    bh: number,
+    r: number,
+    g: number,
+    b: number,
+    maxAlpha: number,
+    radius: number,
+    feather: number
+  ) => {
+    const x0 = Math.max(0, Math.floor(bx - feather));
+    const y0 = Math.max(0, Math.floor(by - feather));
+    const x1 = Math.min(width - 1, Math.ceil(bx + bw + feather));
+    const y1 = Math.min(height - 1, Math.ceil(by + bh + feather));
+    const halfW = bw / 2;
+    const halfH = bh / 2;
+    const cx = bx + halfW;
+    const cy = by + halfH;
+    const rad = Math.min(radius, halfW * 0.45, halfH * 0.45);
+
+    for (let py = y0; py <= y1; py += 1) {
+      const dy = Math.abs(py - cy) - (halfH - rad);
+      for (let px = x0; px <= x1; px += 1) {
+        const dx = Math.abs(px - cx) - (halfW - rad);
+        const signedDist = Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - rad;
+        if (signedDist >= feather) continue;
+        let a = maxAlpha;
+        if (signedDist > 0) {
+          const t = signedDist / feather;
+          const smooth = 1 - t * t * (3 - 2 * t);
+          a = Math.round(maxAlpha * smooth);
+        }
+        if (a <= 0) continue;
+        const off = (py * width + px) * 4;
+        if (a > rgba[off + 3]) {
+          rgba[off] = r;
+          rgba[off + 1] = g;
+          rgba[off + 2] = b;
+          rgba[off + 3] = a;
+        }
+      }
+    }
+  };
+
+  if (cleanSampleText && patchMode !== 'direct') {
+    const targets = hideBoxes.length > 0 ? hideBoxes : [safeBox];
+    for (const box of targets) {
+      paintSoftRoundedRect(
+        box.x * width,
+        box.y * height,
+        box.w * width,
+        box.h * height,
+        pr,
+        pg,
+        pb,
+        248,
+        18,
+        14
+      );
+    }
+  }
+
+  if (patchMode === 'plaque') {
+    const sx = safeBox.x * width + 6;
+    const sy = safeBox.y * height + 6;
+    const sw = Math.max(40, safeBox.w * width - 12);
+    const sh = Math.max(40, safeBox.h * height - 12);
+    paintSoftRoundedRect(sx, sy, sw, sh, pr, pg, pb, 224, 22, 10);
+
+    // Subtle accent border frame around the plaque
+    const x0 = Math.max(0, Math.floor(sx));
+    const y0 = Math.max(0, Math.floor(sy));
+    const x1 = Math.min(width - 1, Math.ceil(sx + sw));
+    const y1 = Math.min(height - 1, Math.ceil(sy + sh));
+    const halfW = sw / 2;
+    const halfH = sh / 2;
+    const cx = sx + halfW;
+    const cy = sy + halfH;
+    const rad = Math.min(20, halfW * 0.4, halfH * 0.4);
+    for (let py = y0; py <= y1; py += 1) {
+      const dy = Math.abs(py - cy) - (halfH - rad);
+      for (let px = x0; px <= x1; px += 1) {
+        const dx = Math.abs(px - cx) - (halfW - rad);
+        const signedDist = Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - rad;
+        if (signedDist >= -2.5 && signedDist <= 0.5) {
+          const off = (py * width + px) * 4;
+          rgba[off] = ar;
+          rgba[off + 1] = ag;
+          rgba[off + 2] = ab;
+          rgba[off + 3] = 195;
+        }
+      }
+    }
+  }
+
+  return encodeRgbaPng(width, height, rgba);
+}
+
+function buildAdaptiveTypewriterAssFile(
+  lines: AssAdaptiveLineSpec[],
+  safeRect: PixelRect,
   partDurationSec: number,
   styling: WcgStylingConfig,
   fontNameSerif: string
@@ -289,22 +838,54 @@ function buildTypewriterAssFile(
   const textAssColor = hexToAssBgr(styling.textColor, '&H00FFFFFF&');
   const accentAssColor = hexToAssBgr(styling.accentColor, '&H006BC2E7&');
 
+  const padX = Math.max(20, Math.round(safeRect.w * 0.08));
+  const padY = Math.max(24, Math.round(safeRect.h * 0.075));
+  const innerW = Math.max(220, safeRect.w - padX * 2);
+  const innerH = Math.max(260, safeRect.h - padY * 2);
+  const centerX = Math.round(safeRect.x + safeRect.w / 2);
+
+  // Scale font sizes proportionally to available safeBox space so text fits neatly without overflowing floral margins
+  const boxScale = Math.min(1.14, Math.max(0.58, Math.min(innerW / 540, innerH / 760)));
+  const spacing = Math.max(0.85, Math.min(1.16, Number(styling.spacingScale || 1)));
+
+  const prepared = lines
+    .filter((l) => String(l.text || '').trim().length > 0)
+    .map((spec) => {
+      const fs = Math.max(17, Math.round(spec.fontSize * boxScale));
+      const approxCharPx = fs * (spec.bold ? 0.54 : 0.49);
+      const maxChars = Math.max(14, Math.floor(innerW / approxCharPx));
+      const wrapped = wrapLines(spec.text, maxChars);
+      const lineHeight = Math.round(fs * 1.18 * spacing);
+      return { spec, fs, wrapped, lineHeight, totalH: wrapped.length * lineHeight };
+    });
+
+  // Ensure total vertical block stack never overflows innerH
+  const sumHeights = prepared.reduce((acc, item) => acc + item.totalH + Math.round(item.fs * 0.25), 0);
+  const compress = sumHeights > innerH ? (innerH * 0.94) / sumHeights : 1;
+
   const events: string[] = [];
-  const spacing = Math.max(0.85, Math.min(1.2, Number(styling.spacingScale || 1)));
+  const minSlotY = safeRect.y + padY;
+  const maxSlotY = safeRect.y + safeRect.h - padY;
 
-  for (const spec of lines) {
-    const wrapped = wrapLines(spec.text, spec.maxCharsPerLine || 34);
-    const lineHeight = Math.round(spec.fontSize * 1.18 * spacing);
-    const startY = Math.round(spec.y - ((wrapped.length - 1) * lineHeight) / 2);
+  for (const item of prepared) {
+    const fs = Math.max(15, Math.round(item.fs * compress));
+    const lineHeight = Math.round(fs * 1.16 * spacing);
+    const blockCenterY = Math.round(minSlotY + item.spec.slotY * (maxSlotY - minSlotY));
+    const halfBlockH = ((item.wrapped.length - 1) * lineHeight) / 2;
+    const clampedCenterY = Math.max(
+      minSlotY + halfBlockH + fs * 0.5,
+      Math.min(maxSlotY - halfBlockH - fs * 0.5, blockCenterY)
+    );
+    const startY = Math.round(clampedCenterY - halfBlockH);
 
-    const totalChars = Math.max(1, wrapped.join('').length);
-    const perCharMs = Math.max(18, Math.round((spec.typeDurationSec * 1000) / totalChars));
+    const totalChars = Math.max(1, item.wrapped.join('').length);
+    const perCharMs = Math.max(18, Math.round((item.spec.typeDurationSec * 1000) / totalChars));
     let charCursor = 0;
 
-    wrapped.forEach((lineStr, idx) => {
+    item.wrapped.forEach((lineStr, idx) => {
       const yPos = startY + idx * lineHeight;
-      const colorTag = spec.isAccent ? accentAssColor : textAssColor;
-      const styleTags = `${spec.bold ? '\\b1' : '\\b0'}${spec.italic ? '\\i1' : '\\i0'}`;
+      const colorTag = item.spec.isAccent ? accentAssColor : textAssColor;
+      const styleTags = `${item.spec.bold ? '\\b1' : '\\b0'}${item.spec.italic ? '\\i1' : '\\i0'}`;
 
       let animatedChars = '';
       const chars = Array.from(lineStr);
@@ -316,9 +897,12 @@ function buildTypewriterAssFile(
         charCursor += chunk.length;
       }
 
-      const tStart = formatAssTime(spec.revealOffsetSec);
+      const tStart = formatAssTime(item.spec.revealOffsetSec);
       const tEnd = formatAssTime(partDurationSec);
-      const prefix = `{\\an5\\pos(${spec.x},${yPos})\\fn${fontNameSerif}\\fs${spec.fontSize}${styleTags}\\1c${colorTag}\\3c&H00091410&\\bord2.2\\shad1.5\\fad(120,250)}`;
+      const outlineHex = getRelativeLuminance(hexToRgbTuple(styling.textColor, [255, 255, 255])) > 140
+        ? '&H00091410&'
+        : '&H55FFFFFF&';
+      const prefix = `{\\an5\\pos(${centerX},${yPos})\\fn${fontNameSerif}\\fs${fs}${styleTags}\\1c${colorTag}\\3c${outlineHex}\\bord2.0\\shad1.2\\fad(120,250)}`;
       events.push(`Dialogue: 0,${tStart},${tEnd},Default,,0,0,0,,${prefix}${animatedChars}`);
     });
   }
@@ -475,7 +1059,7 @@ export function registerWcgRoutes(app: Express) {
     });
   });
 
-  app.post('/api/wcg/library/templates', (req, res) => {
+  app.post('/api/wcg/library/templates', async (req, res) => {
     try {
       ensureOutputDir();
       const body = req.body || {};
@@ -497,27 +1081,36 @@ export function registerWcgRoutes(app: Express) {
       const ext1 = dec1.mime === 'image/png' ? 'png' : dec1.mime === 'image/webp' ? 'webp' : 'jpg';
       const id = `custom_tpl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
       const file1 = `${id}_p1.${ext1}`;
-      fs.writeFileSync(path.join(WCG_LIB_TEMPLATES_DIR, file1), dec1.buffer);
+      const path1 = path.join(WCG_LIB_TEMPLATES_DIR, file1);
+      fs.writeFileSync(path1, dec1.buffer);
       fs.writeFileSync(path.join(BACKEND_CUSTOM_TEMPLATES_DIR, file1), dec1.buffer);
 
       let file2: string | undefined;
+      let path2: string | undefined;
+      let mime2 = dec1.mime;
       if (part2Raw) {
         const dec2 = decodeBase64DataUrl(part2Raw);
         if (dec2 && /^image\/(jpeg|jpg|png|webp)$/.test(dec2.mime) && dec2.buffer.length <= 12 * 1024 * 1024) {
           const ext2 = dec2.mime === 'image/png' ? 'png' : dec2.mime === 'image/webp' ? 'webp' : 'jpg';
           file2 = `${id}_p2.${ext2}`;
-          fs.writeFileSync(path.join(WCG_LIB_TEMPLATES_DIR, file2), dec2.buffer);
+          mime2 = dec2.mime;
+          path2 = path.join(WCG_LIB_TEMPLATES_DIR, file2);
+          fs.writeFileSync(path2, dec2.buffer);
           fs.writeFileSync(path.join(BACKEND_CUSTOM_TEMPLATES_DIR, file2), dec2.buffer);
         }
       }
 
       let file3: string | undefined;
+      let path3: string | undefined;
+      let mime3 = dec1.mime;
       if (part3Raw) {
         const dec3 = decodeBase64DataUrl(part3Raw);
         if (dec3 && /^image\/(jpeg|jpg|png|webp)$/.test(dec3.mime) && dec3.buffer.length <= 12 * 1024 * 1024) {
           const ext3 = dec3.mime === 'image/png' ? 'png' : dec3.mime === 'image/webp' ? 'webp' : 'jpg';
           file3 = `${id}_p3.${ext3}`;
-          fs.writeFileSync(path.join(WCG_LIB_TEMPLATES_DIR, file3), dec3.buffer);
+          mime3 = dec3.mime;
+          path3 = path.join(WCG_LIB_TEMPLATES_DIR, file3);
+          fs.writeFileSync(path3, dec3.buffer);
           fs.writeFileSync(path.join(BACKEND_CUSTOM_TEMPLATES_DIR, file3), dec3.buffer);
         }
       }
@@ -532,6 +1125,26 @@ export function registerWcgRoutes(app: Express) {
               ? 2
               : 1;
 
+      const ff = resolveFfmpegBinary();
+      let part1Analysis: WcgCardPartAnalysis | undefined;
+      let part2Analysis: WcgCardPartAnalysis | undefined;
+      let part3Analysis: WcgCardPartAnalysis | undefined;
+
+      if (ff) {
+        const [a1, a2, a3] = await Promise.all([
+          analyzeCardImageDesign({ ffmpegBin: ff.bin, imagePath: path1, mimeType: dec1.mime, partLabel: 'Part 1' }),
+          path2
+            ? analyzeCardImageDesign({ ffmpegBin: ff.bin, imagePath: path2, mimeType: mime2, partLabel: 'Part 2' })
+            : Promise.resolve(undefined),
+          path3
+            ? analyzeCardImageDesign({ ffmpegBin: ff.bin, imagePath: path3, mimeType: mime3, partLabel: 'Part 3' })
+            : Promise.resolve(undefined),
+        ]);
+        part1Analysis = a1;
+        part2Analysis = a2;
+        part3Analysis = a3;
+      }
+
       const item: WcgCustomTemplateItem = {
         id,
         name,
@@ -543,6 +1156,9 @@ export function registerWcgRoutes(app: Express) {
         part1Url: `/api/wcg/library/assets/templates/${file1}`,
         part2Url: file2 ? `/api/wcg/library/assets/templates/${file2}` : undefined,
         part3Url: file3 ? `/api/wcg/library/assets/templates/${file3}` : undefined,
+        part1Analysis,
+        part2Analysis,
+        part3Analysis,
         createdAt: new Date().toISOString(),
       };
 
@@ -553,6 +1169,67 @@ export function registerWcgRoutes(app: Express) {
       res.json({ ok: true, template: item });
     } catch (err: any) {
       res.status(500).json({ ok: false, error: err?.message || 'Template save failed' });
+    }
+  });
+
+  // Analyze (or Re-Analyze) an uploaded or built-in wedding card design for safe overlay zones & sample-text hiding
+  app.post('/api/wcg/analyze-card', async (req, res) => {
+    try {
+      const ff = resolveFfmpegBinary();
+      if (!ff) {
+        return res.status(500).json({ ok: false, error: 'FFmpeg binary not available for pixel sampling.' });
+      }
+      const body = req.body || {};
+      const templateId = String(body.templateId || '');
+      const part = Number(body.part || 1) as 1 | 2 | 3;
+      const requireVision = Boolean(body.requireVision);
+
+      let targetPath: string | null = null;
+      let mime = 'image/jpeg';
+
+      const manifest = readLibraryManifest();
+      const customIdx = manifest.templates.findIndex((t) => t.id === templateId);
+      if (customIdx !== -1) {
+        const ct = manifest.templates[customIdx];
+        const fname =
+          part === 3
+            ? ct.part3Filename || ct.part2Filename || ct.part1Filename
+            : part === 2
+              ? ct.part2Filename || ct.part1Filename
+              : ct.part1Filename;
+        targetPath = resolveCustomTemplateFile(fname);
+        if (targetPath?.endsWith('.png')) mime = 'image/png';
+        else if (targetPath?.endsWith('.webp')) mime = 'image/webp';
+      } else if (templateId === 'pakistani-emerald-mehndi-multipart') {
+        const { s1, s2 } = resolveMultiPartAssetPaths();
+        targetPath = part === 2 ? s2 : s1;
+      }
+
+      if (!targetPath || !fs.existsSync(targetPath)) {
+        return res.status(404).json({ ok: false, error: 'Card image file analyze karne ke liye nahi mili.' });
+      }
+
+      const analysis = await analyzeCardImageDesign({
+        ffmpegBin: ff.bin,
+        imagePath: targetPath,
+        mimeType: mime,
+        partLabel: `Part ${part}`,
+        throwOnAiError: requireVision,
+      });
+
+      if (customIdx !== -1) {
+        if (part === 1) manifest.templates[customIdx].part1Analysis = analysis;
+        else if (part === 2) manifest.templates[customIdx].part2Analysis = analysis;
+        else manifest.templates[customIdx].part3Analysis = analysis;
+        writeLibraryManifest(manifest);
+      }
+
+      return res.json({ ok: true, part, analysis });
+    } catch (err: any) {
+      return res.status(500).json({
+        ok: false,
+        error: err?.message || 'AI Vision card analysis fail ho gayi.',
+      });
     }
   });
 
@@ -967,27 +1644,108 @@ Keep spacingScale between 0.90 and 1.12.`;
         };
         const xfadeMode = xfadeMap[String(styling.transitionStyle || 'crossfade')] || 'fade';
 
+        const patchMode: WcgPatchBlendMode = styling.patchMode || 'seamless';
+        const builtinMultipartSpec = findWcgTemplate('pakistani-emerald-mehndi-multipart');
+
+        const resolvePartAnalysis = async (
+          imgPath: string | null,
+          savedAnalysis: WcgCardPartAnalysis | undefined,
+          partNum: 1 | 2 | 3
+        ): Promise<WcgCardPartAnalysis | null> => {
+          if (!imgPath) return null;
+          if (savedAnalysis) return savedAnalysis;
+          if (isBuiltinMultipart) {
+            return (partNum === 2 ? builtinMultipartSpec.part2Analysis : builtinMultipartSpec.part1Analysis) || null;
+          }
+          const mime = imgPath.endsWith('.png') ? 'image/png' : imgPath.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+          return await analyzeCardImageDesign({ ffmpegBin, imagePath: imgPath, mimeType: mime, partLabel: `Part ${partNum}` });
+        };
+
+        const [p1Analysis, p2Analysis, p3Analysis] = await Promise.all([
+          resolvePartAnalysis(part1ImagePath, customTpl?.part1Analysis, 1),
+          resolvePartAnalysis(part2ImagePath, customTpl?.part2Analysis || customTpl?.part1Analysis, 2),
+          resolvePartAnalysis(part3ImagePath, customTpl?.part3Analysis || customTpl?.part2Analysis || customTpl?.part1Analysis, 3),
+        ]);
+
+        const computeImageCardSafeRect = async (
+          srcImg: string | null,
+          analysis: WcgCardPartAnalysis | null
+        ): Promise<{ cardRect: PixelRect; safeRect: PixelRect }> => {
+          if (!srcImg) {
+            return {
+              cardRect: { x: 0, y: 0, w: 1080, h: 1920 },
+              safeRect: { x: 130, y: 310, w: 820, h: 1280 },
+            };
+          }
+          const dims = await probeImageDimensions(ffmpegBin, srcImg);
+          const scale = Math.min(1080 / dims.width, 1460 / dims.height);
+          const cardW = Math.max(200, Math.round(dims.width * scale));
+          const cardH = Math.max(200, Math.round(dims.height * scale));
+          const cardX = Math.round((1080 - cardW) / 2);
+          const cardY = Math.round((1920 - cardH) / 2);
+          const sb = analysis?.safeBox || { x: 0.22, y: 0.22, w: 0.56, h: 0.48 };
+          return {
+            cardRect: { x: cardX, y: cardY, w: cardW, h: cardH },
+            safeRect: {
+              x: Math.round(cardX + sb.x * cardW),
+              y: Math.round(cardY + sb.y * cardH),
+              w: Math.round(sb.w * cardW),
+              h: Math.round(sb.h * cardH),
+            },
+          };
+        };
+
         const bakeBgStill = async (
           srcImg: string | null,
           fallbackHex: string,
           outPng: string,
-          maskType: 'p1' | 'p2' | 'none'
+          analysis: WcgCardPartAnalysis | null,
+          cardRect: PixelRect,
+          partIdx: number
         ) => {
           const scaleTail = isFullHd ? '' : `,scale=${targetW}:${targetH}`;
           if (srcImg) {
-            const maskFilter =
-              maskType === 'p1' && isBuiltinMultipart && styling.cleanSampleText
-                ? `,drawbox=x=275:y=495:w=530:h=735:color=0x1B7A72@0.98:t=fill`
-                : maskType === 'p2' && isBuiltinMultipart && styling.cleanSampleText
-                  ? `,drawbox=x=285:y=420:w=510:h=840:color=0x196134@0.98:t=fill`
-                  : '';
-            await execFileAsync(ffmpegBin, [
-              '-y', '-i', srcImg,
-              '-filter_complex',
-              `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=1080:1420:force_original_aspect_ratio=decrease[fgs];[bgb][fgs]overlay=(W-w)/2:(H-h)/2${maskFilter},vignette=PI/6${scaleTail}`,
-              '-frames:v', '1',
-              outPng,
-            ]);
+            const shouldPatch = Boolean(styling.cleanSampleText || patchMode === 'plaque');
+            const patchPngPath = path.join(tmpDir, `p${partIdx}_patch.png`);
+            if (shouldPatch) {
+              const sb = analysis?.safeBox || { x: 0.22, y: 0.22, w: 0.56, h: 0.48 };
+              const hbs = analysis?.hideBoxes || [sb];
+              const pHex = analysis?.patchColor || fallbackHex;
+              const patchBuf = buildFeatheredPatchPngBuffer({
+                width: cardRect.w,
+                height: cardRect.h,
+                safeBox: sb,
+                hideBoxes: hbs,
+                patchHex: pHex,
+                accentHex: styling.accentColor,
+                patchMode,
+                cleanSampleText: Boolean(styling.cleanSampleText),
+              });
+              fs.writeFileSync(patchPngPath, patchBuf);
+              await execFileAsync(ffmpegBin, [
+                '-y',
+                '-i',
+                srcImg,
+                '-i',
+                patchPngPath,
+                '-filter_complex',
+                `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=${cardRect.w}:${cardRect.h}[fgs];[fgs][1:v]overlay=0:0[patched];[bgb][patched]overlay=${cardRect.x}:${cardRect.y},vignette=PI/6${scaleTail}`,
+                '-frames:v',
+                '1',
+                outPng,
+              ]);
+            } else {
+              await execFileAsync(ffmpegBin, [
+                '-y',
+                '-i',
+                srcImg,
+                '-filter_complex',
+                `[0:v]split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24,eq=brightness=-0.06[bgb];[fg]scale=${cardRect.w}:${cardRect.h}[fgs];[bgb][fgs]overlay=${cardRect.x}:${cardRect.y},vignette=PI/6${scaleTail}`,
+                '-frames:v',
+                '1',
+                outPng,
+              ]);
+            }
           } else {
             const fillColor = hexToFfmpegColor(fallbackHex, '0x4E0D19');
             const sColor = hexToFfmpegColor(styling.secondaryColor, '0x2D070F');
@@ -1000,8 +1758,16 @@ Keep spacingScale between 0.90 and 1.12.`;
               `drawbox=x=150:y=1100:w=780:h=155:color=${aColor}@0.65:t=2`,
             ].join(',');
             await execFileAsync(ffmpegBin, [
-              '-y', '-f', 'lavfi', '-i', `color=c=${fillColor}:s=1080x1920:d=1:r=1`,
-              '-vf', `${frameDeco},vignette=PI/6${scaleTail}`, '-frames:v', '1', outPng,
+              '-y',
+              '-f',
+              'lavfi',
+              '-i',
+              `color=c=${fillColor}:s=1080x1920:d=1:r=1`,
+              '-vf',
+              `${frameDeco},vignette=PI/6${scaleTail}`,
+              '-frames:v',
+              '1',
+              outPng,
             ]);
           }
         };
@@ -1014,20 +1780,22 @@ Keep spacingScale between 0.90 and 1.12.`;
 
         if (partCount === 1) {
           const s1Scale = durationSeconds / 18;
-          const ass1 = buildTypewriterAssFile(
+          const geom1 = await computeImageCardSafeRect(part1ImagePath, p1Analysis);
+          const ass1 = buildAdaptiveTypewriterAssFile(
             [
-              { text: card.invocation, x: 540, y: 410, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.25 * s1Scale, typeDurationSec: 0.85 * s1Scale, maxCharsPerLine: 36 },
-              { text: `${card.hostLine1}  &  ${card.hostLine2}`, x: 540, y: 525, fontSize: 32, bold: true, revealOffsetSec: 0.9 * s1Scale, typeDurationSec: 1.1 * s1Scale, maxCharsPerLine: 32 },
-              { text: 'Cordially Invite You to the Wedding Celebration of', x: 540, y: 620, fontSize: 24, italic: true, revealOffsetSec: 1.9 * s1Scale, typeDurationSec: 0.95 * s1Scale, maxCharsPerLine: 38 },
-              { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 725, fontSize: 52, isAccent: true, bold: true, italic: true, revealOffsetSec: 2.7 * s1Scale, typeDurationSec: 1.0 * s1Scale, maxCharsPerLine: 24 },
-              { text: card.eventTitle, x: 540, y: 860, fontSize: 56, isAccent: true, bold: true, revealOffsetSec: 3.6 * s1Scale, typeDurationSec: 0.95 * s1Scale, maxCharsPerLine: 22 },
-              { text: card.eventSubtitle, x: 540, y: 948, fontSize: 28, italic: true, revealOffsetSec: 4.4 * s1Scale, typeDurationSec: 0.85 * s1Scale, maxCharsPerLine: 32 },
-              { text: `Programme  ·  ${card.weddingDate}`, x: 540, y: 1055, fontSize: 31, isAccent: true, bold: true, revealOffsetSec: 5.1 * s1Scale, typeDurationSec: 1.0 * s1Scale, maxCharsPerLine: 34 },
-              { text: card.timing1, x: 540, y: 1135, fontSize: 27, revealOffsetSec: 5.9 * s1Scale, typeDurationSec: 0.85 * s1Scale, maxCharsPerLine: 36 },
-              { text: card.timing2, x: 540, y: 1195, fontSize: 27, revealOffsetSec: 6.6 * s1Scale, typeDurationSec: 0.85 * s1Scale, maxCharsPerLine: 36 },
-              { text: card.venueName, x: 540, y: 1300, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 7.3 * s1Scale, typeDurationSec: 0.9 * s1Scale, maxCharsPerLine: 30 },
-              { text: card.venueAddress, x: 540, y: 1385, fontSize: 23, revealOffsetSec: 8.0 * s1Scale, typeDurationSec: 1.1 * s1Scale, maxCharsPerLine: 38 },
+              { text: card.invocation, slotY: 0.05, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.25 * s1Scale, typeDurationSec: 0.85 * s1Scale },
+              { text: `${card.hostLine1}  &  ${card.hostLine2}`, slotY: 0.145, fontSize: 32, bold: true, revealOffsetSec: 0.9 * s1Scale, typeDurationSec: 1.1 * s1Scale },
+              { text: 'Cordially Invite You to the Wedding Celebration of', slotY: 0.24, fontSize: 24, italic: true, revealOffsetSec: 1.9 * s1Scale, typeDurationSec: 0.95 * s1Scale },
+              { text: `${card.groomName}  &  ${card.brideName}`, slotY: 0.345, fontSize: 52, isAccent: true, bold: true, italic: true, revealOffsetSec: 2.7 * s1Scale, typeDurationSec: 1.0 * s1Scale },
+              { text: card.eventTitle, slotY: 0.465, fontSize: 56, isAccent: true, bold: true, revealOffsetSec: 3.6 * s1Scale, typeDurationSec: 0.95 * s1Scale },
+              { text: card.eventSubtitle, slotY: 0.56, fontSize: 28, italic: true, revealOffsetSec: 4.4 * s1Scale, typeDurationSec: 0.85 * s1Scale },
+              { text: `Programme  ·  ${card.weddingDate}`, slotY: 0.655, fontSize: 30, isAccent: true, bold: true, revealOffsetSec: 5.1 * s1Scale, typeDurationSec: 1.0 * s1Scale },
+              { text: card.timing1, slotY: 0.735, fontSize: 27, revealOffsetSec: 5.9 * s1Scale, typeDurationSec: 0.85 * s1Scale },
+              { text: card.timing2, slotY: 0.80, fontSize: 27, revealOffsetSec: 6.6 * s1Scale, typeDurationSec: 0.85 * s1Scale },
+              { text: card.venueName, slotY: 0.885, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 7.3 * s1Scale, typeDurationSec: 0.9 * s1Scale },
+              { text: card.venueAddress, slotY: 0.96, fontSize: 22, revealOffsetSec: 8.0 * s1Scale, typeDurationSec: 1.1 * s1Scale },
             ],
+            geom1.safeRect,
             durationSeconds,
             styling,
             fontName
@@ -1035,37 +1803,43 @@ Keep spacingScale between 0.90 and 1.12.`;
           const ass1Path = path.join(tmpDir, 'part1.ass');
           const p1BakedPath = path.join(tmpDir, 'p1_bg.png');
           fs.writeFileSync(ass1Path, ass1, 'utf8');
-          await bakeBgStill(part1ImagePath, styling.primaryColor, p1BakedPath, 'p1');
+          await bakeBgStill(part1ImagePath, styling.primaryColor, p1BakedPath, p1Analysis, geom1.cardRect, 1);
 
           ffmpegArgs.push('-loop', '1', '-t', String(durationSeconds), '-framerate', String(fps), '-i', p1BakedPath);
           videoFilter.push(`[0:v]ass='${escapeFfmpegFilterPath(ass1Path)}'${fontsOpt},format=yuv420p[vout]`);
         } else if (partCount === 2) {
-          const ass1 = buildTypewriterAssFile(
+          const [geom1, geom2] = await Promise.all([
+            computeImageCardSafeRect(part1ImagePath, p1Analysis),
+            computeImageCardSafeRect(part2ImagePath, p2Analysis),
+          ]);
+          const ass1 = buildAdaptiveTypewriterAssFile(
             [
-              { text: card.invocation, x: 540, y: 565, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.3 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 34 },
-              { text: card.hostLine1, x: 540, y: 655, fontSize: 38, bold: true, revealOffsetSec: 1.05 * timeScale, typeDurationSec: 1.05 * timeScale, maxCharsPerLine: 28 },
-              { text: card.relationLine1, x: 540, y: 745, fontSize: 25, italic: true, revealOffsetSec: 2.0 * timeScale, typeDurationSec: 1.2 * timeScale, maxCharsPerLine: 34 },
-              { text: card.hostLine2, x: 540, y: 855, fontSize: 38, isAccent: true, bold: true, revealOffsetSec: 3.15 * timeScale, typeDurationSec: 1.05 * timeScale, maxCharsPerLine: 28 },
-              { text: card.relationLine2, x: 540, y: 940, fontSize: 25, italic: true, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 1.15 * timeScale, maxCharsPerLine: 34 },
-              { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 1035, fontSize: 48, isAccent: true, bold: true, italic: true, revealOffsetSec: 5.15 * timeScale, typeDurationSec: 1.0 * timeScale, maxCharsPerLine: 24 },
-              { text: `${card.specialTitle}  ·  ${card.specialNames}`, x: 540, y: 1140, fontSize: 25, revealOffsetSec: 6.05 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 34 },
+              { text: card.invocation, slotY: 0.06, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.3 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: card.hostLine1, slotY: 0.19, fontSize: 38, bold: true, revealOffsetSec: 1.05 * timeScale, typeDurationSec: 1.05 * timeScale },
+              { text: card.relationLine1, slotY: 0.33, fontSize: 25, italic: true, revealOffsetSec: 2.0 * timeScale, typeDurationSec: 1.2 * timeScale },
+              { text: card.hostLine2, slotY: 0.49, fontSize: 38, isAccent: true, bold: true, revealOffsetSec: 3.15 * timeScale, typeDurationSec: 1.05 * timeScale },
+              { text: card.relationLine2, slotY: 0.63, fontSize: 25, italic: true, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 1.15 * timeScale },
+              { text: `${card.groomName}  &  ${card.brideName}`, slotY: 0.77, fontSize: 48, isAccent: true, bold: true, italic: true, revealOffsetSec: 5.15 * timeScale, typeDurationSec: 1.0 * timeScale },
+              { text: `${card.specialTitle}  ·  ${card.specialNames}`, slotY: 0.92, fontSize: 24, revealOffsetSec: 6.05 * timeScale, typeDurationSec: 1.1 * timeScale },
             ],
+            geom1.safeRect,
             partDur,
             styling,
             fontName
           );
-          const ass2 = buildTypewriterAssFile(
+          const ass2 = buildAdaptiveTypewriterAssFile(
             [
-              { text: card.part2Blessing, x: 540, y: 495, fontSize: 35, isAccent: true, bold: true, revealOffsetSec: 0.3 * timeScale, typeDurationSec: 0.8 * timeScale, maxCharsPerLine: 28 },
-              { text: card.part2Intro, x: 540, y: 565, fontSize: 22, revealOffsetSec: 0.95 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 38 },
-              { text: card.eventTitle, x: 540, y: 660, fontSize: 72, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.7 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 20 },
-              { text: card.eventSubtitle, x: 540, y: 745, fontSize: 30, italic: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
-              { text: `Programme  ·  ${card.weddingDate}`, x: 540, y: 850, fontSize: 33, isAccent: true, bold: true, revealOffsetSec: 3.35 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 34 },
-              { text: card.timing1, x: 540, y: 932, fontSize: 28, revealOffsetSec: 4.35 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 36 },
-              { text: card.timing2, x: 540, y: 992, fontSize: 28, revealOffsetSec: 5.1 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 36 },
-              { text: card.venueName, x: 540, y: 1105, fontSize: 37, isAccent: true, bold: true, revealOffsetSec: 5.9 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 30 },
-              { text: card.venueAddress, x: 540, y: 1185, fontSize: 24, revealOffsetSec: 6.65 * timeScale, typeDurationSec: 1.1 * timeScale, maxCharsPerLine: 36 },
+              { text: card.part2Blessing, slotY: 0.06, fontSize: 34, isAccent: true, bold: true, revealOffsetSec: 0.3 * timeScale, typeDurationSec: 0.8 * timeScale },
+              { text: card.part2Intro, slotY: 0.15, fontSize: 22, revealOffsetSec: 0.95 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: card.eventTitle, slotY: 0.28, fontSize: 70, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.7 * timeScale, typeDurationSec: 0.95 * timeScale },
+              { text: card.eventSubtitle, slotY: 0.40, fontSize: 30, italic: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: `Programme  ·  ${card.weddingDate}`, slotY: 0.53, fontSize: 32, isAccent: true, bold: true, revealOffsetSec: 3.35 * timeScale, typeDurationSec: 1.1 * timeScale },
+              { text: card.timing1, slotY: 0.64, fontSize: 28, revealOffsetSec: 4.35 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: card.timing2, slotY: 0.72, fontSize: 28, revealOffsetSec: 5.1 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: card.venueName, slotY: 0.84, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 5.9 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: card.venueAddress, slotY: 0.94, fontSize: 23, revealOffsetSec: 6.65 * timeScale, typeDurationSec: 1.1 * timeScale },
             ],
+            geom2.safeRect,
             partDur,
             styling,
             fontName
@@ -1077,8 +1851,8 @@ Keep spacingScale between 0.90 and 1.12.`;
           fs.writeFileSync(ass1Path, ass1, 'utf8');
           fs.writeFileSync(ass2Path, ass2, 'utf8');
           await Promise.all([
-            bakeBgStill(part1ImagePath, styling.primaryColor, p1BakedPath, 'p1'),
-            bakeBgStill(part2ImagePath, styling.secondaryColor, p2BakedPath, 'p2'),
+            bakeBgStill(part1ImagePath, styling.primaryColor, p1BakedPath, p1Analysis, geom1.cardRect, 1),
+            bakeBgStill(part2ImagePath, styling.secondaryColor, p2BakedPath, p2Analysis, geom2.cardRect, 2),
           ]);
 
           const xfadeOffset = Math.max(2, partDur - xfadeDur).toFixed(2);
@@ -1093,45 +1867,53 @@ Keep spacingScale between 0.90 and 1.12.`;
           );
         } else {
           // 3-Part Triple Function Suite (Function 1 Mehndi -> Function 2 Barat -> Function 3 Walima)
-          const ass1 = buildTypewriterAssFile(
+          const [geom1, geom2, geom3] = await Promise.all([
+            computeImageCardSafeRect(part1ImagePath, p1Analysis),
+            computeImageCardSafeRect(part2ImagePath, p2Analysis),
+            computeImageCardSafeRect(part3ImagePath, p3Analysis),
+          ]);
+          const ass1 = buildAdaptiveTypewriterAssFile(
             [
-              { text: card.invocation, x: 540, y: 470, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.2 * timeScale, typeDurationSec: 0.8 * timeScale, maxCharsPerLine: 36 },
-              { text: `${card.hostLine1}  &  ${card.hostLine2}`, x: 540, y: 585, fontSize: 31, bold: true, revealOffsetSec: 0.85 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 32 },
-              { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 705, fontSize: 50, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.7 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 24 },
-              { text: `FUNCTION 1  ·  ${card.func1Title}`, x: 540, y: 845, fontSize: 56, isAccent: true, bold: true, revealOffsetSec: 2.5 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 24 },
-              { text: card.func1Subtitle, x: 540, y: 950, fontSize: 29, italic: true, revealOffsetSec: 3.3 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 32 },
-              { text: card.func1Date, x: 540, y: 1055, fontSize: 32, isAccent: true, bold: true, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 32 },
-              { text: card.func1Timing, x: 540, y: 1135, fontSize: 27, revealOffsetSec: 4.8 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 34 },
-              { text: card.func1Venue, x: 540, y: 1235, fontSize: 27, isAccent: true, bold: true, revealOffsetSec: 5.5 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 34 },
+              { text: card.invocation, slotY: 0.06, fontSize: 21, isAccent: true, bold: true, revealOffsetSec: 0.2 * timeScale, typeDurationSec: 0.8 * timeScale },
+              { text: `${card.hostLine1}  &  ${card.hostLine2}`, slotY: 0.17, fontSize: 31, bold: true, revealOffsetSec: 0.85 * timeScale, typeDurationSec: 0.95 * timeScale },
+              { text: `${card.groomName}  &  ${card.brideName}`, slotY: 0.30, fontSize: 48, isAccent: true, bold: true, italic: true, revealOffsetSec: 1.7 * timeScale, typeDurationSec: 0.95 * timeScale },
+              { text: `FUNCTION 1  ·  ${card.func1Title}`, slotY: 0.45, fontSize: 54, isAccent: true, bold: true, revealOffsetSec: 2.5 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: card.func1Subtitle, slotY: 0.57, fontSize: 29, italic: true, revealOffsetSec: 3.3 * timeScale, typeDurationSec: 0.85 * timeScale },
+              { text: card.func1Date, slotY: 0.69, fontSize: 32, isAccent: true, bold: true, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 0.85 * timeScale },
+              { text: card.func1Timing, slotY: 0.80, fontSize: 27, revealOffsetSec: 4.8 * timeScale, typeDurationSec: 0.85 * timeScale },
+              { text: card.func1Venue, slotY: 0.92, fontSize: 27, isAccent: true, bold: true, revealOffsetSec: 5.5 * timeScale, typeDurationSec: 0.9 * timeScale },
             ],
+            geom1.safeRect,
             partDur,
             styling,
             fontName
           );
-          const ass2 = buildTypewriterAssFile(
+          const ass2 = buildAdaptiveTypewriterAssFile(
             [
-              { text: 'FUNCTION 2  ·  ROYAL CEREMONY', x: 540, y: 500, fontSize: 24, isAccent: true, bold: true, revealOffsetSec: 0.2 * timeScale, typeDurationSec: 0.75 * timeScale, maxCharsPerLine: 34 },
-              { text: card.func2Title, x: 540, y: 650, fontSize: 72, isAccent: true, bold: true, italic: true, revealOffsetSec: 0.9 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 20 },
-              { text: card.func2Subtitle, x: 540, y: 780, fontSize: 32, italic: true, revealOffsetSec: 1.75 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
-              { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 895, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 28 },
-              { text: card.func2Date, x: 540, y: 1015, fontSize: 34, isAccent: true, bold: true, revealOffsetSec: 3.3 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
-              { text: card.func2Timing, x: 540, y: 1105, fontSize: 29, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 34 },
-              { text: card.func2Venue, x: 540, y: 1225, fontSize: 29, isAccent: true, bold: true, revealOffsetSec: 4.85 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 34 },
+              { text: 'FUNCTION 2  ·  ROYAL CEREMONY', slotY: 0.08, fontSize: 24, isAccent: true, bold: true, revealOffsetSec: 0.2 * timeScale, typeDurationSec: 0.75 * timeScale },
+              { text: card.func2Title, slotY: 0.24, fontSize: 70, isAccent: true, bold: true, italic: true, revealOffsetSec: 0.9 * timeScale, typeDurationSec: 0.95 * timeScale },
+              { text: card.func2Subtitle, slotY: 0.40, fontSize: 32, italic: true, revealOffsetSec: 1.75 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: `${card.groomName}  &  ${card.brideName}`, slotY: 0.54, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.85 * timeScale },
+              { text: card.func2Date, slotY: 0.68, fontSize: 34, isAccent: true, bold: true, revealOffsetSec: 3.3 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: card.func2Timing, slotY: 0.79, fontSize: 29, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 0.85 * timeScale },
+              { text: card.func2Venue, slotY: 0.92, fontSize: 29, isAccent: true, bold: true, revealOffsetSec: 4.85 * timeScale, typeDurationSec: 0.95 * timeScale },
             ],
+            geom2.safeRect,
             partDur,
             styling,
             fontName
           );
-          const ass3 = buildTypewriterAssFile(
+          const ass3 = buildAdaptiveTypewriterAssFile(
             [
-              { text: 'FUNCTION 3  ·  GRAND RECEPTION', x: 540, y: 500, fontSize: 24, isAccent: true, bold: true, revealOffsetSec: 0.2 * timeScale, typeDurationSec: 0.75 * timeScale, maxCharsPerLine: 34 },
-              { text: card.func3Title, x: 540, y: 650, fontSize: 72, isAccent: true, bold: true, italic: true, revealOffsetSec: 0.9 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 20 },
-              { text: card.func3Subtitle, x: 540, y: 780, fontSize: 32, italic: true, revealOffsetSec: 1.75 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
-              { text: `${card.groomName}  &  ${card.brideName}`, x: 540, y: 895, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 28 },
-              { text: card.func3Date, x: 540, y: 1015, fontSize: 34, isAccent: true, bold: true, revealOffsetSec: 3.3 * timeScale, typeDurationSec: 0.9 * timeScale, maxCharsPerLine: 32 },
-              { text: card.func3Timing, x: 540, y: 1105, fontSize: 29, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 0.85 * timeScale, maxCharsPerLine: 34 },
-              { text: card.func3Venue, x: 540, y: 1225, fontSize: 29, isAccent: true, bold: true, revealOffsetSec: 4.85 * timeScale, typeDurationSec: 0.95 * timeScale, maxCharsPerLine: 34 },
+              { text: 'FUNCTION 3  ·  GRAND RECEPTION', slotY: 0.08, fontSize: 24, isAccent: true, bold: true, revealOffsetSec: 0.2 * timeScale, typeDurationSec: 0.75 * timeScale },
+              { text: card.func3Title, slotY: 0.24, fontSize: 70, isAccent: true, bold: true, italic: true, revealOffsetSec: 0.9 * timeScale, typeDurationSec: 0.95 * timeScale },
+              { text: card.func3Subtitle, slotY: 0.40, fontSize: 32, italic: true, revealOffsetSec: 1.75 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: `${card.groomName}  &  ${card.brideName}`, slotY: 0.54, fontSize: 36, isAccent: true, bold: true, revealOffsetSec: 2.55 * timeScale, typeDurationSec: 0.85 * timeScale },
+              { text: card.func3Date, slotY: 0.68, fontSize: 34, isAccent: true, bold: true, revealOffsetSec: 3.3 * timeScale, typeDurationSec: 0.9 * timeScale },
+              { text: card.func3Timing, slotY: 0.79, fontSize: 29, revealOffsetSec: 4.1 * timeScale, typeDurationSec: 0.85 * timeScale },
+              { text: card.func3Venue, slotY: 0.92, fontSize: 29, isAccent: true, bold: true, revealOffsetSec: 4.85 * timeScale, typeDurationSec: 0.95 * timeScale },
             ],
+            geom3.safeRect,
             partDur,
             styling,
             fontName
@@ -1147,9 +1929,9 @@ Keep spacingScale between 0.90 and 1.12.`;
           fs.writeFileSync(ass2Path, ass2, 'utf8');
           fs.writeFileSync(ass3Path, ass3, 'utf8');
           await Promise.all([
-            bakeBgStill(part1ImagePath, styling.primaryColor, p1BakedPath, 'p1'),
-            bakeBgStill(part2ImagePath, styling.secondaryColor, p2BakedPath, 'p2'),
-            bakeBgStill(part3ImagePath, styling.primaryColor, p3BakedPath, 'p1'),
+            bakeBgStill(part1ImagePath, styling.primaryColor, p1BakedPath, p1Analysis, geom1.cardRect, 1),
+            bakeBgStill(part2ImagePath, styling.secondaryColor, p2BakedPath, p2Analysis, geom2.cardRect, 2),
+            bakeBgStill(part3ImagePath, styling.primaryColor, p3BakedPath, p3Analysis, geom3.cardRect, 3),
           ]);
 
           const off1 = Math.max(1.5, partDur - xfadeDur);

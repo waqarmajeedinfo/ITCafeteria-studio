@@ -96,7 +96,10 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
       setPart1File(null);
       setPart2File(null);
       setPart3File(null);
-      setUploadMsg(`"${json.template.name}" (${detectedParts}-Part) permanent server library mein save ho gaya hai.`);
+      const summary = json.template?.part1Analysis?.summaryRomanUrdu
+        ? ` — ${json.template.part1Analysis.summaryRomanUrdu}`
+        : '';
+      setUploadMsg(`"${json.template.name}" (${detectedParts}-Part) save aur AI region-fit ho gaya hai${summary}`);
     } catch (err: any) {
       setUploadErr(err?.message || 'Template upload error');
     } finally {
@@ -215,7 +218,7 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
               >
                 <img src={tpl.part1Url} alt={tpl.name} className="w-full h-full object-cover" />
                 <span className="absolute top-1 left-1 bg-slate-950/85 text-[9px] px-1.5 py-0.5 rounded text-cyan-300 font-semibold">
-                  {tplParts}-Part
+                  {tplParts}-Part{tpl.part1Analysis ? ' · AI Fit' : ''}
                 </span>
                 <span className="absolute bottom-1 left-1 right-7 truncate bg-slate-950/85 text-[10px] px-1.5 py-0.5 rounded text-slate-200">
                   #{index + 1} {tpl.name}
@@ -291,7 +294,11 @@ export const WCGUploadManager: React.FC<WCGUploadManagerProps> = ({
             className="w-full py-2 px-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-200 font-semibold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isUploadingTpl ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-            <span>{isUploadingTpl ? 'Saving Template to Server...' : 'Save Custom Card to Library'}</span>
+            <span>
+              {isUploadingTpl
+                ? 'Uploading & AI Analyzing Regions...'
+                : 'Save & AI-Fit Custom Card to Library'}
+            </span>
           </button>
         </div>
       </div>

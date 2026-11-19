@@ -27,11 +27,13 @@ import {
   findWcgMusicPreset,
   getDefaultMusicForCategory,
   type WcgCardData,
+  type WcgCardPartAnalysis,
   type WcgCustomSongItem,
   type WcgCustomTemplateItem,
   type WcgEventCategory,
   type WcgPartCount,
   type WcgPartFilter,
+  type WcgPatchBlendMode,
   type WcgRenderQuality,
   type WcgRenderResult,
   type WcgStylingConfig,
@@ -138,30 +140,61 @@ function drawArchitecturalBackdrop(
 
 interface DrawTextBlock {
   text: string;
-  yRatio: number;
+  slotY: number; // Normalized 0..1 inside safeRect
   size: number;
   isAccent?: boolean;
   isScript?: boolean;
   bold?: boolean;
   startSec: number;
   typeSec: number;
-  maxWidthRatio?: number;
   boxBorder?: boolean;
+}
+
+interface SafeRectPx {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 function drawTypedBlocks(
   ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
+  safeRect: SafeRectPx,
   localT: number,
   blocks: DrawTextBlock[],
   styling: WcgStylingConfig
 ) {
-  const spacing = Math.max(0.85, Math.min(1.2, styling.spacingScale || 1));
+  const spacing = Math.max(0.85, Math.min(1.16, styling.spacingScale || 1));
+  const padX = Math.max(8, safeRect.w * 0.08);
+  const padY = Math.max(10, safeRect.h * 0.075);
+  const innerW = Math.max(90, safeRect.w - padX * 2);
+  const innerH = Math.max(110, safeRect.h - padY * 2);
+  const centerX = safeRect.x + safeRect.w / 2;
+  const minY = safeRect.y + padY;
+  const maxY = safeRect.y + safeRect.h - padY;
+
+  const boxScale = Math.min(1.14, Math.max(0.58, Math.min(innerW / 180, innerH / 254)));
+
+  // Pre-measure full-text vertical footprint inside safeRect so long copy auto-compresses cleanly
+  const nonEmpty = blocks.filter((b) => String(b.text || '').trim().length > 0);
+  const preMeasured = nonEmpty.map((b) => {
+    const fs = Math.max(6.2, b.size * boxScale);
+    const fontFamily = b.isScript ? styling.scriptFont : styling.displayFont;
+    const weight = b.bold ? '700' : '600';
+    ctx.font = `${weight} ${fs}px "${fontFamily}", Georgia, serif`;
+    const fullLines = wrapCanvasText(ctx, String(b.text || ''), innerW);
+    const lineH = fs * 1.18 * spacing;
+    return { b, fs, fullLinesCount: fullLines.length, lineH };
+  });
+
+  const sumHeights = preMeasured.reduce((acc, m) => acc + m.fullLinesCount * m.lineH + m.fs * 0.25, 0);
+  const compress = sumHeights > innerH * 0.96 ? (innerH * 0.94) / sumHeights : 1;
+
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  for (const b of blocks) {
+  for (const m of preMeasured) {
+    const { b } = m;
     if (localT < b.startSec) continue;
     const progress = Math.min(1, (localT - b.startSec) / Math.max(0.25, b.typeSec));
     const full = String(b.text || '');
@@ -169,38 +202,44 @@ function drawTypedBlocks(
     const shown = full.slice(0, visibleCount);
     const alpha = Math.min(1, (localT - b.startSec) / 0.28);
 
+    const fs = Math.max(5.6, m.fs * compress);
+    const lineH = fs * 1.16 * spacing;
+
     ctx.save();
     ctx.globalAlpha = alpha;
     const fontFamily = b.isScript ? styling.scriptFont : styling.displayFont;
     const weight = b.bold ? '700' : '600';
-    ctx.font = `${weight} ${b.size}px "${fontFamily}", Georgia, serif`;
+    ctx.font = `${weight} ${fs}px "${fontFamily}", Georgia, serif`;
     ctx.fillStyle = b.isAccent ? styling.accentColor : styling.textColor;
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetY = 2;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.62)';
+    ctx.shadowBlur = 7;
+    ctx.shadowOffsetY = 1.5;
 
-    const maxW = w * (b.maxWidthRatio || 0.72);
-    const lines = wrapCanvasText(ctx, shown, maxW);
-    const lineH = b.size * 1.2 * spacing;
-    const centerY = h * 0.5 + (b.yRatio - 0.5) * h * spacing;
-    const firstY = centerY - ((lines.length - 1) * lineH) / 2;
+    const lines = wrapCanvasText(ctx, shown, innerW);
+    const halfBlockH = ((lines.length - 1) * lineH) / 2;
+    const rawCenterY = minY + b.slotY * (maxY - minY);
+    const centerY = Math.max(
+      minY + halfBlockH + fs * 0.5,
+      Math.min(maxY - halfBlockH - fs * 0.5, rawCenterY)
+    );
+    const firstY = centerY - halfBlockH;
 
     if (b.boxBorder && progress > 0.1) {
-      const boxW = w * 0.62;
-      const boxH = Math.max(54, lines.length * lineH + 20);
+      const boxW = Math.min(safeRect.w * 0.92, innerW + 10);
+      const boxH = Math.max(24, lines.length * lineH + 10);
       ctx.save();
       ctx.strokeStyle = styling.accentColor;
-      ctx.lineWidth = 1.6;
-      ctx.fillStyle = 'rgba(6, 20, 14, 0.35)';
+      ctx.lineWidth = 1.4;
+      ctx.fillStyle = 'rgba(6, 20, 14, 0.34)';
       ctx.beginPath();
-      ctx.roundRect(w / 2 - boxW / 2, centerY - boxH / 2, boxW, boxH, 10);
+      ctx.roundRect(centerX - boxW / 2, centerY - boxH / 2, boxW, boxH, 8);
       ctx.fill();
       ctx.stroke();
       ctx.restore();
     }
 
     lines.forEach((line, idx) => {
-      ctx.fillText(line, w / 2, firstY + idx * lineH);
+      ctx.fillText(line, centerX, firstY + idx * lineH);
     });
     ctx.restore();
   }
@@ -215,6 +254,10 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
   const [card, setCard] = useState<WcgCardData>({ ...DEFAULT_WCG_CARD_DATA });
   const [styling, setStyling] = useState<WcgStylingConfig>({ ...WCG_TEMPLATES[0].styling });
   const [durationSeconds, setDurationSeconds] = useState<number>(19);
+  const [showSafeGuide, setShowSafeGuide] = useState<boolean>(false);
+  const [isAnalyzingCard, setIsAnalyzingCard] = useState<boolean>(false);
+  const [analyzeStatusMsg, setAnalyzeStatusMsg] = useState<string>('');
+  const [analyzeErrorMsg, setAnalyzeErrorMsg] = useState<string>('');
 
   // Trend Verifier state
   const [trendQuery, setTrendQuery] = useState<string>('Pakistani Mehndi & Rasm-e-Hina traditional wedding card 2026');
@@ -371,77 +414,77 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       if (partCount === 1) {
         const s1 = durationSeconds / 18;
         return [
-          { text: card.invocation, yRatio: 0.215, size: 8.8, isAccent: true, bold: true, startSec: 0.25 * s1, typeSec: 0.8 * s1, maxWidthRatio: 0.52 },
-          { text: `${card.hostLine1}  &  ${card.hostLine2}`, yRatio: 0.275, size: 12.2, bold: true, startSec: 0.9 * s1, typeSec: 1.1 * s1, maxWidthRatio: 0.66 },
-          { text: 'Invite you to Celebrate the Wedding of', yRatio: 0.325, size: 10.2, startSec: 1.9 * s1, typeSec: 0.9 * s1, maxWidthRatio: 0.62 },
-          { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.382, size: 22.5, isScript: true, isAccent: true, startSec: 2.7 * s1, typeSec: 1.0 * s1, maxWidthRatio: 0.72 },
-          { text: card.eventTitle, yRatio: 0.452, size: 23, isAccent: true, bold: true, startSec: 3.6 * s1, typeSec: 0.9 * s1, maxWidthRatio: 0.7 },
-          { text: card.eventSubtitle, yRatio: 0.498, size: 11.5, startSec: 4.4 * s1, typeSec: 0.8 * s1, maxWidthRatio: 0.62 },
-          { text: `Programme  ·  ${card.weddingDate}`, yRatio: 0.552, size: 12.5, isAccent: true, bold: true, startSec: 5.1 * s1, typeSec: 0.95 * s1, maxWidthRatio: 0.66 },
-          { text: card.timing1, yRatio: 0.595, size: 11.2, startSec: 5.9 * s1, typeSec: 0.8 * s1, maxWidthRatio: 0.66 },
-          { text: card.timing2, yRatio: 0.628, size: 11.2, startSec: 6.6 * s1, typeSec: 0.8 * s1, maxWidthRatio: 0.66 },
-          { text: card.venueName, yRatio: 0.682, size: 15, isAccent: true, bold: true, startSec: 7.3 * s1, typeSec: 0.85 * s1, maxWidthRatio: 0.66 },
-          { text: card.venueAddress, yRatio: 0.732, size: 9.8, startSec: 8.0 * s1, typeSec: 1.0 * s1, maxWidthRatio: 0.58 },
+          { text: card.invocation, slotY: 0.05, size: 7.5, isAccent: true, bold: true, startSec: 0.25 * s1, typeSec: 0.8 * s1 },
+          { text: `${card.hostLine1}  &  ${card.hostLine2}`, slotY: 0.145, size: 10.6, bold: true, startSec: 0.9 * s1, typeSec: 1.1 * s1 },
+          { text: 'Invite you to Celebrate the Wedding of', slotY: 0.24, size: 8.6, startSec: 1.9 * s1, typeSec: 0.9 * s1 },
+          { text: `${card.groomName}  &  ${card.brideName}`, slotY: 0.345, size: 19, isScript: true, isAccent: true, startSec: 2.7 * s1, typeSec: 1.0 * s1 },
+          { text: card.eventTitle, slotY: 0.465, size: 19.5, isAccent: true, bold: true, startSec: 3.6 * s1, typeSec: 0.9 * s1 },
+          { text: card.eventSubtitle, slotY: 0.56, size: 10.2, startSec: 4.4 * s1, typeSec: 0.8 * s1 },
+          { text: `Programme  ·  ${card.weddingDate}`, slotY: 0.655, size: 10.8, isAccent: true, bold: true, startSec: 5.1 * s1, typeSec: 0.95 * s1 },
+          { text: card.timing1, slotY: 0.735, size: 9.8, startSec: 5.9 * s1, typeSec: 0.8 * s1 },
+          { text: card.timing2, slotY: 0.80, size: 9.8, startSec: 6.6 * s1, typeSec: 0.8 * s1 },
+          { text: card.venueName, slotY: 0.885, size: 12.8, isAccent: true, bold: true, startSec: 7.3 * s1, typeSec: 0.85 * s1 },
+          { text: card.venueAddress, slotY: 0.96, size: 8.4, startSec: 8.0 * s1, typeSec: 1.0 * s1 },
         ];
       }
 
       if (partCount === 3) {
         if (part === 1) {
           return [
-            { text: card.invocation, yRatio: 0.25, size: 8.8, isAccent: true, bold: true, startSec: 0.2 * st, typeSec: 0.75 * st, maxWidthRatio: 0.52 },
-            { text: `${card.hostLine1} & ${card.hostLine2}`, yRatio: 0.31, size: 11.8, bold: true, startSec: 0.85 * st, typeSec: 0.95 * st, maxWidthRatio: 0.64 },
-            { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.372, size: 21, isScript: true, isAccent: true, startSec: 1.7 * st, typeSec: 0.9 * st, maxWidthRatio: 0.72 },
-            { text: `FUNCTION 1  ·  ${card.func1Title}`, yRatio: 0.445, size: 24, isAccent: true, bold: true, startSec: 2.5 * st, typeSec: 0.9 * st, maxWidthRatio: 0.72 },
-            { text: card.func1Subtitle, yRatio: 0.502, size: 12.2, startSec: 3.3 * st, typeSec: 0.85 * st, maxWidthRatio: 0.64 },
-            { text: card.func1Date, yRatio: 0.558, size: 13.2, isAccent: true, bold: true, startSec: 4.1 * st, typeSec: 0.85 * st, maxWidthRatio: 0.66 },
-            { text: card.func1Timing, yRatio: 0.605, size: 11.5, startSec: 4.9 * st, typeSec: 0.85 * st, maxWidthRatio: 0.66 },
-            { text: card.func1Venue, yRatio: 0.665, size: 11.5, isAccent: true, bold: true, startSec: 5.7 * st, typeSec: 0.9 * st, maxWidthRatio: 0.6, boxBorder: true },
+            { text: card.invocation, slotY: 0.06, size: 7.5, isAccent: true, bold: true, startSec: 0.2 * st, typeSec: 0.75 * st },
+            { text: `${card.hostLine1} & ${card.hostLine2}`, slotY: 0.17, size: 10.4, bold: true, startSec: 0.85 * st, typeSec: 0.95 * st },
+            { text: `${card.groomName}  &  ${card.brideName}`, slotY: 0.30, size: 17.5, isScript: true, isAccent: true, startSec: 1.7 * st, typeSec: 0.9 * st },
+            { text: `FUNCTION 1  ·  ${card.func1Title}`, slotY: 0.45, size: 19, isAccent: true, bold: true, startSec: 2.5 * st, typeSec: 0.9 * st },
+            { text: card.func1Subtitle, slotY: 0.57, size: 10.5, startSec: 3.3 * st, typeSec: 0.85 * st },
+            { text: card.func1Date, slotY: 0.69, size: 11.4, isAccent: true, bold: true, startSec: 4.1 * st, typeSec: 0.85 * st },
+            { text: card.func1Timing, slotY: 0.80, size: 10, startSec: 4.9 * st, typeSec: 0.85 * st },
+            { text: card.func1Venue, slotY: 0.92, size: 10, isAccent: true, bold: true, startSec: 5.7 * st, typeSec: 0.9 * st, boxBorder: true },
           ];
         }
         if (part === 2) {
           return [
-            { text: 'FUNCTION 2  ·  ROYAL CEREMONY', yRatio: 0.265, size: 10.2, isAccent: true, bold: true, startSec: 0.2 * st, typeSec: 0.75 * st, maxWidthRatio: 0.6 },
-            { text: card.func2Title, yRatio: 0.345, size: 32, isScript: true, isAccent: true, startSec: 0.9 * st, typeSec: 0.95 * st, maxWidthRatio: 0.74 },
-            { text: card.func2Subtitle, yRatio: 0.415, size: 13.5, startSec: 1.8 * st, typeSec: 0.9 * st, maxWidthRatio: 0.64 },
-            { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.472, size: 15, isAccent: true, bold: true, startSec: 2.6 * st, typeSec: 0.85 * st, maxWidthRatio: 0.66 },
-            { text: card.func2Date, yRatio: 0.538, size: 14, isAccent: true, bold: true, startSec: 3.4 * st, typeSec: 0.9 * st, maxWidthRatio: 0.66 },
-            { text: card.func2Timing, yRatio: 0.588, size: 12, startSec: 4.2 * st, typeSec: 0.9 * st, maxWidthRatio: 0.66 },
-            { text: card.func2Venue, yRatio: 0.655, size: 12, isAccent: true, bold: true, startSec: 5.0 * st, typeSec: 0.95 * st, maxWidthRatio: 0.62, boxBorder: true },
+            { text: 'FUNCTION 2  ·  ROYAL CEREMONY', slotY: 0.08, size: 8.8, isAccent: true, bold: true, startSec: 0.2 * st, typeSec: 0.75 * st },
+            { text: card.func2Title, slotY: 0.24, size: 25, isScript: true, isAccent: true, startSec: 0.9 * st, typeSec: 0.95 * st },
+            { text: card.func2Subtitle, slotY: 0.40, size: 11.5, startSec: 1.8 * st, typeSec: 0.9 * st },
+            { text: `${card.groomName}  &  ${card.brideName}`, slotY: 0.54, size: 13, isAccent: true, bold: true, startSec: 2.6 * st, typeSec: 0.85 * st },
+            { text: card.func2Date, slotY: 0.68, size: 12, isAccent: true, bold: true, startSec: 3.4 * st, typeSec: 0.9 * st },
+            { text: card.func2Timing, slotY: 0.79, size: 10.4, startSec: 4.2 * st, typeSec: 0.9 * st },
+            { text: card.func2Venue, slotY: 0.92, size: 10.4, isAccent: true, bold: true, startSec: 5.0 * st, typeSec: 0.95 * st, boxBorder: true },
           ];
         }
         return [
-          { text: 'FUNCTION 3  ·  GRAND RECEPTION', yRatio: 0.265, size: 10.2, isAccent: true, bold: true, startSec: 0.2 * st, typeSec: 0.75 * st, maxWidthRatio: 0.6 },
-          { text: card.func3Title, yRatio: 0.345, size: 32, isScript: true, isAccent: true, startSec: 0.9 * st, typeSec: 0.95 * st, maxWidthRatio: 0.74 },
-          { text: card.func3Subtitle, yRatio: 0.415, size: 13.5, startSec: 1.8 * st, typeSec: 0.9 * st, maxWidthRatio: 0.64 },
-          { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.472, size: 15, isAccent: true, bold: true, startSec: 2.6 * st, typeSec: 0.85 * st, maxWidthRatio: 0.66 },
-          { text: card.func3Date, yRatio: 0.538, size: 14, isAccent: true, bold: true, startSec: 3.4 * st, typeSec: 0.9 * st, maxWidthRatio: 0.66 },
-          { text: card.func3Timing, yRatio: 0.588, size: 12, startSec: 4.2 * st, typeSec: 0.9 * st, maxWidthRatio: 0.66 },
-          { text: card.func3Venue, yRatio: 0.655, size: 12, isAccent: true, bold: true, startSec: 5.0 * st, typeSec: 0.95 * st, maxWidthRatio: 0.62, boxBorder: true },
+          { text: 'FUNCTION 3  ·  GRAND RECEPTION', slotY: 0.08, size: 8.8, isAccent: true, bold: true, startSec: 0.2 * st, typeSec: 0.75 * st },
+          { text: card.func3Title, slotY: 0.24, size: 25, isScript: true, isAccent: true, startSec: 0.9 * st, typeSec: 0.95 * st },
+          { text: card.func3Subtitle, slotY: 0.40, size: 11.5, startSec: 1.8 * st, typeSec: 0.9 * st },
+          { text: `${card.groomName}  &  ${card.brideName}`, slotY: 0.54, size: 13, isAccent: true, bold: true, startSec: 2.6 * st, typeSec: 0.85 * st },
+          { text: card.func3Date, slotY: 0.68, size: 12, isAccent: true, bold: true, startSec: 3.4 * st, typeSec: 0.9 * st },
+          { text: card.func3Timing, slotY: 0.79, size: 10.4, startSec: 4.2 * st, typeSec: 0.9 * st },
+          { text: card.func3Venue, slotY: 0.92, size: 10.4, isAccent: true, bold: true, startSec: 5.0 * st, typeSec: 0.95 * st, boxBorder: true },
         ];
       }
 
       // Default 2-Part Suite
       if (part === 1) {
         return [
-          { text: card.invocation, yRatio: 0.305, size: 9.2, isAccent: true, bold: true, startSec: 0.25 * st, typeSec: 0.85 * st, maxWidthRatio: 0.45 },
-          { text: card.hostLine1, yRatio: 0.358, size: 16.5, bold: true, startSec: 0.95 * st, typeSec: 1.0 * st, maxWidthRatio: 0.58 },
-          { text: card.relationLine1, yRatio: 0.41, size: 11.2, startSec: 1.85 * st, typeSec: 1.15 * st, maxWidthRatio: 0.48 },
-          { text: card.hostLine2, yRatio: 0.47, size: 16.5, isAccent: true, bold: true, startSec: 2.9 * st, typeSec: 1.0 * st, maxWidthRatio: 0.58 },
-          { text: card.relationLine2, yRatio: 0.52, size: 11.2, startSec: 3.8 * st, typeSec: 1.1 * st, maxWidthRatio: 0.48 },
-          { text: `${card.groomName}  &  ${card.brideName}`, yRatio: 0.575, size: 22.5, isScript: true, isAccent: true, startSec: 4.8 * st, typeSec: 0.95 * st, maxWidthRatio: 0.68 },
-          { text: `${card.specialTitle}: ${card.specialNames}`, yRatio: 0.635, size: 11, startSec: 5.7 * st, typeSec: 1.05 * st, maxWidthRatio: 0.52, boxBorder: true },
+          { text: card.invocation, slotY: 0.06, size: 7.5, isAccent: true, bold: true, startSec: 0.25 * st, typeSec: 0.85 * st },
+          { text: card.hostLine1, slotY: 0.19, size: 13.4, bold: true, startSec: 0.95 * st, typeSec: 1.0 * st },
+          { text: card.relationLine1, slotY: 0.33, size: 9.2, startSec: 1.85 * st, typeSec: 1.15 * st },
+          { text: card.hostLine2, slotY: 0.49, size: 13.4, isAccent: true, bold: true, startSec: 2.9 * st, typeSec: 1.0 * st },
+          { text: card.relationLine2, slotY: 0.63, size: 9.2, startSec: 3.8 * st, typeSec: 1.1 * st },
+          { text: `${card.groomName}  &  ${card.brideName}`, slotY: 0.77, size: 17.5, isScript: true, isAccent: true, startSec: 4.8 * st, typeSec: 0.95 * st },
+          { text: `${card.specialTitle}: ${card.specialNames}`, slotY: 0.92, size: 8.8, startSec: 5.7 * st, typeSec: 1.05 * st, boxBorder: true },
         ];
       }
       return [
-        { text: card.part2Blessing, yRatio: 0.255, size: 16, isAccent: true, bold: true, startSec: 0.25 * st, typeSec: 0.75 * st, maxWidthRatio: 0.56 },
-        { text: card.part2Intro, yRatio: 0.298, size: 10, startSec: 0.9 * st, typeSec: 0.85 * st, maxWidthRatio: 0.55 },
-        { text: card.eventTitle, yRatio: 0.352, size: 33, isScript: true, isAccent: true, startSec: 1.65 * st, typeSec: 0.9 * st, maxWidthRatio: 0.72 },
-        { text: card.eventSubtitle, yRatio: 0.405, size: 14, startSec: 2.45 * st, typeSec: 0.85 * st, maxWidthRatio: 0.62 },
-        { text: `Programme  ·  ${card.weddingDate}`, yRatio: 0.462, size: 13.8, isAccent: true, bold: true, startSec: 3.2 * st, typeSec: 1.05 * st, maxWidthRatio: 0.64 },
-        { text: card.timing1, yRatio: 0.508, size: 12.8, startSec: 4.15 * st, typeSec: 0.85 * st, maxWidthRatio: 0.62 },
-        { text: card.timing2, yRatio: 0.542, size: 12.8, startSec: 4.9 * st, typeSec: 0.85 * st, maxWidthRatio: 0.62 },
-        { text: card.venueName, yRatio: 0.602, size: 17, isAccent: true, bold: true, startSec: 5.65 * st, typeSec: 0.85 * st, maxWidthRatio: 0.62 },
-        { text: card.venueAddress, yRatio: 0.655, size: 10.8, startSec: 6.4 * st, typeSec: 1.1 * st, maxWidthRatio: 0.52 },
+        { text: card.part2Blessing, slotY: 0.06, size: 12.6, isAccent: true, bold: true, startSec: 0.25 * st, typeSec: 0.75 * st },
+        { text: card.part2Intro, slotY: 0.15, size: 8.2, startSec: 0.9 * st, typeSec: 0.85 * st },
+        { text: card.eventTitle, slotY: 0.28, size: 25, isScript: true, isAccent: true, startSec: 1.65 * st, typeSec: 0.9 * st },
+        { text: card.eventSubtitle, slotY: 0.40, size: 11, startSec: 2.45 * st, typeSec: 0.85 * st },
+        { text: `Programme  ·  ${card.weddingDate}`, slotY: 0.53, size: 11.2, isAccent: true, bold: true, startSec: 3.2 * st, typeSec: 1.05 * st },
+        { text: card.timing1, slotY: 0.64, size: 10.2, startSec: 4.15 * st, typeSec: 0.85 * st },
+        { text: card.timing2, slotY: 0.72, size: 10.2, startSec: 4.9 * st, typeSec: 0.85 * st },
+        { text: card.venueName, slotY: 0.84, size: 13, isAccent: true, bold: true, startSec: 5.65 * st, typeSec: 0.85 * st },
+        { text: card.venueAddress, slotY: 0.94, size: 8.6, startSec: 6.4 * st, typeSec: 1.1 * st },
       ];
     };
 
@@ -469,33 +512,92 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
           ? (part === 2 ? imgS2Ref.current : imgS1Ref.current)
           : null;
 
+      const partAnalysis: WcgCardPartAnalysis | null = isCustom
+        ? (part === 1
+            ? activeCustomTemplate?.part1Analysis
+            : part === 2
+              ? activeCustomTemplate?.part2Analysis || activeCustomTemplate?.part1Analysis
+              : activeCustomTemplate?.part3Analysis || activeCustomTemplate?.part2Analysis || activeCustomTemplate?.part1Analysis) || null
+        : isBuiltinMultipart
+          ? (part === 2 ? selectedTemplate.part2Analysis : selectedTemplate.part1Analysis) || null
+          : null;
+
+      let safeRect: SafeRectPx = {
+        x: w * 0.14,
+        y: h * 0.17,
+        w: w * 0.72,
+        h: h * 0.66,
+      };
+
+      const patchMode: WcgPatchBlendMode = styling.patchMode || 'seamless';
+
       if ((isCustom || isBuiltinMultipart) && img && img.complete && img.naturalWidth > 0) {
         ctx.save();
         ctx.filter = 'blur(18px) brightness(0.62)';
         ctx.drawImage(img, -20, -20, w + 40, h + 40);
         ctx.restore();
 
-        const zoom = 1 + Math.min(0.03, localT * 0.003);
-        const cardW = w * zoom;
-        const cardH = Math.min(h * 0.78, (img.naturalHeight / img.naturalWidth) * cardW);
+        const baseScale = Math.min(w / img.naturalWidth, (h * 0.76) / img.naturalHeight);
+        const zoom = 1 + Math.min(0.025, localT * 0.0025);
+        const cardW = img.naturalWidth * baseScale * zoom;
+        const cardH = img.naturalHeight * baseScale * zoom;
         const cardX = (w - cardW) / 2;
         const cardY = (h - cardH) / 2;
         ctx.drawImage(img, cardX, cardY, cardW, cardH);
 
-        if (isBuiltinMultipart && styling.cleanSampleText) {
+        const sb = partAnalysis?.safeBox || { x: 0.22, y: 0.22, w: 0.56, h: 0.48 };
+        const hbs = partAnalysis?.hideBoxes || [sb];
+        const pColor = partAnalysis?.patchColor || (part === 2 ? styling.secondaryColor : styling.primaryColor);
+
+        safeRect = {
+          x: cardX + sb.x * cardW,
+          y: cardY + sb.y * cardH,
+          w: sb.w * cardW,
+          h: sb.h * cardH,
+        };
+
+        // Cover all pre-existing sample text & calligraphy smoothly with sampled card background
+        if (styling.cleanSampleText && patchMode !== 'direct') {
           ctx.save();
-          ctx.fillStyle = part === 1 || part === 3 ? 'rgba(27, 122, 114, 0.96)' : 'rgba(25, 97, 52, 0.96)';
-          ctx.shadowColor = part === 1 || part === 3 ? '#1B7A72' : '#196134';
-          ctx.shadowBlur = 18;
-          if (part === 1 || part === 3) {
+          ctx.fillStyle = pColor;
+          ctx.shadowColor = pColor;
+          ctx.shadowBlur = 14;
+          for (const hb of hbs) {
             ctx.beginPath();
-            ctx.roundRect(cardX + cardW * 0.255, cardY + cardH * 0.255, cardW * 0.49, cardH * 0.41, 16);
+            ctx.roundRect(
+              cardX + hb.x * cardW,
+              cardY + hb.y * cardH,
+              hb.w * cardW,
+              hb.h * cardH,
+              10
+            );
             ctx.fill();
-          } else {
-            ctx.beginPath();
-            ctx.roundRect(cardX + cardW * 0.265, cardY + cardH * 0.145, cardW * 0.48, cardH * 0.57, 16);
-            ctx.fill();
+            ctx.fill(); // second soft pass deepens opacity in center while keeping feathered edge
           }
+          ctx.restore();
+        }
+
+        // Optional adaptive frosted/tinted plaque fitted strictly to safeRect
+        if (patchMode === 'plaque') {
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, Math.min(1, alpha)) * 0.88;
+          ctx.fillStyle = pColor;
+          ctx.strokeStyle = styling.accentColor;
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.roundRect(safeRect.x + 2, safeRect.y + 2, safeRect.w - 4, safeRect.h - 4, 12);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Preview-only Safe Overlay Guide toggle
+        if (showSafeGuide) {
+          ctx.save();
+          ctx.setLineDash([4, 3]);
+          ctx.strokeStyle = '#22D3EE';
+          ctx.lineWidth = 1.4;
+          ctx.strokeRect(safeRect.x, safeRect.y, safeRect.w, safeRect.h);
           ctx.restore();
         }
       } else {
@@ -515,7 +617,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       }
       ctx.restore();
 
-      drawTypedBlocks(ctx, w, h, localT, getBlocksForPart(part), styling);
+      drawTypedBlocks(ctx, safeRect, localT, getBlocksForPart(part), styling);
       ctx.restore();
     };
 
@@ -593,7 +695,7 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
       }
     }
     ctx.restore();
-  }, [currentTime, card, styling, selectedTemplate, activeCustomTemplate, partCount, durationSeconds, imagesReady, customImagesRev]);
+  }, [currentTime, card, styling, selectedTemplate, activeCustomTemplate, partCount, durationSeconds, imagesReady, customImagesRev, showSafeGuide]);
 
   const filteredTemplates = useMemo(
     () =>
@@ -610,6 +712,8 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
     setSelectedTemplate(tpl);
     setPartCount(tpl.partCount || 2);
     setStyling({ ...tpl.styling });
+    setAnalyzeStatusMsg('');
+    setAnalyzeErrorMsg('');
     setCard((prev) => ({
       ...prev,
       eventTitle: tpl.defaultEventTitle,
@@ -630,8 +734,97 @@ export const WcgModal: React.FC<WcgModalProps> = ({ onClose }) => {
     const customParts =
       customTpl.partCount || (customTpl.part3Url ? 3 : customTpl.part2Url ? 2 : 1);
     setPartCount(customParts);
+    setAnalyzeErrorMsg('');
+    if (customTpl.part1Analysis) {
+      setStyling((prev) => ({
+        ...prev,
+        primaryColor: customTpl.part1Analysis?.patchColor || prev.primaryColor,
+        textColor: customTpl.part1Analysis?.suggestedTextColor || prev.textColor,
+        accentColor: customTpl.part1Analysis?.suggestedAccentColor || prev.accentColor,
+        cleanSampleText: true,
+        patchMode: prev.patchMode || 'seamless',
+      }));
+      setAnalyzeStatusMsg(customTpl.part1Analysis.summaryRomanUrdu || 'AI card safe zone applied.');
+    } else {
+      setAnalyzeStatusMsg('');
+    }
     setCurrentTime(0);
     setIsPlaying(true);
+  };
+
+  const handleAnalyzeActiveCard = async () => {
+    const targetId = activeCustomTemplate
+      ? activeCustomTemplate.id
+      : selectedTemplate.id === 'pakistani-emerald-mehndi-multipart'
+        ? selectedTemplate.id
+        : null;
+    if (!targetId) return;
+
+    const activePart: 1 | 2 | 3 =
+      partCount === 1
+        ? 1
+        : partCount === 2
+          ? currentTime < durationSeconds / 2
+            ? 1
+            : 2
+          : currentTime < durationSeconds / 3
+            ? 1
+            : currentTime < (durationSeconds * 2) / 3
+              ? 2
+              : 3;
+
+    setIsAnalyzingCard(true);
+    setAnalyzeErrorMsg('');
+    setAnalyzeStatusMsg('');
+    try {
+      const res = await fetch('/api/wcg/analyze-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateId: targetId,
+          part: activePart,
+          requireVision: true,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.ok || !json.analysis) {
+        setAnalyzeErrorMsg(json?.error || 'AI Vision card analysis fail ho gayi.');
+        return;
+      }
+
+      const analysis: WcgCardPartAnalysis = json.analysis;
+      if (activeCustomTemplate) {
+        const updated: WcgCustomTemplateItem = {
+          ...activeCustomTemplate,
+          ...(activePart === 1
+            ? { part1Analysis: analysis }
+            : activePart === 2
+              ? { part2Analysis: analysis }
+              : { part3Analysis: analysis }),
+        };
+        setActiveCustomTemplate(updated);
+        setCustomTemplates((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      } else {
+        setSelectedTemplate((prev) => ({
+          ...prev,
+          ...(activePart === 2 ? { part2Analysis: analysis } : { part1Analysis: analysis }),
+        }));
+      }
+
+      setStyling((prev) => ({
+        ...prev,
+        primaryColor: activePart === 1 ? analysis.patchColor : prev.primaryColor,
+        secondaryColor: activePart === 2 ? analysis.patchColor : prev.secondaryColor,
+        textColor: analysis.suggestedTextColor || prev.textColor,
+        accentColor: analysis.suggestedAccentColor || prev.accentColor,
+        cleanSampleText: true,
+      }));
+      setAnalyzeStatusMsg(analysis.summaryRomanUrdu || 'Part region AI Vision se refine ho gaya hai.');
+    } catch (err: any) {
+      setAnalyzeErrorMsg(err?.message || 'Analyze API connect nahi ho saki.');
+    } finally {
+      setIsAnalyzingCard(false);
+    }
   };
 
   const stopAudioPreview = () => {
@@ -1527,31 +1720,85 @@ imageio-ffmpeg>=0.5.1`}
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
-                    <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={styling.cleanSampleText}
-                        onChange={(e) => setStyling({ ...styling, cleanSampleText: e.target.checked })}
-                        className="rounded border-slate-700 bg-slate-950"
-                      />
-                      <span>Clean sample text center patch on s1 / s2 artwork</span>
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-slate-400">Duration:</span>
-                      {[18, 19, 20].map((sec) => (
-                        <button
-                          key={sec}
-                          onClick={() => setDurationSeconds(sec)}
-                          className={`px-2.5 py-1 rounded-lg border tabular-nums cursor-pointer ${
-                            durationSeconds === sec
-                              ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-200 font-semibold'
-                              : 'bg-slate-950 border-slate-800 text-slate-400'
-                          }`}
-                        >
-                          {sec}s
-                        </button>
-                      ))}
+                  <div className="space-y-3 pt-1 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={styling.cleanSampleText}
+                          onChange={(e) => setStyling({ ...styling, cleanSampleText: e.target.checked })}
+                          className="rounded border-slate-700 bg-slate-950"
+                        />
+                        <span>Hide pre-existing text & calligraphy (Adaptive Patch)</span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400">Duration:</span>
+                        {[18, 19, 20].map((sec) => (
+                          <button
+                            key={sec}
+                            onClick={() => setDurationSeconds(sec)}
+                            className={`px-2.5 py-1 rounded-lg border tabular-nums cursor-pointer ${
+                              durationSeconds === sec
+                                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-200 font-semibold'
+                                : 'bg-slate-950 border-slate-800 text-slate-400'
+                            }`}
+                          >
+                            {sec}s
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Adaptive Card Patch & AI Safe-Zone Panel */}
+                    <div className="p-3 rounded-xl bg-slate-950/75 border border-slate-800 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-300 font-medium">Patch Fit Mode:</span>
+                          <select
+                            value={styling.patchMode || 'seamless'}
+                            onChange={(e) => setStyling({ ...styling, patchMode: e.target.value as WcgPatchBlendMode })}
+                            className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-100"
+                          >
+                            <option value="seamless">Seamless Background Match</option>
+                            <option value="plaque">Fitted Plaque + Gold Border</option>
+                            <option value="direct">Direct Text Only</option>
+                          </select>
+                        </div>
+
+                        {(activeCustomTemplate || selectedTemplate.id === 'pakistani-emerald-mehndi-multipart') && (
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-1.5 text-slate-400 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={showSafeGuide}
+                                onChange={(e) => setShowSafeGuide(e.target.checked)}
+                                className="rounded border-slate-700 bg-slate-950"
+                              />
+                              <span>Safe Guide</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={handleAnalyzeActiveCard}
+                              disabled={isAnalyzingCard}
+                              className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-200 font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              {isAnalyzingCard ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                              <span>{isAnalyzingCard ? 'Analyzing...' : 'AI Analyze Region'}</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {analyzeStatusMsg && (
+                        <div className="text-[11px] text-emerald-300 leading-relaxed">
+                          {analyzeStatusMsg}
+                        </div>
+                      )}
+                      {analyzeErrorMsg && (
+                        <div className="text-[11px] text-rose-300 leading-relaxed">
+                          {analyzeErrorMsg}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </section>
