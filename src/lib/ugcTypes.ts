@@ -1,3 +1,5 @@
+import type { ScriptProviderId } from './scriptModelProviders';
+
 export type UgcAspectRatio = '9:16' | '16:9' | '1:1';
 
 export type UgcAdFormat =
@@ -100,6 +102,9 @@ export interface UgcStoryboardResult {
   fullFormattedOutput: string;
   masterNegativePrompt: string;
   strategyNotesRomanUrdu: string;
+  providerUsed?: string;
+  modelUsed?: string;
+  failoverUsed?: boolean;
 }
 
 export interface UgcCampaignSettings {
@@ -121,6 +126,9 @@ export interface UgcCampaignSettings {
   captionMode: UgcCaptionMode;
   audioBedMood: 'upbeat_ugc' | 'luxury_minimal' | 'kinetic_bass' | 'none';
   customNegativeConstraints: string;
+  scriptProvider?: ScriptProviderId;
+  scriptModel?: string;
+  autoFailover?: boolean;
 }
 
 export interface UgcSavedCampaign {
@@ -211,4 +219,7 @@ export const DEFAULT_UGC_SETTINGS: UgcCampaignSettings = {
   audioBedMood: 'upbeat_ugc',
   customNegativeConstraints:
     'blurry, deformed hands, extra fingers, floating objects, warped fabric, distorted brand logo, redesigned product, plastic skin, watermark, unrelated text overlays',
+  scriptProvider: 'auto',
+  scriptModel: 'gemini-4-hydrogen',
+  autoFailover: true,
 };

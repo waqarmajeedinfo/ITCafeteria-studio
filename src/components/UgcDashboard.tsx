@@ -41,6 +41,13 @@ import {
   type UgcSceneVisualFocus,
   type UgcStoryboardResult,
 } from '../lib/ugcTypes';
+import {
+  SCRIPT_PROVIDER_CATALOG,
+  getDefaultModelForProvider,
+  getProviderCatalogItem,
+  type ScriptProviderId,
+  type ScriptProviderStatus,
+} from '../lib/scriptModelProviders';
 
 interface UgcDashboardProps {
   onClose: () => void;
@@ -123,6 +130,14 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [pythonStatus, setPythonStatus] = useState<{
+    checked: boolean;
+    ok: boolean;
+    detail: string;
+  }>({ checked: false, ok: false, detail: 'Connecting to Python Flask Companion...' });
+  const [scriptProviders, setScriptProviders] = useState<ScriptProviderStatus[]>(() =>
+    SCRIPT_PROVIDER_CATALOG.map((p) => ({ ...p, configured: p.id === 'gemini' }))
+  );
 
   const productFileRef = useRef<HTMLInputElement>(null);
   const secondaryFileRef = useRef<HTMLInputElement>(null);
@@ -143,8 +158,44 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
     }
   };
 
+  const checkPythonCompanion = async () => {
+    try {
+      const resp = await fetch('/api/ugc/python-status');
+      const data = await resp.json();
+      if (resp.ok && data?.ok) {
+        const libs = data.health?.libraries || {};
+        setPythonStatus({
+          checked: true,
+          ok: true,
+          detail: `Flask Ready · Pillow ${libs.pillow || ''} · NumPy ${libs.numpy || ''} · External Video Gen Bypassed`,
+        });
+      } else {
+        setPythonStatus({
+          checked: true,
+          ok: false,
+          detail: data?.error || 'Python Flask Companion offline',
+        });
+      }
+    } catch {
+      setPythonStatus({
+        checked: true,
+        ok: false,
+        detail: 'Python Flask Companion unreachable',
+      });
+    }
+  };
+
   useEffect(() => {
     loadCampaigns();
+    checkPythonCompanion();
+    fetch('/api/ai/script-providers')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.providers)) {
+          setScriptProviders(d.providers);
+        }
+      })
+      .catch(() => {});
     return () => {
       if (pollTimerRef.current) {
         window.clearTimeout(pollTimerRef.current);
@@ -325,7 +376,10 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
       }
       setStoryboard(data.storyboard as UgcStoryboardResult);
       setOutputTab('scenes');
-      setStatusMessage('Stage 4 Complete: Veo 3 Scene Prompts tayar hain. Ab aap Video Render kar sakte hain.');
+      const engineLabel = data.providerUsed
+        ? `${String(data.providerUsed).toUpperCase()} · ${data.modelUsed}${data.failoverUsed ? ' (Auto-Failover)' : ''}`
+        : 'AI Script Router';
+      setStatusMessage(`Stage 4 Complete (${engineLabel}): Veo 3 Scene Prompts tayar hain.`);
       return data.storyboard as UgcStoryboardResult;
     } catch (err: any) {
       setErrorMessage(err?.message || 'Storyboard generation fail ho gayi.');
@@ -360,16 +414,12 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
 
   const runVideoRender = async (sbOverride?: UgcStoryboardResult | null): Promise<UgcRenderResult | null> => {
     const activeStoryboard = sbOverride || storyboard;
-    if (!activeStoryboard || activeStoryboard.scenes.length === 0) {
-      setErrorMessage('Video render karne se pehle Storyboard generate karein.');
-      return null;
-    }
     if (!productImageDataUrl && !modelImageDataUrl) {
-      setErrorMessage('Video render karne ke liye kam az kam Product ya Model image upload karein.');
+      setErrorMessage('Video synthesize karne ke liye kam az kam Product ya Model image upload karein.');
       return null;
     }
     setErrorMessage('');
-    setStatusMessage('FFmpeg + Gemini TTS ke sath multi-scene HD MP4 video render ho raha hai...');
+    setStatusMessage('Python Flask Companion Service (Pillow + NumPy + FFmpeg) direct multi-scene HD MP4 synthesize kar raha hai...');
     try {
       const resp = await fetch('/api/ugc/render-video', {
         method: 'POST',
@@ -378,13 +428,17 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
           productImageDataUrl,
           modelImageDataUrl: settings.modelMode === 'product_only' ? '' : modelImageDataUrl,
           settings,
-          storyboard: activeStoryboard,
+          storyboard: activeStoryboard || undefined,
           productAnalysis,
         }),
       });
       const data = await resp.json();
       if (!resp.ok && data?.status !== 'rendering') {
-        throw new Error(data?.error || 'MP4 video render fail ho gaya.');
+        throw new Error(data?.error || 'Python Flask MP4 video synthesis fail ho gayi.');
+      }
+
+      if (data?.storyboardUsed && !activeStoryboard) {
+        setStoryboard(data.storyboardUsed as UgcStoryboardResult);
       }
 
       let finalResult: UgcRenderResult;
@@ -396,11 +450,11 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
 
       setRenderResult(finalResult);
       setStatusMessage(
-        `HD MP4 Video Render Complete (${finalResult.durationSec}s · Voiceover Scenes: ${finalResult.voiceoverScenesRendered}).`
+        `Python Flask HD MP4 Ready (${finalResult.durationSec}s · Voiceover Scenes: ${finalResult.voiceoverScenesRendered}).`
       );
       return finalResult;
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Video rendering failed.');
+      setErrorMessage(err?.message || 'Python Flask video synthesis failed.');
       return null;
     }
   };
@@ -1182,6 +1236,103 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
               </div>
             </div>
 
+            {/* Multi-Provider AI Script Engine Controls */}
+            {(() => {
+              const activeProvider: ScriptProviderId = settings.scriptProvider || 'auto';
+              const activeMeta = getProviderCatalogItem(activeProvider);
+              const versions = activeMeta
+                ? activeMeta.versions
+                : SCRIPT_PROVIDER_CATALOG.flatMap((p) =>
+                    p.versions.map((v) => ({ ...v, label: `${p.name} — ${v.label}` }))
+                  );
+              const currentVerMeta = versions.find((v) => v.id === settings.scriptModel);
+
+              return (
+                <div className="border border-slate-200 bg-[#F8FAFC] p-3 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800 font-mono">
+                      Script Writer AI Service &amp; Versions
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {scriptProviders.map((sp) => (
+                        <span
+                          key={sp.id}
+                          className={`text-[10px] px-1.5 py-0.5 font-mono border ${
+                            sp.configured
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold'
+                              : 'bg-white text-slate-400 border-slate-200'
+                          }`}
+                          title={sp.configured ? `${sp.name} active` : `Set ${sp.envHint} in server env`}
+                        >
+                          {sp.name.split(' ')[1] || sp.name}: {sp.configured ? 'Ready' : 'Env'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-600 mb-1">
+                        AI Service
+                      </label>
+                      <select
+                        value={activeProvider}
+                        onChange={(e) => {
+                          const prov = e.target.value as ScriptProviderId;
+                          const defModel = getDefaultModelForProvider(prov);
+                          setSettings((prev) => ({
+                            ...prev,
+                            scriptProvider: prov,
+                            scriptModel: defModel,
+                          }));
+                        }}
+                        className="w-full h-8 px-2 border border-slate-300 bg-white text-xs text-slate-900"
+                      >
+                        <option value="auto">Auto Failover (All Services)</option>
+                        {scriptProviders.map((sp) => (
+                          <option key={sp.id} value={sp.id}>
+                            {sp.name} ({sp.versions.length} versions){sp.configured ? '' : ' [Env Key Pending]'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-600 mb-1">
+                        Model Version
+                      </label>
+                      <select
+                        value={settings.scriptModel || versions[0]?.id || ''}
+                        onChange={(e) => updateSetting('scriptModel', e.target.value)}
+                        className="w-full h-8 px-2 border border-slate-300 bg-white text-xs text-slate-900"
+                      >
+                        {versions.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.label} ({v.tier})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="flex items-center gap-2 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings.autoFailover !== false}
+                        onChange={(e) => updateSetting('autoFailover', e.target.checked)}
+                        className="accent-slate-950"
+                      />
+                      <span>Auto-Failover (uninterrupted backup across versions &amp; services)</span>
+                    </label>
+                    {currentVerMeta && (
+                      <span className="text-[10px] text-slate-500 font-mono">{currentVerMeta.note}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-600 mb-1">
                 Negative Constraints Lock
@@ -1203,10 +1354,16 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 font-mono">
-                  Stage 04 · Production Engine
+                  Stage 04 · Python Flask Video Synthesizer
                 </div>
                 <div className="text-sm font-bold text-slate-950">
-                  Generate Google Omni / Veo 3 Prompts & Render HD MP4
+                  Direct Multi-Scene HD MP4 Synthesis (External Video Models Bypassed)
+                </div>
+                <div className="text-[11px] mt-0.5 font-mono text-slate-600">
+                  Python Service:{' '}
+                  <span className={pythonStatus.ok ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>
+                    {pythonStatus.detail}
+                  </span>
                 </div>
               </div>
 
@@ -1229,12 +1386,12 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
                   ) : (
                     <Sparkles className="w-4 h-4 text-emerald-700" />
                   )}
-                  <span>1. Generate Veo 3 Prompts</span>
+                  <span>1. Generate Script & Scenes</span>
                 </button>
 
                 <button
                   type="button"
-                  disabled={isBusy || !storyboard}
+                  disabled={isBusy || (!productImageDataUrl && !modelImageDataUrl)}
                   onClick={async () => {
                     setBusyStep('render');
                     try {
@@ -1250,7 +1407,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
                   ) : (
                     <Film className="w-4 h-4" />
                   )}
-                  <span>2. Render Full MP4 Ad</span>
+                  <span>2. Synthesize MP4 (Python Flask)</span>
                 </button>
 
                 <button
@@ -1414,9 +1571,18 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
                       <h3 className="text-sm font-extrabold text-slate-950">
                         {storyboard.campaignTitle}
                       </h3>
-                      <span className="text-xs font-mono tabular-nums text-slate-700 font-semibold">
-                        {storyboard.scenes.length} Scenes · {storyboard.totalDurationSec}s Total · {storyboard.aspectRatio}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {storyboard.modelUsed && (
+                          <span className="text-[11px] font-mono bg-white border border-slate-300 px-2 py-0.5 text-slate-700">
+                            {storyboard.providerUsed ? `${storyboard.providerUsed.toUpperCase()} · ` : ''}
+                            {storyboard.modelUsed}
+                            {storyboard.failoverUsed ? ' (Failover)' : ''}
+                          </span>
+                        )}
+                        <span className="text-xs font-mono tabular-nums text-slate-700 font-semibold">
+                          {storyboard.scenes.length} Scenes · {storyboard.totalDurationSec}s Total · {storyboard.aspectRatio}
+                        </span>
+                      </div>
                     </div>
                     <p className="text-xs text-slate-600">
                       <strong className="text-slate-900">Opening Signature:</strong> {storyboard.openingSignature}

@@ -25,6 +25,11 @@ import {
 import { registerWcgRoutes } from './server_wcg';
 import { registerUgcRoutes } from './server_ugc';
 import {
+  getScriptProvidersStatus,
+  generateScriptJsonWithProviders,
+} from './server_script_providers';
+import type { ScriptProviderId } from './src/lib/scriptModelProviders';
+import {
   SCRIPT_PATTERNS_12,
   createDefaultRotationState,
   selectNextPatternFromState,
@@ -1928,9 +1933,11 @@ app.post('/api/ai/story-ideas', async (req, res) => {
       excludePoints = [],
       count = 3,
       priorityResources = [],
+      scriptProvider = 'auto',
+      scriptModel = '',
+      autoFailover = true,
     } = req.body || {};
 
-    const ai = getAiClient();
     const safeCount = Math.min(Math.max(Number(count) || 3, 2), 5);
     const excluded = (Array.isArray(excludeTitles) ? excludeTitles : [])
       .map((title: any) => String(title || '').trim())
@@ -2006,46 +2013,21 @@ Return STRICT raw JSON only, no markdown fences:
   ]
 }`;
 
-    const ideaAttempts = [
-      { model: 'gemini-3.1-flash-lite', timeoutMs: 25000, thinking: false },
-      { model: 'gemini-3.8-flash', timeoutMs: 30000, thinking: true },
-    ];
-    let data: any = null;
-    let lastError: any = null;
-
-    for (let attemptIndex = 0; attemptIndex < ideaAttempts.length; attemptIndex += 1) {
-      const attempt = ideaAttempts[attemptIndex];
-      try {
-        const response = await withTimeout(
-          ai.models.generateContent({
-            model: attempt.model,
-            contents: prompt,
-            config: {
-              responseMimeType: 'application/json',
-              temperature: 0.9,
-              maxOutputTokens: 2048,
-              ...(attempt.thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-            },
-          }),
-          attempt.timeoutMs,
-          'Story ideas'
-        );
-
-        const parsed = extractJsonObject(response.text || '');
+    const routerResult = await generateScriptJsonWithProviders<{ ideas: any[] }>({
+      prompt,
+      preferredProvider: (scriptProvider || 'auto') as ScriptProviderId,
+      preferredModel: String(scriptModel || ''),
+      autoFailover: autoFailover !== false,
+      temperature: 0.9,
+      maxTokens: 2500,
+      timeoutMs: 25000,
+      validate: (parsed) => {
         if (!parsed || !Array.isArray(parsed.ideas) || !parsed.ideas.length) {
           throw new Error('AI ne valid ideas JSON return nahi kiya');
         }
-        data = parsed;
-        break;
-      } catch (attemptError: any) {
-        lastError = attemptError;
-        console.warn(`Story ideas attempt (${attempt.model}) failed:`, attemptError?.message || attemptError);
-      }
-    }
-
-    if (!data) {
-      throw lastError || new Error('Fresh ideas generate nahi ho sake');
-    }
+      },
+    });
+    const data = routerResult.parsed;
 
     const ideas = (Array.isArray(data.ideas) ? data.ideas : [])
       .filter((idea: any) => idea && String(idea.title || '').trim())
@@ -2062,7 +2044,12 @@ Return STRICT raw JSON only, no markdown fences:
       throw new Error('AI ne koi fresh idea return nahi kiya');
     }
 
-    res.json({ ideas });
+    res.json({
+      ideas,
+      providerUsed: routerResult.providerUsed,
+      modelUsed: routerResult.modelUsed,
+      failoverUsed: routerResult.failoverUsed,
+    });
   } catch (err: any) {
     console.error('Story ideas error:', err);
     res.status(500).json({ error: friendlyGeminiError(err, 'Fresh ideas generate nahi ho sake. Dobara try karein.') });
@@ -2101,6 +2088,13 @@ function writeScriptRotationState(state: ScriptRotationState): void {
   }
 }
 
+app.get('/api/ai/script-providers', (_req, res) => {
+  res.json({
+    ok: true,
+    providers: getScriptProvidersStatus(),
+  });
+});
+
 app.get('/api/ai/script-rotation', (_req, res) => {
   const state = readScriptRotationState();
   const { pattern } = selectNextPatternFromState(state);
@@ -2130,7 +2124,10 @@ app.post('/api/ai/generate-story', async (req, res) => {
       customInstructions = '',
       dialectTone = 'lahori_conversational',
       flowPromptFormat = 'cinematic_3d',
-      scriptPatternId = ''
+      scriptPatternId = '',
+      scriptProvider = 'auto',
+      scriptModel = '',
+      autoFailover = true,
     } = req.body || {};
 
     const ideaTitle = String(idea.title || '').trim();
@@ -2317,61 +2314,27 @@ Return STRICT valid JSON only, no markdown fences:
   ]
 }`;
 
-    const ai = getAiClient();
-    const storyAttempts = [
-      { model: 'gemini-3-flash-preview', timeoutMs: 80000, thinking: true },
-      { model: 'gemini-3.6-flash', timeoutMs: 50000, thinking: true },
-      { model: 'gemini-3.5-flash', timeoutMs: 80000, thinking: true },
-      { model: 'gemini-3.5-flash-lite', timeoutMs: 80000, thinking: false },
-      { model: 'gemini-3.7-flash', timeoutMs: 60000, thinking: true },
-    ];
-    let data: any = null;
-    let modelUsed = storyAttempts[0].model;
-    let lastError: any = null;
     const minimumScenes = Math.max(4, totalScenes - 2);
-
-    for (let attemptIndex = 0; attemptIndex < storyAttempts.length; attemptIndex += 1) {
-      const attempt = storyAttempts[attemptIndex];
-      try {
-        const response = await withTimeout(
-          ai.models.generateContent({
-            model: attempt.model,
-            contents: prompt,
-            config: {
-              responseMimeType: 'application/json',
-              temperature: 0.88,
-              maxOutputTokens: 32768,
-              ...(attempt.thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-            },
-          }),
-          attempt.timeoutMs,
-          'Story generation'
-        );
-
-        const parsed = extractJsonObject(response.text || '');
-        if (!parsed) {
-          throw new Error('AI ne valid JSON return nahi kiya');
-        }
-        const parsedScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+    const routerResult = await generateScriptJsonWithProviders<any>({
+      prompt,
+      preferredProvider: (scriptProvider || 'auto') as ScriptProviderId,
+      preferredModel: String(scriptModel || ''),
+      autoFailover: autoFailover !== false,
+      temperature: 0.88,
+      maxTokens: 32768,
+      timeoutMs: 45000,
+      validate: (parsed) => {
+        const parsedScenes = Array.isArray(parsed?.scenes) ? parsed.scenes : [];
         if (parsedScenes.length < minimumScenes) {
           throw new Error(`AI ne sirf ${parsedScenes.length} scenes return kiye (${totalScenes} chahiye the)`);
         }
-
-        data = parsed;
-        modelUsed = attempt.model;
-        break;
-      } catch (attemptError: any) {
-        lastError = attemptError;
-        console.error(`Story generation attempt ${attemptIndex + 1} (${attempt.model}) failed:`, attemptError?.message || attemptError);
-        if (attemptIndex < storyAttempts.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 1200));
-        }
-      }
-    }
-
-    if (!data) {
-      throw lastError || new Error('Story generate nahi ho saki');
-    }
+      },
+    });
+    const data = routerResult.parsed;
+    const providerUsed = routerResult.providerUsed;
+    const modelUsed = routerResult.modelUsed;
+    const failoverUsed = routerResult.failoverUsed;
+    const providerAttempts = routerResult.attempts;
 
     const safeString = (value: any) => String(value || '').trim();
     const rawScenes = Array.isArray(data.scenes) ? data.scenes : [];
@@ -2541,7 +2504,10 @@ DIALOGUE: "${dialogue}"`;
         ? practicalBlueprint.sourceLinks
         : (Array.isArray(data.outsourcedLinks) ? data.outsourcedLinks.map((item: any) => safeString(item)).filter(Boolean) : []),
       scenes: finalScenes,
+      providerUsed,
       modelUsed,
+      failoverUsed,
+      providerAttempts,
       practicalBlueprint,
       consistencyReport,
       scriptPattern: {
@@ -2581,11 +2547,17 @@ DIALOGUE: "${dialogue}"`;
 // 10. Agent — Refresh / Modify Story with Creator Directives & Date Verification
 app.post('/api/ai/refresh-story', async (req, res) => {
   try {
-    const { story, customDirectives = '', verifyDate = 'Today' } = req.body || {};
+    const {
+      story,
+      customDirectives = '',
+      verifyDate = 'Today',
+      scriptProvider = 'auto',
+      scriptModel = '',
+      autoFailover = true,
+    } = req.body || {};
     if (!story || !story.title) {
       return res.status(400).json({ error: 'Valid story package required' });
     }
-    const ai = getAiClient();
     const scenes = Array.isArray(story.scenes) ? story.scenes : [];
     const scenesOutline = scenes.map((s: any, idx: number) => `Scene ${idx + 1} (${s.duration || '10s'}) [${s.purpose || ''}]: Visual: ${s.visual || ''} | Dialogue: "${s.dialogue || ''}"`).join('\n');
 
@@ -2639,23 +2611,21 @@ Return STRICT valid JSON only with NO markdown fences:
   ]
 }`;
 
-    const response = await withTimeout(
-      ai.models.generateContent({
-        model: 'gemini-3.5-flash-lite',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.7,
-        },
-      }),
-      45000,
-      'Story refresh'
-    );
-
-    const parsed = extractJsonObject(response.text || '');
-    if (!parsed || !Array.isArray(parsed.scenes) || !parsed.scenes.length) {
-      throw new Error('AI could not parse refreshed story');
-    }
+    const refreshRouterRes = await generateScriptJsonWithProviders<any>({
+      prompt,
+      preferredProvider: (scriptProvider || 'auto') as ScriptProviderId,
+      preferredModel: String(scriptModel || ''),
+      autoFailover: autoFailover !== false,
+      temperature: 0.7,
+      maxTokens: 16384,
+      timeoutMs: 45000,
+      validate: (p) => {
+        if (!p || !Array.isArray(p.scenes) || !p.scenes.length) {
+          throw new Error('AI could not parse refreshed story');
+        }
+      },
+    });
+    const parsed = refreshRouterRes.parsed;
 
     const safeString = (value: any) => String(value || '').trim();
     const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
@@ -2706,6 +2676,9 @@ DIALOGUE: "${dialogue}"`;
       tags: Array.isArray(parsed.tags) && parsed.tags.length ? parsed.tags : story.tags,
       tiktokCaption: safeString(parsed.tiktokCaption) || story.tiktokCaption,
       seriesPlan: safeString(parsed.seriesPlan) || story.seriesPlan,
+      providerUsed: refreshRouterRes.providerUsed,
+      modelUsed: refreshRouterRes.modelUsed,
+      failoverUsed: refreshRouterRes.failoverUsed,
     };
 
     mergeStudioStatePatch(

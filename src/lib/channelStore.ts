@@ -20,6 +20,9 @@ export interface ChannelEngineConfig {
   autonomousPriority?: 'URGENT' | 'HIGH' | 'NORMAL';
   aspectRatio?: '9:16' | '16:9';
   searchGroundingRules?: string;
+  scriptProvider?: 'auto' | 'gemini' | 'claude' | 'openai' | 'llama';
+  scriptModel?: string;
+  autoFailover?: boolean;
 }
 
 export interface ExtendedChannelProfile extends ChannelProfile {
@@ -47,7 +50,10 @@ export const DEFAULT_ENGINE_CONFIGS: Record<string, ChannelEngineConfig> = {
     nicheKeywords: ['windows 11', 'pc hacks', 'chatgpt', 'gemini', 'power automate', 'google sheets', 'secrets'],
     autonomousPriority: 'HIGH',
     aspectRatio: '9:16',
-    searchGroundingRules: 'Prioritize latest Microsoft Windows updates, Google Gemini/OpenAI breakthrough features, and verified productivity shortcuts.'
+    searchGroundingRules: 'Prioritize latest Microsoft Windows updates, Google Gemini/OpenAI breakthrough features, and verified productivity shortcuts.',
+    scriptProvider: 'auto',
+    scriptModel: 'gemini-4-hydrogen',
+    autoFailover: true
   },
   beautyhub: {
     channelId: 'beautyhub',
@@ -337,7 +343,10 @@ export function getDefaultEngineConfig(
     nicheKeywords: [niche.toLowerCase()],
     autonomousPriority: 'HIGH',
     aspectRatio: ratio,
-    searchGroundingRules: `Prioritize latest trends, viral hooks, and verified practices in ${niche}.`
+    searchGroundingRules: `Prioritize latest trends, viral hooks, and verified practices in ${niche}.`,
+    scriptProvider: 'auto',
+    scriptModel: 'gemini-4-hydrogen',
+    autoFailover: true
   };
 }
 

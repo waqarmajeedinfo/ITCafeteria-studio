@@ -82,7 +82,9 @@ export interface GeneratedStory {
   memoryBlock: string;
   idea: StoryIdea;
   discussionNotes: string;
+  providerUsed?: string;
   modelUsed?: string;
+  failoverUsed?: boolean;
   cinematicDirectingActive?: boolean;
   customCinematicDirection?: string;
   lastRefreshedAt?: string;
@@ -195,7 +197,9 @@ export function sanitizeStoryPackage(raw: any): GeneratedStory {
       whyFresh: raw.idea.whyFresh ? String(raw.idea.whyFresh) : undefined
     } : { title: String(raw.title || ''), hook: String(raw.hook || 'Reveal'), angle: '', points: '' },
     discussionNotes: String(raw.discussionNotes || ''),
+    providerUsed: raw.providerUsed ? String(raw.providerUsed) : undefined,
     modelUsed: raw.modelUsed ? String(raw.modelUsed) : undefined,
+    failoverUsed: Boolean(raw.failoverUsed),
     cinematicDirectingActive: Boolean(raw.cinematicDirectingActive),
     customCinematicDirection: raw.customCinematicDirection ? String(raw.customCinematicDirection) : undefined,
     lastRefreshedAt: raw.lastRefreshedAt ? String(raw.lastRefreshedAt) : undefined,
@@ -755,6 +759,13 @@ export const StoryPackageView: React.FC<StoryPackageViewProps> = ({
               {(story.scriptPattern?.name || story.scriptPatternName) && (
                 <span className="px-2 py-0.5 rounded-full bg-indigo-950/80 text-indigo-200 border border-indigo-500/40 font-semibold">
                   Pattern #{story.scriptPattern?.order || ''}: {story.scriptPattern?.name || story.scriptPatternName}
+                </span>
+              )}
+              {story.modelUsed && (
+                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-emerald-300 border border-emerald-500/30 font-mono text-[10px]">
+                  {story.providerUsed ? `${story.providerUsed.toUpperCase()} · ` : ''}
+                  {story.modelUsed}
+                  {story.failoverUsed ? ' (Failover)' : ''}
                 </span>
               )}
               <span className="text-slate-500">{story.dateLabel}</span>

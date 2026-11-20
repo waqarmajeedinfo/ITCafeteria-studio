@@ -1,10 +1,12 @@
 import type { Express } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { execFile, execFileSync } from 'child_process';
+import { execFile, execFileSync, spawn, type ChildProcess } from 'child_process';
 import { fileURLToPath } from 'url';
 import ffmpegStatic from 'ffmpeg-static';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
+import { generateScriptJsonWithProviders } from './server_script_providers';
+import type { ScriptProviderId } from './src/lib/scriptModelProviders';
 import type {
   UgcAdFormat,
   UgcAspectRatio,
@@ -47,11 +49,200 @@ interface UgcRenderJob {
 }
 
 const UGC_JOBS = new Map<string, UgcRenderJob>();
+const UGC_PYTHON_DIR = path.resolve(__dirname, 'backend_ugc');
+const DEFAULT_PYTHON_PORT = Number(process.env.UGC_PYTHON_PORT || 5055);
+let pythonChildProc: ChildProcess | null = null;
+let pythonBootPromise: Promise<string> | null = null;
 
 function ensureUgcDirs(): void {
   for (const dir of [UGC_OUTPUT_DIR, UGC_LIB_DIR]) {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   }
+}
+
+function getLocalOrConfiguredPythonUrl(): { url: string; isExternal: boolean } {
+  const configured = (process.env.UGC_PYTHON_URL || '').trim().replace(/\/+$/, '');
+  if (configured) return { url: configured, isExternal: true };
+  return { url: `http://127.0.0.1:${DEFAULT_PYTHON_PORT}`, isExternal: false };
+}
+
+async function fetchPythonHealth(baseUrl: string): Promise<any | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+    const resp = await fetch(`${baseUrl}/health`, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch {
+    return null;
+  }
+}
+
+async function ensurePythonCompanionRunning(): Promise<{ baseUrl: string; health: any }> {
+  const { url, isExternal } = getLocalOrConfiguredPythonUrl();
+  const existing = await fetchPythonHealth(url);
+  if (existing?.ok) {
+    return { baseUrl: url, health: existing };
+  }
+
+  if (isExternal) {
+    throw new Error(`Configured UGC_PYTHON_URL (${url}) respond nahi kar raha. Flask companion service check karein.`);
+  }
+
+  if (!pythonBootPromise) {
+    pythonBootPromise = (async () => {
+      ensureUgcDirs();
+      const ff = resolveFfmpegBinary();
+      const appPy = path.join(UGC_PYTHON_DIR, 'app.py');
+      if (!fs.existsSync(appPy)) {
+        throw new Error('backend_ugc/app.py missing hai.');
+      }
+
+      if (!pythonChildProc || pythonChildProc.killed) {
+        const pyBin = process.env.PYTHON_BIN || 'python3';
+        pythonChildProc = spawn(pyBin, [appPy], {
+          cwd: UGC_PYTHON_DIR,
+          env: {
+            ...process.env,
+            UGC_PYTHON_PORT: String(DEFAULT_PYTHON_PORT),
+            UGC_RENDERS_DIR: UGC_OUTPUT_DIR,
+            ...(ff ? { FFMPEG_PATH: ff.bin } : {}),
+            PYTHONUNBUFFERED: '1',
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        pythonChildProc.stdout?.on('data', (d) => {
+          const msg = String(d).trim();
+          if (msg) console.log(`[UGC-Flask] ${msg}`);
+        });
+        pythonChildProc.stderr?.on('data', (d) => {
+          const msg = String(d).trim();
+          if (msg && !msg.includes('WARNING: This is a development server')) {
+            console.log(`[UGC-Flask] ${msg}`);
+          }
+        });
+        pythonChildProc.on('exit', () => {
+          pythonChildProc = null;
+        });
+      }
+
+      for (let i = 0; i < 24; i++) {
+        const h = await fetchPythonHealth(url);
+        if (h?.ok) return url;
+        await new Promise((r) => setTimeout(r, 350));
+      }
+      throw new Error('Python Flask Companion Service port 5055 par start nahi ho saki.');
+    })().finally(() => {
+      pythonBootPromise = null;
+    });
+  }
+
+  const readyUrl = await pythonBootPromise;
+  const readyHealth = await fetchPythonHealth(readyUrl);
+  if (!readyHealth?.ok) {
+    throw new Error('Python Flask Companion Service health check fail ho gayi.');
+  }
+  return { baseUrl: readyUrl, health: readyHealth };
+}
+
+function buildDirectStoryboardFromScriptInputs(
+  settings: Partial<UgcCampaignSettings>,
+  productAnalysis?: UgcProductAnalysis | null,
+  hasModelImage = false
+): UgcStoryboardResult {
+  const totalDuration = Math.max(6, Math.min(45, Number(settings.totalDurationSec || 15)));
+  const ratio: UgcAspectRatio =
+    settings.aspectRatio === '16:9' || settings.aspectRatio === '1:1' ? settings.aspectRatio : '9:16';
+  const brand = String(settings.brandName || productAnalysis?.brandName || 'Brand Studio').trim();
+  const product = String(settings.productDetails || productAnalysis?.productName || 'Signature Product').trim();
+  const usp = String(settings.uspOffer || 'Premium crafted quality for everyday results').trim();
+  const cta = String(settings.callToAction || 'Shop Now · Limited Offer').trim();
+  const lang = (settings.language || 'Roman Urdu (Pakistani Creator)') as UgcCampaignSettings['language'];
+
+  const rawLines = product
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const durations = splitDurationsEvenly(totalDuration, 4);
+  const templates: Array<{
+    title: string;
+    focus: UgcSceneVisualFocus;
+    hook: string;
+    vo: string;
+  }> = [
+    {
+      title: 'Attention Hook & Product Lock',
+      focus: 'product_hero',
+      hook: `${brand} · Watch This`,
+      vo:
+        rawLines[0] ||
+        (lang.includes('English')
+          ? `Meet ${product} by ${brand} — engineered to upgrade your daily routine.`
+          : `${brand} ka ${product} check karein — pehli hi nazar mein farq saaf dikhta hai!`),
+    },
+    {
+      title: 'Macro Texture & Proof',
+      focus: 'product_macro',
+      hook: productAnalysis?.material || '100% Authentic Craft',
+      vo:
+        rawLines[1] ||
+        (lang.includes('English')
+          ? `Look closer at every detail. ${usp}.`
+          : `Har detail aur finish bilkul original hai. ${usp}.`),
+    },
+    {
+      title: hasModelImage ? 'Creator Showcase & Proof' : 'Showcase Highlight',
+      focus: hasModelImage ? 'split_model_product' : 'product_hero',
+      hook: usp.slice(0, 42),
+      vo:
+        rawLines[2] ||
+        (lang.includes('English')
+          ? `Real performance you can trust every single day.`
+          : `Daily use ke liye zabardast performance aur real results.`),
+    },
+    {
+      title: 'Final Brand Lockup & CTA',
+      focus: 'reveal_lockup',
+      hook: cta,
+      vo:
+        rawLines[3] ||
+        (lang.includes('English')
+          ? `${cta} with ${brand} today.`
+          : `Abhi order karein — ${cta}!`),
+    },
+  ];
+
+  const normalized = normalizeSceneDurations(
+    templates.map((t, i) => ({
+      title: t.title,
+      durationSec: durations[i],
+      visualFocus: t.focus,
+      cameraMovement: 'Python Direct Ken-Burns + Crossfade Motion',
+      lightingStyle: 'Studio Balanced Grade',
+      characterAction: hasModelImage ? 'Creator paired cleanly beside locked product card' : 'Product centerpiece motion',
+      productInteraction: 'Uploaded product geometry & branding strictly locked',
+      voiceoverLine: t.vo,
+      onScreenHook: t.hook,
+      negativeConstraints: settings.customNegativeConstraints || 'blurry, altered product',
+    })),
+    totalDuration
+  );
+
+  return {
+    campaignTitle: `${brand} — Direct Python Commercial`,
+    openingSignature: getFormatRuleSummary((settings.adFormat || 'ugc_creator_haul') as UgcAdFormat),
+    totalDurationSec: totalDuration,
+    aspectRatio: ratio,
+    language: lang,
+    scenes: normalized,
+    fullFormattedOutput: normalized.map((s) => s.veo3PromptFormatted).join('\n\n'),
+    masterNegativePrompt: String(settings.customNegativeConstraints || ''),
+    strategyNotesRomanUrdu:
+      'Stage 4 Python Flask pipeline ne script inputs ko directly multi-scene HD MP4 mein synthesize kar diya (external video generation models bypass kiye gaye hain).',
+  };
 }
 
 function getUgcAiClient(): GoogleGenAI | null {
@@ -611,14 +802,6 @@ Focus on:
       const productAnalysis = body.productAnalysis as UgcProductAnalysis | null | undefined;
       const modelAnalysis = body.modelAnalysis as UgcModelAnalysis | null | undefined;
 
-      const ai = getUgcAiClient();
-      if (!ai) {
-        return res.status(400).json({
-          ok: false,
-          error: 'GEMINI_API_KEY configured nahi hai. Settings > Secrets mein valid API key check karein.',
-        });
-      }
-
       const totalDuration = Math.max(6, Math.min(45, Number(settings.totalDurationSec || 15)));
       const sceneCount = totalDuration <= 10 ? 3 : totalDuration <= 18 ? 4 : totalDuration <= 30 ? 5 : 6;
       const aspectRatio: UgcAspectRatio =
@@ -662,96 +845,60 @@ INSTRUCTIONS FOR SCENES:
    - Pick "visualFocus" per scene strictly from: "product_hero", "product_macro", "model_avatar", "split_model_product", "reveal_lockup".
    - Make sure "negativeConstraints" on EVERY scene explicitly preserves product identity and avoids blurry/deformed/floating artifacts.
 2. Also populate "fastAssemblyJson" (concise pure JSON specification for fast-assembly hero reveal spots: present tense, active voice, under 120 words description, "text": "none").
-3. Write "strategyNotesRomanUrdu" in crisp Roman Urdu explaining the hook, pacing, and brand positioning.`;
+3. Write "strategyNotesRomanUrdu" in crisp Roman Urdu explaining the hook, pacing, and brand positioning.
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: prompt,
-        config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              campaignTitle: { type: Type.STRING },
-              openingSignature: { type: Type.STRING },
-              strategyNotesRomanUrdu: { type: Type.STRING },
-              masterNegativePrompt: { type: Type.STRING },
-              scenes: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    title: { type: Type.STRING },
-                    durationSec: { type: Type.NUMBER },
-                    visualFocus: { type: Type.STRING },
-                    cameraMovement: { type: Type.STRING },
-                    lightingStyle: { type: Type.STRING },
-                    characterAction: { type: Type.STRING },
-                    productInteraction: { type: Type.STRING },
-                    voiceoverLine: { type: Type.STRING },
-                    onScreenHook: { type: Type.STRING },
-                    negativeConstraints: { type: Type.STRING },
-                  },
-                  required: [
-                    'title',
-                    'durationSec',
-                    'visualFocus',
-                    'cameraMovement',
-                    'lightingStyle',
-                    'characterAction',
-                    'productInteraction',
-                    'voiceoverLine',
-                    'onScreenHook',
-                    'negativeConstraints',
-                  ],
-                },
-              },
-              fastAssemblyJson: {
-                type: Type.OBJECT,
-                properties: {
-                  description: { type: Type.STRING },
-                  style: { type: Type.STRING },
-                  camera: { type: Type.STRING },
-                  lighting: { type: Type.STRING },
-                  environment: { type: Type.STRING },
-                  elements: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  motion: { type: Type.STRING },
-                  ending: { type: Type.STRING },
-                  text: { type: Type.STRING },
-                  keywords: { type: Type.ARRAY, items: { type: Type.STRING } },
-                },
-                required: [
-                  'description',
-                  'style',
-                  'camera',
-                  'lighting',
-                  'environment',
-                  'elements',
-                  'motion',
-                  'ending',
-                  'text',
-                  'keywords',
-                ],
-              },
-            },
-            required: [
-              'campaignTitle',
-              'openingSignature',
-              'strategyNotesRomanUrdu',
-              'masterNegativePrompt',
-              'scenes',
-              'fastAssemblyJson',
-            ],
-          },
+Return STRICT valid raw JSON only (no markdown fences) matching this exact schema:
+{
+  "campaignTitle": "string",
+  "openingSignature": "string",
+  "strategyNotesRomanUrdu": "string",
+  "masterNegativePrompt": "string",
+  "scenes": [
+    {
+      "title": "string",
+      "durationSec": 4,
+      "visualFocus": "product_hero",
+      "cameraMovement": "string",
+      "lightingStyle": "string",
+      "characterAction": "string",
+      "productInteraction": "string",
+      "voiceoverLine": "string",
+      "onScreenHook": "string",
+      "negativeConstraints": "string"
+    }
+  ],
+  "fastAssemblyJson": {
+    "description": "string",
+    "style": "string",
+    "camera": "string",
+    "lighting": "string",
+    "environment": "string",
+    "elements": ["string"],
+    "motion": "string",
+    "ending": "string",
+    "text": "none",
+    "keywords": ["string"]
+  }
+}`;
+
+      const routerRes = await generateScriptJsonWithProviders<any>({
+        prompt,
+        preferredProvider: (settings.scriptProvider || 'auto') as ScriptProviderId,
+        preferredModel: String(settings.scriptModel || ''),
+        autoFailover: settings.autoFailover !== false,
+        temperature: 0.78,
+        maxTokens: 8192,
+        timeoutMs: 45000,
+        validate: (p) => {
+          const s = Array.isArray(p?.scenes) ? p.scenes : [];
+          if (s.length === 0) {
+            throw new Error('AI ne empty storyboard return kiya. Dobara try karein.');
+          }
         },
       });
 
-      const parsed = extractJsonSafe(response.text || '');
+      const parsed = routerRes.parsed;
       const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
-      if (rawScenes.length === 0) {
-        throw new Error('AI ne empty storyboard return kiya. Dobara try karein.');
-      }
 
       const normalizedScenes = normalizeSceneDurations(rawScenes, totalDuration);
       const fullFormattedOutput = normalizedScenes.map((s) => s.veo3PromptFormatted).join('\n\n');
@@ -788,30 +935,56 @@ INSTRUCTIONS FOR SCENES:
         fullFormattedOutput,
         masterNegativePrompt: String(parsed.masterNegativePrompt || settings.customNegativeConstraints),
         strategyNotesRomanUrdu: String(parsed.strategyNotesRomanUrdu || ''),
+        providerUsed: routerRes.providerUsed,
+        modelUsed: routerRes.modelUsed,
+        failoverUsed: routerRes.failoverUsed,
       };
 
-      return res.json({ ok: true, storyboard });
+      return res.json({
+        ok: true,
+        storyboard,
+        providerUsed: routerRes.providerUsed,
+        modelUsed: routerRes.modelUsed,
+        failoverUsed: routerRes.failoverUsed,
+      });
     } catch (err: any) {
       console.error('[UGC Storyboard Error]:', err);
       return res.status(500).json({ ok: false, error: friendlyGeminiError(err, 'Storyboard aur Veo 3 prompts generate nahi ho sake.') });
     }
   });
 
-  // Render complete multi-scene MP4 Commercial Video (FFmpeg + LibASS + Gemini TTS Voiceover)
-  app.post('/api/ugc/render-video', async (req, res) => {
-    const ff = resolveFfmpegBinary();
-    if (!ff) {
-      return res.status(500).json({
+  // Auto-boot local Python Flask Companion Service in background when routes register
+  ensurePythonCompanionRunning().catch((err) => {
+    console.warn('[UGC-Flask Boot Note]:', err?.message || err);
+  });
+
+  app.get('/api/ugc/python-status', async (_req, res) => {
+    try {
+      const { baseUrl, health } = await ensurePythonCompanionRunning();
+      return res.json({
+        ok: true,
+        pythonUrl: baseUrl,
+        mode: 'python-flask-companion',
+        externalVideoModelsBypassed: true,
+        health,
+      });
+    } catch (err: any) {
+      return res.status(503).json({
         ok: false,
-        error: 'FFmpeg binary server par available nahi hai.',
+        mode: 'python-flask-companion',
+        error: err?.message || 'Python Flask Companion Service unavailable',
       });
     }
+  });
 
+  // Render complete multi-scene MP4 Commercial Video via Python Flask Companion Service
+  // Directly processes script writing inputs & synthesizes HD MP4 (bypasses external video gen models)
+  app.post('/api/ugc/render-video', async (req, res) => {
+    const ff = resolveFfmpegBinary();
     const body = req.body || {};
     const productImageDataUrl = String(body.productImageDataUrl || '');
     const modelImageDataUrl = String(body.modelImageDataUrl || '');
     const settings = (body.settings || {}) as UgcCampaignSettings;
-    const storyboard = body.storyboard as UgcStoryboardResult | undefined;
     const productAnalysis = body.productAnalysis as UgcProductAnalysis | undefined;
 
     const decProduct = decodeBase64DataUrl(productImageDataUrl);
@@ -819,15 +992,14 @@ INSTRUCTIONS FOR SCENES:
     if (!decProduct && !decModel) {
       return res.status(400).json({
         ok: false,
-        error: 'Video render karne ke liye kam az kam Product ya Model image provide karein.',
+        error: 'Video synthesize karne ke liye kam az kam Product ya Model image provide karein.',
       });
     }
 
+    // Automatically convert script-writing inputs into multi-scene storyboard if scenes weren't generated yet
+    let storyboard = body.storyboard as UgcStoryboardResult | undefined;
     if (!storyboard || !Array.isArray(storyboard.scenes) || storyboard.scenes.length === 0) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Pehle Stage 4 storyboard scenes generate karein.',
-      });
+      storyboard = buildDirectStoryboardFromScriptInputs(settings, productAnalysis, Boolean(decModel));
     }
 
     const jobId = `ugc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -840,38 +1012,15 @@ INSTRUCTIONS FOR SCENES:
 
     const runRender = async () => {
       ensureUgcDirs();
-      const tmpDir = path.join(UGC_OUTPUT_DIR, `tmp_${jobId}`);
-      fs.mkdirSync(tmpDir, { recursive: true });
-
       try {
-        const aspectRatio: UgcAspectRatio = storyboard.aspectRatio || settings.aspectRatio || '9:16';
-        const { width: W, height: H } = getDimensionsForAspect(aspectRatio);
-        const scenes = storyboard.scenes;
-        const brandLabel = String(settings.brandName || productAnalysis?.brandName || 'BRAND CAMPAIGN').trim();
-        const accentHex = productAnalysis?.colorPalette?.[1] || productAnalysis?.colorPalette?.[0] || '#10B981';
+        // 1. Ensure Python Flask Companion Service is active
+        const { baseUrl: pyBaseUrl } = await ensurePythonCompanionRunning();
 
-        const prodExt = decProduct?.mime.includes('png') ? 'png' : decProduct?.mime.includes('webp') ? 'webp' : 'jpg';
-        const modExt = decModel?.mime.includes('png') ? 'png' : decModel?.mime.includes('webp') ? 'webp' : 'jpg';
-
-        let prodPath = '';
-        if (decProduct) {
-          prodPath = path.join(tmpDir, `product.${prodExt}`);
-          fs.writeFileSync(prodPath, decProduct.buffer);
-        }
-        let modPath = '';
-        if (decModel) {
-          modPath = path.join(tmpDir, `model.${modExt}`);
-          fs.writeFileSync(modPath, decModel.buffer);
-        }
-
-        // Primary fallback if only one image was supplied
-        if (!prodPath && modPath) prodPath = modPath;
-        if (!modPath && prodPath) modPath = prodPath;
-
-        // 1. Optional Gemini TTS Voiceover generation per scene
+        // 2. Optional Gemini TTS Voiceover generation per scene (passes base64 WAV clips into Python Flask)
         const ai = getUgcAiClient();
-        const voiceoverPaths: Array<{ idx: number; path: string; startOffsetSec: number }> = [];
+        const voiceoverClips: Array<{ idx: number; wavBase64: string; startOffsetSec: number }> = [];
         let voiceoverWarning = '';
+        const scenes = storyboard!.scenes;
 
         if (settings.enableVoiceover && ai) {
           let timeCursor = 0;
@@ -908,9 +1057,7 @@ INSTRUCTIONS FOR SCENES:
                 });
                 const b64Audio = ttsResp.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                 if (b64Audio) {
-                  const wavPath = path.join(tmpDir, `vo_${i}.wav`);
-                  fs.writeFileSync(wavPath, Buffer.from(b64Audio, 'base64'));
-                  voiceoverPaths.push({ idx: i, path: wavPath, startOffsetSec: timeCursor });
+                  voiceoverClips.push({ idx: i, wavBase64: b64Audio, startOffsetSec: timeCursor });
                 }
               } catch (ttsErr: any) {
                 if (!voiceoverWarning) {
@@ -924,240 +1071,55 @@ INSTRUCTIONS FOR SCENES:
           voiceoverWarning = 'GEMINI_API_KEY missing hone ki wajah se TTS voiceover skip hua.';
         }
 
-        // 2. Render each scene clip individually at uniform fps/size/pix_fmt for rock-solid xfade concatenation
-        const sceneMp4Paths: string[] = [];
-        const safeFontsDir = fs.existsSync(FONTS_DIR) ? FONTS_DIR : tmpDir;
-
-        for (let i = 0; i < scenes.length; i++) {
-          const sc = scenes[i];
-          const dur = Math.max(1.5, Number(sc.durationSec || 3));
-          const sceneFile = path.join(tmpDir, `scene_${i}.mp4`);
-          const assPath = path.join(tmpDir, `scene_${i}.ass`);
-          const assContent = buildSceneCaptionAss(
-            sc.onScreenHook || sc.title,
-            sc.voiceoverLine || '',
-            i === scenes.length - 1 ? settings.callToAction || brandLabel : brandLabel,
-            dur,
-            W,
-            H,
-            settings.captionMode || 'bold_hook',
-            accentHex
-          );
-          fs.writeFileSync(assPath, assContent, 'utf8');
-
-          const focus: UgcSceneVisualFocus = sc.visualFocus || 'product_hero';
-          const hasSeparateModel = prodPath !== modPath;
-          const isSplit = focus === 'split_model_product' && hasSeparateModel;
-          const isModelOnly = focus === 'model_avatar' && hasSeparateModel;
-          const isMacro = focus === 'product_macro';
-
-          const args: string[] = ['-y', '-threads', '2'];
-
-          if (isSplit) {
-            // Dual-panel Model + Locked Product showcase over ambient blur
-            args.push('-loop', '1', '-t', dur.toFixed(2), '-framerate', '24', '-i', modPath);
-            args.push('-loop', '1', '-t', dur.toFixed(2), '-framerate', '24', '-i', prodPath);
-
-            const isWide = W > H;
-            const modW = isWide ? Math.round(W * 0.56) : Math.round(W * 0.90);
-            const modH = isWide ? Math.round(H * 0.86) : Math.round(H * 0.50);
-            const prodW = isWide ? Math.round(W * 0.36) : Math.round(W * 0.66);
-            const prodH = isWide ? Math.round(H * 0.72) : Math.round(H * 0.30);
-
-            const modX = isWide ? Math.round(W * 0.04) : Math.round((W - modW) / 2);
-            const modY = isWide ? Math.round((H - modH) / 2) : Math.round(H * 0.14);
-            const prodX = isWide ? Math.round(W * 0.61) : Math.round((W - prodW) / 2);
-            const prodY = isWide ? Math.round((H - prodH) / 2) : Math.round(H * 0.56);
-
-            const fc = [
-              `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=28,eq=brightness=-0.16[bg]`,
-              `[0:v]scale=${Math.round(modW * 1.08)}:${Math.round(modH * 1.08)}:force_original_aspect_ratio=increase,crop=${modW}:${modH}:'(iw-${modW})/2':'(ih-${modH})*0.35'[modc]`,
-              `[1:v]scale=${prodW}:${prodH}:force_original_aspect_ratio=decrease,pad=${prodW}:${prodH}:(ow-iw)/2:(oh-ih)/2:color=0xFFFFFF@0.92[prodc]`,
-              `[bg][modc]overlay=${modX}:${modY}[step1]`,
-              `[step1][prodc]overlay=${prodX}:${prodY}:shortest=1[comp]`,
-              `[comp]ass='${escapeFilterPath(assPath)}':fontsdir='${escapeFilterPath(safeFontsDir)}',format=yuv420p[vout]`,
-            ].join(';');
-
-            args.push('-filter_complex', fc, '-map', '[vout]');
-          } else {
-            const activeImg = isModelOnly ? modPath : prodPath;
-            args.push('-loop', '1', '-t', dur.toFixed(2), '-framerate', '24', '-i', activeImg);
-
-            // Dynamic motion crop per scene (macro zoom vs gentle showcase pan)
-            const overW = isMacro ? Math.round(W * 1.38) : Math.round(W * 1.12);
-            const overH = isMacro ? Math.round(H * 1.38) : Math.round(H * 1.12);
-            const panXExpr =
-              i % 2 === 0
-                ? `(iw-${W})*0.5+(iw-${W})*0.18*sin(t*0.8)`
-                : `(iw-${W})*0.5-(iw-${W})*0.18*sin(t*0.8)`;
-            const panYExpr = isMacro
-              ? `(ih-${H})*0.42+(ih-${H})*0.15*cos(t*0.7)`
-              : `(ih-${H})*0.5-(ih-${H})*0.12*(t/${dur.toFixed(2)})`;
-
-            const fgScaleW = Math.round((W * 0.92) / 2) * 2;
-            const fgScaleH = Math.round((H * (aspectRatio === '9:16' ? 0.68 : 0.84)) / 2) * 2;
-            const fgOverW = Math.round((fgScaleW * 1.28) / 2) * 2;
-            const fgOverH = Math.round((fgScaleH * 1.28) / 2) * 2;
-
-            const fc = isModelOnly
-              ? [
-                  `[0:v]scale=${overW}:${overH}:force_original_aspect_ratio=increase,crop=${W}:${H}:'${panXExpr}':'${panYExpr}'[moved]`,
-                  `[moved]ass='${escapeFilterPath(assPath)}':fontsdir='${escapeFilterPath(safeFontsDir)}',format=yuv420p[vout]`,
-                ].join(';')
-              : [
-                  `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=32,eq=brightness=-0.14[bg]`,
-                  isMacro
-                    ? `[0:v]scale=${fgOverW}:${fgOverH}:force_original_aspect_ratio=increase,crop=${fgScaleW}:${fgScaleH}:'(iw-${fgScaleW})*0.5+(iw-${fgScaleW})*0.22*sin(t*0.85)':'(ih-${fgScaleH})*0.45+(ih-${fgScaleH})*0.14*cos(t*0.7)'[fg]`
-                    : `[0:v]scale=${fgScaleW}:${fgScaleH}:force_original_aspect_ratio=decrease[fg]`,
-                  `[bg][fg]overlay=(W-w)/2:(H-h)/2[comp]`,
-                  `[comp]ass='${escapeFilterPath(assPath)}':fontsdir='${escapeFilterPath(safeFontsDir)}',format=yuv420p[vout]`,
-                ].join(';');
-
-            args.push('-filter_complex', fc, '-map', '[vout]');
-          }
-
-          args.push(
-            '-r',
-            '24',
-            '-c:v',
-            'libx264',
-            '-preset',
-            'ultrafast',
-            '-crf',
-            '21',
-            '-pix_fmt',
-            'yuv420p',
-            sceneFile
-          );
-          await runExecFile(ff.bin, args, 90000);
-          sceneMp4Paths.push(sceneFile);
-        }
-
-        // 3. Concatenate scenes cleanly with xfade transitions + mix Voiceover + background commercial bed
-        const xfadeDur = sceneMp4Paths.length > 1 ? 0.35 : 0;
-        const mergeArgs: string[] = ['-y', '-threads', '2'];
-        sceneMp4Paths.forEach((p) => mergeArgs.push('-i', p));
-
-        let audioStartInputIndex = sceneMp4Paths.length;
-        const transitionChoices = ['fade', 'smoothleft', 'wipeup', 'slideleft', 'fadeblack'];
-
-        const filterParts: string[] = [];
-        let lastVideoLabel = '0:v';
-        if (sceneMp4Paths.length > 1) {
-          let runningOffset = Math.max(0.5, Number(scenes[0].durationSec || 3) - xfadeDur);
-          for (let i = 1; i < sceneMp4Paths.length; i++) {
-            const outLabel = i === sceneMp4Paths.length - 1 ? 'vout' : `vx${i}`;
-            const tr = transitionChoices[(i - 1) % transitionChoices.length];
-            filterParts.push(
-              `[${lastVideoLabel}][${i}:v]xfade=transition=${tr}:duration=${xfadeDur.toFixed(2)}:offset=${runningOffset.toFixed(2)}[${outLabel}]`
-            );
-            lastVideoLabel = outLabel;
-            runningOffset += Math.max(0.5, Number(scenes[i].durationSec || 3) - xfadeDur);
-          }
-        } else {
-          filterParts.push(`[0:v]null[vout]`);
-        }
-
-        const finalDur = scenes.reduce((a, s) => a + Math.max(1.5, Number(s.durationSec || 3)), 0) - xfadeDur * (sceneMp4Paths.length - 1);
-
-        // Background audio bed + Voiceovers
-        const audioStreamsToMix: string[] = [];
-        if (settings.audioBedMood !== 'none') {
-          const baseFreq =
-            settings.audioBedMood === 'luxury_minimal'
-              ? '146.83'
-              : settings.audioBedMood === 'kinetic_bass'
-                ? '110.00'
-                : '196.00';
-          const harmFreq =
-            settings.audioBedMood === 'luxury_minimal'
-              ? '220.00'
-              : settings.audioBedMood === 'kinetic_bass'
-                ? '164.81'
-                : '293.66';
-          filterParts.push(
-            `aevalsrc=exprs='0.035*sin(2*PI*${baseFreq}*t)+0.02*sin(2*PI*${harmFreq}*t)*(0.5+0.5*sin(2*PI*2*t))':s=44100:c=stereo:d=${Math.max(2, finalDur).toFixed(2)},afade=t=in:st=0:d=0.4,afade=t=out:st=${Math.max(0.5, finalDur - 0.6).toFixed(2)}:d=0.6[musicbed]`
-          );
-          audioStreamsToMix.push('[musicbed]');
-        } else {
-          filterParts.push(
-            `anullsrc=channel_layout=stereo:sample_rate=44100,atrim=duration=${Math.max(2, finalDur).toFixed(2)}[silbed]`
-          );
-          audioStreamsToMix.push('[silbed]');
-        }
-
-        voiceoverPaths.forEach((vo, idx) => {
-          mergeArgs.push('-i', vo.path);
-          const inputIdx = audioStartInputIndex + idx;
-          const delayMs = Math.max(0, Math.round(vo.startOffsetSec * 1000));
-          const lbl = `vo${idx}`;
-          filterParts.push(
-            `[${inputIdx}:a]aresample=44100,aformat=channel_layouts=stereo,volume=1.35,adelay=${delayMs}|${delayMs}[${lbl}]`
-          );
-          audioStreamsToMix.push(`[${lbl}]`);
+        // 3. Dispatch full script-to-video synthesis directly to Python Flask Companion Service
+        const pyResp = await fetch(`${pyBaseUrl}/synthesize-video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId,
+            async: false,
+            productImageDataUrl,
+            modelImageDataUrl,
+            settings,
+            storyboard,
+            productAnalysis,
+            voiceoverClips,
+            ...(ff ? { ffmpegPath: ff.bin } : {}),
+          }),
         });
 
-        if (audioStreamsToMix.length === 1) {
-          filterParts.push(`${audioStreamsToMix[0]}anull[aout]`);
-        } else {
-          filterParts.push(
-            `${audioStreamsToMix.join('')}amix=inputs=${audioStreamsToMix.length}:duration=longest:dropout_transition=0.2,dynaudnorm[aout]`
-          );
+        const pyData: any = await pyResp.json().catch(() => null);
+        if (!pyResp.ok || !pyData?.ok || !pyData?.filename) {
+          throw new Error(pyData?.error || 'Python Flask video synthesis fail ho gayi.');
         }
 
-        const outFilename = `${jobId}.mp4`;
-        const outPath = path.join(UGC_OUTPUT_DIR, outFilename);
-        mergeArgs.push(
-          '-filter_complex',
-          filterParts.join(';'),
-          '-map',
-          '[vout]',
-          '-map',
-          '[aout]',
-          '-t',
-          Math.max(2, finalDur).toFixed(2),
-          '-r',
-          '24',
-          '-c:v',
-          'libx264',
-          '-preset',
-          'veryfast',
-          '-crf',
-          '20',
-          '-c:a',
-          'aac',
-          '-b:a',
-          '192k',
-          '-ac',
-          '2',
-          '-ar',
-          '44100',
-          '-movflags',
-          '+faststart',
-          outPath
-        );
-
-        await runExecFile(ff.bin, mergeArgs, 120000);
+        // If external UGC_PYTHON_URL rendered remotely, mirror MP4 into local UGC_OUTPUT_DIR
+        const outFilename = path.basename(String(pyData.filename));
+        const localOutPath = path.join(UGC_OUTPUT_DIR, outFilename);
+        if (!fs.existsSync(localOutPath)) {
+          const dlResp = await fetch(`${pyBaseUrl}/download/${encodeURIComponent(outFilename)}`);
+          if (!dlResp.ok) {
+            throw new Error('Synthesized MP4 Python Flask service se download nahi ho saki.');
+          }
+          const arrBuf = await dlResp.arrayBuffer();
+          fs.writeFileSync(localOutPath, Buffer.from(arrBuf));
+        }
 
         job.status = 'completed';
         job.result = {
           ok: true,
-          engine: `ffmpeg (${ff.source}) + gemini-tts`,
+          engine: String(pyData.engine || 'python-flask (Pillow + NumPy + FFmpeg)'),
           filename: outFilename,
           videoUrl: `/api/ugc/download/${outFilename}`,
           downloadUrl: `/api/ugc/download/${outFilename}?download=1`,
-          durationSec: Number(finalDur.toFixed(1)),
-          hasVoiceover: voiceoverPaths.length > 0,
-          voiceoverScenesRendered: voiceoverPaths.length,
+          durationSec: Number(pyData.durationSec || storyboard!.totalDurationSec || 15),
+          hasVoiceover: Boolean(pyData.hasVoiceover),
+          voiceoverScenesRendered: Number(pyData.voiceoverScenesRendered || 0),
           ...(voiceoverWarning ? { voiceoverWarning } : {}),
         };
       } catch (err: any) {
         job.status = 'failed';
-        job.error = err?.message || 'UGC video render fail ho gaya.';
-      } finally {
-        try {
-          fs.rmSync(tmpDir, { recursive: true, force: true });
-        } catch {}
+        job.error = err?.message || 'Python Flask UGC video synthesis fail ho gayi.';
       }
     };
 
@@ -1169,12 +1131,12 @@ INSTRUCTIONS FOR SCENES:
 
     if (fastOutcome === 'done') {
       if (job.status === 'completed' && job.result) {
-        return res.json({ ...job.result, status: 'completed', jobId });
+        return res.json({ ...job.result, status: 'completed', jobId, storyboardUsed: storyboard });
       }
       return res.status(500).json({ ok: false, status: 'failed', jobId, error: job.error || 'Render failed' });
     }
 
-    return res.json({ ok: true, status: 'rendering', jobId });
+    return res.json({ ok: true, status: 'rendering', jobId, storyboardUsed: storyboard });
   });
 
   app.get('/api/ugc/jobs/:jobId', (req, res) => {

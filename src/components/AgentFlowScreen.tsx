@@ -44,6 +44,13 @@ import {
   extractCandidateSpecificPoints
 } from '../lib/profileStore';
 import { CATEGORY_TOPIC_BANK } from './AutopilotManager';
+import {
+  SCRIPT_PROVIDER_CATALOG,
+  getDefaultModelForProvider,
+  getProviderCatalogItem,
+  type ScriptProviderId,
+  type ScriptProviderStatus
+} from '../lib/scriptModelProviders';
 
 export interface AgentTriggerSelection {
   channelId: ChannelProfile['id'];
@@ -295,6 +302,18 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
     pivotedToTitle: string;
     reason: string;
   } | null>(null);
+  const [scriptProvider, setScriptProvider] = useState<ScriptProviderId>(
+    simulatorConfig?.scriptProvider || 'auto'
+  );
+  const [scriptModel, setScriptModel] = useState<string>(
+    simulatorConfig?.scriptModel || 'gemini-4-hydrogen'
+  );
+  const [autoFailover, setAutoFailover] = useState<boolean>(
+    simulatorConfig?.autoFailover ?? true
+  );
+  const [scriptProviders, setScriptProviders] = useState<ScriptProviderStatus[]>(() =>
+    SCRIPT_PROVIDER_CATALOG.map((p) => ({ ...p, configured: p.id === 'gemini' }))
+  );
 
   const onOutcomeRef = useRef(onOutcome);
   const onCloseRef = useRef(onClose);
@@ -366,7 +385,10 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
         excludeTitles: buildExcludedTitles([seed]),
         excludePoints: coveredPointsExclusion,
         count: mode === 'duplicate' ? 4 : 3,
-        priorityResources: (selection as any)?.priorityResources || []
+        priorityResources: (selection as any)?.priorityResources || [],
+        scriptProvider,
+        scriptModel,
+        autoFailover
       }, abortRef.current?.signal);
 
       const rawIdeas: StoryIdea[] = (Array.isArray(data.ideas) ? data.ideas : [])
@@ -460,7 +482,10 @@ export const AgentFlowScreen: React.FC<AgentFlowScreenProps> = ({
         excludePoints: coveredPointsExclusion,
         dialectTone: simulatorConfig?.dialectTone || 'lahori_conversational',
         flowPromptFormat: simulatorConfig?.flowPromptFormat || 'split_screen',
-        customInstructions: `${antiTemplateDirective}\n${simulatorConfig?.customInstructions || ''}`.trim()
+        customInstructions: `${antiTemplateDirective}\n${simulatorConfig?.customInstructions || ''}`.trim(),
+        scriptProvider,
+        scriptModel,
+        autoFailover
       }, abortRef.current?.signal);
 
       const rawScenes = Array.isArray(data.scenes) ? data.scenes : [];
@@ -554,7 +579,9 @@ Status: bani`;
         memoryBlock,
         idea,
         discussionNotes: notes,
+        providerUsed: data.providerUsed,
         modelUsed: data.modelUsed,
+        failoverUsed: Boolean(data.failoverUsed),
         practicalBlueprint: data.practicalBlueprint,
         consistencyReport: data.consistencyReport,
         practicalSteps: data.practicalBlueprint?.steps?.map((s: any) => `${s.stepNumber}. ${s.actionTitle}: ${s.exactPathOrCommand}`),
@@ -728,7 +755,10 @@ Status: bani`;
         excludeTitles: Array.from(attemptedTitlesRef.current),
         excludePoints: coveredPointsExclusion,
         count: 4,
-        priorityResources: (selection as any)?.priorityResources || []
+        priorityResources: (selection as any)?.priorityResources || [],
+        scriptProvider,
+        scriptModel,
+        autoFailover
       }, abortRef.current?.signal);
 
       const rawIdeas: StoryIdea[] = (Array.isArray(data.ideas) ? data.ideas : [])
@@ -890,6 +920,17 @@ Status: bani`;
       }
     }, 250);
   }
+
+  useEffect(() => {
+    fetch('/api/ai/script-providers')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.providers)) {
+          setScriptProviders(d.providers);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -1230,6 +1271,62 @@ Rules:
             Duration: <strong className="text-white">{selection.sceneCount * 10}s</strong> ({selection.sceneCount} scenes)
           </span>
         </div>
+
+        {/* Multi-Service AI Script Switcher Strip */}
+        {(() => {
+          const activeMeta = getProviderCatalogItem(scriptProvider);
+          const versions = activeMeta
+            ? activeMeta.versions
+            : SCRIPT_PROVIDER_CATALOG.flatMap((p) =>
+                p.versions.map((v) => ({ ...v, label: `${p.name} — ${v.label}` }))
+              );
+          return (
+            <div className="px-4 py-2 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="text-cyan-300 font-semibold font-mono text-[10px] uppercase tracking-wider">
+                Script AI:
+              </span>
+              <select
+                value={scriptProvider}
+                disabled={phase === 'generating'}
+                onChange={(e) => {
+                  const nextProv = e.target.value as ScriptProviderId;
+                  setScriptProvider(nextProv);
+                  setScriptModel(getDefaultModelForProvider(nextProv));
+                }}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none focus:border-cyan-400 cursor-pointer disabled:opacity-50"
+              >
+                <option value="auto">Auto Failover (Gemini · Claude · GPT · Llama)</option>
+                {scriptProviders.map((sp) => (
+                  <option key={sp.id} value={sp.id}>
+                    {sp.name} ({sp.versions.length}v){sp.configured ? ' • Ready' : ' • Env Key Needed'}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={scriptModel}
+                disabled={phase === 'generating'}
+                onChange={(e) => setScriptModel(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none focus:border-cyan-400 cursor-pointer disabled:opacity-50 max-w-[230px]"
+              >
+                {versions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label} [{v.tier}]
+                  </option>
+                ))}
+              </select>
+              <label className="flex items-center gap-1.5 text-[10px] text-slate-300 cursor-pointer ml-auto">
+                <input
+                  type="checkbox"
+                  checked={autoFailover}
+                  disabled={phase === 'generating'}
+                  onChange={(e) => setAutoFailover(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-800 text-cyan-500 h-3.5 w-3.5 cursor-pointer"
+                />
+                <span>Auto-Failover</span>
+              </label>
+            </div>
+          );
+        })()}
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {bypassedDuplicates && (

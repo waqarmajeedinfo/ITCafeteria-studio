@@ -415,7 +415,10 @@ export const AgentSimulator: React.FC = () => {
       duplicateStrictness: eng.duplicateStrictness || 'balanced',
       dialectTone: eng.dialectTone || 'formal',
       flowPromptFormat: eng.flowPromptFormat || 'cinematic_3d',
-      customInstructions: eng.customInstructions || ''
+      customInstructions: eng.customInstructions || '',
+      scriptProvider: eng.scriptProvider || prev.scriptProvider || 'auto',
+      scriptModel: eng.scriptModel || prev.scriptModel || 'gemini-4-hydrogen',
+      autoFailover: eng.autoFailover ?? prev.autoFailover ?? true,
     }));
 
     setDraftSceneCount(eng.defaultSceneCount || nextProfile.defaultSceneCount || 10);
@@ -1042,7 +1045,10 @@ export const AgentSimulator: React.FC = () => {
             duplicateStrictness: fresh.duplicateStrictness,
             dialectTone: fresh.dialectTone,
             flowPromptFormat: fresh.flowPromptFormat,
-            customInstructions: fresh.customInstructions
+            customInstructions: fresh.customInstructions,
+            scriptProvider: fresh.scriptProvider || 'auto',
+            scriptModel: fresh.scriptModel || 'gemini-4-hydrogen',
+            autoFailover: fresh.autoFailover ?? true,
           });
         }}
         onSave={(newCfg) => {

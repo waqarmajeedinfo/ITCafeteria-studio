@@ -35,6 +35,13 @@ import {
   resetEngineConfigForChannel,
   type ExtendedChannelProfile
 } from '../lib/channelStore';
+import {
+  SCRIPT_PROVIDER_CATALOG,
+  getDefaultModelForProvider,
+  getProviderCatalogItem,
+  type ScriptProviderId,
+  type ScriptProviderStatus
+} from '../lib/scriptModelProviders';
 
 export interface ScenePresetItem {
   id: string;
@@ -80,6 +87,9 @@ export interface SimulatorConfig {
   scenePresets?: ScenePresetItem[];
   dialectPresets?: DialectPresetItem[];
   stylePresets?: StylePresetItem[];
+  scriptProvider?: ScriptProviderId;
+  scriptModel?: string;
+  autoFailover?: boolean;
 }
 
 /**
@@ -407,6 +417,9 @@ export const DEFAULT_SIMULATOR_CONFIG: SimulatorConfig = {
   scenePresets: DEFAULT_SCENE_PRESETS,
   dialectPresets: DEFAULT_DIALECT_PRESETS,
   stylePresets: DEFAULT_STYLE_PRESETS,
+  scriptProvider: 'auto',
+  scriptModel: 'gemini-4-hydrogen',
+  autoFailover: true,
   customInstructions:
     'High-stakes urgent tone in Roman Urdu. Structure: Shocking security/productivity warning or myth reveal, Live proof of why users are at risk, Root cause explanation, 1-Click fix & prevention step, Post-fix verification test, Interactive viewer question, Subscribe CTA.'
 };
@@ -467,6 +480,9 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
   const [local, setLocal] = useState<SimulatorConfig>(config);
   const [savedToast, setSavedToast] = useState<string | null>(null);
   const [activeRulePattern, setActiveRulePattern] = useState<string>('bug_security');
+  const [providerStatuses, setProviderStatuses] = useState<ScriptProviderStatus[]>(() =>
+    SCRIPT_PROVIDER_CATALOG.map((p) => ({ ...p, configured: p.id === 'gemini' }))
+  );
 
   // Script Presets (Top row of 4)
   const currentProfile = channels[selectedChannelId] || channels['itcafeteria'];
@@ -509,8 +525,22 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
       duplicateStrictness: eng.duplicateStrictness || config.duplicateStrictness || 'deep',
       dialectTone: eng.dialectTone || config.dialectTone || 'workshop',
       flowPromptFormat: eng.flowPromptFormat || config.flowPromptFormat || 'split_screen',
-      customInstructions: eng.customInstructions || config.customInstructions || ''
+      customInstructions: eng.customInstructions || config.customInstructions || '',
+      scriptProvider: eng.scriptProvider || config.scriptProvider || 'auto',
+      scriptModel: eng.scriptModel || config.scriptModel || 'gemini-4-hydrogen',
+      autoFailover: eng.autoFailover ?? config.autoFailover ?? true,
     });
+
+    if (isOpen) {
+      fetch('/api/ai/script-providers')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (Array.isArray(data?.providers)) {
+            setProviderStatuses(data.providers);
+          }
+        })
+        .catch(() => {});
+    }
 
     const prof = loadedChannels[targetChannel] || loadedChannels['itcafeteria'];
     const loadedPresets = loadCustomScriptPresets(targetChannel, prof);
@@ -546,7 +576,10 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
       duplicateStrictness: eng.duplicateStrictness || 'deep',
       dialectTone: eng.dialectTone || (isBeauty ? 'beauty_friendly' : 'workshop'),
       flowPromptFormat: eng.flowPromptFormat || (isBeauty ? 'aesthetic_soft_glam' : 'split_screen'),
-      customInstructions: eng.customInstructions || (isBeauty ? defaultBeautyInstruction : defaultTechInstruction)
+      customInstructions: eng.customInstructions || (isBeauty ? defaultBeautyInstruction : defaultTechInstruction),
+      scriptProvider: eng.scriptProvider || prev.scriptProvider || 'auto',
+      scriptModel: eng.scriptModel || prev.scriptModel || 'gemini-4-hydrogen',
+      autoFailover: eng.autoFailover ?? prev.autoFailover ?? true,
     }));
     setActiveRulePattern(isItCaf ? '1' : isBeauty ? 'beauty_10_scene' : '10_scene_short');
 
@@ -586,7 +619,10 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
       flowPromptFormat: local.flowPromptFormat,
       customInstructions: local.customInstructions,
       lockPersonaAcrossScenes: local.lockPersonaAcrossScenes,
-      autoQueueSync: local.autoQueueSync
+      autoQueueSync: local.autoQueueSync,
+      scriptProvider: local.scriptProvider || 'auto',
+      scriptModel: local.scriptModel || 'gemini-4-hydrogen',
+      autoFailover: local.autoFailover ?? true,
     });
 
     setSavedToast('Settings saved successfully!');
@@ -605,7 +641,10 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
       duplicateStrictness: fresh.duplicateStrictness,
       dialectTone: fresh.dialectTone,
       flowPromptFormat: fresh.flowPromptFormat,
-      customInstructions: fresh.customInstructions
+      customInstructions: fresh.customInstructions,
+      scriptProvider: fresh.scriptProvider || 'auto',
+      scriptModel: fresh.scriptModel || 'gemini-4-hydrogen',
+      autoFailover: fresh.autoFailover ?? true,
     }));
     onReset();
     saveSimulatorConfig(DEFAULT_SIMULATOR_CONFIG);
@@ -940,6 +979,110 @@ export const SimulatorConfigModal: React.FC<SimulatorConfigModalProps> = ({
                 </select>
               </div>
             </div>
+
+            {/* Multi-Service AI Script Generation Selector */}
+            {(() => {
+              const activeProvider: ScriptProviderId = local.scriptProvider || 'auto';
+              const activeCatalog = getProviderCatalogItem(activeProvider);
+              const availableVersions = activeCatalog
+                ? activeCatalog.versions
+                : SCRIPT_PROVIDER_CATALOG.flatMap((p) =>
+                    p.versions.map((v) => ({ ...v, id: v.id, label: `${p.name} — ${v.label}` }))
+                  );
+              const activeVersionMeta = availableVersions.find((v) => v.id === local.scriptModel);
+
+              return (
+                <div className="p-3.5 rounded-xl bg-slate-900/90 border border-cyan-500/25 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Cpu className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs font-bold text-white uppercase tracking-wider">
+                        Multi-Service AI Script Engine
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {providerStatuses.map((ps) => (
+                        <span
+                          key={ps.id}
+                          className={`text-[10px] px-2 py-0.5 rounded font-mono border ${
+                            ps.configured
+                              ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
+                              : 'bg-slate-800/80 text-slate-400 border-slate-700'
+                          }`}
+                          title={ps.configured ? `${ps.name} Ready` : `Set ${ps.envHint} in server env`}
+                        >
+                          {ps.name.split(' ')[1] || ps.name}: {ps.configured ? 'Ready' : 'Env'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1 text-[11px]">
+                        AI Script Service
+                      </label>
+                      <select
+                        value={activeProvider}
+                        onChange={(e) => {
+                          const nextProv = e.target.value as ScriptProviderId;
+                          const nextModel = getDefaultModelForProvider(nextProv);
+                          setLocal((prev) => ({
+                            ...prev,
+                            scriptProvider: nextProv,
+                            scriptModel: nextModel,
+                          }));
+                        }}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                      >
+                        <option value="auto">Auto Failover (All Configured Services)</option>
+                        {providerStatuses.map((ps) => (
+                          <option key={ps.id} value={ps.id}>
+                            {ps.name} ({ps.versions.length} versions) {ps.configured ? '• Ready' : '• Server Key Needed'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-slate-300 font-semibold block mb-1 text-[11px]">
+                        Model Version
+                      </label>
+                      <select
+                        value={local.scriptModel || availableVersions[0]?.id || ''}
+                        onChange={(e) => updateField('scriptModel', e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                      >
+                        {availableVersions.map((ver) => (
+                          <option key={ver.id} value={ver.id}>
+                            {ver.label} [{ver.tier}]
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <label className="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white">
+                      <input
+                        type="checkbox"
+                        checked={local.autoFailover !== false}
+                        onChange={(e) => updateField('autoFailover', e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-400 h-4 w-4 cursor-pointer"
+                      />
+                      <span className="text-[11px]">
+                        Uninterrupted Failover (agar chosen model busy ya quota limit par ho to foran backup version/service par switch kare)
+                      </span>
+                    </label>
+                    {activeVersionMeta && (
+                      <span className="text-[10px] text-cyan-300/80 font-mono">
+                        {activeVersionMeta.note}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Checkbox: Auto-save to Queue & Calendar */}
             <div className="pt-2 border-t border-slate-800/80">
