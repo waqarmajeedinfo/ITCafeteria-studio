@@ -1,5 +1,17 @@
 [
   {
+    "id": "audit-1795195774271-cfe15a",
+    "timestamp": "2026-11-20T17:29:34.271Z",
+    "userId": "user-admin-info-01",
+    "username": "waqarmajeedinfo",
+    "role": "admin",
+    "action": "LOGIN_SUCCESS",
+    "details": "User logged in successfully with role: admin",
+    "targetFile": "user-data/waqarmajeedinfo",
+    "ip": "169.254.169.126",
+    "status": "LOCAL_LOGGED"
+  },
+  {
     "id": "audit-1794452332324-01b176",
     "timestamp": "2026-11-12T02:58:52.324Z",
     "userId": "user-std-01",

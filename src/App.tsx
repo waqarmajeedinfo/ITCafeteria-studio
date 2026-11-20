@@ -93,6 +93,7 @@ import { GroundLevelSearchDashboard } from './components/GroundLevelSearchDashbo
 import { CompanionMemoryModal } from './components/CompanionMemoryModal';
 import { GoLiveCoPilotModal } from './components/GoLiveCoPilotModal';
 import { WcgModal } from './components/WcgModal';
+import { UgcDashboard } from './components/UgcDashboard';
 import {
   MenuBarCustomizerModal,
   loadMenuConfig,
@@ -181,6 +182,7 @@ export default function App() {
   const [showTagManager, setShowTagManager] = useState(false);
   const [showMultiUserModal, setShowMultiUserModal] = useState(false);
   const [showWcgModal, setShowWcgModal] = useState(false);
+  const [showUgcDashboard, setShowUgcDashboard] = useState(false);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserSessionProfile | null>(() => userAuthManager.getUser());
   const [channels, setChannels] = useState<Record<string, ExtendedChannelProfile>>(loadAllChannels);
   const [activeChannelId, setActiveChannelId] = useState<string>('itcafeteria');
@@ -393,7 +395,7 @@ export default function App() {
 
   // Prevent full-page scroll when Banner, Dictionary or Unsaved modal is open
   useEffect(() => {
-    if (showDictionary || showBannerModal || showUnsavedModal || showWcgModal) {
+    if (showDictionary || showBannerModal || showUnsavedModal || showWcgModal || showUgcDashboard) {
       document.documentElement.classList.add('modal-open');
       document.body.classList.add('modal-open');
       return () => {
@@ -401,7 +403,7 @@ export default function App() {
         document.body.classList.remove('modal-open');
       };
     }
-  }, [showDictionary, showBannerModal, showUnsavedModal, showWcgModal]);
+  }, [showDictionary, showBannerModal, showUnsavedModal, showWcgModal, showUgcDashboard]);
 
 
   // Holographic background theme & animation states
@@ -1201,6 +1203,23 @@ export default function App() {
                 <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
                 <span className="whitespace-nowrap">{getButtonLabel('wcg')}</span>
               </button>
+
+              {/* Prominent UGC Ad Engine Button Right Beside WCG */}
+              <button
+                onClick={() => {
+                  setOpenMenu(null);
+                  setShowUgcDashboard(true);
+                }}
+                className={`h-10 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer border whitespace-nowrap select-none shrink-0 ${
+                  showUgcDashboard
+                    ? 'text-slate-950 bg-white border-emerald-400 shadow-lg ring-2 ring-emerald-400/40'
+                    : 'text-emerald-200 hover:text-slate-950 bg-emerald-950/50 hover:bg-white border-emerald-400/50 hover:border-white shadow-sm'
+                }`}
+                title="UGC Ad Engine — White-Screen Multi-Scene Veo 3 & MP4 Commercial Studio"
+              >
+                <Video className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap">{getButtonLabel('ugc')}</span>
+              </button>
             </div>
 
             {/* Right: Settings Button Only */}
@@ -1281,6 +1300,18 @@ export default function App() {
                   <span className="flex items-center gap-2 font-semibold">
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                     <span>{getButtonLabel('wcg')} — Wedding Card Generator</span>
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setShowUgcDashboard(true);
+                  }}
+                  className="w-full mt-1.5 px-3 py-2 rounded-xl flex items-center justify-between text-left text-xs bg-white text-slate-950 border border-emerald-400 cursor-pointer"
+                >
+                  <span className="flex items-center gap-2 font-bold">
+                    <Video className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>{getButtonLabel('ugc')} — UGC Ad Engine (White-Screen)</span>
                   </span>
                 </button>
               </div>
@@ -2104,6 +2135,10 @@ export default function App() {
 
       {showWcgModal && (
         <WcgModal onClose={() => setShowWcgModal(false)} />
+      )}
+
+      {showUgcDashboard && (
+        <UgcDashboard onClose={() => setShowUgcDashboard(false)} />
       )}
 
       <DiagnosticMessageBox />
