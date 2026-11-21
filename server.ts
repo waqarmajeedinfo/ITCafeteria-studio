@@ -2883,6 +2883,30 @@ registerGitHubSyncRoutes(app);
 registerWcgRoutes(app);
 registerUgcRoutes(app);
 
+// Never let unmatched /api/* routes fall through to SPA HTML (<!doctype html>)
+app.all('/api/*', (req, res) => {
+  res.status(404).json({
+    ok: false,
+    error: `API endpoint nahi mila: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// Express JSON error handler (prevents HTML error pages on PayloadTooLarge / malformed JSON)
+app.use((err: any, req: any, res: any, next: any) => {
+  if (res.headersSent) return next(err);
+  if (req.originalUrl?.startsWith('/api/') || req.path?.startsWith('/api/')) {
+    const status = Number(err?.status || err?.statusCode) || 500;
+    return res.status(status).json({
+      ok: false,
+      error:
+        status === 413
+          ? 'Request payload bohot bada hai (max 50MB). Chhoti image size upload karein.'
+          : String(err?.message || 'Server error'),
+    });
+  }
+  return next(err);
+});
+
 // Setup Vite middleware in dev or static files in prod
 async function startServer() {
   let viteServer: any = null;

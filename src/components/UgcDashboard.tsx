@@ -108,6 +108,28 @@ function rebuildFormattedScenePrompt(scene: UgcScenePlan): string {
   return `**SCENE ${scene.sceneNumber} (${scene.durationSec.toFixed(1)}s | ${scene.timeRange})**\nGoogle Omni / Veo 3 Prompt: ${promptBody}`;
 }
 
+async function safeReadJson(resp: Response, fallbackLabel = 'Server'): Promise<any> {
+  const raw = await resp.text().catch(() => '');
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { ok: false, error: `${fallbackLabel} ne khali response diya (HTTP ${resp.status}).` };
+  }
+  if (trimmed.startsWith('<')) {
+    const hint =
+      resp.status === 502 || resp.status === 504 || resp.status === 503
+        ? 'Server gateway timeout ya service restart ho rahi hai. 10-15 second baad dobara try karein.'
+        : resp.status === 413
+          ? 'Uploaded image size bohot zyada hai. Chhoti image select karein.'
+          : `${fallbackLabel} ne JSON ki jagah HTML page return kiya (HTTP ${resp.status}). Backend build/routes check karein.`;
+    throw new Error(hint);
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    throw new Error(`${fallbackLabel} response invalid JSON tha (HTTP ${resp.status}).`);
+  }
+}
+
 export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
   const [settings, setSettings] = useState<UgcCampaignSettings>(() => ({ ...DEFAULT_UGC_SETTINGS }));
   const [productImageDataUrl, setProductImageDataUrl] = useState<string>('');
@@ -148,7 +170,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
     try {
       const resp = await fetch('/api/ugc/campaigns');
       if (resp.ok) {
-        const data = await resp.json();
+        const data = await safeReadJson(resp, 'Campaigns API');
         if (Array.isArray(data?.campaigns)) {
           setSavedCampaigns(data.campaigns);
         }
@@ -161,7 +183,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
   const checkPythonCompanion = async () => {
     try {
       const resp = await fetch('/api/ugc/python-status');
-      const data = await resp.json();
+      const data = await safeReadJson(resp, 'Python Companion');
       if (resp.ok && data?.ok) {
         const libs = data.health?.libraries || {};
         setPythonStatus({
@@ -176,11 +198,11 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
           detail: data?.error || 'Python Flask Companion offline',
         });
       }
-    } catch {
+    } catch (err: any) {
       setPythonStatus({
         checked: true,
         ok: false,
-        detail: 'Python Flask Companion unreachable',
+        detail: err?.message || 'Python Flask Companion unreachable',
       });
     }
   };
@@ -189,7 +211,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
     loadCampaigns();
     checkPythonCompanion();
     fetch('/api/ai/script-providers')
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => (r.ok ? safeReadJson(r, 'Script Providers').catch(() => null) : null))
       .then((d) => {
         if (Array.isArray(d?.providers)) {
           setScriptProviders(d.providers);
@@ -270,7 +292,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
           productDetails: settings.productDetails,
         }),
       });
-      const data = await resp.json();
+      const data = await safeReadJson(resp, 'Product Analysis');
       if (!resp.ok || !data?.ok || !data.analysis) {
         throw new Error(data?.error || 'Product Vision Analysis fail ho gayi.');
       }
@@ -307,7 +329,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
           productCategory: productAnalysis?.category || settings.productDetails,
         }),
       });
-      const data = await resp.json();
+      const data = await safeReadJson(resp, 'Model Analysis');
       if (!resp.ok || !data?.ok || !data.analysis) {
         throw new Error(data?.error || 'Model Vision Analysis fail ho gayi.');
       }
@@ -338,7 +360,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
           aspectRatio: settings.aspectRatio,
         }),
       });
-      const data = await resp.json();
+      const data = await safeReadJson(resp, 'AI Avatar Generation');
       if (!resp.ok || !data?.imageUrl) {
         throw new Error(data?.error || 'AI Avatar generate nahi ho saka.');
       }
@@ -370,7 +392,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
           modelAnalysis: modOverride !== undefined ? modOverride : modelAnalysis,
         }),
       });
-      const data = await resp.json();
+      const data = await safeReadJson(resp, 'Storyboard Generator');
       if (!resp.ok || !data?.ok || !data.storyboard) {
         throw new Error(data?.error || 'Storyboard generate nahi ho saka.');
       }
@@ -393,7 +415,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
       const tick = async () => {
         try {
           const resp = await fetch(`/api/ugc/jobs/${encodeURIComponent(jobId)}`);
-          const data = await resp.json();
+          const data = await safeReadJson(resp, 'Video Render Status');
           if (data?.status === 'completed' && data.filename) {
             resolve(data as UgcRenderResult);
             return;
@@ -432,7 +454,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
           productAnalysis,
         }),
       });
-      const data = await resp.json();
+      const data = await safeReadJson(resp, 'Video Synthesizer');
       if (!resp.ok && data?.status !== 'rendering') {
         throw new Error(data?.error || 'Python Flask MP4 video synthesis fail ho gayi.');
       }
@@ -528,7 +550,7 @@ export const UgcDashboard: React.FC<UgcDashboardProps> = ({ onClose }) => {
           lastVideoUrl: renderResult?.videoUrl,
         }),
       });
-      const data = await resp.json();
+      const data = await safeReadJson(resp, 'Save Campaign');
       if (!resp.ok || !data?.ok) {
         throw new Error(data?.error || 'Campaign save nahi ho saki.');
       }

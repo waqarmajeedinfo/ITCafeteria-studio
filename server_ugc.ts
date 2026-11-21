@@ -69,11 +69,18 @@ function getLocalOrConfiguredPythonUrl(): { url: string; isExternal: boolean } {
 async function fetchPythonHealth(baseUrl: string): Promise<any | null> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2500);
+    const timer = setTimeout(() => controller.abort(), 3000);
     const resp = await fetch(`${baseUrl}/health`, { signal: controller.signal });
     clearTimeout(timer);
     if (!resp.ok) return null;
-    return await resp.json();
+    const raw = await resp.text();
+    if (!raw || raw.trim().startsWith('<')) return null;
+    const json = JSON.parse(raw);
+    // Ensure we don't accidentally treat backend_wcg (wcg-python-moviepy) as UGC Flask companion
+    if (!json?.ok || (json.service && json.service !== 'itcafeteria-ugc-flask-companion')) {
+      return null;
+    }
+    return json;
   } catch {
     return null;
   }
@@ -81,13 +88,20 @@ async function fetchPythonHealth(baseUrl: string): Promise<any | null> {
 
 async function ensurePythonCompanionRunning(): Promise<{ baseUrl: string; health: any }> {
   const { url, isExternal } = getLocalOrConfiguredPythonUrl();
-  const existing = await fetchPythonHealth(url);
-  if (existing?.ok) {
-    return { baseUrl: url, health: existing };
+  if (isExternal) {
+    const existing = await fetchPythonHealth(url);
+    if (existing?.ok) {
+      return { baseUrl: url, health: existing };
+    }
+    console.warn(
+      `[UGC-Flask] External UGC_PYTHON_URL (${url}) unavailable or incompatible; automatically falling back to local backend_ugc on port ${DEFAULT_PYTHON_PORT}.`
+    );
   }
 
-  if (isExternal) {
-    throw new Error(`Configured UGC_PYTHON_URL (${url}) respond nahi kar raha. Flask companion service check karein.`);
+  const localUrl = `http://127.0.0.1:${DEFAULT_PYTHON_PORT}`;
+  const localExisting = await fetchPythonHealth(localUrl);
+  if (localExisting?.ok) {
+    return { baseUrl: localUrl, health: localExisting };
   }
 
   if (!pythonBootPromise) {
@@ -129,8 +143,8 @@ async function ensurePythonCompanionRunning(): Promise<{ baseUrl: string; health
       }
 
       for (let i = 0; i < 24; i++) {
-        const h = await fetchPythonHealth(url);
-        if (h?.ok) return url;
+        const h = await fetchPythonHealth(localUrl);
+        if (h?.ok) return localUrl;
         await new Promise((r) => setTimeout(r, 350));
       }
       throw new Error('Python Flask Companion Service port 5055 par start nahi ho saki.');
@@ -560,23 +574,27 @@ export function registerUgcRoutes(app: Express): void {
         return res.status(400).json({ ok: false, error: 'Valid product image (PNG/JPG/WebP) upload karein.' });
       }
 
-      // Optional delegation to Python Flask analyzer microservice if configured
+      // Optional delegation to Python Flask analyzer microservice only if it is a verified UGC companion
       const pyUrl = (process.env.UGC_PYTHON_URL || '').trim().replace(/\/+$/, '');
       if (pyUrl) {
         try {
-          const pyResp = await fetch(`${pyUrl}/analyze-product`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productImageDataUrl, brandHint }),
-          });
-          if (pyResp.ok) {
-            const pyJson: any = await pyResp.json();
-            if (pyJson?.ok && pyJson.analysis) {
-              return res.json({
-                ok: true,
-                engine: 'python-flask-vision',
-                analysis: { ...pyJson.analysis, analyzedAt: new Date().toISOString() },
-              });
+          const pyHealth = await fetchPythonHealth(pyUrl);
+          if (pyHealth?.ok) {
+            const pyResp = await fetch(`${pyUrl}/analyze-product`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ productImageDataUrl, brandHint }),
+            });
+            const rawPy = await pyResp.text().catch(() => '');
+            if (pyResp.ok && rawPy && !rawPy.trim().startsWith('<')) {
+              const pyJson: any = JSON.parse(rawPy);
+              if (pyJson?.ok && pyJson.analysis) {
+                return res.json({
+                  ok: true,
+                  engine: 'python-flask-vision',
+                  analysis: { ...pyJson.analysis, analyzedAt: new Date().toISOString() },
+                });
+              }
             }
           }
         } catch (err) {
@@ -610,45 +628,61 @@ Rules:
 - Write summaryRomanUrdu in natural, crisp Pakistani Roman Urdu (2 short sentences).`,
       });
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: { parts },
-        config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              category: { type: Type.STRING },
-              productName: { type: Type.STRING },
-              brandName: { type: Type.STRING },
-              material: { type: Type.STRING },
-              colorPalette: { type: Type.ARRAY, items: { type: Type.STRING } },
-              colorNames: { type: Type.STRING },
-              brandingAndText: { type: Type.STRING },
-              silhouetteAndProportions: { type: Type.STRING },
-              keyVisualFeatures: { type: Type.ARRAY, items: { type: Type.STRING } },
-              recommendedOpening: { type: Type.STRING },
-              realityLockDirective: { type: Type.STRING },
-              summaryRomanUrdu: { type: Type.STRING },
+      const visionModels = ['gemini-3.1-flash-lite', 'gemini-4-hydrogen'];
+      let response: any = null;
+      let usedModel = 'gemini-3.1-flash-lite';
+      let lastVisionErr: any = null;
+      for (const vModel of visionModels) {
+        try {
+          response = await ai.models.generateContent({
+            model: vModel,
+            contents: { parts },
+            config: {
+              thinkingConfig: {
+                thinkingLevel: vModel === 'gemini-3.1-flash-lite' ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW,
+              },
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  category: { type: Type.STRING },
+                  productName: { type: Type.STRING },
+                  brandName: { type: Type.STRING },
+                  material: { type: Type.STRING },
+                  colorPalette: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  colorNames: { type: Type.STRING },
+                  brandingAndText: { type: Type.STRING },
+                  silhouetteAndProportions: { type: Type.STRING },
+                  keyVisualFeatures: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  recommendedOpening: { type: Type.STRING },
+                  realityLockDirective: { type: Type.STRING },
+                  summaryRomanUrdu: { type: Type.STRING },
+                },
+                required: [
+                  'category',
+                  'productName',
+                  'brandName',
+                  'material',
+                  'colorPalette',
+                  'colorNames',
+                  'brandingAndText',
+                  'silhouetteAndProportions',
+                  'keyVisualFeatures',
+                  'recommendedOpening',
+                  'realityLockDirective',
+                  'summaryRomanUrdu',
+                ],
+              },
             },
-            required: [
-              'category',
-              'productName',
-              'brandName',
-              'material',
-              'colorPalette',
-              'colorNames',
-              'brandingAndText',
-              'silhouetteAndProportions',
-              'keyVisualFeatures',
-              'recommendedOpening',
-              'realityLockDirective',
-              'summaryRomanUrdu',
-            ],
-          },
-        },
-      });
+          });
+          usedModel = vModel;
+          break;
+        } catch (vErr: any) {
+          lastVisionErr = vErr;
+          console.warn(`[UGC Product Vision] ${vModel} failed, trying fallback:`, vErr?.message || vErr);
+        }
+      }
+      if (!response) throw lastVisionErr || new Error('Product vision analysis failed');
 
       const parsed = extractJsonSafe(response.text || '');
       const analysis: UgcProductAnalysis = {
@@ -672,7 +706,7 @@ Rules:
         analyzedAt: new Date().toISOString(),
       };
 
-      return res.json({ ok: true, engine: 'gemini-4-hydrogen-vision', analysis });
+      return res.json({ ok: true, engine: `${usedModel}-vision`, analysis });
     } catch (err: any) {
       console.error('[UGC Product Vision Error]:', err);
       return res.status(500).json({ ok: false, error: friendlyGeminiError(err, 'Product analyze nahi ho saka.') });
@@ -694,19 +728,23 @@ Rules:
       const pyUrl = (process.env.UGC_PYTHON_URL || '').trim().replace(/\/+$/, '');
       if (pyUrl) {
         try {
-          const pyResp = await fetch(`${pyUrl}/analyze-model`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ modelImageDataUrl }),
-          });
-          if (pyResp.ok) {
-            const pyJson: any = await pyResp.json();
-            if (pyJson?.ok && pyJson.analysis) {
-              return res.json({
-                ok: true,
-                engine: 'python-flask-vision',
-                analysis: { ...pyJson.analysis, analyzedAt: new Date().toISOString() },
-              });
+          const pyHealth = await fetchPythonHealth(pyUrl);
+          if (pyHealth?.ok) {
+            const pyResp = await fetch(`${pyUrl}/analyze-model`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ modelImageDataUrl }),
+            });
+            const rawPy = await pyResp.text().catch(() => '');
+            if (pyResp.ok && rawPy && !rawPy.trim().startsWith('<')) {
+              const pyJson: any = JSON.parse(rawPy);
+              if (pyJson?.ok && pyJson.analysis) {
+                return res.json({
+                  ok: true,
+                  engine: 'python-flask-vision',
+                  analysis: { ...pyJson.analysis, analyzedAt: new Date().toISOString() },
+                });
+              }
             }
           }
         } catch (err) {
@@ -722,13 +760,19 @@ Rules:
         });
       }
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: {
-          parts: [
-            { inlineData: { mimeType: dec.mime, data: dec.base64 } },
-            {
-              text: `You are Stage 2 (Model / Avatar Integration & Face Identity Lock) of the UGC Ad Engine.
+      const visionModels = ['gemini-3.1-flash-lite', 'gemini-4-hydrogen'];
+      let response: any = null;
+      let usedModel = 'gemini-3.1-flash-lite';
+      let lastVisionErr: any = null;
+      for (const vModel of visionModels) {
+        try {
+          response = await ai.models.generateContent({
+            model: vModel,
+            contents: {
+              parts: [
+                { inlineData: { mimeType: dec.mime, data: dec.base64 } },
+                {
+                  text: `You are Stage 2 (Model / Avatar Integration & Face Identity Lock) of the UGC Ad Engine.
 Analyze this uploaded model/avatar reference photo for ${productCategory || 'a commercial UGC video ad'}.
 Focus on:
 - subjectType (e.g., Gen-Z Female Creator, Male Lifestyle Presenter, etc.)
@@ -739,37 +783,47 @@ Focus on:
 - compatibilityNotes (how the creator should hold or wear the product naturally)
 - faceIdentityLockRule (strict prompt rule locking face structure, expression, hair, body proportions across every scene)
 - summaryRomanUrdu (2 concise Roman Urdu sentences summarizing the locked avatar profile).`,
+                },
+              ],
             },
-          ],
-        },
-        config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              subjectType: { type: Type.STRING },
-              skinToneAndRealism: { type: Type.STRING },
-              hairAndStyling: { type: Type.STRING },
-              outfitAndFabricPhysics: { type: Type.STRING },
-              poseAndFraming: { type: Type.STRING },
-              compatibilityNotes: { type: Type.STRING },
-              faceIdentityLockRule: { type: Type.STRING },
-              summaryRomanUrdu: { type: Type.STRING },
+            config: {
+              thinkingConfig: {
+                thinkingLevel: vModel === 'gemini-3.1-flash-lite' ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW,
+              },
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  subjectType: { type: Type.STRING },
+                  skinToneAndRealism: { type: Type.STRING },
+                  hairAndStyling: { type: Type.STRING },
+                  outfitAndFabricPhysics: { type: Type.STRING },
+                  poseAndFraming: { type: Type.STRING },
+                  compatibilityNotes: { type: Type.STRING },
+                  faceIdentityLockRule: { type: Type.STRING },
+                  summaryRomanUrdu: { type: Type.STRING },
+                },
+                required: [
+                  'subjectType',
+                  'skinToneAndRealism',
+                  'hairAndStyling',
+                  'outfitAndFabricPhysics',
+                  'poseAndFraming',
+                  'compatibilityNotes',
+                  'faceIdentityLockRule',
+                  'summaryRomanUrdu',
+                ],
+              },
             },
-            required: [
-              'subjectType',
-              'skinToneAndRealism',
-              'hairAndStyling',
-              'outfitAndFabricPhysics',
-              'poseAndFraming',
-              'compatibilityNotes',
-              'faceIdentityLockRule',
-              'summaryRomanUrdu',
-            ],
-          },
-        },
-      });
+          });
+          usedModel = vModel;
+          break;
+        } catch (vErr: any) {
+          lastVisionErr = vErr;
+          console.warn(`[UGC Model Vision] ${vModel} failed, trying fallback:`, vErr?.message || vErr);
+        }
+      }
+      if (!response) throw lastVisionErr || new Error('Model vision analysis failed');
 
       const parsed = extractJsonSafe(response.text || '');
       const analysis: UgcModelAnalysis = {
@@ -787,7 +841,7 @@ Focus on:
         analyzedAt: new Date().toISOString(),
       };
 
-      return res.json({ ok: true, engine: 'gemini-4-hydrogen-vision', analysis });
+      return res.json({ ok: true, engine: `${usedModel}-vision`, analysis });
     } catch (err: any) {
       console.error('[UGC Model Vision Error]:', err);
       return res.status(500).json({ ok: false, error: friendlyGeminiError(err, 'Model image analyze nahi ho saki.') });
@@ -888,7 +942,8 @@ Return STRICT valid raw JSON only (no markdown fences) matching this exact schem
         autoFailover: settings.autoFailover !== false,
         temperature: 0.78,
         maxTokens: 8192,
-        timeoutMs: 45000,
+        timeoutMs: 16000,
+        maxTotalMs: 36000,
         validate: (p) => {
           const s = Array.isArray(p?.scenes) ? p.scenes : [];
           if (s.length === 0) {
@@ -1088,9 +1143,20 @@ Return STRICT valid raw JSON only (no markdown fences) matching this exact schem
           }),
         });
 
-        const pyData: any = await pyResp.json().catch(() => null);
+        const pyRawText = await pyResp.text().catch(() => '');
+        let pyData: any = null;
+        if (pyRawText && !pyRawText.trim().startsWith('<')) {
+          try {
+            pyData = JSON.parse(pyRawText);
+          } catch {
+            pyData = null;
+          }
+        }
         if (!pyResp.ok || !pyData?.ok || !pyData?.filename) {
-          throw new Error(pyData?.error || 'Python Flask video synthesis fail ho gayi.');
+          throw new Error(
+            pyData?.error ||
+              `Python Flask video synthesis error (HTTP ${pyResp.status}).`
+          );
         }
 
         // If external UGC_PYTHON_URL rendered remotely, mirror MP4 into local UGC_OUTPUT_DIR

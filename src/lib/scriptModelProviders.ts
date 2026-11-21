@@ -25,13 +25,13 @@ export const SCRIPT_PROVIDER_CATALOG: ScriptProviderMeta[] = [
     name: 'Google Gemini',
     envHint: 'GEMINI_API_KEY',
     versions: [
-      { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen', tier: 'flagship', note: 'Latest high-precision creative & JSON architect' },
-      { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', tier: 'balanced', note: 'Fast multi-scene Roman Urdu storyteller' },
-      { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', tier: 'balanced', note: 'Reliable long-context director output' },
-      { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', tier: 'fast', note: 'High-speed structured story output' },
-      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', tier: 'balanced', note: 'Proven 10-scene JSON backup engine' },
-      { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', tier: 'fast', note: 'Lightweight high-quota backup' },
-      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', tier: 'fast', note: 'Rapid idea discovery fallback' },
+      { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', tier: 'balanced', note: 'Fast multi-scene Roman Urdu storyteller (Recommended)' },
+      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', tier: 'fast', note: 'Ultra-fast 3s JSON & idea discovery engine' },
+      { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite', tier: 'fast', note: 'Lightweight high-quota backup (~4s)' },
+      { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen', tier: 'flagship', note: 'Deep reasoning JSON architect (slower preview)' },
+      { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', tier: 'balanced', note: 'Long-context director output backup' },
+      { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', tier: 'fast', note: 'Structured story output backup' },
+      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', tier: 'balanced', note: '10-scene JSON backup engine' },
     ],
   },
   {
@@ -76,7 +76,7 @@ export function getProviderCatalogItem(providerId: ScriptProviderId): ScriptProv
 }
 
 export function getDefaultModelForProvider(providerId: ScriptProviderId): string {
-  if (providerId === 'auto') return 'gemini-4-hydrogen';
+  if (providerId === 'auto') return 'gemini-3.8-flash';
   const found = getProviderCatalogItem(providerId);
-  return found?.versions[0]?.id || 'gemini-4-hydrogen';
+  return found?.versions[0]?.id || 'gemini-3.8-flash';
 }

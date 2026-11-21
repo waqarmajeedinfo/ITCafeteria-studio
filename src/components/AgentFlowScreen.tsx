@@ -130,11 +130,27 @@ async function postJson(url: string, body: unknown, signal?: AbortSignal) {
     body: JSON.stringify(body),
     signal
   });
-  const data = await response.json().catch(() => ({} as Record<string, unknown>));
-  if (!response.ok) {
-    throw new Error(String((data as any)?.error || `Request failed (${response.status})`));
+  const raw = await response.text().catch(() => '');
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('<')) {
+    throw new Error(
+      response.status === 502 || response.status === 504 || response.status === 503
+        ? `Server gateway timeout / restarting (HTTP ${response.status}). Dobara try karein.`
+        : `Server ne JSON ki jagah HTML response diya (HTTP ${response.status}).`
+    );
   }
-  return data as Record<string, any>;
+  let data: Record<string, any> = {};
+  if (trimmed) {
+    try {
+      data = JSON.parse(trimmed);
+    } catch {
+      throw new Error(`Invalid JSON response (HTTP ${response.status})`);
+    }
+  }
+  if (!response.ok) {
+    throw new Error(String(data?.error || `Request failed (${response.status})`));
+  }
+  return data;
 }
 
 function createInstantFallbackStory(

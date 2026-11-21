@@ -1545,22 +1545,25 @@ Keep spacingScale between 0.90 and 1.12.`;
             styling,
           }),
         });
-        if (pyRes.ok) {
-          const pyJson: any = await pyRes.json();
-          const remoteUrl = `${pythonServiceUrl}${pyJson.downloadPath}`;
-          return res.json({
-            ok: true,
-            status: 'completed',
-            filename: pyJson.filename,
-            videoUrl: remoteUrl,
-            downloadUrl: remoteUrl,
-            durationSeconds,
-            resolution: quality === '720p' ? '720x1280' : '1080x1920',
-            engine: 'onrender-python-moviepy',
-            multiPart: partCount > 1,
-            partCount,
-            musicId,
-          });
+        const rawPy = await pyRes.text().catch(() => '');
+        if (pyRes.ok && rawPy && !rawPy.trim().startsWith('<')) {
+          const pyJson: any = JSON.parse(rawPy);
+          if (pyJson?.downloadPath) {
+            const remoteUrl = `${pythonServiceUrl}${pyJson.downloadPath}`;
+            return res.json({
+              ok: true,
+              status: 'completed',
+              filename: pyJson.filename,
+              videoUrl: remoteUrl,
+              downloadUrl: remoteUrl,
+              durationSeconds,
+              resolution: quality === '720p' ? '720x1280' : '1080x1920',
+              engine: 'onrender-python-moviepy',
+              multiPart: partCount > 1,
+              partCount,
+              musicId,
+            });
+          }
         }
       } catch (pyErr) {
         console.warn('[WCG Render] Python OnRender service unreachable, falling back to local FFmpeg engine:', pyErr);

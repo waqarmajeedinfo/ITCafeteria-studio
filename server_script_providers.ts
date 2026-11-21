@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import {
   SCRIPT_PROVIDER_CATALOG,
   type ScriptProviderId,
@@ -21,6 +21,21 @@ export interface MultiProviderScriptResult<T = any> {
   modelUsed: string;
   failoverUsed: boolean;
   attempts: ScriptAttemptRecord[];
+}
+
+// Track recently successful provider/model pairs in memory so subsequent requests
+// in 'auto' mode don't burn 30s+ retrying temporarily unavailable models on Render proxies.
+const RECENT_HEALTHY_MODELS = new Map<ConcreteProvider, { model: string; ts: number }>();
+const HEALTHY_CACHE_TTL_MS = 10 * 60 * 1000;
+
+function getRecentlyHealthyModel(provider: ConcreteProvider): string | null {
+  const rec = RECENT_HEALTHY_MODELS.get(provider);
+  if (!rec) return null;
+  if (Date.now() - rec.ts > HEALTHY_CACHE_TTL_MS) {
+    RECENT_HEALTHY_MODELS.delete(provider);
+    return null;
+  }
+  return rec.model;
 }
 
 function getLlamaGatewayConfig(): {
@@ -174,16 +189,27 @@ async function callGeminiModel(
     httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
   });
 
-  const needsZeroThinkingBudget = !model.includes('lite');
+  const isGemini4 = model.startsWith('gemini-4-');
+  const isGemini31Lite = model === 'gemini-3.1-flash-lite';
+  const config: Record<string, any> = {
+    responseMimeType: 'application/json',
+    maxOutputTokens: maxTokens,
+  };
+  if (isGemini4) {
+    config.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
+  } else if (isGemini31Lite) {
+    config.thinkingConfig = { thinkingLevel: ThinkingLevel.MINIMAL };
+  } else {
+    config.temperature = temperature;
+    if (!model.includes('lite') && !model.startsWith('gemini-3.')) {
+      config.thinkingConfig = { thinkingBudget: 0 };
+    }
+  }
+
   const promise = ai.models.generateContent({
     model,
     contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      temperature,
-      maxOutputTokens: maxTokens,
-      ...(needsZeroThinkingBudget ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-    },
+    config,
   });
 
   const resp = await new Promise<any>((resolve, reject) => {
@@ -234,7 +260,13 @@ async function callClaudeModel(
     timeoutMs
   );
 
-  const json: any = await resp.json().catch(() => null);
+  const rawBody = await resp.text().catch(() => '');
+  let json: any = null;
+  try {
+    json = rawBody ? JSON.parse(rawBody) : null;
+  } catch {
+    throw new Error(`Anthropic returned non-JSON response (HTTP ${resp.status})`);
+  }
   if (!resp.ok) {
     throw new Error(json?.error?.message || `Anthropic HTTP ${resp.status}`);
   }
@@ -286,7 +318,13 @@ async function callOpenAiModel(
     timeoutMs
   );
 
-  const json: any = await resp.json().catch(() => null);
+  const rawBody = await resp.text().catch(() => '');
+  let json: any = null;
+  try {
+    json = rawBody ? JSON.parse(rawBody) : null;
+  } catch {
+    throw new Error(`OpenAI returned non-JSON response (HTTP ${resp.status})`);
+  }
   if (!resp.ok) {
     throw new Error(json?.error?.message || `OpenAI HTTP ${resp.status}`);
   }
@@ -331,7 +369,13 @@ async function callLlamaModel(
     timeoutMs
   );
 
-  const json: any = await resp.json().catch(() => null);
+  const rawBody = await resp.text().catch(() => '');
+  let json: any = null;
+  try {
+    json = rawBody ? JSON.parse(rawBody) : null;
+  } catch {
+    throw new Error(`Meta Llama gateway returned non-JSON response (HTTP ${resp.status})`);
+  }
   if (!resp.ok) {
     throw new Error(json?.error?.message || `Meta Llama HTTP ${resp.status}`);
   }
@@ -346,6 +390,7 @@ export async function generateScriptJsonWithProviders<T = any>(options: {
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
+  maxTotalMs?: number;
   validate?: (parsed: any) => void;
 }): Promise<MultiProviderScriptResult<T>> {
   const {
@@ -355,7 +400,8 @@ export async function generateScriptJsonWithProviders<T = any>(options: {
     autoFailover = true,
     temperature = 0.85,
     maxTokens = 16384,
-    timeoutMs = 55000,
+    timeoutMs = 15000,
+    maxTotalMs = 38000,
     validate,
   } = options;
 
@@ -387,22 +433,33 @@ export async function generateScriptJsonWithProviders<T = any>(options: {
       if (preferredModel) {
         pushUnique(preferredProvider, preferredModel);
       }
+      const cached = getRecentlyHealthyModel(preferredProvider);
+      if (cached) pushUnique(preferredProvider, cached);
       for (const ver of meta.versions) {
         pushUnique(preferredProvider, ver.id);
       }
     }
-  } else if (preferredModel) {
-    const matchProvider = SCRIPT_PROVIDER_CATALOG.find((p) =>
-      p.versions.some((v) => v.id === preferredModel)
-    );
-    if (matchProvider && isScriptProviderConfigured(matchProvider.id)) {
-      pushUnique(matchProvider.id, preferredModel);
+  } else {
+    // In 'auto' mode, prioritize recently healthy models first so requests don't stall behind busy previews
+    for (const pMeta of configuredProviders) {
+      const cached = getRecentlyHealthyModel(pMeta.id);
+      if (cached) pushUnique(pMeta.id, cached);
+    }
+    if (preferredModel) {
+      const matchProvider = SCRIPT_PROVIDER_CATALOG.find((p) =>
+        p.versions.some((v) => v.id === preferredModel)
+      );
+      if (matchProvider && isScriptProviderConfigured(matchProvider.id)) {
+        pushUnique(matchProvider.id, preferredModel);
+      }
     }
   }
 
   // 2. If autoFailover is enabled (or preferredProvider is 'auto'), enqueue all configured providers & versions
   if (preferredProvider === 'auto' || autoFailover) {
     for (const pMeta of configuredProviders) {
+      const cached = getRecentlyHealthyModel(pMeta.id);
+      if (cached) pushUnique(pMeta.id, cached);
       for (const ver of pMeta.versions) {
         pushUnique(pMeta.id, ver.id);
       }
@@ -411,20 +468,26 @@ export async function generateScriptJsonWithProviders<T = any>(options: {
 
   const attempts: ScriptAttemptRecord[] = [];
   let lastErr: any = null;
+  const deadline = Date.now() + maxTotalMs;
 
   for (let i = 0; i < queue.length; i++) {
+    const remainingMs = deadline - Date.now();
+    if (i > 0 && remainingMs < 3500) {
+      break;
+    }
+    const perAttemptTimeout = Math.min(timeoutMs, Math.max(4000, remainingMs));
     const { provider, model } = queue[i];
     const started = Date.now();
     try {
       let rawText = '';
       if (provider === 'gemini') {
-        rawText = await callGeminiModel(model, prompt, temperature, maxTokens, timeoutMs);
+        rawText = await callGeminiModel(model, prompt, temperature, maxTokens, perAttemptTimeout);
       } else if (provider === 'claude') {
-        rawText = await callClaudeModel(model, prompt, temperature, maxTokens, timeoutMs);
+        rawText = await callClaudeModel(model, prompt, temperature, maxTokens, perAttemptTimeout);
       } else if (provider === 'openai') {
-        rawText = await callOpenAiModel(model, prompt, temperature, maxTokens, timeoutMs);
+        rawText = await callOpenAiModel(model, prompt, temperature, maxTokens, perAttemptTimeout);
       } else {
-        rawText = await callLlamaModel(model, prompt, temperature, maxTokens, timeoutMs);
+        rawText = await callLlamaModel(model, prompt, temperature, maxTokens, perAttemptTimeout);
       }
 
       const parsed = extractJsonObjectRobust(rawText);
@@ -434,6 +497,8 @@ export async function generateScriptJsonWithProviders<T = any>(options: {
       if (validate) {
         validate(parsed);
       }
+
+      RECENT_HEALTHY_MODELS.set(provider, { model, ts: Date.now() });
 
       attempts.push({
         provider,
