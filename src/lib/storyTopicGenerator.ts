@@ -73,57 +73,129 @@ function normalizeTag(tag?: string): string {
   return clean.startsWith('@') ? clean : `@${clean}`;
 }
 
-/**
- * Generates a complete, authentic 10-scene Roman Urdu story package tailored to the topic.
- */
-export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): GeneratedStory {
-  const presenter = params.presenter || 'Waqar Majeed';
-  const channelName = params.channelName || 'IT Cafeteria';
-  const charTag = normalizeTag(params.characterTag || '@WM25-1');
-  const rawTitle = params.title.trim();
-  const titleClean = rawTitle.replace(/#\S+/g, '').replace(/@\S+/g, '').trim();
-  const category = params.category || 'AI & Smart Technology';
-  const dateLabel = params.scheduledDate
-    ? `${params.scheduledDate} • ${params.scheduledTime || '6:00 PM PKT'}`
-    : new Date().toLocaleDateString('en-GB');
+interface TopicBeat {
+  purpose: string;
+  visual: string;
+  dialogue: string;
+}
 
-  const [line1, line2] = splitHeadline(titleClean);
+interface TopicTemplateOutput {
+  hook: string;
+  description: string;
+  tags: string[];
+  hashtags: string[];
+  tiktokCaption: string;
+  thumbnailHeadline: string;
+  thumbnailSubBadge: string;
+  rawBeats: TopicBeat[];
+  demoPromptFallback?: string;
+}
 
-  const lowerTitle = titleClean.toLowerCase();
-  const lowerCat = category.toLowerCase();
+interface TopicTemplateContext {
+  titleClean: string;
+  lowerTitle: string;
+  lowerCat: string;
+  category: string;
+  categoryId: number;
+  channelName: string;
+  presenter: string;
+  charTag: string;
+  line1: string;
+  line2: string;
+  practicalBlueprint: PracticalBlueprint;
+}
 
-  // Topic classification - granular checks so specific topics don't collapse into Storage Sense
-  const isExcelCenter = lowerTitle.includes('center across') || lowerTitle.includes('merge cells') || lowerTitle.includes('merging');
-  const isGoogleSheets = !isExcelCenter && (lowerTitle.includes('sheet') || lowerTitle.includes('smart fill') || (lowerTitle.includes('excel') && !isExcelCenter));
-  const isPromptHacks = lowerTitle.includes('prompt') || lowerTitle.includes('chatgpt') || (lowerTitle.includes('shortcuts') && (lowerTitle.includes('ai') || lowerCat.includes('prompt')));
-  const isChatbotWorkflow = lowerTitle.includes('chatbot') || lowerTitle.includes('workflow') || lowerTitle.includes('multi-agent') || lowerTitle.includes('power automate') || lowerCat.includes('chatbot');
-  const isStorageSense = lowerTitle.includes('storage sense') || lowerTitle.includes('c-drive') || lowerTitle.includes('c drive') || lowerTitle.includes('cdrive') || lowerTitle.includes('free space') || lowerTitle.includes('clean c');
-  const isGodMode = lowerTitle.includes('god mode') || lowerTitle.includes('control panel') || lowerTitle.includes('guid') || lowerTitle.includes('200+ hidden');
-  const isClipboard = lowerTitle.includes('clipboard') || lowerTitle.includes('win + v') || lowerTitle.includes('win+v') || lowerTitle.includes('paste old');
-  const isRunCommands = lowerTitle.includes('run command') || lowerTitle.includes('win + r') || lowerTitle.includes('win+r');
-  const isPowerPlan = lowerTitle.includes('power plan') || lowerTitle.includes('ultimate performance');
-  const isWhatsApp = lowerTitle.includes('whatsapp') || lowerTitle.includes('mobile');
-  const isYouTubeCourse = lowerTitle.includes('youtube') || lowerTitle.includes('yt automation') || lowerTitle.includes('chapter');
+type TopicId =
+  | 'excel_center'
+  | 'google_sheets'
+  | 'prompt_hacks'
+  | 'chatbot_workflow'
+  | 'storage_sense_sequel'
+  | 'storage_sense'
+  | 'god_mode'
+  | 'beauty'
+  | 'blueprint_default';
 
-  let hook = '';
-  let description = '';
-  let tags: string[] = [];
-  let hashtags: string[] = [];
-  let tiktokCaption = '';
-  let thumbnailHeadline = line1;
-  let thumbnailSubBadge = line2;
-  let rawBeats: { purpose: string; visual: string; dialogue: string }[] = [];
+function classifyStoryTopic(ctx: TopicTemplateContext): TopicId {
+  const { lowerTitle, lowerCat, channelName } = ctx;
+  const isExcelCenter =
+    lowerTitle.includes('center across') ||
+    lowerTitle.includes('merge cells') ||
+    lowerTitle.includes('merging');
+  if (isExcelCenter) return 'excel_center';
 
-  if (isGoogleSheets) {
-    hook = 'Excel ya Google Sheets mein ghanton ka manual data entry bina kisi complex formula ke automate karein!';
-    description = `Google Sheets AI Smart Fill hack! Ghanton ka data formatting aur extraction ab seedha built-in AI se automate karein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
-    tags = ['google sheets ai', 'smart fill', 'google sheets shortcut', 'excel tricks', 'it cafeteria', 'waqar majeed', 'data entry automation', 'urdu tech'];
-    hashtags = ['#Shorts', '#GoogleSheets', '#AISmartFill', '#ITCafeteria', '#DataHacks', '#ExcelUrdu'];
-    tiktokCaption = 'Google Sheets ka yeh AI Smart Fill hack aapka ghanton ka waqt bachaega! 📊⚡ #itcafeteria #googlesheets #techhacks';
-    thumbnailHeadline = 'SHEETS AI SMART FILL';
-    thumbnailSubBadge = 'AUTOMATE MANUAL DATA';
+  if (
+    lowerTitle.includes('sheet') ||
+    lowerTitle.includes('smart fill') ||
+    lowerTitle.includes('excel')
+  ) {
+    return 'google_sheets';
+  }
 
-    rawBeats = [
+  if (
+    lowerTitle.includes('prompt') ||
+    lowerTitle.includes('chatgpt') ||
+    (lowerTitle.includes('shortcuts') && (lowerTitle.includes('ai') || lowerCat.includes('prompt')))
+  ) {
+    return 'prompt_hacks';
+  }
+
+  if (
+    lowerTitle.includes('chatbot') ||
+    lowerTitle.includes('workflow') ||
+    lowerTitle.includes('multi-agent') ||
+    lowerTitle.includes('power automate') ||
+    lowerCat.includes('chatbot')
+  ) {
+    return 'chatbot_workflow';
+  }
+
+  const isStorageSense =
+    lowerTitle.includes('storage sense') ||
+    lowerTitle.includes('c-drive') ||
+    lowerTitle.includes('c drive') ||
+    lowerTitle.includes('cdrive') ||
+    lowerTitle.includes('free space') ||
+    lowerTitle.includes('clean c');
+  if (isStorageSense) {
+    const isSequel =
+      lowerTitle.includes('part 2') ||
+      lowerTitle.includes('sequel') ||
+      lowerTitle.includes('episode 2') ||
+      lowerTitle.includes('advanced') ||
+      lowerTitle.includes('pro');
+    return isSequel ? 'storage_sense_sequel' : 'storage_sense';
+  }
+
+  if (
+    lowerTitle.includes('god mode') ||
+    lowerTitle.includes('control panel') ||
+    lowerTitle.includes('guid') ||
+    lowerTitle.includes('200+ hidden')
+  ) {
+    return 'god_mode';
+  }
+
+  const isBeauty =
+    lowerCat.includes('beauty') ||
+    lowerCat.includes('skincare') ||
+    lowerCat.includes('hair') ||
+    lowerCat.includes('makeup') ||
+    channelName.toLowerCase().includes('beauty');
+  return isBeauty ? 'beauty' : 'blueprint_default';
+}
+
+const TOPIC_TEMPLATE_BUILDERS: Record<TopicId, (ctx: TopicTemplateContext) => TopicTemplateOutput> = {
+  google_sheets: ({ presenter, category, charTag }) => ({
+    hook: 'Excel ya Google Sheets mein ghanton ka manual data entry bina kisi complex formula ke automate karein!',
+    description: `Google Sheets AI Smart Fill hack! Ghanton ka data formatting aur extraction ab seedha built-in AI se automate karein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`,
+    tags: ['google sheets ai', 'smart fill', 'google sheets shortcut', 'excel tricks', 'it cafeteria', 'waqar majeed', 'data entry automation', 'urdu tech'],
+    hashtags: ['#Shorts', '#GoogleSheets', '#AISmartFill', '#ITCafeteria', '#DataHacks', '#ExcelUrdu'],
+    tiktokCaption: 'Google Sheets ka yeh AI Smart Fill hack aapka ghanton ka waqt bachaega! 📊⚡ #itcafeteria #googlesheets #techhacks',
+    thumbnailHeadline: 'SHEETS AI SMART FILL',
+    thumbnailSubBadge: 'AUTOMATE MANUAL DATA',
+    demoPromptFallback: 'Extract first name and format official email from messy Column A data using Google Sheets AI Smart Fill (Ctrl + E).',
+    rawBeats: [
       {
         purpose: 'Disruptive Hook (Pattern Interrupt)',
         visual: `${charTag} stands before glowing dual monitors showing a chaotic spreadsheet with 1,000 messy unformatted rows.`,
@@ -174,17 +246,19 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
         visual: 'Animated IT Cafeteria YouTube subscribe bell pulsing with glowing blue neon border.',
         dialogue: 'Aise advanced Google Sheets aur AI shortcuts daily seekhne ke liye IT Cafeteria ko foran subscribe karein!'
       }
-    ];
-  } else if (isPromptHacks) {
-    hook = 'ChatGPT ya Gemini se generic aur boring answers milte hain? Yeh 3 prompt hacks lagayein!';
-    description = `AI Prompt Hacks & Shortcuts Masterclass! ChatGPT aur Gemini se 10X behtar aur accurate answers hasil karne ka secret tareeqa.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
-    tags = ['prompt hacks', 'chatgpt prompt', 'gemini ai', 'prompt engineering', 'it cafeteria', 'waqar majeed', 'urdu ai masterclass'];
-    hashtags = ['#Shorts', '#AIPrompts', '#PromptHacks', '#ITCafeteria', '#ChatGPT', '#GeminiAI'];
-    tiktokCaption = 'AI prompts likhne ka yeh secret tareeqa 99% log nahi jante! 🤖🔥 #itcafeteria #chatgpt #prompthacks';
-    thumbnailHeadline = 'AI PROMPT HACKS';
-    thumbnailSubBadge = '10X BETTER AI RESULTS';
+    ]
+  }),
 
-    rawBeats = [
+  prompt_hacks: ({ presenter, category, charTag }) => ({
+    hook: 'ChatGPT ya Gemini se generic aur boring answers milte hain? Yeh 3 prompt hacks lagayein!',
+    description: `AI Prompt Hacks & Shortcuts Masterclass! ChatGPT aur Gemini se 10X behtar aur accurate answers hasil karne ka secret tareeqa.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`,
+    tags: ['prompt hacks', 'chatgpt prompt', 'gemini ai', 'prompt engineering', 'it cafeteria', 'waqar majeed', 'urdu ai masterclass'],
+    hashtags: ['#Shorts', '#AIPrompts', '#PromptHacks', '#ITCafeteria', '#ChatGPT', '#GeminiAI'],
+    tiktokCaption: 'AI prompts likhne ka yeh secret tareeqa 99% log nahi jante! 🤖🔥 #itcafeteria #chatgpt #prompthacks',
+    thumbnailHeadline: 'AI PROMPT HACKS',
+    thumbnailSubBadge: '10X BETTER AI RESULTS',
+    demoPromptFallback: 'Act as an expert systems architect. Provide direct, non-fluff, tabular checklist of the architecture without filler text.',
+    rawBeats: [
       {
         purpose: 'Disruptive Hook (Pattern Interrupt)',
         visual: `${charTag} standing in tech studio looking directly into camera with shocked expression as generic AI text burns away.`,
@@ -235,17 +309,19 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
         visual: 'IT Cafeteria subscribe card with Masterclass Episode 4 teaser box in bottom corner.',
         dialogue: 'Agli episode mein hum multi-agent chaining seekhenge. Video ko save karein aur IT Cafeteria ko follow karein!'
       }
-    ];
-  } else if (isChatbotWorkflow) {
-    hook = 'Customer support aur repetitive tasks ko 100% automate karein bina kisi coding ke!';
-    description = `AI Chatbots & Automated Workflows Masterclass! Multi-agent architecture aur webhook automations step-by-step seekhein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
-    tags = ['ai chatbot', 'workflow automation', 'multi agent ai', 'power automate', 'it cafeteria', 'waqar majeed', 'no code ai'];
-    hashtags = ['#Shorts', '#AIChatbot', '#Workflows', '#ITCafeteria', '#Automation', '#NoCode'];
-    tiktokCaption = 'Apna khud ka 24/7 autonomous AI support agent banayein 0 code ke sath! 🤖⚡ #itcafeteria #chatbot #ai';
-    thumbnailHeadline = 'AI CHATBOT WORKFLOWS';
-    thumbnailSubBadge = '100% NO-CODE AUTOMATION';
+    ]
+  }),
 
-    rawBeats = [
+  chatbot_workflow: ({ presenter, category, charTag }) => ({
+    hook: 'Customer support aur repetitive tasks ko 100% automate karein bina kisi coding ke!',
+    description: `AI Chatbots & Automated Workflows Masterclass! Multi-agent architecture aur webhook automations step-by-step seekhein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`,
+    tags: ['ai chatbot', 'workflow automation', 'multi agent ai', 'power automate', 'it cafeteria', 'waqar majeed', 'no code ai'],
+    hashtags: ['#Shorts', '#AIChatbot', '#Workflows', '#ITCafeteria', '#Automation', '#NoCode'],
+    tiktokCaption: 'Apna khud ka 24/7 autonomous AI support agent banayein 0 code ke sath! 🤖⚡ #itcafeteria #chatbot #ai',
+    thumbnailHeadline: 'AI CHATBOT WORKFLOWS',
+    thumbnailSubBadge: '100% NO-CODE AUTOMATION',
+    demoPromptFallback: 'Create a multi-agent webhook router that classifies incoming inquiries into Support, Sales, or Booking with zero code.',
+    rawBeats: [
       {
         purpose: 'Disruptive Hook (Pattern Interrupt)',
         visual: `${charTag} stands next to animated floating flowchart nodes connecting WhatsApp, Gmail and Google Sheets.`,
@@ -296,145 +372,142 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
         visual: 'IT Cafeteria subscribe button and downloadable workflow blueprint link in description card.',
         dialogue: 'Poora workflow blueprint description mein bilkul free hai. Aisi advanced tech ke liye IT Cafeteria ko follow karein!'
       }
-    ];
-  } else if (isStorageSense) {
-    const isSequel = lowerTitle.includes('part 2') || lowerTitle.includes('sequel') || lowerTitle.includes('episode 2') || lowerTitle.includes('advanced') || lowerTitle.includes('pro');
+    ]
+  }),
 
-    if (isSequel) {
-      // Part 2 / Sequel: Advanced Space Recovery (DISM & CompactOS)
-      hook = 'Storage Sense ke baad bhi C-Drive red hai? Yeh advanced command line trick 25GB free karegi!';
-      description = `C-Drive Red Alert (Part 2: Advanced Pro Space Recovery)! DISM cleanup aur CompactOS se 25GB extra space bachaayein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
-      tags = ['c drive full', 'c drive red', 'part 2 space recovery', 'compact os', 'dism cleanup', 'windows 11 pro', 'it cafeteria', 'waqar majeed'];
-      hashtags = ['#Shorts', '#CDriveFull', '#Part2', '#Windows11Pro', '#ITCafeteria', '#SpaceRecovery'];
-      tiktokCaption = 'C-Drive red masla hal karne ka Advanced Part 2 tarika! 💾⚡ #itcafeteria #windows11 #cdrivefull';
-      thumbnailHeadline = 'C-DRIVE RED (PART 2)';
-      thumbnailSubBadge = 'ADVANCED 25GB RECOVERY';
+  storage_sense_sequel: ({ presenter, category, charTag }) => ({
+    hook: 'Storage Sense ke baad bhi C-Drive red hai? Yeh advanced command line trick 25GB free karegi!',
+    description: `C-Drive Red Alert (Part 2: Advanced Pro Space Recovery)! DISM cleanup aur CompactOS se 25GB extra space bachaayein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`,
+    tags: ['c drive full', 'c drive red', 'part 2 space recovery', 'compact os', 'dism cleanup', 'windows 11 pro', 'it cafeteria', 'waqar majeed'],
+    hashtags: ['#Shorts', '#CDriveFull', '#Part2', '#Windows11Pro', '#ITCafeteria', '#SpaceRecovery'],
+    tiktokCaption: 'C-Drive red masla hal karne ka Advanced Part 2 tarika! 💾⚡ #itcafeteria #windows11 #cdrivefull',
+    thumbnailHeadline: 'C-DRIVE RED (PART 2)',
+    thumbnailSubBadge: 'ADVANCED 25GB RECOVERY',
+    rawBeats: [
+      {
+        purpose: 'Hook',
+        visual: `${charTag} holds glowing internal SSD drive up to camera with intense focus.`,
+        dialogue: 'Agar aapki Windows C-Drive red ho chuki hai, to yeh advanced command-line cleaning formula foran note karein!'
+      },
+      {
+        purpose: 'Problem + Agitate',
+        visual: 'Disk space analyzer visualizer mapping locked space inside System Volume Information and dormant update cache.',
+        dialogue: 'Asal masla surface files nahi, purane Windows updates ke packages aur ghost hibernation files hain. Agar isay foran saaf na karein to drive crash hogi aur PC freeze ho jayega.'
+      },
+      {
+        purpose: 'Reveal',
+        visual: 'Windows terminal opening with administrative privileges highlighting official built-in tools.',
+        dialogue: 'Lekin Windows ke paas built-in commands hain jo baghair kisi paid software ke sari dormant space free karti hain.'
+      },
+      {
+        purpose: 'Demo 1',
+        visual: 'Mode A (Screen only): Full-screen desktop briefly for context, then camera zooms in and focuses tightly on Terminal Admin window filling the frame. Visible cursor runs compact.exe /compactos:always with large readable on-screen command text.',
+        dialogue: 'Step 1: Win plus X daba kar Terminal Admin kholein aur compact.exe slash compactos always enter karein.'
+      },
+      {
+        purpose: 'Demo 2',
+        visual: 'Mode A (Screen only): Terminal window zoomed in for high legibility. Visible cursor executes dism.exe /online /cleanup-image /startcomponentcleanup /resetbase with large on-screen command banner.',
+        dialogue: 'Step 2: DISM cleanup command chalayein jo tamam expire ho chuki update files ko permanently delete karti hai.'
+      },
+      {
+        purpose: 'Demo 3',
+        visual: 'Mode A (Screen only): Terminal zoomed in executing powercfg -h off with large readable on-screen command text, wiping dormant hiberfil file.',
+        dialogue: 'Step 3: Desktop users powercfg minus h off dabayein taake unused hibernation ghost file khatam ho jaye.'
+      },
+      {
+        purpose: 'Proof + Result',
+        visual: 'Mode A (Screen only): File Explorer window opening to This PC. Camera zooms in on C-Drive storage capacity bar as it turns from red to cyan with 35GB free space.',
+        dialogue: 'Nateeja dekhein! C-Drive ka red bar blue ho chuka hai aur 30 GB se zyada clean space ready hai.'
+      },
+      {
+        purpose: 'Benefit',
+        visual: 'System diagnostics showing fast CPU boost and zero lag across active apps.',
+        dialogue: 'Iska faida yeh hai ke system par zero load hai aur read write speed pehle se 2 guna fast respond kar rahi hai.'
+      },
+      {
+        purpose: 'Curiosity Loop',
+        visual: `${charTag} pointing toward Windows settings with futuristic holographic lock.`,
+        dialogue: 'Kya aap jante hain ke isi tarah RAM cache bhi baghair restart kiye instant refresh ho sakti hai?'
+      },
+      {
+        purpose: 'Conclusion + Save CTA',
+        visual: 'IT Cafeteria save video badge with subscribe button pulsating on screen.',
+        dialogue: 'Is video ko abhi save kar lein aur IT Cafeteria ko follow karke notification on karein!'
+      }
+    ]
+  }),
 
-      rawBeats = [
-        {
-          purpose: 'Hook',
-          visual: `${charTag} holds glowing internal SSD drive up to camera with intense focus.`,
-          dialogue: 'Agar aapki Windows C-Drive red ho chuki hai, to yeh advanced command-line cleaning formula foran note karein!'
-        },
-        {
-          purpose: 'Problem + Agitate',
-          visual: 'Disk space analyzer visualizer mapping locked space inside System Volume Information and dormant update cache.',
-          dialogue: 'Asal masla surface files nahi, purane Windows updates ke packages aur ghost hibernation files hain. Agar isay foran saaf na karein to drive crash hogi aur PC freeze ho jayega.'
-        },
-        {
-          purpose: 'Reveal',
-          visual: 'Windows terminal opening with administrative privileges highlighting official built-in tools.',
-          dialogue: 'Lekin Windows ke paas built-in commands hain jo baghair kisi paid software ke sari dormant space free karti hain.'
-        },
-        {
-          purpose: 'Demo 1',
-          visual: 'Mode A (Screen only): Full-screen desktop briefly for context, then camera zooms in and focuses tightly on Terminal Admin window filling the frame. Visible cursor runs compact.exe /compactos:always with large readable on-screen command text.',
-          dialogue: 'Step 1: Win plus X daba kar Terminal Admin kholein aur compact.exe slash compactos always enter karein.'
-        },
-        {
-          purpose: 'Demo 2',
-          visual: 'Mode A (Screen only): Terminal window zoomed in for high legibility. Visible cursor executes dism.exe /online /cleanup-image /startcomponentcleanup /resetbase with large on-screen command banner.',
-          dialogue: 'Step 2: DISM cleanup command chalayein jo tamam expire ho chuki update files ko permanently delete karti hai.'
-        },
-        {
-          purpose: 'Demo 3',
-          visual: 'Mode A (Screen only): Terminal zoomed in executing powercfg -h off with large readable on-screen command text, wiping dormant hiberfil file.',
-          dialogue: 'Step 3: Desktop users powercfg minus h off dabayein taake unused hibernation ghost file khatam ho jaye.'
-        },
-        {
-          purpose: 'Proof + Result',
-          visual: 'Mode A (Screen only): File Explorer window opening to This PC. Camera zooms in on C-Drive storage capacity bar as it turns from red to cyan with 35GB free space.',
-          dialogue: 'Nateeja dekhein! C-Drive ka red bar blue ho chuka hai aur 30 GB se zyada clean space ready hai.'
-        },
-        {
-          purpose: 'Benefit',
-          visual: 'System diagnostics showing fast CPU boost and zero lag across active apps.',
-          dialogue: 'Iska faida yeh hai ke system par zero load hai aur read write speed pehle se 2 guna fast respond kar rahi hai.'
-        },
-        {
-          purpose: 'Curiosity Loop',
-          visual: `${charTag} pointing toward Windows settings with futuristic holographic lock.`,
-          dialogue: 'Kya aap jante hain ke isi tarah RAM cache bhi baghair restart kiye instant refresh ho sakti hai?'
-        },
-        {
-          purpose: 'Conclusion + Save CTA',
-          visual: 'IT Cafeteria save video badge with subscribe button pulsating on screen.',
-          dialogue: 'Is video ko abhi save kar lein aur IT Cafeteria ko follow karke notification on karein!'
-        }
-      ];
-    } else {
-      // Standard Storage Sense
-      hook = 'Windows PC slow ho raha hai? Sirf yeh ek hidden setting on karein aur system 2X fast karein!';
-      description = `Windows 11 aur PC speedup secrets! Bina kisi third party tool ke RAM aur storage optimize karein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
-      tags = ['windows 11', 'pc speedup', 'c drive clean', 'storage sense', 'it cafeteria', 'waqar majeed', 'pc hacks urdu'];
-      hashtags = ['#Shorts', '#Windows11', '#PCHacks', '#ITCafeteria', '#TechShorts', '#SpeedUpPC'];
-      tiktokCaption = 'Windows PC ki speed 2X boost karne ka secret Windows built-in tareeqa! 💻⚡ #itcafeteria #windows11 #pchacks';
-      thumbnailHeadline = 'WINDOWS 11 SECRET';
-      thumbnailSubBadge = 'AUTO CLEAN & SPEEDUP';
+  storage_sense: ({ presenter, category, charTag }) => ({
+    hook: 'Windows PC slow ho raha hai? Sirf yeh ek hidden setting on karein aur system 2X fast karein!',
+    description: `Windows 11 aur PC speedup secrets! Bina kisi third party tool ke RAM aur storage optimize karein.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`,
+    tags: ['windows 11', 'pc speedup', 'c drive clean', 'storage sense', 'it cafeteria', 'waqar majeed', 'pc hacks urdu'],
+    hashtags: ['#Shorts', '#Windows11', '#PCHacks', '#ITCafeteria', '#TechShorts', '#SpeedUpPC'],
+    tiktokCaption: 'Windows PC ki speed 2X boost karne ka secret Windows built-in tareeqa! 💻⚡ #itcafeteria #windows11 #pchacks',
+    thumbnailHeadline: 'WINDOWS 11 SECRET',
+    thumbnailSubBadge: 'AUTO CLEAN & SPEEDUP',
+    rawBeats: [
+      {
+        purpose: 'Hook',
+        visual: `${charTag} gestures toward a computer monitor showing heavy lag and spinning mouse cursor.`,
+        dialogue: 'Aapka computer ya laptop achanak hang ho raha hai? Kisi third party cleaner app ko bilkul mat install karein!'
+      },
+      {
+        purpose: 'Problem + Agitate',
+        visual: 'Task manager opening with 100% disk usage and red warning bar across background services.',
+        dialogue: 'Background update cache aur temporary files silently hard drive par jam hoti rehti hain. Agar isay saaf na karein to hard drive crash kar sakti hai aur daily kaam atak jayega.'
+      },
+      {
+        purpose: 'Reveal',
+        visual: 'Keyboard pressing Windows + I, navigating straight to System > Storage settings.',
+        dialogue: 'Windows key plus I dabayein aur System mein Storage par click karein. Yahan Windows ka built-in cleaner maujood hai.'
+      },
+      {
+        purpose: 'Demo 1',
+        visual: 'Mode A (Screen only): Windows Settings Storage page. Visible cursor toggles Storage Sense switch to ON and sets cleanup frequency with clear highlight.',
+        dialogue: 'Step 1: Storage Sense ko on karein aur cleanup frequency ko Every Week par set karein taake junk auto delete hota rahe.'
+      },
+      {
+        purpose: 'Demo 2',
+        visual: 'Mode A (Screen only): Screen zooms in on "Run Storage Sense Now" button. Visible cursor clicks the button as active cleanup progress bar frees temporary cache.',
+        dialogue: 'Step 2: Ab Run Storage Sense dabayein taake temporary junk files baghair kisi error ke saaf ho jayein.'
+      },
+      {
+        purpose: 'Demo 3',
+        visual: 'Mode A (Screen only): Task Manager Startup Apps tab zoomed in for high legibility. Visible cursor highlights and disables unnecessary background apps.',
+        dialogue: 'Step 3: Task Manager mein Startup Apps par ja kar faltu software disable karein taake boot time aadha reh jaye.'
+      },
+      {
+        purpose: 'Proof + Result',
+        visual: 'Mode A (Screen only): Task Manager performance graph. Camera zooms in on disk and CPU usage dropping from 95% to 3% with green verification checkmark.',
+        dialogue: 'Nateeja dekhein! System load foran normal ho gaya aur applications bina kisi delay ke instant open ho rahi hain.'
+      },
+      {
+        purpose: 'Benefit',
+        visual: `${charTag} in sleek cyber workstation with smooth running monitors and clean desktop.`,
+        dialogue: 'Iska faida yeh hai ke aapke laptop ki life aur speed salon tak fresh aur tez rahegi.'
+      },
+      {
+        purpose: 'Curiosity Loop',
+        visual: 'Keyboard glowing with shortcut hint for Windows hidden memory diagnostics.',
+        dialogue: 'Kya aap jante hain ke Windows mein baghair restart kiye bhi memory clean ho sakti hai?'
+      },
+      {
+        purpose: 'Conclusion + Save CTA',
+        visual: 'IT Cafeteria subscribe button and YouTube channel bell animation.',
+        dialogue: 'Daily Windows shortcuts seekhne ke liye is video ko save karein aur IT Cafeteria ko subscribe karein!'
+      }
+    ]
+  }),
 
-      rawBeats = [
-        {
-          purpose: 'Hook',
-          visual: `${charTag} gestures toward a computer monitor showing heavy lag and spinning mouse cursor.`,
-          dialogue: 'Aapka computer ya laptop achanak hang ho raha hai? Kisi third party cleaner app ko bilkul mat install karein!'
-        },
-        {
-          purpose: 'Problem + Agitate',
-          visual: 'Task manager opening with 100% disk usage and red warning bar across background services.',
-          dialogue: 'Background update cache aur temporary files silently hard drive par jam hoti rehti hain. Agar isay saaf na karein to hard drive crash kar sakti hai aur daily kaam atak jayega.'
-        },
-        {
-          purpose: 'Reveal',
-          visual: 'Keyboard pressing Windows + I, navigating straight to System > Storage settings.',
-          dialogue: 'Windows key plus I dabayein aur System mein Storage par click karein. Yahan Windows ka built-in cleaner maujood hai.'
-        },
-        {
-          purpose: 'Demo 1',
-          visual: 'Mode A (Screen only): Windows Settings Storage page. Visible cursor toggles Storage Sense switch to ON and sets cleanup frequency with clear highlight.',
-          dialogue: 'Step 1: Storage Sense ko on karein aur cleanup frequency ko Every Week par set karein taake junk auto delete hota rahe.'
-        },
-        {
-          purpose: 'Demo 2',
-          visual: 'Mode A (Screen only): Screen zooms in on "Run Storage Sense Now" button. Visible cursor clicks the button as active cleanup progress bar frees temporary cache.',
-          dialogue: 'Step 2: Ab Run Storage Sense dabayein taake temporary junk files baghair kisi error ke saaf ho jayein.'
-        },
-        {
-          purpose: 'Demo 3',
-          visual: 'Mode A (Screen only): Task Manager Startup Apps tab zoomed in for high legibility. Visible cursor highlights and disables unnecessary background apps.',
-          dialogue: 'Step 3: Task Manager mein Startup Apps par ja kar faltu software disable karein taake boot time aadha reh jaye.'
-        },
-        {
-          purpose: 'Proof + Result',
-          visual: 'Mode A (Screen only): Task Manager performance graph. Camera zooms in on disk and CPU usage dropping from 95% to 3% with green verification checkmark.',
-          dialogue: 'Nateeja dekhein! System load foran normal ho gaya aur applications bina kisi delay ke instant open ho rahi hain.'
-        },
-        {
-          purpose: 'Benefit',
-          visual: `${charTag} in sleek cyber workstation with smooth running monitors and clean desktop.`,
-          dialogue: 'Iska faida yeh hai ke aapke laptop ki life aur speed salon tak fresh aur tez rahegi.'
-        },
-        {
-          purpose: 'Curiosity Loop',
-          visual: 'Keyboard glowing with shortcut hint for Windows hidden memory diagnostics.',
-          dialogue: 'Kya aap jante hain ke Windows mein baghair restart kiye bhi memory clean ho sakti hai?'
-        },
-        {
-          purpose: 'Conclusion + Save CTA',
-          visual: 'IT Cafeteria subscribe button and YouTube channel bell animation.',
-          dialogue: 'Daily Windows shortcuts seekhne ke liye is video ko save karein aur IT Cafeteria ko subscribe karein!'
-        }
-      ];
-    }
-  } else if (isGodMode) {
-    hook = 'Windows 11 ka Secret God Mode: Aik single folder se 200+ hidden control panel settings unlock karein!';
-    description = `Windows 11 God Mode Secret Trick! 200 se zyada hidden system settings aik jagah.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
-    tags = ['windows god mode', 'god mode trick', 'hidden settings windows 11', 'it cafeteria', 'waqar majeed', 'pc shortcuts urdu'];
-    hashtags = ['#Shorts', '#GodMode', '#Windows11', '#ITCafeteria', '#PCSecrets'];
-    tiktokCaption = 'Windows 11 ka Secret God Mode kaise activate karein! 🔥⚡ #itcafeteria #godmode #pchacks';
-    thumbnailHeadline = 'WINDOWS GOD MODE';
-    thumbnailSubBadge = '200+ HIDDEN SETTINGS';
-
-    rawBeats = [
+  god_mode: ({ presenter, category, charTag }) => ({
+    hook: 'Windows 11 ka Secret God Mode: Aik single folder se 200+ hidden control panel settings unlock karein!',
+    description: `Windows 11 God Mode Secret Trick! 200 se zyada hidden system settings aik jagah.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`,
+    tags: ['windows god mode', 'god mode trick', 'hidden settings windows 11', 'it cafeteria', 'waqar majeed', 'pc shortcuts urdu'],
+    hashtags: ['#Shorts', '#GodMode', '#Windows11', '#ITCafeteria', '#PCSecrets'],
+    tiktokCaption: 'Windows 11 ka Secret God Mode kaise activate karein! 🔥⚡ #itcafeteria #godmode #pchacks',
+    thumbnailHeadline: 'WINDOWS GOD MODE',
+    thumbnailSubBadge: '200+ HIDDEN SETTINGS',
+    rawBeats: [
       {
         purpose: 'Hook',
         visual: `${charTag} stands before multiple holographic control panels expanding in 360 degrees.`,
@@ -485,17 +558,18 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
         visual: 'IT Cafeteria subscribe button and community card.',
         dialogue: 'Aisi hidden Windows tricks ke liye is video ko save karein aur IT Cafeteria ko follow karein!'
       }
-    ];
-  } else if (isExcelCenter) {
-    hook = 'Excel mein cells merge karna band karein! Yeh Center Across Selection trick formulas ko tootne se bachayegi.';
-    description = `Excel Center Across Selection trick! Merge Cells ki wajah se formulas break hona hamesha ke liye band.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`;
-    tags = ['excel center across selection', 'stop merge cells', 'excel formulas', 'it cafeteria', 'waqar majeed', 'excel hacks urdu'];
-    hashtags = ['#Shorts', '#ExcelHacks', '#CenterAcrossSelection', '#ITCafeteria', '#DataTips'];
-    tiktokCaption = 'Excel mein cells merge karne ki ghalti hamesha ke liye band karein! 📊⚡ #itcafeteria #excel #techtips';
-    thumbnailHeadline = 'STOP MERGING CELLS';
-    thumbnailSubBadge = 'CENTER ACROSS SELECTION';
+    ]
+  }),
 
-    rawBeats = [
+  excel_center: ({ presenter, category, charTag }) => ({
+    hook: 'Excel mein cells merge karna band karein! Yeh Center Across Selection trick formulas ko tootne se bachayegi.',
+    description: `Excel Center Across Selection trick! Merge Cells ki wajah se formulas break hona hamesha ke liye band.\n\nPresenter: ${presenter} • IT Cafeteria\nCategory: ${category}\nTag: ${charTag}`,
+    tags: ['excel center across selection', 'stop merge cells', 'excel formulas', 'it cafeteria', 'waqar majeed', 'excel hacks urdu'],
+    hashtags: ['#Shorts', '#ExcelHacks', '#CenterAcrossSelection', '#ITCafeteria', '#DataTips'],
+    tiktokCaption: 'Excel mein cells merge karne ki ghalti hamesha ke liye band karein! 📊⚡ #itcafeteria #excel #techtips',
+    thumbnailHeadline: 'STOP MERGING CELLS',
+    thumbnailSubBadge: 'CENTER ACROSS SELECTION',
+    rawBeats: [
       {
         purpose: 'Disruptive Hook (Pattern Interrupt)',
         visual: `${charTag} points to Excel sheet where #VALUE! error pops up after merging cells.`,
@@ -546,155 +620,252 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
         visual: 'IT Cafeteria subscribe card and YouTube notification bell.',
         dialogue: 'Daily Excel aur office hacks ke liye IT Cafeteria ko foran subscribe karein!'
       }
-    ];
-  } else {
-    // Dynamic generation incorporating exact title, category, and active channel profile
-    const isBeauty = lowerCat.includes('beauty') || lowerCat.includes('skincare') || lowerCat.includes('hair') || lowerCat.includes('makeup') || channelName.toLowerCase().includes('beauty');
+    ]
+  }),
 
-    hook = isBeauty
-      ? `Kya aap jante hain ke ${titleClean} se glowing aur healthy look hasil karna kitna asaan hai?`
-      : `Kya aap jante hain ke ${titleClean} aapka ghanton ka waqt bacha sakta hai?`;
-    description = `${titleClean}! Complete step-by-step masterclass in Roman Urdu.\n\nPresenter: ${presenter} • ${channelName}\nCategory: ${category}\nTag: ${charTag}`;
-    tags = [titleClean.toLowerCase(), category.toLowerCase(), channelName.toLowerCase(), presenter.toLowerCase(), 'tips urdu', 'trending guide'];
-    hashtags = ['#Shorts', `#${channelName.replace(/\s+/g, '')}`, '#ViralGuide', '#UrduContent'];
-    tiktokCaption = `${titleClean} ka secret tarika! Dekhein aur try karein 🔥 #${channelName.toLowerCase().replace(/\s+/g, '')} #shorts`;
-    thumbnailHeadline = line1;
-    thumbnailSubBadge = line2;
+  beauty: ({ titleClean, presenter, category, channelName, charTag, line1, line2 }) => {
+    const channelTag = channelName.replace(/\s+/g, '');
+    return {
+      hook: `Kya aap jante hain ke ${titleClean} se glowing aur healthy look hasil karna kitna asaan hai?`,
+      description: `${titleClean}! Complete step-by-step masterclass in Roman Urdu.\n\nPresenter: ${presenter} • ${channelName}\nCategory: ${category}\nTag: ${charTag}`,
+      tags: [titleClean.toLowerCase(), category.toLowerCase(), channelName.toLowerCase(), presenter.toLowerCase(), 'tips urdu', 'trending guide'],
+      hashtags: ['#Shorts', `#${channelTag}`, '#ViralGuide', '#UrduContent'],
+      tiktokCaption: `${titleClean} ka secret tarika! Dekhein aur try karein 🔥 #${channelTag.toLowerCase()} #shorts`,
+      thumbnailHeadline: line1,
+      thumbnailSubBadge: line2,
+      rawBeats: [
+        {
+          purpose: 'Disruptive Hook (Pattern Interrupt)',
+          visual: `${charTag} in elegant vanity studio lights gesturing towards floating text: "${titleClean}".`,
+          dialogue: `Agar aap bhi ${titleClean} ke baare mein confused hain ya chemical products se thak chuke hain, to yeh zaroor dekhein!`
+        },
+        {
+          purpose: 'The Problem Exposed',
+          visual: 'Split screen displaying common skincare mistakes and unbalanced routine results.',
+          dialogue: 'Aksar log galat products mix kar ke apni skin barrier ko damage kar lete hain aur results nahi milte.'
+        },
+        {
+          purpose: 'Secret Feature Reveal',
+          visual: `Soft studio focus on gentle dermatologically-approved ingredients and tools for ${titleClean}.`,
+          dialogue: `Lekin aaj ${channelName} par mein aapko iska ek natural aur verified formula dikha rahi hoon jo 100% safe hai.`
+        },
+        {
+          purpose: 'Step 1: Configuration',
+          visual: 'Clean application step with morning sunlight highlighting natural skin texture.',
+          dialogue: 'Step 1: Sab se pehle gentle cleanser se base clean karein aur yeh pehli step apply karein.'
+        },
+        {
+          purpose: 'Step 2: Core Execution',
+          visual: 'Smooth upward massage technique demonstration with timer overlay.',
+          dialogue: 'Step 2: Is product ko circular motion mein sirf do minute tak massage karein taake skin absorb kar sake.'
+        },
+        {
+          purpose: 'Live Verification Proof',
+          visual: 'Clear radiant glow comparison before and after with hydration moisture gauge.',
+          dialogue: 'Farq dekhein! Skin instant hydrate aur glowing mehsoos ho rahi hai baghair kisi chipchipahat ke.'
+        },
+        {
+          purpose: 'Pro Tip & Optimization',
+          visual: 'Callout badge showing SPF sunscreen layer and night-time lock ritual.',
+          dialogue: 'Pro tip: Subah ke waqt iske baad sunscreen lagana hargiz na bhoolein warna effect zaya ho jayega.'
+        },
+        {
+          purpose: 'Mistake Avoidance',
+          visual: 'Caution badge over harsh physical scrubs and expired cosmetic formulas.',
+          dialogue: 'Khabardaar: Is routine ke doran harsh exfoliating scrubs mat lagayein taake redness na aaye.'
+        },
+        {
+          purpose: 'Executive Summary',
+          visual: `${charTag} smiling at camera holding completed daily skincare regimen kit.`,
+          dialogue: 'Yeh asaan daily routine aapki skin ko natural glow aur permanent fresh look faraham karegi.'
+        },
+        {
+          purpose: 'Call to Action & Community',
+          visual: `${channelName} subscribe and follow animation with gentle pastel pink aesthetic.`,
+          dialogue: `Aise authentic beauty aur skincare secrets rozana seekhne ke liye ${channelName} ko foran follow karein!`
+        }
+      ]
+    };
+  },
 
-    rawBeats = isBeauty
-      ? [
-          {
-            purpose: 'Disruptive Hook (Pattern Interrupt)',
-            visual: `${charTag} in elegant vanity studio studio lights gesturing towards floating text: "${titleClean}".`,
-            dialogue: `Agar aap bhi ${titleClean} ke baare mein confused hain ya chemical products se thak chuke hain, to yeh zaroor dekhein!`
-          },
-          {
-            purpose: 'The Problem Exposed',
-            visual: 'Split screen displaying common skincare mistakes and unbalanced routine results.',
-            dialogue: `Aksar log galat products mix kar ke apni skin barrier ko damage kar lete hain aur results nahi milte.`
-          },
-          {
-            purpose: 'Secret Feature Reveal',
-            visual: `Soft studio focus on gentle dermatologically-approved ingredients and tools for ${titleClean}.`,
-            dialogue: `Lekin aaj ${channelName} par mein aapko iska ek natural aur verified formula dikha rahi hoon jo 100% safe hai.`
-          },
-          {
-            purpose: 'Step 1: Configuration',
-            visual: 'Clean application step with morning sunlight highlighting natural skin texture.',
-            dialogue: `Step 1: Sab se pehle gentle cleanser se base clean karein aur yeh pehli step apply karein.`
-          },
-          {
-            purpose: 'Step 2: Core Execution',
-            visual: 'Smooth upward massage technique demonstration with timer overlay.',
-            dialogue: `Step 2: Is product ko circular motion mein sirf do minute tak massage karein taake skin absorb kar sake.`
-          },
-          {
-            purpose: 'Live Verification Proof',
-            visual: 'Clear radiant glow comparison before and after with hydration moisture gauge.',
-            dialogue: `Farq dekhein! Skin instant hydrate aur glowing mehsoos ho rahi hai baghair kisi chipchipahat ke.`
-          },
-          {
-            purpose: 'Pro Tip & Optimization',
-            visual: 'Callout badge showing SPF sunscreen layer and night-time lock ritual.',
-            dialogue: `Pro tip: Subah ke waqt iske baad sunscreen lagana hargiz na bhoolein warna effect zaya ho jayega.`
-          },
-          {
-            purpose: 'Mistake Avoidance',
-            visual: 'Caution badge over harsh physical scrubs and expired cosmetic formulas.',
-            dialogue: `Khabardaar: Is routine ke doran harsh exfoliating scrubs mat lagayein taake redness na aaye.`
-          },
-          {
-            purpose: 'Executive Summary',
-            visual: `${charTag} smiling at camera holding completed daily skincare regimen kit.`,
-            dialogue: `Yeh asaan daily routine aapki skin ko natural glow aur permanent fresh look faraham karegi.`
-          },
-          {
-            purpose: 'Call to Action & Community',
-            visual: `${channelName} subscribe and follow animation with gentle pastel pink aesthetic.`,
-            dialogue: `Aise authentic beauty aur skincare secrets rozana seekhne ke liye ${channelName} ko foran follow karein!`
-          }
-        ]
-      : (() => {
-          // Derive scenes directly from Practical Blueprint
-          const bp = buildPracticalBlueprint({
-            topic: titleClean,
-            categoryName: category,
-            categoryId: params.categoryId || 1,
-            channelId: channelName.toLowerCase().includes('beauty') ? 'beautyhub' : 'itcafeteria'
-          });
-          const tool = bp.namedToolOrApp || titleClean;
-          const s1 = bp.steps[0] || { actionTitle: 'Access Tool', exactPathOrCommand: tool, expectedResult: 'Tool Ready', dialogueFocus: `Step 1: ${tool} open karein.` };
-          const s2 = bp.steps[1] || { actionTitle: 'Execute Action', exactPathOrCommand: 'Settings -> Feature', expectedResult: 'Feature active', dialogueFocus: `Step 2: Yeh specific setting toggle karein.` };
-          const s3 = bp.steps[2] || { actionTitle: 'Verify Output', exactPathOrCommand: 'Run / Test', expectedResult: 'Output verified', dialogueFocus: `Step 3: Ab live test run karke verify karein.` };
+  blueprint_default: ({ titleClean, presenter, category, channelName, charTag, line1, line2, practicalBlueprint }) => {
+    const channelTag = channelName.replace(/\s+/g, '');
+    const tool = practicalBlueprint.namedToolOrApp || titleClean;
+    const s1 = practicalBlueprint.steps[0] || {
+      actionTitle: 'Access Tool',
+      exactPathOrCommand: tool,
+      expectedResult: 'Tool Ready',
+      dialogueFocus: `Step 1: ${tool} open karein.`
+    };
+    const s2 = practicalBlueprint.steps[1] || {
+      actionTitle: 'Execute Action',
+      exactPathOrCommand: 'Settings -> Feature',
+      expectedResult: 'Feature active',
+      dialogueFocus: 'Step 2: Yeh specific setting toggle karein.'
+    };
+    const s3 = practicalBlueprint.steps[2] || {
+      actionTitle: 'Verify Output',
+      exactPathOrCommand: 'Run / Test',
+      expectedResult: 'Output verified',
+      dialogueFocus: 'Step 3: Ab live test run karke verify karein.'
+    };
 
-          return [
-            {
-              purpose: 'Hook',
-              visual: `${charTag} standing at workstation, points toward high-contrast floating 3D graphic of ${tool}.`,
-              dialogue: `Kya aap jante hain ke ${tool} se aapka ghanton ka kaam asan ho sakta hai? Dekhein yeh verified tareeqa.`
-            },
-            {
-              purpose: 'Problem + Agitate',
-              visual: `Split screen displaying traditional slow manual bottleneck without ${tool}.`,
-              dialogue: `Aksar log is kaam ke liye ghanton manual tareeqay use karte hain. Is maslay ko ignore karne se rozana waqt zaya hota hai aur kaam hamesha atak jata hai.`
-            },
-            {
-              purpose: 'Reveal',
-              visual: `Screencast zooming into ${tool} official interface displaying the verified feature.`,
-              dialogue: `Lekin ${tool} ka yeh official feature aapke poore process ko 3 simple steps mein convert kar deta hai.`
-            },
-            {
-              purpose: 'Demo 1',
-              visual: s1.visualDescription || `Mode A (Screen only): Screencast executing ${s1.exactPathOrCommand} in ${tool}. Visible cursor highlights the action with large readable on-screen command text.`,
-              dialogue: s1.dialogueFocus || `Step 1: ${s1.exactPathOrCommand} open karein jesa screen par dikh raha hai.`
-            },
-            {
-              purpose: 'Demo 2',
-              visual: s2.visualDescription || `Mode A (Screen only): Screencast applying ${s2.exactPathOrCommand} with clear cursor highlight and large on-screen parameter text.`,
-              dialogue: s2.dialogueFocus || `Step 2: ${s2.exactPathOrCommand} configure karein.`
-            },
-            {
-              purpose: 'Demo 3',
-              visual: s3.visualDescription || `Mode A (Screen only): Live screen executing ${s3.exactPathOrCommand} with progress indicators and visible cursor.`,
-              dialogue: s3.dialogueFocus || `Step 3: Ab ${s3.actionTitle} run karein aur final settings save karein.`
-            },
-            {
-              purpose: 'Proof + Result',
-              visual: `Mode A (Screen only): Live verification screen confirming ${s3.expectedResult}. Camera zooms in on output readout with large on-screen verification text.`,
-              dialogue: `Nateeja dekhein! Screen par verified output ready hai aur har calculation bilkul accurate hai.`
-            },
-            {
-              purpose: 'Benefit',
-              visual: `${charTag} in studio framing key takeaway card for ${tool}.`,
-              dialogue: `Iska faida yeh hai ke aapka daily workflow bilkul automate ho jata hai aur consistency barqarar rehti hai.`
-            },
-            {
-              purpose: 'Curiosity Loop',
-              visual: `Graphic card highlighting another smart option inside ${tool}.`,
-              dialogue: `Kya aap jante hain ke is tool ki advanced settings mein aik aur time-saving trick bhi maujood hai?`
-            },
-            {
-              purpose: 'Conclusion + Save CTA',
-              visual: `${channelName} subscribe button animation with ${presenter} presentation end-card.`,
-              dialogue: `Is tutorial ko abhi save kar lein aur ${channelName} ko follow karein!`
-            }
-          ];
-        })();
+    return {
+      hook: `Kya aap jante hain ke ${titleClean} aapka ghanton ka waqt bacha sakta hai?`,
+      description: `${titleClean}! Complete step-by-step masterclass in Roman Urdu.\n\nPresenter: ${presenter} • ${channelName}\nCategory: ${category}\nTag: ${charTag}`,
+      tags: [titleClean.toLowerCase(), category.toLowerCase(), channelName.toLowerCase(), presenter.toLowerCase(), 'tips urdu', 'trending guide'],
+      hashtags: ['#Shorts', `#${channelTag}`, '#ViralGuide', '#UrduContent'],
+      tiktokCaption: `${titleClean} ka secret tarika! Dekhein aur try karein 🔥 #${channelTag.toLowerCase()} #shorts`,
+      thumbnailHeadline: line1,
+      thumbnailSubBadge: line2,
+      rawBeats: [
+        {
+          purpose: 'Hook',
+          visual: `${charTag} standing at workstation, points toward high-contrast floating 3D graphic of ${tool}.`,
+          dialogue: `Kya aap jante hain ke ${tool} se aapka ghanton ka kaam asan ho sakta hai? Dekhein yeh verified tareeqa.`
+        },
+        {
+          purpose: 'Problem + Agitate',
+          visual: `Split screen displaying traditional slow manual bottleneck without ${tool}.`,
+          dialogue: 'Aksar log is kaam ke liye ghanton manual tareeqay use karte hain. Is maslay ko ignore karne se rozana waqt zaya hota hai aur kaam hamesha atak jata hai.'
+        },
+        {
+          purpose: 'Reveal',
+          visual: `Screencast zooming into ${tool} official interface displaying the verified feature.`,
+          dialogue: `Lekin ${tool} ka yeh official feature aapke poore process ko 3 simple steps mein convert kar deta hai.`
+        },
+        {
+          purpose: 'Demo 1',
+          visual: s1.visualDescription || `Mode A (Screen only): Screencast executing ${s1.exactPathOrCommand} in ${tool}. Visible cursor highlights the action with large readable on-screen command text.`,
+          dialogue: s1.dialogueFocus || `Step 1: ${s1.exactPathOrCommand} open karein jesa screen par dikh raha hai.`
+        },
+        {
+          purpose: 'Demo 2',
+          visual: s2.visualDescription || `Mode A (Screen only): Screencast applying ${s2.exactPathOrCommand} with clear cursor highlight and large on-screen parameter text.`,
+          dialogue: s2.dialogueFocus || `Step 2: ${s2.exactPathOrCommand} configure karein.`
+        },
+        {
+          purpose: 'Demo 3',
+          visual: s3.visualDescription || `Mode A (Screen only): Live screen executing ${s3.exactPathOrCommand} with progress indicators and visible cursor.`,
+          dialogue: s3.dialogueFocus || `Step 3: Ab ${s3.actionTitle} run karein aur final settings save karein.`
+        },
+        {
+          purpose: 'Proof + Result',
+          visual: `Mode A (Screen only): Live verification screen confirming ${s3.expectedResult}. Camera zooms in on output readout with large on-screen verification text.`,
+          dialogue: 'Nateeja dekhein! Screen par verified output ready hai aur har calculation bilkul accurate hai.'
+        },
+        {
+          purpose: 'Benefit',
+          visual: `${charTag} in studio framing key takeaway card for ${tool}.`,
+          dialogue: 'Iska faida yeh hai ke aapka daily workflow bilkul automate ho jata hai aur consistency barqarar rehti hai.'
+        },
+        {
+          purpose: 'Curiosity Loop',
+          visual: `Graphic card highlighting another smart option inside ${tool}.`,
+          dialogue: 'Kya aap jante hain ke is tool ki advanced settings mein aik aur time-saving trick bhi maujood hai?'
+        },
+        {
+          purpose: 'Conclusion + Save CTA',
+          visual: `${channelName} subscribe button animation with ${presenter} presentation end-card.`,
+          dialogue: `Is tutorial ko abhi save kar lein aur ${channelName} ko follow karein!`
+        }
+      ]
+    };
   }
+};
 
-  const rotationState = loadLocalScriptRotationState();
-  const { pattern: activePattern } = selectNextPatternFromState(rotationState, params.scriptPatternId);
-  const recentStories = rotationState.recentStories || [];
+const PATTERN_SCENE2_OVERRIDES: Record<string, (tool: string) => { purpose: string; dialogue: string }> = {
+  before_after: (tool) => ({
+    purpose: 'Before State: Why Old Method Fails',
+    dialogue: `Pehle purane tareeqay mein ${tool} ke bina ghanton zaya hote the aur natija bhi adhora rehta tha.`
+  }),
+  chhupe_hue_secrets: (tool) => ({
+    purpose: 'Hidden Menu Proof',
+    dialogue: `Zahir par yeh aam menu lagta hai, magar ${tool} ke andar ek chhupa option poora kaam badal deta hai.`
+  }),
+  lecturrar_pattern: (tool) => ({
+    purpose: 'Core Principle Breakdown',
+    dialogue: `Pehle buniyadi logic samjhein mere bhai: ${tool} background mein kis usool par kaam karta hai taake ghalti na ho.`
+  }),
+  myth_vs_reality: (tool) => ({
+    purpose: 'Why The Myth Spreads',
+    dialogue: `Log aksar suni sunayi baat par yaqeen kar ke ${tool} ka asli aur asan rasta nazar andaz kar dete hain.`
+  }),
+  ghalti_alert: (tool) => ({
+    purpose: 'Costly Mistake Exposure',
+    dialogue: `Yaar dekhein, jab hum ${tool} mein default setting chhor dete hain to poora kaam slow ya error se bhar jata hai.`
+  }),
+  live_showdown: (tool) => ({
+    purpose: 'Showdown Rules & Setup',
+    dialogue: `Aaj dono tareeqon ko ek hi ${tool} task par check karenge taake saaf pata chale konsa zyada tez aur clean hai.`
+  }),
+  desi_case_study: (tool) => ({
+    purpose: 'Real Bottleneck Moment',
+    dialogue: `Masla bilkul aam tha: deadline sirf adhay ghantay door thi aur ${tool} ka kaam manual tareeqe se atak gaya tha.`
+  }),
+  zero_to_hero_roadmap: (tool) => ({
+    purpose: 'Level 1: Clean Foundation',
+    dialogue: `Level 1 bilkul seedha hai: sab se pehle ${tool} ki buniyadi screen aur clean settings set karein jese yahan dikh raha hai.`
+  })
+};
+
+/**
+ * Generates a complete, authentic 10-scene Roman Urdu story package tailored to the topic.
+ */
+export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): GeneratedStory {
+  const presenter = params.presenter || 'Waqar Majeed';
+  const channelName = params.channelName || 'IT Cafeteria';
+  const charTag = normalizeTag(params.characterTag || '@WM25-1');
+  const rawTitle = params.title.trim();
+  const titleClean = rawTitle.replace(/#\S+/g, '').replace(/@\S+/g, '').trim();
+  const category = params.category || 'AI & Smart Technology';
+  const categoryId = params.categoryId || 1;
+  const dateLabel = params.scheduledDate
+    ? `${params.scheduledDate} • ${params.scheduledTime || '6:00 PM PKT'}`
+    : new Date().toLocaleDateString('en-GB');
+
+  const [line1, line2] = splitHeadline(titleClean);
 
   const practicalBlueprint = buildPracticalBlueprint({
     topic: titleClean,
     categoryName: category,
-    categoryId: params.categoryId || 1,
+    categoryId,
     channelId: channelName.toLowerCase().includes('beauty') ? 'beautyhub' : 'itcafeteria'
   });
+
+  const templateCtx: TopicTemplateContext = {
+    titleClean,
+    lowerTitle: titleClean.toLowerCase(),
+    lowerCat: category.toLowerCase(),
+    category,
+    categoryId,
+    channelName,
+    presenter,
+    charTag,
+    line1,
+    line2,
+    practicalBlueprint
+  };
+
+  const topicId = classifyStoryTopic(templateCtx);
+  const template = TOPIC_TEMPLATE_BUILDERS[topicId](templateCtx);
+
+  let { hook } = template;
+  const {
+    tags,
+    tiktokCaption,
+    thumbnailHeadline,
+    thumbnailSubBadge,
+    rawBeats,
+    demoPromptFallback
+  } = template;
+
+  const rotationState = loadLocalScriptRotationState();
+  const { pattern: activePattern } = selectNextPatternFromState(rotationState, params.scriptPatternId);
+  const recentStories = rotationState.recentStories || [];
   const blueprintTool = practicalBlueprint.namedToolOrApp || titleClean.split(/[:\-—|]+/)[0].trim();
 
-  // Align Scene 1, Scene 2 transition, and Final CTA with the active sequential Script Pattern
+  // Align Scene 1, Scene 2 transition, Scene 5 retention spike, and Final CTA with the active Script Pattern
   if (rawBeats.length > 0) {
     const isDemo = isDemoScriptPattern(activePattern);
     const currentS1 = rawBeats[0]?.dialogue || '';
@@ -729,54 +900,11 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
           purpose: activePattern.beatProgression[1] || 'Direct Hands-On Demo Start',
           dialogue: `Ab baghair kisi intezar ke seedha live screen par ${blueprintTool} ka pehla practical step dekhein aur saath note karein.`
         };
-      } else if (activePattern.id === 'before_after') {
-        rawBeats[1] = {
-          ...rawBeats[1],
-          purpose: 'Before State: Why Old Method Fails',
-          dialogue: `Pehle purane tareeqay mein ${blueprintTool} ke bina ghanton zaya hote the aur natija bhi adhora rehta tha.`
-        };
-      } else if (activePattern.id === 'chhupe_hue_secrets') {
-        rawBeats[1] = {
-          ...rawBeats[1],
-          purpose: 'Hidden Menu Proof',
-          dialogue: `Zahir par yeh aam menu lagta hai, magar ${blueprintTool} ke andar ek chhupa option poora kaam badal deta hai.`
-        };
-      } else if (activePattern.id === 'lecturrar_pattern') {
-        rawBeats[1] = {
-          ...rawBeats[1],
-          purpose: 'Core Principle Breakdown',
-          dialogue: `Pehle buniyadi logic samjhein mere bhai: ${blueprintTool} background mein kis usool par kaam karta hai taake ghalti na ho.`
-        };
-      } else if (activePattern.id === 'myth_vs_reality') {
-        rawBeats[1] = {
-          ...rawBeats[1],
-          purpose: 'Why The Myth Spreads',
-          dialogue: `Log aksar suni sunayi baat par yaqeen kar ke ${blueprintTool} ka asli aur asan rasta nazar andaz kar dete hain.`
-        };
-      } else if (activePattern.id === 'ghalti_alert') {
-        rawBeats[1] = {
-          ...rawBeats[1],
-          purpose: 'Costly Mistake Exposure',
-          dialogue: `Yaar dekhein, jab hum ${blueprintTool} mein default setting chhor dete hain to poora kaam slow ya error se bhar jata hai.`
-        };
-      } else if (activePattern.id === 'live_showdown') {
-        rawBeats[1] = {
-          ...rawBeats[1],
-          purpose: 'Showdown Rules & Setup',
-          dialogue: `Aaj dono tareeqon ko ek hi ${blueprintTool} task par check karenge taake saaf pata chale konsa zyada tez aur clean hai.`
-        };
-      } else if (activePattern.id === 'desi_case_study') {
-        rawBeats[1] = {
-          ...rawBeats[1],
-          purpose: 'Real Bottleneck Moment',
-          dialogue: `Masla bilkul aam tha: deadline sirf adhay ghantay door thi aur ${blueprintTool} ka kaam manual tareeqe se atak gaya tha.`
-        };
-      } else if (activePattern.id === 'zero_to_hero_roadmap') {
-        rawBeats[1] = {
-          ...rawBeats[1],
-          purpose: 'Level 1: Clean Foundation',
-          dialogue: `Level 1 bilkul seedha hai: sab se pehle ${blueprintTool} ki buniyadi screen aur clean settings set karein jese yahan dikh raha hai.`
-        };
+      } else {
+        const scene2Override = PATTERN_SCENE2_OVERRIDES[activePattern.id]?.(blueprintTool);
+        if (scene2Override) {
+          rawBeats[1] = { ...rawBeats[1], ...scene2Override };
+        }
       }
     }
 
@@ -823,7 +951,7 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     const phoneticDialogue = applyPhoneticFixes(validated.dialogue);
     const words = phoneticDialogue.split(/\s+/).filter(Boolean).length;
     const flowScript = buildCategoryFlowScript({
-      categoryId: params.categoryId || 1,
+      categoryId,
       sceneNum,
       totalScenes: rawBeats.length,
       beatPurpose: beat.purpose,
@@ -939,13 +1067,10 @@ export function generateTopicAccurateStoryPackage(params: GenerateStoryParams): 
     discussionNotes: `Pattern ${activePattern.order}/${SCRIPT_PATTERNS_12.length} (${activePattern.name}) — Lahori Pakistani Punjab Tone. ${activePattern.tone} Tailored 10-scene sequence for ${titleClean}. Strictly 10s per scene, 22-25 words per dialogue.`,
     practicalSteps: practicalBlueprint.steps.map(s => `${s.stepNumber}. ${s.actionTitle}: ${s.exactPathOrCommand}`),
     outsourcedLinks: practicalBlueprint.sourceLinks,
-    demoPrompt: practicalBlueprint.improvedPrompt || (isGoogleSheets
-      ? `Extract first name and format official email from messy Column A data using Google Sheets AI Smart Fill (Ctrl + E).`
-      : isPromptHacks
-      ? `Act as an expert systems architect. Provide direct, non-fluff, tabular checklist of the architecture without filler text.`
-      : isChatbotWorkflow
-      ? `Create a multi-agent webhook router that classifies incoming inquiries into Support, Sales, or Booking with zero code.`
-      : `Complete hands-on demonstration of ${titleClean} in Roman Urdu.`),
+    demoPrompt:
+      practicalBlueprint.improvedPrompt ||
+      demoPromptFallback ||
+      `Complete hands-on demonstration of ${titleClean} in Roman Urdu.`,
     practicalBlueprint,
     consistencyReport,
     scriptPattern: {
