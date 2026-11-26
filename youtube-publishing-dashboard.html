@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YouTube Publishing Queue</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#070b14;color:#e2e8f0}*{box-sizing:border-box}body{margin:0;padding:24px;max-width:1000px;margin-inline:auto}h1{margin:.25rem 0}.muted{color:#94a3b8;font-size:.9rem}.card{background:#101827;border:1px solid #293548;border-radius:16px;padding:20px;margin:18px 0}.row{display:flex;gap:12px;flex-wrap:wrap}.row>*{flex:1;min-width:180px}label{display:block;font-size:.85rem;color:#cbd5e1;margin:12px 0 6px}input,textarea,select{width:100%;padding:11px;border-radius:9px;border:1px solid #334155;background:#080e19;color:#f8fafc}textarea{min-height:110px;resize:vertical}button,.button{border:0;border-radius:9px;background:#0891b2;color:white;font-weight:700;padding:11px 15px;cursor:pointer;text-decoration:none;display:inline-block}button:disabled{opacity:.5;cursor:wait}.secondary{background:#334155}.danger{background:#9f1239}.approve{background:#059669}.item{border-top:1px solid #293548;padding:16px 0}.item:first-child{border-top:0}.badge{display:inline-block;border:1px solid #475569;border-radius:20px;padding:3px 9px;font-size:.75rem;color:#67e8f9}.actions{display:flex;gap:8px;margin-top:12px}.status{white-space:pre-wrap;color:#fbbf24;min-height:1.4em}code{color:#67e8f9;overflow-wrap:anywhere}.small{font-size:.8rem}header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <header><div><h1>YouTube Publishing Queue</h1><p class="muted">Approval-gated uploads · Pakistan time · 5, 6, 7, or 8 PM slots</p></div><a class="button" href="/youtube-publishing/connect">Connect YouTube</a></header>
+  <section class="card">
+    <div id="connection" class="muted">Checking YouTube connection…</div>
+    <p class="small muted">After connecting, upload video and metadata here. Every item stays pending until you explicitly approve it. Approval uploads it as private and asks YouTube to publish it at the selected time.</p>
+  </section>
+  <section class="card">
+    <h2>Submit for approval</h2>
+    <form id="form">
+      <label for="title">Video title (max 100 characters)</label><input id="title" maxlength="100" required>
+      <label for="description">Description</label><textarea id="description" maxlength="5000"></textarea>
+      <label for="tags">Tags (comma-separated, max 30)</label><input id="tags" placeholder="youtube tips, it cafeteria">
+      <div class="row"><div><label for="date">Publish date</label><input id="date" type="date" required></div><div><label for="slot">Pakistan time slot</label><select id="slot"><option value="17">5:00 PM PKT</option><option value="18" selected>6:00 PM PKT</option><option value="19">7:00 PM PKT</option><option value="20">8:00 PM PKT</option></select></div></div>
+      <label for="video">Video file (MP4 recommended, up to 35 MB)</label><input id="video" type="file" accept="video/*" required>
+      <p class="status" id="formStatus"></p><button id="submit" type="submit">Add to approval queue</button>
+    </form>
+  </section>
+  <section class="card"><div class="row" style="align-items:center"><h2 style="margin:0">Approval queue</h2><button class="secondary" id="refresh" type="button">Refresh queue</button></div><div id="queue" class="muted" style="margin-top:16px">Loading…</div></section>
+<script>
+const $=id=>document.getElementById(id);const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dateInput=$('date');const today=new Date();const localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);dateInput.min=localDate;dateInput.value=localDate;
+function localScheduleIso(date,hour){return new Date(`${date}T${String(hour).padStart(2,'0')}:00:00+05:00`).toISOString()}
+async function loadStatus(){try{const r=await fetch('/youtube-publishing/status',{credentials:'same-origin'});const d=await r.json();$('connection').innerHTML=d.connected?`YouTube connected · upload permission <b>${d.uploadScopeGranted?'granted':'missing — reconnect to grant'}</b>`:'YouTube not connected. Select Connect YouTube to authorize publishing.'}catch{$('connection').textContent='Could not check connection.'}}
+async function loadQueue(){const root=$('queue');try{const r=await fetch('/youtube-publishing/queue',{credentials:'same-origin'});const d=await r.json();if(!r.ok)throw Error(d.error||'Queue request failed');if(!d.items.length){root.innerHTML='<p class="muted">Queue abhi khaali hai.</p>';return}root.innerHTML=d.items.map(item=>`<article class="item"><span class="badge">${esc(item.status)}</span><h3>${esc(item.title)}</h3><div class="small muted">Scheduled: ${esc(new Date(item.scheduledAt).toLocaleString('en-PK',{timeZone:'Asia/Karachi'}))} PKT · Updated ${esc(new Date(item.updatedAt).toLocaleString())}</div>${item.youtubeUrl?`<p><a class="button" target="_blank" rel="noreferrer" href="${esc(item.youtubeUrl)}">Open YouTube video</a></p>`:''}${item.error?`<p class="status">${esc(item.error)}</p>`:''}${item.status==='pending_approval'?`<div class="actions"><button class="approve" data-approve="${esc(item.id)}">Approve & schedule</button><button class="danger" data-cancel="${esc(item.id)}">Cancel</button></div>`:''}</article>`).join('');root.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>mutate(b.dataset.approve,'approve'));root.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>mutate(b.dataset.cancel,'cancel'))}catch(e){root.innerHTML=`<p class="status">${esc(e.message)}</p>`}}
+async function mutate(id,action){if(action==='approve'&&!confirm('Approval se yeh video YouTube par upload hogi, private rahegi, aur selected waqt par publish ke liye schedule hogi. Continue?'))return;try{const r=await fetch(`/youtube-publishing/queue/${encodeURIComponent(id)}/${action}`,{method:'POST',credentials:'same-origin'});const d=await r.json();if(!r.ok)throw Error(d.error||d.item?.error||'Action failed');await loadQueue();await loadStatus()}catch(e){alert(e.message);await loadQueue()}}
+$('form').addEventListener('submit',async e=>{e.preventDefault();const button=$('submit');const file=$('video').files[0];if(!file)return;if(file.size>35*1024*1024){$('formStatus').textContent='File 35 MB se chhoti honi chahiye.';return}button.disabled=true;$('formStatus').textContent='Upload queue mein save ho rahi hai…';try{const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');reader.onerror=()=>reject(Error('File read nahi ho saki'));reader.readAsDataURL(file)});const body={title:$('title').value,description:$('description').value,tags:$('tags').value.split(',').map(t=>t.trim()).filter(Boolean),scheduledAt:localScheduleIso(dateInput.value,$('slot').value),videoBase64:base64,mimeType:file.type||'video/mp4'};const r=await fetch('/youtube-publishing/queue',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.error||'Queue submit fail ho gaya');e.target.reset();dateInput.value=localDate;$('formStatus').textContent='Approval queue mein add ho gaya. Video publish karne se pehle Approve dabana zaroori hai.';await loadQueue()}catch(err){$('formStatus').textContent=err.message}finally{button.disabled=false}});
+$('refresh').onclick=()=>loadQueue();loadStatus();loadQueue();
+</script>
+</body>
+</html>
