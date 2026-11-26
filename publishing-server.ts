@@ -1,7 +1,18 @@
-import { registerYouTubePublishingRoutes } from './youtube-publishing.js';
+import express from 'express';
+import dotenv from 'dotenv';
+import { registerYouTubePublishingRoutes } from './youtube-publishing';
 
-// server.js owns the existing Express app and deployment middleware. Keep the
-// publishing routes on a distinct prefix because the legacy /api/* 404 handler
-// is registered by server.js before this extension module is loaded.
-const { app } = await import('./server.js');
+dotenv.config({ override: true });
+
+const app = express();
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
 registerYouTubePublishingRoutes(app);
+
+const port = Number(process.env.PORT || 3000);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`YouTube publishing module listening on port ${port}`);
+});
+
+export { app };
