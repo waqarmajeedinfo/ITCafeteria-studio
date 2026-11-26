@@ -1,13 +1,20 @@
+## YouTube Agent + Approval Publishing
 
-## YouTube approval-based publishing service
+This branch adds a supervised YouTube agent workflow and a separate deployable publishing service. The agent creates source-cited research drafts and tracks approval state; it does not publish automatically.
 
-This repository now includes a separate Node service for an approval-gated YouTube publishing queue. Deploy it as a **second** Render Web Service from this repository (it is not wired into the main Studio server):
+### Workflow
 
-1. Set the service root to the repository root and runtime to Node.
-2. Build command: `npm install && npm run build:publishing`
-3. Start command: `npm run start:publishing`
-4. Add `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `INTEGRATION_SECRET` (use a long random secret), and `APP_URL` (the public URL of this publishing service) to this service's environment.
-5. In Google Cloud OAuth credentials, add `https://YOUR-PUBLISHING-SERVICE/api/integrations/oauth/youtube/callback` as an authorized redirect URI. Enable YouTube Data API v3 and request YouTube upload permission through the Connect button.
-6. Open `https://YOUR-PUBLISHING-SERVICE/youtube-publishing`, connect the channel, upload a video, choose a future 5, 6, 7, or 8 PM Asia/Karachi slot, then approve it. Approval uploads the video as private with YouTube's scheduled publish time.
+1. Agent research creates a dry-run draft and a source list.
+2. Metadata, title, sources, and final rendered video are reviewed.
+3. Approval requires `APP_ACCESS_KEY` via the Bearer authorization header.
+4. The approved publishing queue uploads through YouTube Data API v3 only after explicit approval.
+5. The publisher stores the YouTube video ID and URL, and reconciles success/failure.
 
-The queue is stored in `data/youtube-publishing/queue.json` and media files on the service filesystem. Use a persistent disk for the publishing service; ephemeral filesystems lose queued videos on restart/redeploy. Keep the service URL and OAuth credentials private. Build/lint verification is still required in CI or a local checkout.
+### Deploy
+
+- Build command: `npm install && npm run build:publishing`
+- Start command: `npm run start:publishing`
+- Required environment: `APP_ACCESS_KEY`, `APP_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `INTEGRATION_SECRET`
+- Mount a persistent disk at `data/youtube-publishing` and `data/youtube-agent`.
+
+Approval actions require the same `APP_ACCESS_KEY` value in an `Authorization: Bearer <key>` header. No browser-cookie publisher is included.
